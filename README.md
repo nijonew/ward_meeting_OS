@@ -1,0 +1,2 @@
+# Ward_meetings_announcements
+Configurable ward meeting management application
