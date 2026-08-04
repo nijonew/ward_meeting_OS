@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
 import { MEETING_TYPES, UPCOMING_MEETING } from "@/lib/mock-data";
 
@@ -16,12 +17,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-      <header className="flex items-baseline justify-between border-b border-rule pb-6">
-        <span className="font-display text-xl tracking-tight">Ward Meeting OS</span>
-        <span className="font-mono text-xs uppercase tracking-widest text-slate">
-          Single Ward
-        </span>
-      </header>
+      <AppHeader tag="Single Ward" />
 
       <section className="mt-10">
         <p className="font-mono text-xs uppercase tracking-widest text-slate">This week</p>

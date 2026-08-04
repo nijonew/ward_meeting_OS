@@ -14,10 +14,37 @@ export const MEETING_TYPES: MeetingType[] = [
   { slug: "youth-council", name: "Youth Council", isBuilt: false },
 ];
 
-export const UPCOMING_MEETING: Meeting = {
-  id: "mock-sacrament-2026-08-09",
-  meetingType: "sacrament-meeting",
-  title: "Sacrament Meeting",
-  date: "2026-08-09",
-  stage: "planning",
-};
+export const MEETINGS: Meeting[] = [
+  {
+    id: "mock-sacrament-2026-08-09",
+    meetingType: "sacrament-meeting",
+    title: "Sacrament Meeting",
+    date: "2026-08-09",
+    stage: "planning",
+  },
+  {
+    id: "mock-bishopric-2026-08-06",
+    meetingType: "bishopric-meeting",
+    title: "Bishopric Meeting",
+    date: "2026-08-06",
+    stage: "template",
+  },
+  {
+    id: "mock-ward-council-2026-08-06",
+    meetingType: "ward-council",
+    title: "Ward Council",
+    date: "2026-08-06",
+    stage: "template",
+  },
+  {
+    id: "mock-youth-council-2026-08-06",
+    meetingType: "youth-council",
+    title: "Youth Council",
+    date: "2026-08-06",
+    stage: "template",
+  },
+];
+
+/** Used by the landing page's "This week" hero. */
+export const UPCOMING_MEETING: Meeting =
+  MEETINGS.find((m) => m.meetingType === "sacrament-meeting") ?? MEETINGS[0];
