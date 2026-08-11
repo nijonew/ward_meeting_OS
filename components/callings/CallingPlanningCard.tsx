@@ -41,9 +41,18 @@ export function CallingPlanningCard({
   people: PersonOption[];
   upcomingSacramentMeetings: Meeting[];
 }) {
-  const save = updateCallingPlanning.bind(null, planning.id, callingId);
-  const addSuggestionAction = addSuggestion.bind(null, planning.id, callingId);
-  const push = pushToSacramentMeeting.bind(null, planning.id, callingId);
+  const save = async (formData: FormData) => {
+    "use server";
+    await updateCallingPlanning(planning.id, callingId, formData);
+  };
+  const addSuggestionAction = async (formData: FormData) => {
+    "use server";
+    await addSuggestion(planning.id, callingId, formData);
+  };
+  const push = async (formData: FormData) => {
+    "use server";
+    await pushToSacramentMeeting(planning.id, callingId, formData);
+  };
 
   const readyToPush =
     (planning.calling_status === "to_announce" && planning.selected_person_id) ||
@@ -155,7 +164,10 @@ export function CallingPlanningCard({
         {planning.suggestions.length > 0 && (
           <ul className="mt-2 flex flex-col gap-1">
             {planning.suggestions.map((s) => {
-              const remove = removeSuggestion.bind(null, s.id, callingId);
+              const remove = async () => {
+                "use server";
+                await removeSuggestion(s.id, callingId);
+              };
               return (
                 <li key={s.id} className="flex items-center justify-between text-sm">
                   <span className="text-ink">

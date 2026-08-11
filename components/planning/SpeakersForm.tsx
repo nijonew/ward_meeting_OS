@@ -18,7 +18,11 @@ export function SpeakersForm({
   speakers: SpeakerRow[];
   people: PersonOption[];
 }) {
-  const save = (variant === "adults" ? saveAdultSpeakers : saveYouthSpeakers).bind(null, meetingId);
+  const saveAction = variant === "adults" ? saveAdultSpeakers : saveYouthSpeakers;
+  const save = async (formData: FormData) => {
+    "use server";
+    await saveAction(meetingId, formData);
+  };
   const bySlot = new Map(speakers.map((s) => [s.slot, s]));
 
   return (

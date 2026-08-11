@@ -9,7 +9,10 @@ export function PlanningInfoForm({
   meetingId: string;
   planning: PlanningInfo | null;
 }) {
-  const save = savePlanningInfo.bind(null, meetingId);
+  const save = async (formData: FormData) => {
+    "use server";
+    await savePlanningInfo(meetingId, formData);
+  };
 
   return (
     <form action={save} className="rounded-lg border border-rule bg-card p-6">

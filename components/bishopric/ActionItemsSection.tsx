@@ -1,92 +1,97 @@
-import { addActionItem, toggleActionItem } from "@/app/meetings/[id]/bishopric-actions";
-import type { ActionItemRow } from "@/lib/data/bishopric-meeting";
-import type { PersonOption } from "@/lib/data/people";
+import { addAgendaItemDirect, setAgendaItemStatus } from "@/app/meetings/[id]/bishopric-actions";
+import type { AgendaItemRow } from "@/lib/data/bishopric-meeting";
 
-export function ActionItemsSection({
+export function AgendaItemsSection({
   meetingId,
   items,
-  people,
 }: {
   meetingId: string;
-  items: ActionItemRow[];
-  people: PersonOption[];
+  items: AgendaItemRow[];
 }) {
   const add = async (formData: FormData) => {
     "use server";
-    await addActionItem(meetingId, formData);
+    await addAgendaItemDirect(meetingId, formData);
   };
 
   return (
     <div className="rounded-lg border border-rule bg-card p-6">
-      <h2 className="font-display text-xl">Action Items</h2>
+      <h2 className="font-display text-xl">Agenda Items</h2>
+      <p className="mt-1 text-xs text-slate">
+        Items added here publish immediately. Anything submitted through the (separate) public
+        submission form shows up here as pending, for you to review.
+      </p>
 
       {items.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
           {items.map((item) => {
-            const toggle = async () => {
+            const publish = async () => {
               "use server";
-              await toggleActionItem(item.id, meetingId, item.completed);
+              await setAgendaItemStatus(item.id, meetingId, "published");
+            };
+            const archive = async () => {
+              "use server";
+              await setAgendaItemStatus(item.id, meetingId, "archived");
             };
             return (
-              <li
-                key={item.id}
-                className="flex items-start gap-3 rounded-md border border-rule/60 px-3 py-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={item.completed}
-                  readOnly
-                  aria-hidden="true"
-                  className="mt-1"
-                />
-                <span className={["flex-1", item.completed ? "text-slate/50 line-through" : "text-ink"].join(" ")}>
-                  {item.description}
-                  {item.assigned_to_name && (
-                    <span className="text-slate"> &mdash; {item.assigned_to_name}</span>
-                  )}
-                  {item.due_date && <span className="text-slate"> (due {item.due_date})</span>}
-                </span>
-                <form action={toggle}>
-                  <button type="submit" className="text-xs text-slate hover:text-ink">
-                    {item.completed ? "Undo" : "Mark done"}
-                  </button>
-                </form>
+              <li key={item.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-ink">{item.title}</span>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={[
+                        "font-mono text-[10px] uppercase tracking-widest",
+                        item.status === "published"
+                          ? "text-sage"
+                          : item.status === "archived"
+                            ? "text-slate/50"
+                            : "text-brass",
+                      ].join(" ")}
+                    >
+                      {item.status}
+                    </span>
+                    {item.status !== "published" && (
+                      <form action={publish}>
+                        <button type="submit" className="text-xs text-slate hover:text-ink">
+                          Publish
+                        </button>
+                      </form>
+                    )}
+                    {item.status !== "archived" && (
+                      <form action={archive}>
+                        <button type="submit" className="text-xs text-slate hover:text-ink">
+                          Archive
+                        </button>
+                      </form>
+                    )}
+                  </span>
+                </div>
+                {item.body && <p className="mt-1 text-slate">{item.body}</p>}
+                <p className="mt-1 text-[11px] text-slate/60">Submitted by {item.submitted_by_name}</p>
               </li>
             );
           })}
         </ul>
       )}
 
-      <form action={add} className="mt-4 flex flex-col gap-2 border-t border-rule/60 pt-4 sm:flex-row sm:items-end">
+      <form action={add} className="mt-4 flex flex-col gap-2 border-t border-rule/60 pt-4">
         <input
           type="text"
-          name="description"
+          name="title"
           required
-          placeholder="Description"
-          className="flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        />
-        <select
-          name="assigned_to_id"
-          defaultValue=""
+          placeholder="Title"
           className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        >
-          <option value="">&mdash; Assign to &mdash;</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          name="due_date"
+        />
+        <textarea
+          name="body"
+          rows={2}
+          placeholder="Details"
           className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <button
           type="submit"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+          className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
         >
-          Add
+          Add &amp; Publish
         </button>
       </form>
     </div>

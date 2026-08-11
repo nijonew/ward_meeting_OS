@@ -11,7 +11,10 @@ export function BishopricMinutesForm({
   minutes: BishopricMinutes | null;
   people: PersonOption[];
 }) {
-  const save = saveBishopricMinutes.bind(null, meetingId);
+  const save = async (formData: FormData) => {
+    "use server";
+    await saveBishopricMinutes(meetingId, formData);
+  };
 
   const textarea = (name: string, label: string, defaultValue: string | null, rows = 2) => (
     <label className="mt-4 block text-sm text-slate">

@@ -16,7 +16,10 @@ export function BishopricAssignmentsForm({
   assignments: BishopricAssignmentRow[];
   people: PersonOption[];
 }) {
-  const save = saveBishopricAssignments.bind(null, meetingId);
+  const save = async (formData: FormData) => {
+    "use server";
+    await saveBishopricAssignments(meetingId, formData);
+  };
   const byRole = new Map(assignments.map((a) => [a.role, a]));
 
   return (

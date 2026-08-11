@@ -1,7 +1,10 @@
 import { saveCouncilNotes, type CouncilNotes } from "@/lib/data/council-notes";
 
 export function CouncilNotesForm({ meetingId, notes }: { meetingId: string; notes: CouncilNotes | null }) {
-  const save = saveCouncilNotes.bind(null, meetingId);
+  const save = async (formData: FormData) => {
+    "use server";
+    await saveCouncilNotes(meetingId, formData);
+  };
 
   return (
     <form action={save} className="rounded-lg border border-rule bg-card p-6">

@@ -19,7 +19,10 @@ export function RabnmSection({
   people: PersonOption[];
   callings: CallingOption[];
 }) {
-  const add = addRabnmItem.bind(null, meetingId);
+  const add = async (formData: FormData) => {
+    "use server";
+    await addRabnmItem(meetingId, formData);
+  };
 
   return (
     <div className="rounded-lg border border-rule bg-card p-6">
@@ -28,7 +31,10 @@ export function RabnmSection({
       {items.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
           {items.map((item) => {
-            const remove = deleteRabnmItem.bind(null, item.id, meetingId);
+            const remove = async () => {
+              "use server";
+              await deleteRabnmItem(item.id, meetingId);
+            };
             return (
               <li
                 key={item.id}

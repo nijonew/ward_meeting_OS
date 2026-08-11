@@ -12,7 +12,10 @@ export function AssignmentsForm({
   assignments: AssignmentRow[];
   people: PersonOption[];
 }) {
-  const save = saveAssignments.bind(null, meetingId);
+  const save = async (formData: FormData) => {
+    "use server";
+    await saveAssignments(meetingId, formData);
+  };
   const byRole = new Map(assignments.map((a) => [a.role, a]));
 
   return (

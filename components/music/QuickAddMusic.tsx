@@ -3,11 +3,16 @@ import { MUSIC_TYPES } from "@/lib/data/sacrament-constants";
 import type { PersonOption } from "@/lib/data/people";
 
 export function QuickAddMusic({ people }: { people: PersonOption[] }) {
+  const add = async (formData: FormData) => {
+    "use server";
+    await addSingleMusicItem(formData);
+  };
+
   return (
     <details className="rounded-lg border border-rule bg-card p-6">
       <summary className="cursor-pointer font-display text-xl">Add One Item</summary>
 
-      <form action={addSingleMusicItem} className="mt-4 flex flex-col gap-3">
+      <form action={add} className="mt-4 flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm text-slate">
             Date

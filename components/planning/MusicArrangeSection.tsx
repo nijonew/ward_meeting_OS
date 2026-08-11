@@ -11,7 +11,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function MusicItemRow({ item, meetingId, needsSlot }: { item: MusicRow; meetingId: string; needsSlot: boolean }) {
-  const arrange = arrangeMusicItem.bind(null, item.id, meetingId);
+  const arrange = async (formData: FormData) => {
+    "use server";
+    await arrangeMusicItem(item.id, meetingId, formData);
+  };
   const performer = item.group_name || item.individual_name;
 
   return (
