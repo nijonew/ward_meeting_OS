@@ -38,8 +38,14 @@ export default async function AnnouncementsInboxPage() {
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
             {items.map((item) => {
-              const publish = setSubmissionStatus.bind(null, item.kind, item.id, "published");
-              const archive = setSubmissionStatus.bind(null, item.kind, item.id, "archived");
+              const publish = async () => {
+                "use server";
+                await setSubmissionStatus(item.kind, item.id, "published");
+              };
+              const archive = async () => {
+                "use server";
+                await setSubmissionStatus(item.kind, item.id, "archived");
+              };
               return (
                 <li
                   key={`${item.kind}-${item.id}`}
