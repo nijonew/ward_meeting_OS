@@ -11,7 +11,10 @@ export function ActionItemsSection({
   items: ActionItemRow[];
   people: PersonOption[];
 }) {
-  const add = addActionItem.bind(null, meetingId);
+  const add = async (formData: FormData) => {
+    "use server";
+    await addActionItem(meetingId, formData);
+  };
 
   return (
     <div className="rounded-lg border border-rule bg-card p-6">
@@ -20,7 +23,10 @@ export function ActionItemsSection({
       {items.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
           {items.map((item) => {
-            const toggle = toggleActionItem.bind(null, item.id, meetingId, item.completed);
+            const toggle = async () => {
+              "use server";
+              await toggleActionItem(item.id, meetingId, item.completed);
+            };
             return (
               <li
                 key={item.id}
