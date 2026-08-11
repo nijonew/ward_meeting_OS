@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
-import { MEETING_TYPES, MEETINGS } from "@/lib/mock-data";
-import type { Meeting, MeetingTypeSlug } from "@/lib/types";
+import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
+import type { Meeting } from "@/lib/types";
 
 function formatMeetingDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -12,39 +13,29 @@ function formatMeetingDate(iso: string) {
   });
 }
 
-function meetingTypeName(slug: MeetingTypeSlug) {
-  return MEETING_TYPES.find((t) => t.slug === slug)?.name ?? slug;
-}
-
-function isTypeBuilt(slug: MeetingTypeSlug) {
-  return MEETING_TYPES.find((t) => t.slug === slug)?.isBuilt ?? false;
-}
-
-function MeetingRow({ meeting }: { meeting: Meeting }) {
-  const built = isTypeBuilt(meeting.meetingType);
-
+function MeetingRow({ meeting, isBuilt }: { meeting: Meeting; isBuilt: boolean }) {
   const card = (
     <div
       className={[
         "flex flex-col gap-3 rounded-md border px-5 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between",
-        built ? "border-rule bg-card hover:border-ink/30" : "border-rule/60",
+        isBuilt ? "border-rule bg-card hover:border-ink/30" : "border-rule/60",
       ].join(" ")}
     >
       <div>
         <p className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
-          {meetingTypeName(meeting.meetingType)}
-        </p>
-        <p className={["font-display text-lg", built ? "text-ink" : "text-ink/40"].join(" ")}>
           {meeting.title}
         </p>
-        <p className={built ? "text-sm text-slate" : "text-sm text-slate/60"}>
+        <p className={["font-display text-lg", isBuilt ? "text-ink" : "text-ink/40"].join(" ")}>
+          {meeting.title}
+        </p>
+        <p className={isBuilt ? "text-sm text-slate" : "text-sm text-slate/60"}>
           {formatMeetingDate(meeting.date)}
         </p>
       </div>
 
       <div className="flex items-center gap-3">
         <LifecycleBadge stage={meeting.stage} />
-        {!built && (
+        {!isBuilt && (
           <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/70">
             Coming soon
           </span>
@@ -53,8 +44,7 @@ function MeetingRow({ meeting }: { meeting: Meeting }) {
     </div>
   );
 
-  if (!built) {
-    // Not yet a real workflow — render inert, no link.
+  if (!isBuilt) {
     return <li>{card}</li>;
   }
 
@@ -67,7 +57,27 @@ function MeetingRow({ meeting }: { meeting: Meeting }) {
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const { user } = await getSessionUser();
+
+  if (!user) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+        <AppHeader tag="Single Ward" />
+        <p className="mt-10 text-slate">Sign in to see meetings.</p>
+        <Link
+          href="/login"
+          className="mt-4 inline-flex w-fit items-center rounded-md bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+        >
+          Sign in
+        </Link>
+      </main>
+    );
+  }
+
+  const [meetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
+  const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
+
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Single Ward" />
@@ -76,10 +86,16 @@ export default function DashboardPage() {
         <p className="font-mono text-xs uppercase tracking-widest text-slate">Meetings</p>
 
         <ul className="mt-4 flex flex-col gap-3">
-          {MEETINGS.map((meeting) => (
-            <MeetingRow key={meeting.id} meeting={meeting} />
+          {meetings.map((meeting) => (
+            <MeetingRow
+              key={meeting.id}
+              meeting={meeting}
+              isBuilt={builtSlugs.has(meeting.meetingType)}
+            />
           ))}
         </ul>
+
+        {meetings.length === 0 && <p className="mt-4 text-slate">No meetings scheduled yet.</p>}
       </section>
 
       <footer className="mt-auto pt-16 text-xs text-slate">
