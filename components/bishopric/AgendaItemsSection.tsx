@@ -8,7 +8,10 @@ export function AgendaItemsSection({
   meetingId: string;
   items: AgendaItemRow[];
 }) {
-  const add = addAgendaItemDirect.bind(null, meetingId);
+  const add = async (formData: FormData) => {
+    "use server";
+    await addAgendaItemDirect(meetingId, formData);
+  };
 
   return (
     <div className="rounded-lg border border-rule bg-card p-6">
@@ -21,8 +24,14 @@ export function AgendaItemsSection({
       {items.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
           {items.map((item) => {
-            const publish = setAgendaItemStatus.bind(null, item.id, meetingId, "published");
-            const archive = setAgendaItemStatus.bind(null, item.id, meetingId, "archived");
+            const publish = async () => {
+              "use server";
+              await setAgendaItemStatus(item.id, meetingId, "published");
+            };
+            const archive = async () => {
+              "use server";
+              await setAgendaItemStatus(item.id, meetingId, "archived");
+            };
             return (
               <li key={item.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
