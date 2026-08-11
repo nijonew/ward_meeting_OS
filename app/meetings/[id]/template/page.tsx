@@ -22,7 +22,11 @@ export default async function TemplatePage({
   }
 
   const templateText = await getTemplateBySlug(meeting.meetingType);
-  const save = saveTemplate.bind(null, meeting.meetingType, meetingId);
+
+  const save = async (formData: FormData) => {
+    "use server";
+    await saveTemplate(meeting.meetingType, meetingId, formData);
+  };
 
   return (
     <div className="rounded-lg border border-rule bg-card p-6">
