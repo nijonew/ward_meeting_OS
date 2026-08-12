@@ -50,7 +50,6 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     youthRes,
     musicRes,
     rabnmRes,
-    rabnmPeopleRes,
   ] = await Promise.all([
     supabase.rpc("get_meeting_special_format", { p_meeting_id: meetingId }),
     supabase
