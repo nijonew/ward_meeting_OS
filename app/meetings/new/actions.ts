@@ -19,7 +19,7 @@ export async function createMeeting(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
-    .insert({ meeting_type_id, date, stage: "draft" })
+    .insert({ meeting_type_id, date, stage: "planning" })
     .select("id")
     .single();
 
