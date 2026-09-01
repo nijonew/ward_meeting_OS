@@ -11,6 +11,35 @@ export interface SubmissionRow {
   created_at: string;
 }
 
+export interface PublishedAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
+
+/**
+ * Announcements the bishopric (or communications specialist, once that
+ * role has its own submission UI) has marked "published" -- these are
+ * safe to show on the public landing page with no login required.
+ */
+export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("announcements")
+    .select("id, title, body, created_at")
+    .is("meeting_id", null)
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data as PublishedAnnouncement[];
+}
+
 export async function getGeneralSubmissions(): Promise<SubmissionRow[]> {
   const supabase = await createClient();
 

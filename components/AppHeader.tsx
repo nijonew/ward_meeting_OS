@@ -16,7 +16,7 @@ export async function AppHeader({ tag }: { tag: string }) {
   return (
     <header className="flex items-baseline justify-between border-b border-rule pb-6">
       <Link href="/" className="font-display text-xl tracking-tight">
-        Ward Meeting OS
+        Ward OS
       </Link>
       <div className="flex items-center gap-4">
         <span className="font-mono text-xs uppercase tracking-widest text-slate">{tag}</span>

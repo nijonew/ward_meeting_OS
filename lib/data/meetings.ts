@@ -58,6 +58,36 @@ export async function getUpcomingMeeting(): Promise<Meeting | null> {
   return meetings.find((m) => m.meetingType === "sacrament-meeting") ?? meetings[0] ?? null;
 }
 
+/**
+ * The sacrament meeting the public landing page should link to today, if
+ * any. "Published" (per the lifecycle: ready -> live -> archived) means
+ * the print-ready program -- music, speakers, prayers, musicians,
+ * conducting, presiding -- is finalized. Ward business and announcements
+ * made live during conducting are intentionally not part of this view;
+ * they're folded in only once the meeting is archived.
+ *
+ * Only returns a meeting dated today -- the tile should not appear (or
+ * should say "nothing published yet") on any other day, even if a
+ * sacrament meeting exists in a ready/live stage for a future Sunday.
+ */
+export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | null> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id, date, stage, meeting_types(slug, name)")
+    .eq("date", today)
+    .in("stage", ["ready", "live"]);
+
+  if (error || !data) {
+    return null;
+  }
+
+  const meetings = data.map(mapMeetingRow);
+  return meetings.find((m) => m.meetingType === "sacrament-meeting") ?? null;
+}
+
 export async function getMeetingById(id: string): Promise<Meeting | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
