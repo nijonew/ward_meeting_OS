@@ -1,7 +1,17 @@
 import { createClient } from "./server";
 
+export type AppRole =
+  | "bishopric"
+  | "music_planner"
+  | "communications_specialist"
+  | "yw_presidency"
+  | "yw_advisor"
+  | "yw_specialist"
+  | "ym_advisor"
+  | "ym_specialist";
+
 export interface SessionProfile {
-  role: "bishopric" | "music_planner" | null;
+  role: AppRole | null;
   display_name: string | null;
   email: string | null;
 }
