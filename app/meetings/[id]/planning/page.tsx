@@ -1,5 +1,12 @@
 import { redirect } from "next/navigation";
 import { getMeetingById } from "@/lib/data/meetings";
+import {
+  getMeetingWithType,
+  getTemplateElements,
+  getRoleAssignments,
+  type TemplateElementRow,
+} from "@/lib/data/meeting-elements";
+import { getElementNotes } from "@/lib/data/meeting-element-notes";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getActiveCallings } from "@/lib/data/callings";
@@ -7,16 +14,29 @@ import { getBishopricMeetingData } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { SPEAKER_SLOTS_ADULT, SPEAKER_SLOTS_YOUTH } from "@/lib/data/sacrament-constants";
+import {
+  PersonRoleField,
+  FreeTextField,
+  PersonAndTextField,
+  LabelOnlyField,
+} from "@/components/planning/DynamicElementField";
 import { PlanningInfoForm } from "@/components/planning/PlanningInfoForm";
-import { AssignmentsForm } from "@/components/planning/AssignmentsForm";
 import { SpeakersForm } from "@/components/planning/SpeakersForm";
 import { RabnmSection } from "@/components/planning/RabnmSection";
 import { MusicArrangeSection } from "@/components/planning/MusicArrangeSection";
 import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
-import { BishopricAssignmentsForm } from "@/components/bishopric/BishopricAssignmentsForm";
 import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
 import { AgendaItemsSection } from "@/components/bishopric/AgendaItemsSection";
 import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
+
+// Free-text elements that already have a dedicated, unambiguous home
+// elsewhere -- rendering them again here would create two disconnected
+// copies of the same field. Shown as a pointer instead of a duplicate
+// editor.
+const REDIRECT_NOTES: Record<string, string> = {
+  ward_business: "Edit in Meeting Info above",
+  stake_business: "Edit in Meeting Info above",
+};
 
 export default async function PlanningViewPage({
   params,
@@ -35,52 +55,156 @@ export default async function PlanningViewPage({
     return <p className="text-slate">Could not load this meeting.</p>;
   }
 
-  if (meeting.meetingType === "bishopric-meeting") {
-    const [data, people] = await Promise.all([getBishopricMeetingData(meetingId), getActivePeople()]);
-    return (
-      <div className="flex flex-col gap-6">
-        <BishopricMinutesForm meetingId={meetingId} minutes={data.minutes} people={people} />
-        <BishopricAssignmentsForm meetingId={meetingId} assignments={data.assignments} people={people} />
-        <ActionItemsSection meetingId={meetingId} items={data.actionItems} people={people} />
-        <AgendaItemsSection meetingId={meetingId} items={data.agendaItems} />
-      </div>
-    );
+  const meetingWithType = await getMeetingWithType(meetingId);
+  if (!meetingWithType) {
+    return <p className="text-slate">Could not load this meeting.</p>;
   }
 
-  if (meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council") {
-    const notes = await getCouncilNotes(meetingId);
-    return <CouncilNotesForm meetingId={meetingId} notes={notes} />;
-  }
+  const isSacrament = meeting.meetingType === "sacrament-meeting";
+  const isBishopric = meeting.meetingType === "bishopric-meeting";
+  const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
+  const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  // sacrament-meeting
-  const [data, people, callings] = await Promise.all([
-    getSacramentPlanningData(meetingId),
+  const [templateElements, people, roleAssignments, elementNotes] = await Promise.all([
+    getTemplateElements(meetingWithType.meetingTypeId),
     getActivePeople(),
-    getActiveCallings(),
+    getRoleAssignments(meetingId, roleTable),
+    getElementNotes(meetingId),
   ]);
+
+  const sacramentData = isSacrament ? await getSacramentPlanningData(meetingId) : null;
+  const callings = isSacrament ? await getActiveCallings() : [];
+  const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
+  const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
+
+  const renderedMusicKinds = new Set<string>();
+  const renderedSlotKinds = new Set<string>();
+
+  function renderElement(el: TemplateElementRow) {
+    switch (el.resolution_kind) {
+      case "person_role":
+        return (
+          <PersonRoleField
+            key={el.id}
+            meetingId={meetingId}
+            elementKey={el.key}
+            label={el.label}
+            table={roleTable}
+            people={people}
+            value={roleAssignments[el.key]}
+          />
+        );
+
+      case "free_text":
+        if (REDIRECT_NOTES[el.key]) {
+          return <LabelOnlyField key={el.id} label={el.label} note={REDIRECT_NOTES[el.key]} />;
+        }
+        return (
+          <FreeTextField
+            key={el.id}
+            meetingId={meetingId}
+            elementKey={el.key}
+            label={el.label}
+            value={elementNotes[el.key]}
+          />
+        );
+
+      case "person_and_text":
+        return (
+          <PersonAndTextField
+            key={el.id}
+            meetingId={meetingId}
+            elementKey={el.key}
+            label={el.label}
+            people={people}
+            value={elementNotes[el.key]}
+          />
+        );
+
+      case "music":
+        // Rendered once, below, via the existing MusicArrangeSection --
+        // avoid an empty placeholder per hymn-type element.
+        renderedMusicKinds.add(el.key);
+        return null;
+
+      case "person_slot":
+        // Rendered once per slot type, below, via the existing
+        // SpeakersForm -- avoid duplicating the 9-slot form per element.
+        renderedSlotKinds.add(el.key);
+        return null;
+
+      case "none":
+      default: {
+        const note = el.key === "agenda_items" ? "See Agenda Items below" : undefined;
+        return <LabelOnlyField key={el.id} label={el.label} note={note} />;
+      }
+    }
+  }
+
+  const elementFields = templateElements.map(renderElement).filter(Boolean);
 
   return (
     <div className="flex flex-col gap-6">
-      <PlanningInfoForm meetingId={meetingId} planning={data.planning} />
-      <AssignmentsForm meetingId={meetingId} assignments={data.assignments} people={people} />
-      <SpeakersForm
-        meetingId={meetingId}
-        title="Speakers - Adults"
-        variant="adults"
-        slots={SPEAKER_SLOTS_ADULT}
-        speakers={data.speakersAdults}
-        people={people}
-      />
-      <SpeakersForm
-        meetingId={meetingId}
-        title="Speakers - Youth"
-        variant="youth"
-        slots={SPEAKER_SLOTS_YOUTH}
-        speakers={data.speakersYouth}
-        people={people}
-      />
-      <MusicArrangeSection meetingId={meetingId} music={data.music} />
-      <RabnmSection meetingId={meetingId} items={data.rabnm} people={people} callings={callings} />
+      {isSacrament && sacramentData && (
+        <PlanningInfoForm meetingId={meetingId} planning={sacramentData.planning} />
+      )}
+
+      {templateElements.length === 0 ? (
+        <div className="rounded-lg border border-rule bg-card p-6">
+          <p className="text-sm text-slate">
+            No elements configured for this meeting type yet. Add some in the{" "}
+            <a href={`/meetings/${meetingId}/template`} className="underline">
+              template builder
+            </a>
+            .
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-rule bg-card p-6">
+          <h2 className="font-display text-xl">Agenda</h2>
+          <div className="mt-4 flex flex-col gap-2">{elementFields}</div>
+        </div>
+      )}
+
+      {isSacrament && sacramentData && renderedMusicKinds.size > 0 && (
+        <MusicArrangeSection meetingId={meetingId} music={sacramentData.music} />
+      )}
+
+      {isSacrament && sacramentData && renderedSlotKinds.has("speaker") && (
+        <SpeakersForm
+          meetingId={meetingId}
+          title="Speakers - Adults"
+          variant="adults"
+          slots={SPEAKER_SLOTS_ADULT}
+          speakers={sacramentData.speakersAdults}
+          people={people}
+        />
+      )}
+
+      {isSacrament && sacramentData && renderedSlotKinds.has("youth_speaker") && (
+        <SpeakersForm
+          meetingId={meetingId}
+          title="Speakers - Youth"
+          variant="youth"
+          slots={SPEAKER_SLOTS_YOUTH}
+          speakers={sacramentData.speakersYouth}
+          people={people}
+        />
+      )}
+
+      {isSacrament && sacramentData && (
+        <RabnmSection meetingId={meetingId} items={sacramentData.rabnm} people={people} callings={callings} />
+      )}
+
+      {isBishopric && bishopricData && (
+        <>
+          <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData.minutes} people={people} />
+          <ActionItemsSection meetingId={meetingId} items={bishopricData.actionItems} people={people} />
+          <AgendaItemsSection meetingId={meetingId} items={bishopricData.agendaItems} />
+        </>
+      )}
+
+      {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
     </div>
   );
 }

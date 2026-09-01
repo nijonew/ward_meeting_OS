@@ -96,3 +96,36 @@ export async function getTemplateElements(meetingTypeId: string): Promise<Templa
     };
   });
 }
+
+export interface RoleAssignmentValue {
+  assigned_to_id: string | null;
+  confirmed: boolean;
+}
+
+/**
+ * Person-role assignments for a meeting, keyed by role (== element key).
+ * `table` picks which underlying table to read: sacrament meetings use
+ * sacrament_assignments (which has a `confirmed` column consumed by the
+ * public view); every other meeting type reuses bishopric_assignments
+ * (meeting-agnostic despite the name -- see architecture notes).
+ */
+export async function getRoleAssignments(
+  meetingId: string,
+  table: "sacrament_assignments" | "bishopric_assignments"
+): Promise<Record<string, RoleAssignmentValue>> {
+  const supabase = await createClient();
+
+  const { data } =
+    table === "sacrament_assignments"
+      ? await supabase.from(table).select("role, assigned_to_id, confirmed").eq("meeting_id", meetingId)
+      : await supabase.from(table).select("role, assigned_to_id").eq("meeting_id", meetingId);
+
+  const result: Record<string, RoleAssignmentValue> = {};
+  for (const row of (data ?? []) as { role: string; assigned_to_id: string | null; confirmed?: boolean }[]) {
+    result[row.role] = {
+      assigned_to_id: row.assigned_to_id,
+      confirmed: row.confirmed ?? true,
+    };
+  }
+  return result;
+}
