@@ -105,7 +105,11 @@ export default async function HomePage() {
               href="/announcements"
             />
             <Tile title="Speaker & Prayer History" comingSoon />
-            <Tile title="Assignment Rotations" comingSoon />
+            <Tile
+              title="Assignment Rotations"
+              description="Who's next for prayers, chorister, etc."
+              href="/rotations"
+            />
           </TileGrid>
         </section>
       )}

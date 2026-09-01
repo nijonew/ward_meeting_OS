@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 
 export type CreateMeetingState = { error?: string };
 
@@ -20,12 +21,15 @@ export async function createMeeting(
   const { data, error } = await supabase
     .from("meetings")
     .insert({ meeting_type_id, date, stage: "planning" })
-    .select("id")
+    .select("id, meeting_types(slug)")
     .single();
 
   if (error || !data) {
     return { error: error?.message ?? "Could not create the meeting." };
   }
+
+  const meetingType = Array.isArray(data.meeting_types) ? data.meeting_types[0] : data.meeting_types;
+  await applyRotationsToNewMeeting(data.id, meeting_type_id, meetingType?.slug ?? "");
 
   redirect(`/meetings/${data.id}`);
 }
