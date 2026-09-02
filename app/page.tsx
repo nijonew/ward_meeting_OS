@@ -115,7 +115,7 @@ export default async function HomePage() {
       )}
 
       <footer className="mt-auto pt-16 text-xs text-slate">
-        Ward OS &mdash; Heritage Ward &mdash; Syracuse Utah Stake &mdash; 
+        Ward OS &mdash; Heritage Ward &mdash; Syracuse Utah Stake
       </footer>
     </main>
   );
