@@ -34,7 +34,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-      <AppHeader tag={WARD_NAME} />
+      <AppHeader />
 
       <section className="mt-10">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">{WARD_NAME}</h1>

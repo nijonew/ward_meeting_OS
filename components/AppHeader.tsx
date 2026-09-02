@@ -7,7 +7,7 @@ import { signOut } from "@/app/auth/actions";
  * sign-in state. Extracted out of the landing page so the dashboard (and
  * future pages) don't duplicate this markup.
  */
-export async function AppHeader({ tag }: { tag: string }) {
+export async function AppHeader({ tag }: { tag?: string }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -19,7 +19,7 @@ export async function AppHeader({ tag }: { tag: string }) {
         Ward OS
       </Link>
       <div className="flex items-center gap-4">
-        <span className="font-mono text-xs uppercase tracking-widest text-slate">{tag}</span>
+        {tag && <span className="font-mono text-xs uppercase tracking-widest text-slate">{tag}</span>}
         {user ? (
           <form action={signOut}>
             <button
