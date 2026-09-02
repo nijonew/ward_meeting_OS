@@ -45,13 +45,15 @@ export default async function HomePage() {
       <section className="mt-8">
         <p className="font-mono text-xs uppercase tracking-widest text-slate">This week</p>
         <TileGrid>
-          {todaysSacramentMeeting && (
-            <Tile
-              title="Sacrament Meeting Program"
-              description="Today's program"
-              href={`/meetings/${todaysSacramentMeeting.id}/public`}
-            />
-          )}
+            {todaysSacramentMeeting ? (
+              <Tile
+                title="Sacrament Meeting Program"
+                description="Today's program"
+                href={`/meetings/${todaysSacramentMeeting.id}/public`}
+              />
+            ) : (
+              <Tile title="Sacrament Meeting Program" description="Published on meeting day" comingSoon />
+            )}
           <Tile title="Announcements" description="Ward-wide announcements" href="/announcements/public" />
           <Tile
             title="Youth Activities"
