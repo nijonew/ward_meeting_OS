@@ -115,7 +115,7 @@ export default async function HomePage() {
       )}
 
       <footer className="mt-auto pt-16 text-xs text-slate">
-        Ward OS &mdash; planning, conducting, and publishing meetings from one source of truth.
+        Ward OS &mdash; Heritage Ward &mdash; Syracuse Utah Stake &mdash; <a href="https://www.churchofjesuschrist.org" target="_blank" rel="noopener noreferrer">LDS.org</a>
       </footer>
     </main>
   );
