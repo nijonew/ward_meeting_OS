@@ -80,7 +80,11 @@ export default async function HomePage() {
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Music</p>
           <TileGrid>
             <Tile title="Sacrament Music Planning" description="Enter upcoming hymns and music" href="/music" />
-            <Tile title="Music Coordination" comingSoon />
+            <Tile
+              title="Music Coordination"
+              description="Status across upcoming meetings"
+              href="/music-coordination"
+            />
           </TileGrid>
         </section>
       )}
