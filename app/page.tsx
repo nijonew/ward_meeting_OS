@@ -60,7 +60,7 @@ export default async function HomePage() {
             description="Planned activities for YW and YM"
             href="/youth-activities"
           />
-          <Tile title="Scheduled Events" comingSoon />
+          <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
         </TileGrid>
       </section>
 
@@ -106,7 +106,11 @@ export default async function HomePage() {
               description="Review and publish submissions"
               href="/announcements"
             />
-            <Tile title="Speaker & Prayer History" comingSoon />
+            <Tile
+              title="Speaker & Prayer History"
+              description="Who's due for a turn"
+              href="/speaker-prayer-history"
+            />
             <Tile
               title="Assignment Rotations"
               description="Who's next for prayers, chorister, etc."
