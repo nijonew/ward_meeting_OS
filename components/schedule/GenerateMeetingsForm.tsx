@@ -1,75 +1,47 @@
 "use client";
 
 import { useActionState } from "react";
-import { createMeeting, type CreateMeetingState } from "@/app/meetings/new/actions";
-import type { MeetingTypeOption } from "@/lib/data/meeting-types";
+import { generateMeetings } from "@/app/meeting-schedule/actions";
 
-const initialState: CreateMeetingState = {};
+const initialState: { error?: string; created?: number; skippedExisting?: number } = {};
 
-export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeOption[] }) {
-  const [state, formAction, pending] = useActionState(createMeeting, initialState);
+export function GenerateMeetingsForm() {
+  const [state, formAction, pending] = useActionState(generateMeetings, initialState);
 
   return (
-    <form action={formAction} className="mt-4 flex flex-col gap-3">
-      <label className="text-sm text-slate">
-        Meeting Type
-        <select
-          name="meeting_type_id"
-          required
-          defaultValue=""
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+    <div className="rounded-lg border border-rule bg-card p-6">
+      <h2 className="font-display text-xl">Generate Meetings</h2>
+      <p className="mt-1 text-sm text-slate">
+        Creates real meetings from the active cadence rules above, for any dates that don&rsquo;t
+        already have one. Safe to run again later &mdash; existing meetings are never duplicated.
+      </p>
+
+      <form action={formAction} className="mt-4 flex flex-wrap items-center gap-3">
+        <label className="text-xs text-slate">
+          Through
+          <input
+            type="date"
+            name="through_date"
+            required
+            className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
         >
-          <option value="" disabled>
-            Choose a meeting type
-          </option>
-          {meetingTypes.map((mt) => (
-            <option key={mt.id} value={mt.id}>
-              {mt.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          {pending ? "Generating..." : "Generate"}
+        </button>
+      </form>
 
-      <label className="text-sm text-slate">
-        Date
-        <input
-          type="date"
-          name="date"
-          required
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        />
-      </label>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm text-slate">
-          Time (optional)
-          <input
-            type="time"
-            name="time_of_day"
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-          />
-        </label>
-        <label className="text-sm text-slate">
-          Duration, minutes (optional)
-          <input
-            type="number"
-            name="duration_minutes"
-            min={5}
-            step={5}
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-          />
-        </label>
-      </div>
-
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
-      >
-        {pending ? "Creating..." : "Create Meeting"}
-      </button>
-
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-    </form>
+      {state.error && <p className="mt-3 text-sm text-red-600">{state.error}</p>}
+      {state.created !== undefined && (
+        <p className="mt-3 text-sm text-ink">
+          Created {state.created} meeting{state.created === 1 ? "" : "s"}
+          {state.skippedExisting ? ` (${state.skippedExisting} already existed and were skipped)` : ""}.
+        </p>
+      )}
+    </div>
   );
 }
