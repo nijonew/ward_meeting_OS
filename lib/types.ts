@@ -45,4 +45,7 @@ export interface Meeting {
   /** ISO date, e.g. "2026-08-09". Sunday meetings only, per current Notion structure. */
   date: string;
   stage: MeetingLifecycleStage;
+  /** "HH:MM" 24-hour, or null if not set (older meetings predate this field). */
+  timeOfDay: string | null;
+  durationMinutes: number | null;
 }

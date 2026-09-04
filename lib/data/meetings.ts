@@ -26,6 +26,8 @@ function mapMeetingRow(row: {
   id: string;
   date: string;
   stage: string;
+  time_of_day: string | null;
+  duration_minutes: number | null;
   meeting_types: { slug: string; name: string }[] | { slug: string; name: string } | null;
 }): Meeting {
   const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
@@ -36,6 +38,8 @@ function mapMeetingRow(row: {
     title: meetingType?.name ?? "Meeting",
     date: row.date,
     stage: row.stage as MeetingLifecycleStage,
+    timeOfDay: row.time_of_day,
+    durationMinutes: row.duration_minutes,
   };
 }
 
@@ -43,7 +47,7 @@ export async function getUpcomingMeetings(): Promise<Meeting[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, stage, meeting_types(slug, name)")
+    .select("id, date, stage, time_of_day, duration_minutes, meeting_types(slug, name)")
     .order("date", { ascending: true });
 
   if (error || !data) {
@@ -76,7 +80,7 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
 
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, stage, meeting_types(slug, name)")
+    .select("id, date, stage, time_of_day, duration_minutes, meeting_types(slug, name)")
     .eq("date", today)
     .in("stage", ["ready", "live"]);
 
@@ -92,7 +96,7 @@ export async function getMeetingById(id: string): Promise<Meeting | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, stage, meeting_types(slug, name)")
+    .select("id, date, stage, time_of_day, duration_minutes, meeting_types(slug, name)")
     .eq("id", id)
     .single();
 

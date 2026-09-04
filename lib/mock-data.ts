@@ -21,6 +21,8 @@ export const MEETINGS: Meeting[] = [
     title: "Sacrament Meeting",
     date: "2026-08-09",
     stage: "planning",
+    timeOfDay: null,
+    durationMinutes: null,
   },
   {
     id: "mock-bishopric-2026-08-06",
@@ -28,6 +30,8 @@ export const MEETINGS: Meeting[] = [
     title: "Bishopric Meeting",
     date: "2026-08-06",
     stage: "template",
+    timeOfDay: null,
+    durationMinutes: null,
   },
   {
     id: "mock-ward-council-2026-08-06",
@@ -35,6 +39,8 @@ export const MEETINGS: Meeting[] = [
     title: "Ward Council",
     date: "2026-08-06",
     stage: "template",
+    timeOfDay: null,
+    durationMinutes: null,
   },
   {
     id: "mock-youth-council-2026-08-06",
@@ -42,6 +48,8 @@ export const MEETINGS: Meeting[] = [
     title: "Youth Council",
     date: "2026-08-06",
     stage: "template",
+    timeOfDay: null,
+    durationMinutes: null,
   },
 ];
 

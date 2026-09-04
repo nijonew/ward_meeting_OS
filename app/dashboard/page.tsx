@@ -139,12 +139,17 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Meetings</p>
           {canCreate && (
-            <Link
-              href="/meetings/new"
-              className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90"
-            >
-              + New Meeting
-            </Link>
+            <span className="flex items-center gap-3">
+              <Link href="/meeting-schedule" className="text-xs text-slate hover:text-ink">
+                Meeting Schedule
+              </Link>
+              <Link
+                href="/meetings/new"
+                className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90"
+              >
+                + New Meeting
+              </Link>
+            </span>
           )}
         </div>
 
