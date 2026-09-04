@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
-import { getScheduleRules } from "@/lib/data/meeting-schedule";
+import { getScheduleRules, type ScheduleRule } from "@/lib/data/meeting-schedule";
 import { getMeetingTypes } from "@/lib/data/meetings";
 import { addScheduleRule, deleteScheduleRule, toggleScheduleRuleActive } from "@/app/meeting-schedule/actions";
+import { AddRuleForm } from "@/components/schedule/AddRuleForm";
 import { GenerateMeetingsForm } from "@/components/schedule/GenerateMeetingsForm";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -14,6 +15,19 @@ function formatTime(t: string) {
   const period = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function describeSchedule(r: ScheduleRule): string {
+  if (r.cadence === "weekly") {
+    return `Every ${DAY_NAMES[r.day_of_week ?? 0]}`;
+  }
+  if (r.cadence === "nth_weekday") {
+    return `${NTH_NAMES[(r.nth_occurrence ?? 1) - 1]} ${DAY_NAMES[r.day_of_week ?? 0]} of the month`;
+  }
+  const offset = r.offset_days ?? 0;
+  const anchor = `${NTH_NAMES[(r.anchor_nth_occurrence ?? 1) - 1]} ${DAY_NAMES[r.anchor_day_of_week ?? 0]}`;
+  if (offset === 0) return anchor;
+  return `${Math.abs(offset)} day${Math.abs(offset) === 1 ? "" : "s"} ${offset > 0 ? "after" : "before"} the ${anchor}`;
 }
 
 export default async function MeetingSchedulePage() {
@@ -51,12 +65,11 @@ export default async function MeetingSchedulePage() {
         <h2 className="font-display text-xl">Cadence</h2>
 
         {rules.length > 0 && (
-          <table className="mt-4 w-full min-w-[640px] text-sm">
+          <table className="mt-4 w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
                 <th className="pb-2 pr-3">Meeting Type</th>
-                <th className="pb-2 pr-3">Cadence</th>
-                <th className="pb-2 pr-3">Day</th>
+                <th className="pb-2 pr-3">Schedule</th>
                 <th className="pb-2 pr-3">Time</th>
                 <th className="pb-2 pr-3">Duration</th>
                 <th className="pb-2 pr-3">Active</th>
@@ -76,10 +89,7 @@ export default async function MeetingSchedulePage() {
                 return (
                   <tr key={r.id} className="border-b border-rule/40 last:border-0">
                     <td className="py-2 pr-3 text-ink">{r.meeting_type_name}</td>
-                    <td className="py-2 pr-3 text-slate">
-                      {r.cadence === "weekly" ? "Weekly" : `${NTH_NAMES[(r.nth_occurrence ?? 1) - 1]} of month`}
-                    </td>
-                    <td className="py-2 pr-3 text-slate">{DAY_NAMES[r.day_of_week]}</td>
+                    <td className="py-2 pr-3 text-slate">{describeSchedule(r)}</td>
                     <td className="py-2 pr-3 text-slate">{formatTime(r.time_of_day)}</td>
                     <td className="py-2 pr-3 text-slate">{r.duration_minutes} min</td>
                     <td className="py-2 pr-3">
@@ -109,89 +119,12 @@ export default async function MeetingSchedulePage() {
           </table>
         )}
 
-        <form action={addRule} className="mt-6 grid grid-cols-2 gap-3 border-t border-rule/60 pt-6 sm:grid-cols-6">
-          <select
-            name="meeting_type_id"
-            required
-            defaultValue=""
-            className="col-span-2 rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink sm:col-span-1"
-          >
-            <option value="" disabled>
-              Meeting type
-            </option>
-            {meetingTypes.map((t) => (
-              <option key={t.slug} value={t.slug}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            name="cadence"
-            required
-            defaultValue="weekly"
-            className="rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink"
-          >
-            <option value="weekly">Weekly</option>
-            <option value="nth_weekday">Nth of month</option>
-          </select>
-
-          <select
-            name="nth_occurrence"
-            defaultValue=""
-            className="rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink"
-          >
-            <option value="">&mdash;</option>
-            {NTH_NAMES.map((n, i) => (
-              <option key={n} value={i + 1}>
-                {n}
-              </option>
-            ))}
-          </select>
-
-          <select
-            name="day_of_week"
-            required
-            defaultValue=""
-            className="rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink"
-          >
-            <option value="" disabled>
-              Day
-            </option>
-            {DAY_NAMES.map((d, i) => (
-              <option key={d} value={i}>
-                {d}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="time"
-            name="time_of_day"
-            required
-            className="rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink"
-          />
-
-          <input
-            type="number"
-            name="duration_minutes"
-            required
-            min={5}
-            step={5}
-            placeholder="Minutes"
-            className="rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink"
-          />
-
-          <button
-            type="submit"
-            className="col-span-2 w-fit rounded-md bg-ink px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-ink/90 sm:col-span-6"
-          >
-            Add Rule
-          </button>
-        </form>
+        <AddRuleForm meetingTypes={meetingTypes} onAdd={addRule} />
         <p className="mt-2 text-[11px] text-slate/60">
-          For a cadence like &ldquo;1st and 3rd Tuesday,&rdquo; add two rules with the same meeting
-          type &mdash; one for each week.
+          For &ldquo;1st and 3rd Tuesday,&rdquo; add two Nth-of-month rules. For something like
+          &ldquo;the Tuesday after the 3rd Sunday,&rdquo; use Relative &mdash; it&rsquo;s computed
+          from the anchor day each month rather than a fixed numbered weekday, so it lands correctly
+          no matter how the month falls.
         </p>
       </div>
 

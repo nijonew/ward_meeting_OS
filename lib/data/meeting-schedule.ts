@@ -5,9 +5,12 @@ export interface ScheduleRule {
   id: string;
   meeting_type_id: string;
   meeting_type_name: string;
-  cadence: "weekly" | "nth_weekday";
+  cadence: "weekly" | "nth_weekday" | "relative";
   nth_occurrence: number | null;
-  day_of_week: number; // 0=Sunday..6=Saturday
+  day_of_week: number | null; // 0=Sunday..6=Saturday
+  anchor_nth_occurrence: number | null;
+  anchor_day_of_week: number | null;
+  offset_days: number | null;
   time_of_day: string; // "HH:MM:SS"
   duration_minutes: number;
   active: boolean;
@@ -18,17 +21,20 @@ export async function getScheduleRules(): Promise<ScheduleRule[]> {
   const { data } = await supabase
     .from("meeting_schedule_rules")
     .select(
-      "id, meeting_type_id, cadence, nth_occurrence, day_of_week, time_of_day, duration_minutes, active, meeting_types(name)"
+      "id, meeting_type_id, cadence, nth_occurrence, day_of_week, anchor_nth_occurrence, anchor_day_of_week, offset_days, time_of_day, duration_minutes, active, meeting_types(name)"
     )
-    .order("day_of_week");
+    .order("cadence");
 
   return ((data ?? []) as unknown[]).map((row) => {
     const r = row as {
       id: string;
       meeting_type_id: string;
-      cadence: "weekly" | "nth_weekday";
+      cadence: "weekly" | "nth_weekday" | "relative";
       nth_occurrence: number | null;
-      day_of_week: number;
+      day_of_week: number | null;
+      anchor_nth_occurrence: number | null;
+      anchor_day_of_week: number | null;
+      offset_days: number | null;
       time_of_day: string;
       duration_minutes: number;
       active: boolean;
@@ -42,6 +48,9 @@ export async function getScheduleRules(): Promise<ScheduleRule[]> {
       cadence: r.cadence,
       nth_occurrence: r.nth_occurrence,
       day_of_week: r.day_of_week,
+      anchor_nth_occurrence: r.anchor_nth_occurrence,
+      anchor_day_of_week: r.anchor_day_of_week,
+      offset_days: r.offset_days,
       time_of_day: r.time_of_day,
       duration_minutes: r.duration_minutes,
       active: r.active,
@@ -56,16 +65,42 @@ export async function addScheduleRule(formData: FormData): Promise<ActionResult>
 
   const meetingTypeSlug = String(formData.get("meeting_type_id") ?? "");
   const cadence = String(formData.get("cadence") ?? "");
-  const nthRaw = String(formData.get("nth_occurrence") ?? "");
-  const day_of_week = Number(formData.get("day_of_week"));
   const time_of_day = String(formData.get("time_of_day") ?? "");
   const duration_minutes = Number(formData.get("duration_minutes"));
 
   if (!meetingTypeSlug || !cadence || !time_of_day || !duration_minutes) {
     return { error: "All fields are required." };
   }
-  if (cadence === "nth_weekday" && !nthRaw) {
-    return { error: "Choose 1st through 5th for a monthly cadence." };
+
+  let day_of_week: number | null = null;
+  let nth_occurrence: number | null = null;
+  let anchor_day_of_week: number | null = null;
+  let anchor_nth_occurrence: number | null = null;
+  let offset_days: number | null = null;
+
+  if (cadence === "weekly") {
+    const raw = formData.get("day_of_week");
+    if (raw === null || raw === "") return { error: "Choose a day of the week." };
+    day_of_week = Number(raw);
+  } else if (cadence === "nth_weekday") {
+    const dayRaw = formData.get("day_of_week");
+    const nthRaw = formData.get("nth_occurrence");
+    if (dayRaw === null || dayRaw === "") return { error: "Choose a day of the week." };
+    if (nthRaw === null || nthRaw === "") return { error: "Choose 1st through 5th." };
+    day_of_week = Number(dayRaw);
+    nth_occurrence = Number(nthRaw);
+  } else if (cadence === "relative") {
+    const anchorDayRaw = formData.get("anchor_day_of_week");
+    const anchorNthRaw = formData.get("anchor_nth_occurrence");
+    const offsetRaw = formData.get("offset_days");
+    if (anchorDayRaw === null || anchorDayRaw === "") return { error: "Choose the anchor day of the week." };
+    if (anchorNthRaw === null || anchorNthRaw === "") return { error: "Choose the anchor's 1st through 5th." };
+    if (offsetRaw === null || offsetRaw === "") return { error: "Enter a day offset." };
+    anchor_day_of_week = Number(anchorDayRaw);
+    anchor_nth_occurrence = Number(anchorNthRaw);
+    offset_days = Number(offsetRaw);
+  } else {
+    return { error: "Unknown cadence." };
   }
 
   const { data: meetingType } = await supabase
@@ -78,8 +113,11 @@ export async function addScheduleRule(formData: FormData): Promise<ActionResult>
   const { error } = await supabase.from("meeting_schedule_rules").insert({
     meeting_type_id: meetingType.id,
     cadence,
-    nth_occurrence: cadence === "nth_weekday" ? Number(nthRaw) : null,
+    nth_occurrence,
     day_of_week,
+    anchor_nth_occurrence,
+    anchor_day_of_week,
+    offset_days,
     time_of_day,
     duration_minutes,
   });
@@ -118,6 +156,17 @@ function weeklyDates(start: Date, end: Date, dayOfWeek: number): string[] {
   return dates;
 }
 
+/** The Nth occurrence of dayOfWeek in the given month, or null if that month doesn't have one (e.g. no 5th). */
+function nthOccurrenceInMonth(year: number, month: number, dayOfWeek: number, nth: number): Date | null {
+  const matches: Date[] = [];
+  for (let day = 1; day <= 31; day++) {
+    const candidate = new Date(year, month, day);
+    if (candidate.getMonth() !== month) break; // ran past end of month
+    if (candidate.getDay() === dayOfWeek) matches.push(candidate);
+  }
+  return matches[nth - 1] ?? null;
+}
+
 /** The Nth occurrence of day_of_week in each month between start and end (inclusive). */
 function nthWeekdayDates(start: Date, end: Date, dayOfWeek: number, nth: number): string[] {
   const dates: string[] = [];
@@ -125,17 +174,42 @@ function nthWeekdayDates(start: Date, end: Date, dayOfWeek: number, nth: number)
   const last = new Date(end.getFullYear(), end.getMonth(), 1);
 
   while (cursor <= last) {
-    const year = cursor.getFullYear();
-    const month = cursor.getMonth();
-    const matchesInMonth: Date[] = [];
-    for (let day = 1; day <= 31; day++) {
-      const candidate = new Date(year, month, day);
-      if (candidate.getMonth() !== month) break; // ran past end of month
-      if (candidate.getDay() === dayOfWeek) matchesInMonth.push(candidate);
-    }
-    const picked = matchesInMonth[nth - 1]; // undefined if month doesn't have a 5th, e.g.
+    const picked = nthOccurrenceInMonth(cursor.getFullYear(), cursor.getMonth(), dayOfWeek, nth);
     if (picked && picked >= start && picked <= end) {
       dates.push(toISODate(picked));
+    }
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return dates;
+}
+
+/**
+ * Dates computed as "offsetDays days after (or before, if negative) the
+ * Nth occurrence of anchorDayOfWeek" in each month -- e.g. "2 days after
+ * the 3rd Sunday" (the Tuesday that follows it, whichever numbered
+ * Tuesday that happens to be that month). Iterates one month of padding
+ * on each side of the range so an offset that crosses a month boundary
+ * still gets caught.
+ */
+function relativeDates(
+  start: Date,
+  end: Date,
+  anchorDayOfWeek: number,
+  anchorNth: number,
+  offsetDays: number
+): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+  const last = new Date(end.getFullYear(), end.getMonth() + 1, 1);
+
+  while (cursor <= last) {
+    const anchor = nthOccurrenceInMonth(cursor.getFullYear(), cursor.getMonth(), anchorDayOfWeek, anchorNth);
+    if (anchor) {
+      const candidate = new Date(anchor);
+      candidate.setDate(candidate.getDate() + offsetDays);
+      if (candidate >= start && candidate <= end) {
+        dates.push(toISODate(candidate));
+      }
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -172,10 +246,20 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
   let skippedExisting = 0;
 
   for (const rule of rules) {
-    const candidateDates =
-      rule.cadence === "weekly"
-        ? weeklyDates(today, through, rule.day_of_week)
-        : nthWeekdayDates(today, through, rule.day_of_week, rule.nth_occurrence ?? 1);
+    let candidateDates: string[];
+    if (rule.cadence === "weekly") {
+      candidateDates = weeklyDates(today, through, rule.day_of_week ?? 0);
+    } else if (rule.cadence === "nth_weekday") {
+      candidateDates = nthWeekdayDates(today, through, rule.day_of_week ?? 0, rule.nth_occurrence ?? 1);
+    } else {
+      candidateDates = relativeDates(
+        today,
+        through,
+        rule.anchor_day_of_week ?? 0,
+        rule.anchor_nth_occurrence ?? 1,
+        rule.offset_days ?? 0
+      );
+    }
 
     if (candidateDates.length === 0) continue;
 
