@@ -10,7 +10,7 @@ import { getElementNotes } from "@/lib/data/meeting-element-notes";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getActiveCallings } from "@/lib/data/callings";
-import { getBishopricMeetingData } from "@/lib/data/bishopric-meeting";
+import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { SPEAKER_SLOTS_ADULT, SPEAKER_SLOTS_YOUTH } from "@/lib/data/sacrament-constants";
@@ -76,9 +76,14 @@ export default async function PlanningViewPage({
   const callings = isSacrament ? await getActiveCallings() : [];
   const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
   const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
+  // agenda_items is a general catalog element any meeting type's template
+  // can include -- fetched independently of meeting type so it works
+  // everywhere, not just Bishopric Meeting.
+  const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
   const renderedMusicKinds = new Set<string>();
   const renderedSlotKinds = new Set<string>();
+  const renderedNoneKinds = new Set<string>();
 
   function renderElement(el: TemplateElementRow) {
     switch (el.resolution_kind) {
@@ -135,8 +140,13 @@ export default async function PlanningViewPage({
 
       case "none":
       default: {
-        const note = el.key === "agenda_items" ? "See Agenda Items below" : undefined;
-        return <LabelOnlyField key={el.id} label={el.label} note={note} />;
+        if (el.key === "agenda_items") {
+          // Rendered once, below, via AgendaItemsSection -- no
+          // placeholder needed since a real section follows.
+          renderedNoneKinds.add(el.key);
+          return null;
+        }
+        return <LabelOnlyField key={el.id} label={el.label} />;
       }
     }
   }
@@ -200,8 +210,11 @@ export default async function PlanningViewPage({
         <>
           <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData.minutes} people={people} />
           <ActionItemsSection meetingId={meetingId} items={bishopricData.actionItems} people={people} />
-          <AgendaItemsSection meetingId={meetingId} items={bishopricData.agendaItems} />
         </>
+      )}
+
+      {renderedNoneKinds.has("agenda_items") && (
+        <AgendaItemsSection meetingId={meetingId} items={agendaItems} />
       )}
 
       {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}

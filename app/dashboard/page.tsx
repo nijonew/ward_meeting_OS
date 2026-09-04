@@ -2,7 +2,9 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
+import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
 import type { Meeting } from "@/lib/types";
 
 function formatMeetingDate(iso: string) {
@@ -58,12 +60,12 @@ function MeetingRow({ meeting, isBuilt }: { meeting: Meeting; isBuilt: boolean }
 }
 
 export default async function DashboardPage() {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
 
   if (!user) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Single Ward" />
+        <AppHeader tag="Meetings" />
         <p className="mt-10 text-slate">Sign in to see meetings.</p>
         <Link
           href="/login"
@@ -77,13 +79,74 @@ export default async function DashboardPage() {
 
   const [meetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
+  const canCreate = profile?.role === "bishopric";
+  const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-      <AppHeader tag="Single Ward" />
+      <AppHeader tag="Meetings" />
+
+      {canCreate && unassignedAgendaItems.length > 0 && (
+        <section className="mt-10 rounded-lg border border-rule bg-card p-6">
+          <h2 className="font-display text-xl">Unassigned Agenda Items</h2>
+          <p className="mt-1 text-xs text-slate">
+            Submitted through the public form without a specific meeting. Assign each one to a
+            meeting to bring it into that meeting&rsquo;s Agenda Items for review.
+          </p>
+          <ul className="mt-4 flex flex-col gap-3">
+            {unassignedAgendaItems.map((item) => {
+              const assign = async (formData: FormData) => {
+                "use server";
+                const meetingId = String(formData.get("meeting_id") ?? "");
+                if (meetingId) await assignAgendaItemToMeeting(item.id, meetingId);
+              };
+              return (
+                <li key={item.id} className="rounded-md border border-rule/60 p-3 text-sm">
+                  <p className="text-ink">{item.title}</p>
+                  {item.body && <p className="mt-1 text-slate">{item.body}</p>}
+                  <p className="mt-1 text-[11px] text-slate/60">Submitted by {item.submitted_by_name}</p>
+                  <form action={assign} className="mt-2 flex items-center gap-2">
+                    <select
+                      name="meeting_id"
+                      required
+                      defaultValue=""
+                      className="flex-1 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+                    >
+                      <option value="" disabled>
+                        Choose a meeting&hellip;
+                      </option>
+                      {meetings.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.title} &mdash; {formatMeetingDate(m.date)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90"
+                    >
+                      Assign
+                    </button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-10">
-        <p className="font-mono text-xs uppercase tracking-widest text-slate">Meetings</p>
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-xs uppercase tracking-widest text-slate">Meetings</p>
+          {canCreate && (
+            <Link
+              href="/meetings/new"
+              className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90"
+            >
+              + New Meeting
+            </Link>
+          )}
+        </div>
 
         <ul className="mt-4 flex flex-col gap-3">
           {meetings.map((meeting) => (
@@ -99,8 +162,7 @@ export default async function DashboardPage() {
       </section>
 
       <footer className="mt-auto pt-16 text-xs text-slate">
-        Ward Meeting OS &mdash; planning, conducting, and publishing meetings from one source of
-        truth.
+        Ward OS &mdash; planning, conducting, and publishing meetings from one source of truth.
       </footer>
     </main>
   );

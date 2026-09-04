@@ -36,11 +36,51 @@ export interface AgendaItemRow {
   status: string;
 }
 
+export interface UnassignedAgendaItemRow {
+  id: string;
+  title: string;
+  body: string;
+  submitted_by_name: string;
+  created_at: string;
+}
+
 export interface BishopricMeetingData {
   minutes: BishopricMinutes | null;
   assignments: BishopricAssignmentRow[];
   actionItems: ActionItemRow[];
   agendaItems: AgendaItemRow[];
+}
+
+/**
+ * Agenda items for one specific meeting -- usable for ANY meeting type,
+ * not just Bishopric Meeting (agenda_items is a general catalog element
+ * that any meeting type's template can include).
+ */
+export async function getAgendaItemsForMeeting(meetingId: string): Promise<AgendaItemRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_items")
+    .select("id, title, body, submitted_by_name, status")
+    .eq("meeting_id", meetingId)
+    .order("created_at");
+  return (data as AgendaItemRow[] | null) ?? [];
+}
+
+/**
+ * Public submissions from /submit never get a meeting_id (the form
+ * doesn't ask which meeting) -- these show up here so the Bishopric can
+ * assign each one to a specific upcoming meeting, where it'll then
+ * appear in that meeting's own Agenda Items section for the usual
+ * publish/archive review.
+ */
+export async function getUnassignedAgendaItems(): Promise<UnassignedAgendaItemRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_items")
+    .select("id, title, body, submitted_by_name, created_at")
+    .is("meeting_id", null)
+    .order("created_at");
+  return (data as UnassignedAgendaItemRow[] | null) ?? [];
 }
 
 export async function getBishopricMeetingData(meetingId: string): Promise<BishopricMeetingData> {

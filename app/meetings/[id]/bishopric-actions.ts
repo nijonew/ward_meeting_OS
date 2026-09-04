@@ -129,3 +129,19 @@ export async function setAgendaItemStatus(
   revalidatePath(`/meetings/${meetingId}`);
   return { success: true };
 }
+
+/**
+ * Assigns a publicly-submitted agenda item (no meeting_id yet) to a
+ * specific meeting -- from here it shows up in that meeting's own
+ * Agenda Items section for the usual publish/archive review.
+ */
+export async function assignAgendaItemToMeeting(itemId: string, meetingId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("agenda_items").update({ meeting_id: meetingId }).eq("id", itemId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  revalidatePath(`/meetings/${meetingId}/planning`);
+  return { success: true };
+}
