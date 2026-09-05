@@ -16,6 +16,16 @@ export interface PublishedAnnouncement {
   title: string;
   body: string;
   created_at: string;
+  organization: string | null;
+  announcement_type: string | null;
+  audience: string | null;
+  where_announced: string | null;
+  start_date: string | null;
+  start_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  location: string | null;
+  link_url: string | null;
 }
 
 /**
@@ -28,7 +38,9 @@ export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement
 
   const { data, error } = await supabase
     .from("announcements")
-    .select("id, title, body, created_at")
+    .select(
+      "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url"
+    )
     .is("meeting_id", null)
     .eq("status", "published")
     .order("created_at", { ascending: false });

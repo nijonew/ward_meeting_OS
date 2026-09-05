@@ -19,9 +19,8 @@ export default async function SubmitPage({
       <section className="mt-10">
         <h1 className="font-display text-2xl">Submit an Announcement or Agenda Item</h1>
         <p className="mt-2 text-sm text-slate">
-          Anyone can submit. Agenda items go straight onto that meeting&rsquo;s agenda; the Bishopric
-          can remove one if needed. Announcements are reviewed by the Bishopric before appearing
-          publicly.
+          Anyone can submit. Both agenda items and announcements go live right away &mdash; the
+          Bishopric can remove either afterward if needed.
         </p>
 
         {success && (

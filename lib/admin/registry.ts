@@ -156,11 +156,22 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   announcements: {
     table: "announcements",
     label: "Announcements",
-    description: "Submitted announcements, published to the public landing page when marked Published.",
+    description:
+      "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one. Organization/Type are free text (not a fixed dropdown) since the real form's \"Other\" answers shouldn't get stranded outside a fixed list; Audience/Where Announced are comma-separated (the form's checkbox questions -- no multi-select column type yet).",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },
       { column: "body", label: "Body", type: "long_text", required: true },
+      { column: "organization", label: "Organization", type: "text" },
+      { column: "announcement_type", label: "Type", type: "text" },
+      { column: "audience", label: "Audience", type: "text" },
+      { column: "where_announced", label: "Where Announced", type: "text" },
+      { column: "start_date", label: "Start Date", type: "date" },
+      { column: "start_time", label: "Start Time", type: "time" },
+      { column: "end_date", label: "End Date", type: "date" },
+      { column: "end_time", label: "End Time", type: "time" },
+      { column: "location", label: "Location", type: "text" },
+      { column: "link_url", label: "Link", type: "text" },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },

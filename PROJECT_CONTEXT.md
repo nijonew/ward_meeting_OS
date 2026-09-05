@@ -7,15 +7,18 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 030
+## Current migration number: 031
 
-Migrations `022`–`027` all confirmed run by the user (2026-09-05). `025`
+Migrations `022`–`030` all confirmed run by the user (2026-09-05). `025`
 was used by the user's own project-workflow-review session, outside
 this chat -- exactly the kind of collision this file exists to warn
-about. `028_agenda_items_time_needed.sql`, `029_people_labels.sql`, and
-`030_people_profile_link.sql` exist in the repo but still need to be
-run -- **030 also changes an RLS policy, read its own comment before
-running it**. Next migration should be `031_*.sql`. Migrations are
+about. That session (branch `claude/project-workflow-review-226b91`,
+not yet merged into `main` as of this note) separately verified 025
+working and found all 11 configured rotations currently have zero
+members in production -- worth pulling into `main`'s own Known open
+items once that branch is reviewed/merged, not duplicated here
+blind. `031_announcements_richer.sql` exists in the repo but still
+needs to be run. Next migration should be `032_*.sql`. Migrations are
 plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
@@ -370,42 +373,51 @@ pending. `submitAnnouncement` was deliberately left untouched (still
 pending by default) — see the blocked event-announcement workflow
 below for why.
 
-### Terminology question + Workflow: announcing an upcoming event (BLOCKED — needs input)
+### ~~Terminology question + Workflow: announcing an upcoming event~~ — built 2026-09-05
 
-The user is deliberately trying to remove ambiguity between events,
-announcements, activities, youth activities, information, and
-assignments, and wants **youth activities kept completely separate**
-from all other announcement-type content (events, activities,
-information, assignments, ongoing classes, etc.). They linked a second
-reference form (for adding an event announcement) and asked whether it
-helps resolve the terminology question.
+The Google Form itself (`.../1FAIpQLSfeFKoow2UfLzuwBYHxaS8xRlv9MsfRDXHgItqQbIWOWUXSIQ/viewform`)
+401'd on every fetch attempt, same as before — the user pasted its real
+field list directly instead. That answered the terminology question:
+it's a general **announcement request** form, not an event-only one —
+"event" is just one value (`Single Event`) of several under "What type
+of announcement is this?" (Ongoing Event, Future - For Planning,
+Action, General Information, Assignments, Lesson). Youth only appears
+as an *organization*/*audience* value on this form, never its own type
+— confirms `youth_activities` should stay the separate table it already
+is, not get folded into this.
 
-**Could not fetch the form** — `https://docs.google.com/forms/d/e/
-1FAIpQLSfeFKoow2UfLzuwBYHxaS8xRlv9MsfRDXHgItqQbIWOWUXSIQ/viewform`
-returned HTTP 401 Unauthorized on two attempts (2026-09-05), unlike the
-agenda-item form which fetched cleanly — this one appears to require
-being signed into an authorized Google account to view. Ask the user
-for the field list directly, or a link/export that doesn't require
-that, before building anything from it.
+Migration `031` (still needs to be run) extends `announcements` with
+the form's real fields: `organization` + `announcement_type` (the
+form's radio/single-select questions, each with a real "Other" —
+stored as free text rather than a fixed `select` column so an "Other"
+answer isn't stranded outside a fixed list), `audience` +
+`where_announced` (the form's checkbox/multi-select questions — stored
+as comma-joined text; the generic Table Admin engine has no
+multi-select column type yet and this is a two-column, not-yet-common
+need, not worth adding one for), `start_date`/`start_time`/`end_date`/
+`end_time`, `location`, `link_url`. File attachment (the form's last
+question) was explicitly skipped per the user's instruction.
 
-The stated workflow itself (anyone can add an event announcement,
-admin-reviewed but "not necessary to add an extra review step at this
-time," included by default / excludable by admin) sounds like the same
-"included by default" pattern applied to the agenda-item workflow above
-— but deliberately **not treated as license to flip `announcements`'
-default to auto-published**: that table already has a real, live,
-no-login public page (`/announcements/public`), so an anonymous
-submission going instantly public before any admin sees it is a
-materially bigger exposure than an agenda item (which today only
-becomes visible inside a specific logged-in meeting's agenda, and the
-non-admin no-login viewing feature for those meetings isn't even built
-yet — see the non-Sacrament workflow above). Whether "an announcement
-of an upcoming event" even belongs on `announcements` (title/body,
-no date fields) or is really about `ward_events` (which already has
-`event_date`/`event_time`/`location` and, notably, already defaults
-new admin-added rows to `published` per `app/ward-events/actions.ts`)
-is exactly the kind of ambiguity the user is asking about — don't
-guess at it; ask once the form is available.
+`submitAnnouncement` (`app/submit/actions.ts`) now matches the form
+exactly and **publishes immediately** (flips from the old `pending`
+default) — the user's original workflow description ("not necessary to
+add an extra review step at this time," "included by default... but
+can be excluded by admin") already settled the auto-publish-risk
+question flagged here previously; an admin can still exclude one via
+Status in Table Admin or the `/announcements` inbox.
+`components/submit/SubmitForm.tsx` grew the new fields (checkboxes for
+the multi-select questions, a select-with-"Other"-textbox for the
+single-select ones).
+
+**Bug found and fixed along the way:** `/announcements/public` — the
+page the landing page's "Announcements" tile has linked to all
+along — contained a stray duplicate of the landing page's own
+`HomePage` component, not an announcements listing.
+`getPublishedAnnouncements()` (`lib/data/general-submissions.ts`)
+existed and worked but was never called from anywhere. Nobody following
+that tile has ever actually seen a posted announcement. Replaced with a
+real listing page rendering title/body/organization/type/date
+range/location/link.
 
 ## Known open items
 
