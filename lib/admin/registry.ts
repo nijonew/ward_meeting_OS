@@ -1,4 +1,22 @@
 import type { AdminTableConfig } from "./types";
+import {
+  ASSIGNMENT_ROLES,
+  MUSIC_TYPES,
+  RABNM_TYPES,
+  SPECIAL_FORMATS,
+  SPEAKER_SLOTS_ADULT,
+  SPEAKER_SLOTS_YOUTH,
+  slotLabel,
+} from "@/lib/data/sacrament-constants";
+import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
+
+const PUBLISH_STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "published", label: "Published" },
+];
+
+const SPEAKER_SLOT_OPTIONS_ADULT = SPEAKER_SLOTS_ADULT.map((s) => ({ value: s, label: slotLabel(s) }));
+const SPEAKER_SLOT_OPTIONS_YOUTH = SPEAKER_SLOTS_YOUTH.map((s) => ({ value: s, label: slotLabel(s) }));
 
 const SUBMISSION_STATUSES = [
   { value: "pending", label: "Pending" },
@@ -44,6 +62,21 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  *   break that page for an entire meeting type, not just create bad data.
  * - meeting_schedule_rules: already has a dedicated editor at
  *   /meeting-schedule with Edit/Copy -- no need to duplicate it here.
+ * - rotations, rotation_members: /rotations already manages membership
+ *   and ordering with the correct sort_order/next_index bookkeeping
+ *   (see app/rotations/actions.ts) -- a raw grid edit to sort_order
+ *   here could desync next_index from what member is actually "next."
+ * - sacrament_rabnm_people: pure join table with a composite key
+ *   (rabnm_id, person_id), no surrogate id column -- the generic editor
+ *   assumes every table has an `id` primary key, so this one needs
+ *   composite-key support that doesn't exist yet.
+ *
+ * Columns deliberately left off tables that ARE included:
+ * - meetings.stage: the template/planning/review/ready/live/archived
+ *   lifecycle controls what the public program page shows -- edit it
+ *   through the meeting's own pages, not here.
+ * - meetings.agenda_share_token: an unguessable-link secret. Exposing
+ *   or hand-editing it in a grid defeats the point of it being one.
  */
 export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   agenda_items: {
@@ -81,7 +114,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Bishopric Assignments",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
-      { column: "role", label: "Role", type: "text", required: true },
+      { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "confirmed", label: "Confirmed", type: "boolean" },
     ],
@@ -149,6 +182,148 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "element_key", label: "Element Key", type: "text", required: true },
       { column: "person_id", label: "Person", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "text_value", label: "Text", type: "long_text" },
+    ],
+  },
+
+  meetings: {
+    table: "meetings",
+    label: "Meetings",
+    description:
+      "Edit meeting metadata. Stage and the agenda share link are managed by the app, not editable here. Prefer /meetings/new or /meeting-schedule to create new meetings so rotations get assigned automatically -- a row added here skips that.",
+    orderBy: { column: "date", ascending: false },
+    columns: [
+      { column: "meeting_type_id", label: "Meeting Type", type: "foreign_key", required: true, foreignKey: { table: "meeting_types", valueColumn: "id", labelColumn: "name" } },
+      { column: "date", label: "Date", type: "date", required: true },
+      { column: "time_of_day", label: "Time", type: "time" },
+      { column: "duration_minutes", label: "Duration (min)", type: "number" },
+    ],
+  },
+
+  people: {
+    table: "people",
+    label: "People",
+    orderBy: { column: "name", ascending: true },
+    columns: [
+      { column: "name", label: "Name", type: "text", required: true },
+      { column: "email", label: "Email", type: "text" },
+      { column: "active", label: "Active", type: "boolean" },
+      { column: "notes", label: "Notes", type: "long_text" },
+    ],
+  },
+
+  sacrament_assignments: {
+    table: "sacrament_assignments",
+    label: "Sacrament Assignments",
+    columns: [
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
+      { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
+      { column: "confirmed", label: "Confirmed", type: "boolean" },
+    ],
+  },
+
+  sacrament_music: {
+    table: "sacrament_music",
+    label: "Sacrament Music",
+    description: "submitted_by is left out here -- it's an attribution field for the public submission form, not something to reassign.",
+    columns: [
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "type", label: "Type", type: "select", required: true, options: [...MUSIC_TYPES] },
+      { column: "slot", label: "Slot", type: "text" },
+      { column: "hymn_number", label: "Hymn #", type: "number" },
+      { column: "piece_name", label: "Piece Name", type: "text" },
+      { column: "individual_id", label: "Individual", type: "foreign_key", foreignKey: PERSON_FK },
+      { column: "group_name", label: "Group Name", type: "text" },
+      { column: "accompanist_id", label: "Accompanist", type: "foreign_key", foreignKey: PERSON_FK },
+      { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
+    ],
+  },
+
+  sacrament_planning: {
+    table: "sacrament_planning",
+    label: "Sacrament Planning",
+    columns: [
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },
+      { column: "ward_business", label: "Ward Business", type: "long_text" },
+      { column: "stake_business", label: "Stake Business", type: "long_text" },
+      { column: "visiting_authorities", label: "Visiting Authorities", type: "long_text" },
+      { column: "recognitions", label: "Recognitions", type: "long_text" },
+      { column: "hidden_notes", label: "Hidden Notes", type: "long_text" },
+    ],
+  },
+
+  sacrament_rabnm: {
+    table: "sacrament_rabnm",
+    label: "Releases / New Callings / Records",
+    columns: [
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },
+      { column: "calling_id", label: "Calling", type: "foreign_key", foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
+      { column: "detail", label: "Detail", type: "text" },
+      { column: "event_date", label: "Event Date", type: "date" },
+    ],
+  },
+
+  sacrament_speakers_adults: {
+    table: "sacrament_speakers_adults",
+    label: "Sacrament Speakers (Adult)",
+    orderBy: { column: "slot", ascending: true },
+    columns: [
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "slot", label: "Slot", type: "select", required: true, options: SPEAKER_SLOT_OPTIONS_ADULT },
+      { column: "speaker_id", label: "Speaker", type: "foreign_key", foreignKey: PERSON_FK },
+      { column: "guest_speaker_name", label: "Guest Speaker Name", type: "text" },
+      { column: "topic", label: "Topic", type: "text" },
+      { column: "duration", label: "Duration", type: "text" },
+      { column: "confirmed", label: "Confirmed", type: "boolean" },
+    ],
+  },
+
+  sacrament_speakers_youth: {
+    table: "sacrament_speakers_youth",
+    label: "Sacrament Speakers (Youth)",
+    orderBy: { column: "slot", ascending: true },
+    columns: [
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "slot", label: "Slot", type: "select", required: true, options: SPEAKER_SLOT_OPTIONS_YOUTH },
+      { column: "speaker_id", label: "Speaker", type: "foreign_key", foreignKey: PERSON_FK },
+      { column: "guest_speaker_name", label: "Guest Speaker Name", type: "text" },
+      { column: "topic", label: "Topic", type: "text" },
+      { column: "duration", label: "Duration", type: "text" },
+      { column: "confirmed", label: "Confirmed", type: "boolean" },
+    ],
+  },
+
+  ward_events: {
+    table: "ward_events",
+    label: "Ward Events",
+    orderBy: { column: "event_date", ascending: true },
+    columns: [
+      { column: "event_date", label: "Date", type: "date", required: true },
+      { column: "event_time", label: "Time", type: "time" },
+      { column: "title", label: "Title", type: "text", required: true },
+      { column: "location", label: "Location", type: "text" },
+      { column: "notes", label: "Notes", type: "long_text" },
+      { column: "status", label: "Status", type: "select", required: true, options: PUBLISH_STATUSES },
+    ],
+  },
+
+  youth_activities: {
+    table: "youth_activities",
+    label: "Youth Activities",
+    orderBy: { column: "activity_date", ascending: true },
+    columns: [
+      { column: "activity_date", label: "Date", type: "date", required: true },
+      { column: "activity_time", label: "Time", type: "time" },
+      { column: "title", label: "Title", type: "text", required: true },
+      { column: "group_name", label: "Group", type: "select", required: true, options: YOUTH_ACTIVITY_GROUPS },
+      { column: "location", label: "Location", type: "text" },
+      { column: "development_category", label: "Development Category", type: "select", options: YOUTH_DEVELOPMENT_CATEGORIES },
+      { column: "youth_lead", label: "Youth Lead", type: "text" },
+      { column: "advisor_lead", label: "Advisor Lead", type: "text" },
+      { column: "notes", label: "Notes", type: "long_text" },
+      { column: "status", label: "Status", type: "select", required: true, options: PUBLISH_STATUSES },
     ],
   },
 };
