@@ -9,7 +9,7 @@ https://ward-meeting-os.vercel.app
 
 ## Current migration number: 031
 
-Migrations `022`–`030` all confirmed run by the user (2026-09-05). `025`
+Migrations `022`–`031` all confirmed run by the user (2026-09-05). `025`
 was used by the user's own project-workflow-review session, outside
 this chat -- exactly the kind of collision this file exists to warn
 about. That session (branch `claude/project-workflow-review-226b91`,
@@ -17,9 +17,9 @@ not yet merged into `main` as of this note) separately verified 025
 working and found all 11 configured rotations currently have zero
 members in production -- worth pulling into `main`'s own Known open
 items once that branch is reviewed/merged, not duplicated here
-blind. `031_announcements_richer.sql` exists in the repo but still
-needs to be run. Next migration should be `032_*.sql`. Migrations are
-plain `.sql` files at
+blind -- that branch's own work is being finished before it comes back
+to this one for re-evaluation. Next migration should be `032_*.sql`.
+Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
