@@ -7,9 +7,12 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 021
+## Current migration number: 022
 
-Next migration should be `022_*.sql`. Migrations are plain `.sql` files at
+`022_admin_select_options.sql` exists in the repo but still needs the
+user to actually run it in the Supabase SQL editor (written, not yet
+confirmed run as of 2026-09-04). Next migration should be `023_*.sql`.
+Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -108,14 +111,11 @@ Requested while going through the `/admin` Table Admin feature
 time, rather than building ahead. Update this list (strike/remove an item,
 or note partial progress) as each is picked up.
 
-1. **Admin-editable option lists for `calling_status`/`release_status`.**
-   Confirmed with the user: migration `022` is free to use for this. Not
-   yet built — needs a new table (e.g. `admin_select_options`: field key,
-   value, label, sort order) that the two calling_planning select columns
-   read their options from instead of the hardcoded arrays in
-   `lib/admin/registry.ts`, plus an admin UI to add/reorder/remove option
-   rows (the existing Table Admin engine can likely host this table
-   itself once it exists).
+1. ~~**Admin-editable option lists for `calling_status`/`release_status`.**~~
+   Done (2026-09-04) — `admin_select_options` table (migration `022`,
+   **user still needs to run this in the Supabase SQL editor**),
+   `lib/data/select-options.ts`, wired into both the real Calling
+   Planning UI and the "Dropdown Option Lists" admin table.
 2. **Sacrament Music.** Rename admin label "Sacrament Music" →
    "Sacrament Meeting Music". Create a hymn/song reference table covering
    all three current hymnals/songbooks — *Hymns for Home and Church*,
@@ -158,6 +158,21 @@ or note partial progress) as each is picked up.
    Aaronic Priesthood, etc. — see `RABNM_TYPES` in
    `lib/data/sacrament-constants.ts` for the current type list), so this
    isn't a simple flat-column admin grid like the others.
+5. **Sacrament Speakers (adult/youth) — rename + re-scope.** *If* these
+   tables continue to exist (user's own qualifier — not fully committed
+   yet): rename to "Sacrament Meeting Speakers (Adult)" / "(Youth)".
+   More importantly, the user sees their actual purpose differently than
+   how they're built today: `sacrament_speakers_adults/youth` are
+   currently forward-planning tables (a `meeting_id` FK ties a speaker
+   directly to one specific upcoming meeting) — but the user wants them
+   to be a **history log** of who has spoken in the past (informs future
+   planning, e.g. via `/speaker-prayer-history`'s existing "who's due"
+   view), not the live planning surface itself. The live planning
+   surface for a specific date is item 3 above (the Sacrament Meeting
+   Planning redesign) — these two items are closely related and should
+   probably be designed together: item 3's per-date element planning is
+   presumably what *writes* the eventual "spoke on this date" history
+   record these tables would hold, once repurposed.
 
 ## Working conventions
 
