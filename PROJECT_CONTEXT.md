@@ -286,6 +286,57 @@ in a trusted-admin context.
   Concrete, well-scoped gap — good candidate to build once past the
   vision-gathering phase.
 
+### Terminology: "notes" vs. "minutes"
+
+The user has used these interchangeably up to now. Going forward:
+**notes** = what admins write live, during a meeting, on specific
+elements. **minutes** = what a *later* meeting's admin produces when
+they review a previous meeting's notes and relate them back (summarize
+discussion points, action items, etc.) as an agenda element of the
+*current* meeting. Minutes are a retelling of notes, not a separate
+data type — there isn't a distinct "minutes" table/field to build,
+just a distinct verb for "notes, once someone reports on them later."
+
+### Workflow: Admin adding notes to elements during a meeting
+
+1. An admin attending a meeting logs in, selects that meeting, and sees
+   notes fields for specific elements — agenda items, discussion
+   items — but **not** the rotationally-assigned ones. Plus a general
+   notes field, and an action items field (dropdown for the
+   organization or individual assigned, plus a description).
+2. These are viewable/editable **in real time by all admins in the
+   meeting** — while the meeting is happening, everyone with access
+   sees everyone else's notes update live.
+3. Non-admins only get access after the meeting is completed/archived
+   (consistent with the non-Sacrament workflow's notes-visibility rule
+   above).
+4. When a future meeting's admin relates minutes, they look at the
+   archived meeting and see the agenda **as it was finalized**, with
+   the notes rendered so they visually stand out from the element they
+   describe (e.g. a font color change) — not blended in as if part of
+   the agenda itself.
+
+**Known gaps, not yet built:**
+- **No real-time sync exists anywhere in the app.** Server actions +
+  `revalidatePath` only refresh the acting user's own session on their
+  next interaction — nothing pushes live updates to *other* open admin
+  sessions. Multiple admins in the same meeting would need to manually
+  reload to see each other's notes appear. Supabase Realtime could
+  cover this but nothing subscribes to live changes today.
+- **Action items can only be assigned to a person today**
+  (`meeting_action_items.assigned_to_id` is a single FK to `people`) —
+  no concept of assigning to an *organization* (a quorum, auxiliary,
+  class, etc.) exists in the schema at all.
+- **No distinct "view an archived meeting" experience exists.**
+  Confirmed by checking every route under `app/meetings/[id]/` — none
+  branches on `stage === 'archived'`. An archived meeting is presumably
+  still shown through the same editable planning form as any other,
+  with no read-only finalized-agenda view, and no visual treatment
+  distinguishing notes from the elements they describe.
+- The non-admin post-archive visibility rule (item 5 in the
+  non-Sacrament workflow above) still isn't built — reconfirmed here,
+  not a new gap.
+
 ## Known open items
 
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
