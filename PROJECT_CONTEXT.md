@@ -9,11 +9,14 @@ https://ward-meeting-os.vercel.app
 
 ## Current migration number: 025
 
-Migrations `022`–`024` confirmed run by the user (2026-09-04). Migration
-`025` (`apply_rotation_assignment` Postgres function, see Assignment
-Rotations below) written 2026-09-04, **not yet confirmed run by the
-user**. Next migration after that should be `026_*.sql`. Migrations are
-plain `.sql` files at
+Migrations `022`–`025` confirmed run by the user (2026-09-04/05).
+Migration `025` (`apply_rotation_assignment` Postgres function, see
+Assignment Rotations below) additionally verified working (2026-09-05)
+via a rollback-safe functional test run directly against production in
+the Supabase SQL editor -- confirmed it assigns the correct person to
+the correct table and advances `next_index` correctly, with everything
+the test wrote rolled back afterward. Next migration should be
+`026_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -75,6 +78,14 @@ before.
 
 ## Known open items
 
+- **No rotation has any members yet.** Discovered 2026-09-05 while
+  verifying migration 025: all 11 configured rotations (bishopric-meeting
+  closing/opening prayer + handbook training + spiritual thought,
+  sacrament-meeting chorister/conducting/organist, ward-council and
+  youth-council closing/opening prayer) currently show `member_count = 0`
+  in production. Until people are assigned (via `/rotations`, or its
+  `syncRotationMembership()` logic), every new meeting silently skips all
+  rotation-based assignments -- not a bug, just an unfinished setup step.
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
 - Bishopric-side free-text elements (spiritual thought, handbook training,
   young men coordination, impressions, calling planning, sacrament meeting
