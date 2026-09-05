@@ -111,13 +111,15 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   hymnal_songs: {
     table: "hymnal_songs",
-    label: "Hymnal / Songbook Reference",
+    label: "Music Reference",
     description:
-      "Reference list of hymn/song numbers and titles across the three current music collections -- for looking things up while entering Sacrament Meeting Music, not tied to any specific meeting. Not pre-populated yet; add entries here as needed.",
+      "Reference list of hymn/song numbers and titles across the three current music collections -- for looking things up while entering Sacrament Meeting Music, not tied to any specific meeting.",
     orderBy: { column: "songbook", ascending: true },
     columns: [
       { column: "songbook", label: "Songbook", type: "select", required: true, options: SONGBOOKS },
-      { column: "number", label: "Number", type: "number", required: true },
+      // Text, not number: several entries share a base number with a
+      // lettered suffix (e.g. "20a"/"20b" are two different songs).
+      { column: "number", label: "Number", type: "text", required: true },
       { column: "title", label: "Title", type: "text", required: true },
     ],
   },
