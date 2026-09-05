@@ -337,6 +337,44 @@ just a distinct verb for "notes, once someone reports on them later."
   non-Sacrament workflow above) still isn't built — reconfirmed here,
   not a new gap.
 
+### Workflow: Adding agenda items for a non-Sacrament meeting
+
+Anyone invited to a non-sacrament meeting should be able to add agenda
+items for their organization: enter the site (via a tile for meeting
+agenda items) or a direct link from an email announcement/reminder,
+fill out the form, and the item becomes available to the meeting(s) it
+pertains to — **included by default**, excludable by an admin if
+needed. The user linked the actual form ward members use today as the
+reference for what fields belong: [Heritage Ward Meeting Agenda
+form](https://docs.google.com/forms/d/e/1FAIpQLSdThJMvNwBYWzGnKAE-pkLf9oRf1EZmyZMZtWXAng5aUT-o0A/viewform),
+fetched and confirmed (2026-09-05) to actually ask for: Email
+(*required*), Your Name (not required), Desired Meeting for Agenda
+Item (Bishopric / Ward Council / Ward Youth Council), Date of Meeting,
+Description of Agenda Item (one paragraph field, no separate title),
+and How Much Time Do You Need (1–2 / 3–5 / 6+ minutes).
+
+**Known conflicts with what's built today** (checked the real code, not
+assumed):
+- **No tile links to `/submit` at all.** Searched `app/page.tsx` — the
+  "select the tile" step in this workflow has no tile to select yet.
+- **The current `/submit` form doesn't match the reference form's
+  fields.** It has one combined announcement/agenda-item form with
+  title + body + name + email, all four required. It's missing:
+  which meeting type the item is for, which date, and how much time is
+  needed. It also splits into title+body where the real form has just
+  one description field, and requires name where the real form doesn't.
+- **Submitted agenda items always get `meeting_id = null`** — an admin
+  has to manually match each one to a specific meeting afterward (the
+  Dashboard's "Unassigned Agenda Items" section). There's no way today
+  for the submitter to specify the meeting type/date up front, which
+  the real reference form already asks for.
+- **Default visibility is inverted from what's described.**
+  `components/bishopric/AgendaItemsSection.tsx` confirms submitted
+  items start `status = 'pending'` (excluded from the meeting's
+  agenda) and need an admin to explicitly click "Publish" before they
+  appear. The vision calls for **included by default**, with an option
+  to exclude — the opposite default.
+
 ## Known open items
 
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
