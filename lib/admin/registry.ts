@@ -346,7 +346,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_speakers_adults: {
     table: "sacrament_speakers_adults",
-    label: "Sacrament Speakers (Adult)",
+    label: "Sacrament Meeting Speakers (Adult)",
+    description:
+      "Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -361,7 +363,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_speakers_youth: {
     table: "sacrament_speakers_youth",
-    label: "Sacrament Speakers (Youth)",
+    label: "Sacrament Meeting Speakers (Youth)",
+    description:
+      "Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },

@@ -188,21 +188,21 @@ or note partial progress) as each is picked up.
    the grid still can't attach people to a record since that lives in
    `sacrament_rabnm_people`, a composite-key join table the generic
    engine doesn't support (see registry.ts).
-5. **Sacrament Speakers (adult/youth) — rename + re-scope.** *If* these
-   tables continue to exist (user's own qualifier — not fully committed
-   yet): rename to "Sacrament Meeting Speakers (Adult)" / "(Youth)".
-   More importantly, the user sees their actual purpose differently than
-   how they're built today: `sacrament_speakers_adults/youth` are
-   currently forward-planning tables (a `meeting_id` FK ties a speaker
-   directly to one specific upcoming meeting) — but the user wants them
-   to be a **history log** of who has spoken in the past (informs future
-   planning, e.g. via `/speaker-prayer-history`'s existing "who's due"
-   view), not the live planning surface itself. The live planning
-   surface for a specific date is item 3 above (the Sacrament Meeting
-   Planning redesign) — these two items are closely related and should
-   probably be designed together: item 3's per-date element planning is
-   presumably what *writes* the eventual "spoke on this date" history
-   record these tables would hold, once repurposed.
+5. ~~**Sacrament Speakers (adult/youth) — rename + re-scope.**~~ Done
+   (2026-09-05): renamed to "Sacrament Meeting Speakers (Adult)" /
+   "(Youth)". The re-scope turned into a discovery rather than a build:
+   checked `/speaker-prayer-history`'s actual "who's due" logic
+   (`lib/data/speaker-prayer-history.ts`) and it already reads these
+   same tables filtered to `stage = 'archived'` and `confirmed = true`
+   -- so the history-vs-forward-planning split the user wanted is
+   already happening today via a query filter over one table, not two
+   separate tables. Presented that finding plus the real cost of a full
+   duplicate-table split (new table, migrating the live Speakers form,
+   an archive-time copy step, rewriting the history query) and the user
+   chose to skip the schema split -- just added a description on both
+   tables in Table Admin clarifying the dual role (editing a future
+   meeting's speakers here doesn't affect who's counted as recently
+   having a turn, since only archived+confirmed rows count).
 6. **Sortable column headers in Table Admin.** (2026-09-05, user's own
    words: "future upgrade") Click a column heading in `AdminTableEditor`
    to sort the grid by that column, presumably click-again to reverse.
