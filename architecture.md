@@ -2,7 +2,13 @@
 
 ## Architecture & Design Document
 
-### Version 0.1 (Draft)
+### Version 0.2 (Draft)
+
+> This document holds the long-term vision and design principles.
+> For the current implementation's actual state (tables, roles, open
+> items, in-progress work), see [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) —
+> when the two disagree, `PROJECT_CONTEXT.md` describes what's really
+> built and this document should be updated to match.
 
 ## 1. Vision
 
@@ -35,9 +41,10 @@ Conducting, Public) without duplication.
 Meetings are the core object. People, callings, planning, publication,
 and history all support meetings.
 
-### Notion Stores Data
+### Supabase Stores Data
 
-Notion is the system of record. Next.js provides the user experience and
+Supabase (Postgres) is the system of record, with row-level security
+enforced on every table. Next.js provides the user experience and
 application logic.
 
 ## 3. Core Entities
@@ -119,14 +126,20 @@ Collaborative planning meeting.
 
 ## 7. Permissions
 
-Examples:
+Current implementation:
 
--   Bishop: Full access
--   Bishopric Counselors: Full meeting editing
--   Executive Secretary: Agenda and planning management
--   Ward Clerk: Minutes and agenda management
--   Invited Participants: Submit agenda items
--   Ward Members: View published meetings only
+-   Bishopric (bishop, counselors, executive secretary, and ward clerk):
+    one shared role with full meeting editing. The app does not yet
+    distinguish between these four people individually — see
+    `PROJECT_CONTEXT.md`'s Table Admin queue for the open item tracking
+    this gap (matters most for who can add
+    Recognitions/Advancements/Baptisms/New Members records).
+-   Music Planner, Communications Specialist, and the granular youth
+    roles (YW Presidency/Advisor/Specialist, YM Advisor/Specialist):
+    scoped to their own planning areas.
+-   Invited Participants: Submit agenda items (not yet built — planned
+    as a share-token, no-login view).
+-   Ward Members: View published meetings only, unauthenticated.
 
 ## 8. Dynamic Content
 
@@ -140,15 +153,21 @@ person - Due date - Status
 
 ## 10. Publication Model
 
-Private planning data is rendered into a public meeting program using a
-meeting-specific obscured URL.
+Private planning data is rendered into public routes gated by row-level
+security: narrow anon-access policies expose only records already
+filtered to what's meant to be public (e.g. `confirmed = true`,
+`status = 'published'`), matching what the public UI filters to
+client-side. Meeting-specific obscured/share-token URLs (security
+through an unguessable link) remain the planned model for the
+not-yet-built invited-participant agenda views, but are not how the
+public meeting program itself is protected today.
 
 ## 11. Technology Stack
 
 -   Next.js
 -   TypeScript
 -   Tailwind CSS
--   Notion
+-   Supabase (Postgres + Auth)
 -   GitHub
 -   Vercel
 
