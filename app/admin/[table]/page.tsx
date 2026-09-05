@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
 import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions } from "@/lib/admin/table-data";
+import { getSelectOptions } from "@/lib/data/select-options";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { updateRow, insertRow, deleteRow } from "./actions";
 
@@ -27,10 +28,23 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
 
   const rows = await getAdminRows(config);
 
+  // A select column with `optionsFrom` reads its live choices from
+  // admin_select_options instead of its hardcoded `options` (used only
+  // as the fallback) -- resolve those now so the rest of this page and
+  // AdminTableEditor never need to know the difference.
+  const resolvedColumns = await Promise.all(
+    config.columns.map(async (c) => {
+      if (c.type === "select" && c.optionsFrom) {
+        return { ...c, options: await getSelectOptions(c.optionsFrom, c.options ?? []) };
+      }
+      return c;
+    })
+  );
+
   // Every foreign_key column gets its full, unscoped option list (used
   // directly for most columns, and as the fallback for a scoped column's
   // "add new row" case, before any row exists to scope by).
-  const fkColumns = config.columns.filter((c) => c.type === "foreign_key" && c.foreignKey);
+  const fkColumns = resolvedColumns.filter((c) => c.type === "foreign_key" && c.foreignKey);
   const fkOptionEntries = await Promise.all(
     fkColumns.map(async (c) => {
       const fk = c.foreignKey!;
@@ -61,7 +75,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
 
       <AdminTableEditor
         table={config.table}
-        columns={config.columns}
+        columns={resolvedColumns}
         rows={rows}
         fkOptions={fkOptions}
         scopedFkOptions={scopedFkOptions}

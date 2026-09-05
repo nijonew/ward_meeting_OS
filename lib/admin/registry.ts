@@ -9,6 +9,17 @@ import {
   slotLabel,
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
+import { DEFAULT_CALLING_STATUSES, DEFAULT_RELEASE_STATUSES } from "@/lib/data/calling-planning";
+
+/** Fields whose choices can be edited via the "Dropdown Option Lists"
+ *  admin table below (admin_select_options) instead of code. Kept as an
+ *  explicit list -- rather than free text on that table's field_key
+ *  column -- so a typo there can't silently produce an empty dropdown
+ *  somewhere else in the app. */
+const OPTION_FIELD_KEYS = [
+  { value: "calling_planning.calling_status", label: "Calling Planning → Calling Status" },
+  { value: "calling_planning.release_status", label: "Calling Planning → Release Status" },
+];
 
 const PUBLISH_STATUSES = [
   { value: "draft", label: "Draft" },
@@ -22,24 +33,6 @@ const SUBMISSION_STATUSES = [
   { value: "pending", label: "Pending" },
   { value: "published", label: "Published" },
   { value: "archived", label: "Archived" },
-];
-
-const CALLING_STATUSES = [
-  { value: "discussing", label: "Discussing" },
-  { value: "future", label: "Future" },
-  { value: "declined", label: "Declined" },
-  { value: "to_announce", label: "To Announce in Sacrament" },
-  { value: "to_be_set_apart", label: "To Be Set Apart" },
-  { value: "to_record", label: "To Record" },
-  { value: "complete", label: "Complete" },
-];
-
-const RELEASE_STATUSES = [
-  { value: "previously_vacant", label: "Previously Vacant" },
-  { value: "discussing", label: "Discussing" },
-  { value: "to_announce", label: "To Announce in Sacrament" },
-  { value: "to_record", label: "To Record" },
-  { value: "complete", label: "Complete" },
 ];
 
 /** meetingTypeSlug narrows the Meeting calendar picker to just that
@@ -84,6 +77,20 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  *   or hand-editing it in a grid defeats the point of it being one.
  */
 export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
+  admin_select_options: {
+    table: "admin_select_options",
+    label: "Dropdown Option Lists",
+    description:
+      "Manage the choices shown in other tables' status dropdowns (currently Calling Planning's Calling Status and Release Status). Deleting every row for a Field Key falls back to that field's built-in default list rather than showing no choices at all.",
+    orderBy: { column: "field_key", ascending: true },
+    columns: [
+      { column: "field_key", label: "Field Key", type: "select", required: true, options: OPTION_FIELD_KEYS },
+      { column: "value", label: "Value (stored)", type: "text", required: true },
+      { column: "label", label: "Label (shown)", type: "text", required: true },
+      { column: "sort_order", label: "Sort Order", type: "number" },
+    ],
+  },
+
   agenda_items: {
     table: "agenda_items",
     label: "Agenda Items",
@@ -133,7 +140,14 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "calling_id", label: "Calling", type: "foreign_key", required: true, foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
-      { column: "calling_status", label: "Calling Status", type: "select", required: true, options: CALLING_STATUSES },
+      {
+        column: "calling_status",
+        label: "Calling Status",
+        type: "select",
+        required: true,
+        options: DEFAULT_CALLING_STATUSES,
+        optionsFrom: "calling_planning.calling_status",
+      },
       { column: "selected_person_id", label: "Selected Person", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "date_set_apart", label: "Date Set Apart", type: "date" },
       {
@@ -150,7 +164,14 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
           { value: "__previously_vacant__", label: "— Previously Vacant / New Calling —", patch: { release_status: "previously_vacant" } },
         ],
       },
-      { column: "release_status", label: "Release Status", type: "select", required: true, options: RELEASE_STATUSES },
+      {
+        column: "release_status",
+        label: "Release Status",
+        type: "select",
+        required: true,
+        options: DEFAULT_RELEASE_STATUSES,
+        optionsFrom: "calling_planning.release_status",
+      },
       { column: "notes", label: "Notes", type: "long_text" },
       { column: "announced_meeting_id", label: "Announced In", type: "foreign_key", foreignKey: MEETING_FK("sacrament-meeting") },
     ],

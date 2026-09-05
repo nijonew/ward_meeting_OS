@@ -7,9 +7,12 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 021
+## Current migration number: 022
 
-Next migration should be `022_*.sql`. Migrations are plain `.sql` files at
+`022_admin_select_options.sql` exists in the repo but still needs the
+user to actually run it in the Supabase SQL editor (written, not yet
+confirmed run as of 2026-09-04). Next migration should be `023_*.sql`.
+Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -102,6 +105,76 @@ before.
     column (or two) on `meetings` rather than overloading `stage`, since
     `stage` tracks how far along the program is, not whether the meeting
     is happening at all. Lower priority than the auto-archive item.
+
+## Table Admin update queue (FIFO — work top to bottom)
+
+Requested while going through the `/admin` Table Admin feature
+(2026-09-04). Per the user: return to these in the order added, one at a
+time, rather than building ahead. Update this list (strike/remove an item,
+or note partial progress) as each is picked up.
+
+1. ~~**Admin-editable option lists for `calling_status`/`release_status`.**~~
+   Done (2026-09-04) — `admin_select_options` table (migration `022`,
+   **user still needs to run this in the Supabase SQL editor**),
+   `lib/data/select-options.ts`, wired into both the real Calling
+   Planning UI and the "Dropdown Option Lists" admin table.
+2. **Sacrament Music.** Rename admin label "Sacrament Music" →
+   "Sacrament Meeting Music". Create a hymn/song reference table covering
+   all three current hymnals/songbooks — *Hymns for Home and Church*,
+   *Hymns of The Church of Jesus Christ of Latter-day Saints*,
+   *Children's Songbook of The Church of Jesus Christ of Latter-day
+   Saints* — with each entry's number and title (a real data-entry task,
+   likely needs sourcing the actual hymn lists). Remove the `slot` column
+   from the admin grid/planning flow — user doesn't know what it's for
+   and element ordering is handled by the bishopric/admins directly, not
+   by this field. Remove the `status` column too — bishopric/music
+   coordinator entries don't need a "vetted" status; anything entered is
+   already vetted by virtue of who entered it.
+3. **Sacrament Planning.** Rename admin label "Sacrament Planning" →
+   "Sacrament Meeting Planning". Bigger redesign, not just a rename: the
+   `special_format` options (Standard, Testimony Meeting, Stake
+   Conference, etc. — see `SPECIAL_FORMATS` in
+   `lib/data/sacrament-constants.ts`) should become default *template*
+   names rather than a plain field. Target workflow (matches the old
+   spreadsheet): a list of upcoming Sundays by date, each pre-populated
+   with standing elements (opening/closing prayer, at least one more) —
+   the user adds an element to a given date, picks its name/type, and
+   fills in detail (person, music info, etc.) — then the actual meeting
+   program for that date pulls in whatever elements are attached to it,
+   reorderable at that point. This effectively describes a per-date
+   element-planning table upstream of the meeting's own program, distinct
+   from (but feeding) the existing dynamic planning view. Needs real
+   design work before touching schema.
+4. **Releases/New Callings/Records (`sacrament_rabnm`).** Rename to
+   "Recognitions/Advancements/Baptisms/New Members". Purpose: ward
+   business items outside of callings, for inclusion in the meeting's
+   conducting view. The ward clerk and executive secretary need to be
+   able to add these (that's the typical/primary path), with the
+   bishopric also able to; **note:** "clerk"/"exec sec" are folded into
+   the single shared `bishopric` app role today (see Architecture above)
+   with no way to distinguish them for a narrower permission — may need
+   its own decision if per-person (not per-role) add access matters here.
+   Needs a real per-type form design: which fields are required/shown
+   changes depending on the record type (release vs. new calling vs.
+   baby blessing vs. baptism vs. new member vs. mission call vs.
+   Aaronic Priesthood, etc. — see `RABNM_TYPES` in
+   `lib/data/sacrament-constants.ts` for the current type list), so this
+   isn't a simple flat-column admin grid like the others.
+5. **Sacrament Speakers (adult/youth) — rename + re-scope.** *If* these
+   tables continue to exist (user's own qualifier — not fully committed
+   yet): rename to "Sacrament Meeting Speakers (Adult)" / "(Youth)".
+   More importantly, the user sees their actual purpose differently than
+   how they're built today: `sacrament_speakers_adults/youth` are
+   currently forward-planning tables (a `meeting_id` FK ties a speaker
+   directly to one specific upcoming meeting) — but the user wants them
+   to be a **history log** of who has spoken in the past (informs future
+   planning, e.g. via `/speaker-prayer-history`'s existing "who's due"
+   view), not the live planning surface itself. The live planning
+   surface for a specific date is item 3 above (the Sacrament Meeting
+   Planning redesign) — these two items are closely related and should
+   probably be designed together: item 3's per-date element planning is
+   presumably what *writes* the eventual "spoke on this date" history
+   record these tables would hold, once repurposed.
 
 ## Working conventions
 

@@ -33,8 +33,15 @@ export interface AdminColumnConfig {
   label: string;
   type: AdminColumnType;
   required?: boolean;
-  /** Fixed choices, for type: "select". */
+  /** Fixed choices, for type: "select". Used directly if optionsFrom is
+   *  absent; otherwise it's the fallback when that field_key has no rows
+   *  yet in admin_select_options. */
   options?: AdminOption[];
+  /** For type: "select" -- reads live choices from admin_select_options
+   *  (field_key column) via lib/data/select-options.ts, so admins can
+   *  add/remove/reorder them without a code change. Falls back to
+   *  `options` above if that field_key has no rows. */
+  optionsFrom?: string;
   /** Lookup target, for type: "foreign_key". A "meetings" target renders
    *  as a calendar picker instead of a dropdown (see AdminCellInput);
    *  meetingTypeSlug narrows it to just that meeting type's dates, since
