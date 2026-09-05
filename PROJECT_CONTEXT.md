@@ -9,11 +9,8 @@ https://ward-meeting-os.vercel.app
 
 ## Current migration number: 024
 
-`022_admin_select_options.sql`, `023_sacrament_music_auto_approve.sql`,
-and `024_hymnal_songs.sql` all exist in the repo but still need the user
-to actually run them (in that order) in the Supabase SQL editor (written,
-not yet confirmed run as of 2026-09-04). Next migration should be
-`025_*.sql`. Migrations are plain `.sql` files at
+Migrations `022`–`024` confirmed run by the user (2026-09-04). Next
+migration should be `025_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -106,6 +103,16 @@ before.
     column (or two) on `meetings` rather than overloading `stage`, since
     `stage` tracks how far along the program is, not whether the meeting
     is happening at all. Lower priority than the auto-archive item.
+- **Cadence rules for Youth Activities / Ward Events.** (2026-09-04,
+  user's note was cut off mid-thought -- "We likely need" ... nothing
+  after) Wants the same kind of rule-based pre-scheduling `/meeting-
+  schedule` already does for meetings (weekly / nth-weekday / relative
+  cadence, a "Generate" action) applied to `youth_activities` and
+  `ward_events` too, so recurring activities/events don't have to be
+  entered one at a time. Likely reuses the same cadence-shape concept
+  (see Meeting Schedule above) rather than inventing a new one, but
+  needs the rest of the requirement (whatever came after "We likely
+  need") before designing -- ask when picked up.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 
