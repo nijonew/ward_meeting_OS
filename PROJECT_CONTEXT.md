@@ -375,6 +375,43 @@ assumed):
   appear. The vision calls for **included by default**, with an option
   to exclude — the opposite default.
 
+### Terminology question + Workflow: announcing an upcoming event (BLOCKED — needs input)
+
+The user is deliberately trying to remove ambiguity between events,
+announcements, activities, youth activities, information, and
+assignments, and wants **youth activities kept completely separate**
+from all other announcement-type content (events, activities,
+information, assignments, ongoing classes, etc.). They linked a second
+reference form (for adding an event announcement) and asked whether it
+helps resolve the terminology question.
+
+**Could not fetch the form** — `https://docs.google.com/forms/d/e/
+1FAIpQLSfeFKoow2UfLzuwBYHxaS8xRlv9MsfRDXHgItqQbIWOWUXSIQ/viewform`
+returned HTTP 401 Unauthorized on two attempts (2026-09-05), unlike the
+agenda-item form which fetched cleanly — this one appears to require
+being signed into an authorized Google account to view. Ask the user
+for the field list directly, or a link/export that doesn't require
+that, before building anything from it.
+
+The stated workflow itself (anyone can add an event announcement,
+admin-reviewed but "not necessary to add an extra review step at this
+time," included by default / excludable by admin) sounds like the same
+"included by default" pattern applied to the agenda-item workflow above
+— but deliberately **not treated as license to flip `announcements`'
+default to auto-published**: that table already has a real, live,
+no-login public page (`/announcements/public`), so an anonymous
+submission going instantly public before any admin sees it is a
+materially bigger exposure than an agenda item (which today only
+becomes visible inside a specific logged-in meeting's agenda, and the
+non-admin no-login viewing feature for those meetings isn't even built
+yet — see the non-Sacrament workflow above). Whether "an announcement
+of an upcoming event" even belongs on `announcements` (title/body,
+no date fields) or is really about `ward_events` (which already has
+`event_date`/`event_time`/`location` and, notably, already defaults
+new admin-added rows to `published` per `app/ward-events/actions.ts`)
+is exactly the kind of ambiguity the user is asking about — don't
+guess at it; ask once the form is available.
+
 ## Known open items
 
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
