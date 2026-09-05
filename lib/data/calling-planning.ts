@@ -53,7 +53,7 @@ export interface CallingPlanningRow {
   suggestions: SuggestionRow[];
 }
 
-function personName(rel: unknown): string | null {
+export function personName(rel: unknown): string | null {
   if (Array.isArray(rel)) return (rel[0] as { name?: string } | undefined)?.name ?? null;
   return (rel as { name?: string } | null)?.name ?? null;
 }
