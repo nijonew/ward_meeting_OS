@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   addScheduleRule as addRule,
+  updateScheduleRule as updateRule,
   deleteScheduleRule as deleteRule,
   toggleScheduleRuleActive as toggleRule,
   generateMeetingsFromRules,
@@ -12,6 +13,12 @@ type ActionResult = { success: true } | { error: string };
 
 export async function addScheduleRule(formData: FormData): Promise<ActionResult> {
   const result = await addRule(formData);
+  if ("success" in result) revalidatePath("/meeting-schedule");
+  return result;
+}
+
+export async function updateScheduleRule(id: string, formData: FormData): Promise<ActionResult> {
+  const result = await updateRule(id, formData);
   if ("success" in result) revalidatePath("/meeting-schedule");
   return result;
 }

@@ -4,6 +4,7 @@ import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 export interface ScheduleRule {
   id: string;
   meeting_type_id: string;
+  meeting_type_slug: string;
   meeting_type_name: string;
   cadence: "weekly" | "nth_weekday" | "relative";
   nth_occurrence: number | null;
@@ -21,7 +22,7 @@ export async function getScheduleRules(): Promise<ScheduleRule[]> {
   const { data } = await supabase
     .from("meeting_schedule_rules")
     .select(
-      "id, meeting_type_id, cadence, nth_occurrence, day_of_week, anchor_nth_occurrence, anchor_day_of_week, offset_days, time_of_day, duration_minutes, active, meeting_types(name)"
+      "id, meeting_type_id, cadence, nth_occurrence, day_of_week, anchor_nth_occurrence, anchor_day_of_week, offset_days, time_of_day, duration_minutes, active, meeting_types(slug, name)"
     )
     .order("cadence");
 
@@ -38,12 +39,13 @@ export async function getScheduleRules(): Promise<ScheduleRule[]> {
       time_of_day: string;
       duration_minutes: number;
       active: boolean;
-      meeting_types: { name?: string }[] | { name?: string } | null;
+      meeting_types: { slug?: string; name?: string }[] | { slug?: string; name?: string } | null;
     };
     const meetingType = Array.isArray(r.meeting_types) ? r.meeting_types[0] : r.meeting_types;
     return {
       id: r.id,
       meeting_type_id: r.meeting_type_id,
+      meeting_type_slug: meetingType?.slug ?? "",
       meeting_type_name: meetingType?.name ?? "Meeting",
       cadence: r.cadence,
       nth_occurrence: r.nth_occurrence,
@@ -60,15 +62,24 @@ export async function getScheduleRules(): Promise<ScheduleRule[]> {
 
 type ActionResult = { success: true } | { error: string };
 
-export async function addScheduleRule(formData: FormData): Promise<ActionResult> {
-  const supabase = await createClient();
-
-  const meetingTypeSlug = String(formData.get("meeting_type_id") ?? "");
+/** Reads and validates the cadence-dependent fields shared by add and update. */
+function readRuleFields(formData: FormData):
+  | {
+      cadence: string;
+      time_of_day: string;
+      duration_minutes: number;
+      day_of_week: number | null;
+      nth_occurrence: number | null;
+      anchor_day_of_week: number | null;
+      anchor_nth_occurrence: number | null;
+      offset_days: number | null;
+    }
+  | { error: string } {
   const cadence = String(formData.get("cadence") ?? "");
   const time_of_day = String(formData.get("time_of_day") ?? "");
   const duration_minutes = Number(formData.get("duration_minutes"));
 
-  if (!meetingTypeSlug || !cadence || !time_of_day || !duration_minutes) {
+  if (!cadence || !time_of_day || !duration_minutes) {
     return { error: "All fields are required." };
   }
 
@@ -103,6 +114,27 @@ export async function addScheduleRule(formData: FormData): Promise<ActionResult>
     return { error: "Unknown cadence." };
   }
 
+  return {
+    cadence,
+    time_of_day,
+    duration_minutes,
+    day_of_week,
+    nth_occurrence,
+    anchor_day_of_week,
+    anchor_nth_occurrence,
+    offset_days,
+  };
+}
+
+export async function addScheduleRule(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const meetingTypeSlug = String(formData.get("meeting_type_id") ?? "");
+  if (!meetingTypeSlug) return { error: "Choose a meeting type." };
+
+  const fields = readRuleFields(formData);
+  if ("error" in fields) return fields;
+
   const { data: meetingType } = await supabase
     .from("meeting_types")
     .select("id")
@@ -112,15 +144,33 @@ export async function addScheduleRule(formData: FormData): Promise<ActionResult>
 
   const { error } = await supabase.from("meeting_schedule_rules").insert({
     meeting_type_id: meetingType.id,
-    cadence,
-    nth_occurrence,
-    day_of_week,
-    anchor_nth_occurrence,
-    anchor_day_of_week,
-    offset_days,
-    time_of_day,
-    duration_minutes,
+    ...fields,
   });
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function updateScheduleRule(id: string, formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const meetingTypeSlug = String(formData.get("meeting_type_id") ?? "");
+  if (!meetingTypeSlug) return { error: "Choose a meeting type." };
+
+  const fields = readRuleFields(formData);
+  if ("error" in fields) return fields;
+
+  const { data: meetingType } = await supabase
+    .from("meeting_types")
+    .select("id")
+    .eq("slug", meetingTypeSlug)
+    .single();
+  if (!meetingType) return { error: "Unknown meeting type." };
+
+  const { error } = await supabase
+    .from("meeting_schedule_rules")
+    .update({ meeting_type_id: meetingType.id, ...fields })
+    .eq("id", id);
 
   if (error) return { error: error.message };
   return { success: true };
