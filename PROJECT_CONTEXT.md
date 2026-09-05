@@ -7,12 +7,13 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 022
+## Current migration number: 024
 
-`022_admin_select_options.sql` exists in the repo but still needs the
-user to actually run it in the Supabase SQL editor (written, not yet
-confirmed run as of 2026-09-04). Next migration should be `023_*.sql`.
-Migrations are plain `.sql` files at
+`022_admin_select_options.sql`, `023_sacrament_music_auto_approve.sql`,
+and `024_hymnal_songs.sql` all exist in the repo but still need the user
+to actually run them (in that order) in the Supabase SQL editor (written,
+not yet confirmed run as of 2026-09-04). Next migration should be
+`025_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -118,18 +119,20 @@ or note partial progress) as each is picked up.
    **user still needs to run this in the Supabase SQL editor**),
    `lib/data/select-options.ts`, wired into both the real Calling
    Planning UI and the "Dropdown Option Lists" admin table.
-2. **Sacrament Music.** Rename admin label "Sacrament Music" →
-   "Sacrament Meeting Music". Create a hymn/song reference table covering
-   all three current hymnals/songbooks — *Hymns for Home and Church*,
-   *Hymns of The Church of Jesus Christ of Latter-day Saints*,
-   *Children's Songbook of The Church of Jesus Christ of Latter-day
-   Saints* — with each entry's number and title (a real data-entry task,
-   likely needs sourcing the actual hymn lists). Remove the `slot` column
-   from the admin grid/planning flow — user doesn't know what it's for
-   and element ordering is handled by the bishopric/admins directly, not
-   by this field. Remove the `status` column too — bishopric/music
-   coordinator entries don't need a "vetted" status; anything entered is
-   already vetted by virtue of who entered it.
+2. ~~**Sacrament Music.**~~ Done (2026-09-04): renamed to "Sacrament
+   Meeting Music" in Table Admin. `status` turned out to be the actual
+   print-readiness gate (not a submission-vetting flag as first assumed)
+   -- removed the manual "Approved" step everywhere per the user's
+   decision, so every entry is now auto-published (migration `023`,
+   backfills existing pending rows too). `slot` turned out to matter for
+   real (disambiguates multiple Intermediate Hymns/Musical Numbers in
+   one meeting) -- left alone everywhere per the user's decision, just
+   dropped from the Table Admin grid. New `hymnal_songs` reference table
+   (migration `024`, registered as "Hymnal / Songbook Reference") --
+   structure only, NOT populated with real hymn/song data yet (typing
+   ~500+ titles from memory risked real inaccuracies; needs a proper
+   source -- ask the user how they'd like this populated when picked
+   back up).
 3. **Sacrament Planning.** Rename admin label "Sacrament Planning" →
    "Sacrament Meeting Planning". Bigger redesign, not just a rename: the
    `special_format` options (Standard, Testimony Meeting, Stake
