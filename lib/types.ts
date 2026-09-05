@@ -1,10 +1,9 @@
 /**
  * Core domain types for Ward Meeting OS.
  *
- * These mirror the entities defined in architecture.md. Until Notion
- * synchronization (Priority 7) is built, the app reads placeholder data
- * shaped to these same types (see lib/mock-data.ts), so wiring in the
- * real Notion-backed data source later shouldn't require UI changes.
+ * These mirror the entities defined in architecture.md. The app is
+ * Supabase-backed (see lib/supabase/ and PROJECT_CONTEXT.md) -- there is
+ * no mock/placeholder data layer anymore.
  */
 
 export type MeetingLifecycleStage =

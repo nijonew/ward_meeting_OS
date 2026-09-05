@@ -4,6 +4,14 @@
 
 ### Version 0.1 (Draft)
 
+> **Note:** This is the original vision/design document from before the
+> project settled on its current backend. It predates the switch to
+> Supabase and still describes Notion as the system of record in a few
+> places below (left as historical context rather than silently
+> rewritten). For what's actually true today -- data model, auth, RLS,
+> current feature status, open items -- see `PROJECT_CONTEXT.md`, which
+> is the maintained, accurate reference.
+
 ## 1. Vision
 
 ### Purpose

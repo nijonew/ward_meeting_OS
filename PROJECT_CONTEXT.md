@@ -74,11 +74,19 @@ before.
   review) can currently be entered in TWO places — new dynamic per-element
   fields AND the old `BishopricMinutesForm`'s similarly-named fixed columns.
   Not consolidated yet; ask before changing either.
-- `AssignmentsForm.tsx` / `BishopricAssignmentsForm.tsx` are unused legacy
-  components (superseded by the dynamic planning view) — safe to delete,
-  never got around to it.
+- ~~`AssignmentsForm.tsx` / `BishopricAssignmentsForm.tsx` were unused
+  legacy components (superseded by the dynamic planning view) — deleted
+  2026-09-04.~~
 - ~~`lib/data/data.ts` was a dead duplicate of `lib/data/rotations.ts`
   (same three exports, unimported anywhere) — deleted 2026-09-04.~~
+- ~~`lib/mock-data.ts` was dead code from before the Supabase pivot
+  (nothing imported it, only a stale comment in `lib/types.ts` referenced
+  it) — deleted 2026-09-04, comment fixed.~~
+- ~~`docs/architecture.md` was a byte-for-byte duplicate of the root
+  `architecture.md` — deleted 2026-09-04. The survivor still describes
+  the pre-Supabase Notion-backed design in places; flagged with a note at
+  its top pointing to this file as the current source of truth rather
+  than rewritten, since it's a historical vision doc.~~
 - Agenda items for Bishopric/Ward Council/Youth Council should eventually
   get a share-token-based no-login view for invited attendees (security
   through an unguessable link, not auth) — not built yet.
