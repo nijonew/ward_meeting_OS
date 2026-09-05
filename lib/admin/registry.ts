@@ -31,13 +31,16 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  * One entry per table exposed under /admin. Only tables listed here show
  * up at all; only the columns listed for a table are readable/writable.
  *
- * Deliberately NOT included yet (need a decision, see chat):
+ * Deliberately excluded, by decision (not just pending):
  * - bishopric_minutes: PROJECT_CONTEXT.md flags this table's free-text
  *   fields as a known duplicate-entry hazard with the dynamic planning
- *   view -- don't wire up a third way to edit them without asking.
+ *   view -- stays out until that's consolidated, so this grid doesn't
+ *   become a third place to edit the same data.
  * - meeting_element_types, meeting_templates, meeting_type_members,
- *   meeting_type_templates, meeting_types: these are the catalog that
- *   drives the dynamic planning view's rendering. A bad row here can
+ *   meeting_type_templates, meeting_types: the catalog that drives the
+ *   dynamic planning view's rendering. Stays admin-only via direct
+ *   Supabase access (or a future purpose-built editor with real
+ *   validation) rather than the generic grid, since a bad row here can
  *   break that page for an entire meeting type, not just create bad data.
  * - meeting_schedule_rules: already has a dedicated editor at
  *   /meeting-schedule with Edit/Copy -- no need to duplicate it here.
