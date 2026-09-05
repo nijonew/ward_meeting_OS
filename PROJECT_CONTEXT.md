@@ -7,14 +7,16 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 029
+## Current migration number: 030
 
 Migrations `022`–`027` all confirmed run by the user (2026-09-05). `025`
 was used by the user's own project-workflow-review session, outside
 this chat -- exactly the kind of collision this file exists to warn
-about. `028_agenda_items_time_needed.sql` and `029_people_labels.sql`
-exist in the repo but still need to be run. Next migration should be
-`030_*.sql`. Migrations are plain `.sql` files at
+about. `028_agenda_items_time_needed.sql`, `029_people_labels.sql`, and
+`030_people_profile_link.sql` exist in the repo but still need to be
+run -- **030 also changes an RLS policy, read its own comment before
+running it**. Next migration should be `031_*.sql`. Migrations are
+plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -276,12 +278,13 @@ than auto-matching by email) is a sound safeguard against impersonation
 in a trusted-admin context.
 
 **Known gaps, not yet built:**
-- **No auth-account-to-person link exists at all.** `profiles` (login
-  accounts: role, display_name, email) and `people` (the roster: name,
-  email, active, notes) are entirely separate tables today, no foreign
-  key between them — confirmed by search, not assumed. The "admin
-  matches an authenticated account to a person" step has no data model
-  or UI yet.
+- ~~No auth-account-to-person link existed~~ — **built 2026-09-05**
+  (migration `030`, needs to be run, **read its comment before
+  running** — it also adds an RLS policy opening `profiles` to
+  authenticated SELECT, needed for the dropdown to list accounts):
+  `people.profile_id` nullable/unique FK into `profiles`, editable as
+  "Login Account" in Table Admin's People grid via the existing generic
+  FK dropdown — no new UI needed.
 - ~~`people` only has one boolean (`active`)~~ — **built 2026-09-05**
   (migration `029`, needs to be run): added `age_group`
   (adult/youth/child) and `attendance_status`
