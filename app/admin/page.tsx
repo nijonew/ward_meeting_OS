@@ -46,6 +46,27 @@ export default async function AdminIndexPage() {
           ))}
         </ul>
       )}
+
+      <section>
+        <h2 className="font-display text-xl">Other Admin Tools</h2>
+        <p className="mt-1 text-xs text-slate">
+          Not generic-grid editors -- these have dedicated add/remove/reorder UIs of their own.
+        </p>
+        <ul className="mt-3 divide-y divide-rule rounded-lg border border-rule bg-card">
+          <li>
+            <Link
+              href="/admin/meeting-templates"
+              className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
+            >
+              <span className="font-medium text-ink">Meeting Templates</span>
+              <span className="ml-4 truncate text-xs text-slate">
+                Default agenda elements new meetings are seeded with, by meeting type (and format,
+                for Sacrament Meeting)
+              </span>
+            </Link>
+          </li>
+        </ul>
+      </section>
     </main>
   );
 }

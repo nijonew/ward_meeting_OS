@@ -60,9 +60,11 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  *   become a third place to edit the same data.
  * - meeting_element_types, meeting_templates, meeting_type_members,
  *   meeting_type_templates, meeting_types: the catalog that drives the
- *   dynamic planning view's rendering. Stays admin-only via direct
- *   Supabase access (or a future purpose-built editor with real
- *   validation) rather than the generic grid, since a bad row here can
+ *   dynamic planning view's rendering. meeting_templates now has its own
+ *   purpose-built editor at /admin/meeting-templates instead (reorder +
+ *   slot-count UI, keyed by meeting type + format); the rest stay
+ *   admin-only via direct Supabase access rather than the generic grid,
+ *   since a bad row here can
  *   break that page for an entire meeting type, not just create bad data.
  * - meeting_schedule_rules: already has a dedicated editor at
  *   /meeting-schedule with Edit/Copy -- no need to duplicate it here.
@@ -302,7 +304,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_planning: {
     table: "sacrament_planning",
-    label: "Sacrament Planning",
+    label: "Sacrament Meeting Planning",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },

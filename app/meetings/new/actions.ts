@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
+import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
 
 export type CreateMeetingState = { error?: string };
 
@@ -32,7 +33,19 @@ export async function createMeeting(
   }
 
   const meetingType = Array.isArray(data.meeting_types) ? data.meeting_types[0] : data.meeting_types;
-  await applyRotationsToNewMeeting(data.id, meeting_type_id, meetingType?.slug ?? "");
+  const meetingTypeSlug = meetingType?.slug ?? "";
+  const isSacrament = meetingTypeSlug === "sacrament-meeting";
+
+  // For Sacrament Meeting, special_format is chosen up front (on this
+  // form) rather than lazily on first Meeting Info save, so the correct
+  // format-specific default template can be seeded immediately below.
+  const specialFormat = isSacrament ? String(formData.get("special_format") ?? "standard") : "standard";
+  if (isSacrament) {
+    await supabase.from("sacrament_planning").insert({ meeting_id: data.id, special_format: specialFormat });
+  }
+
+  await applyRotationsToNewMeeting(data.id, meeting_type_id, meetingTypeSlug);
+  await seedPlannedElementsForMeeting(data.id, meeting_type_id, isSacrament ? specialFormat : null);
 
   redirect(`/meetings/${data.id}`);
 }

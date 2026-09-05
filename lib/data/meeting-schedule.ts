@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
+import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
 
 export interface ScheduleRule {
   id: string;
@@ -340,8 +341,18 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
     if (error) return { error: error.message };
 
     const slug = slugById.get(rule.meeting_type_id) ?? "";
+    const isSacrament = slug === "sacrament-meeting";
+
     for (const row of (inserted ?? []) as { id: string }[]) {
+      // Bulk-generated meetings always start as "standard" -- cadence
+      // rules can't know about a future Stake Conference/General
+      // Conference Sunday; the user corrects special_format manually
+      // (via Meeting Info) for whichever real Sundays need it.
+      if (isSacrament) {
+        await supabase.from("sacrament_planning").insert({ meeting_id: row.id, special_format: "standard" });
+      }
       await applyRotationsToNewMeeting(row.id, rule.meeting_type_id, slug);
+      await seedPlannedElementsForMeeting(row.id, rule.meeting_type_id, isSacrament ? "standard" : null);
       created += 1;
     }
   }

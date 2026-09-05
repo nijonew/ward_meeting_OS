@@ -2,55 +2,67 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getMeetingTypes } from "@/lib/data/meeting-types";
+import { getApplicableElements, getTemplateElements } from "@/lib/data/meeting-elements";
+import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import {
-  getMeetingWithType,
-  getApplicableElements,
-  getPlannedElements,
-} from "@/lib/data/meeting-elements";
-import {
-  addTemplateElement,
-  removeTemplateElement,
-  setTemplateSlotCount,
-  moveTemplateElement,
-} from "@/app/meetings/[id]/template-actions";
+  addDefaultTemplateElement,
+  removeDefaultTemplateElement,
+  setDefaultTemplateSlotCount,
+  moveDefaultTemplateElement,
+} from "./actions";
 
-function formatDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+function TabLink({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
+        active ? "bg-ink text-paper" : "text-slate hover:text-ink",
+      ].join(" ")}
+    >
+      {label}
+    </Link>
+  );
 }
 
-export default async function TemplatePage({
-  params,
+export default async function MeetingTemplatesAdminPage({
+  searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  searchParams: Promise<{ type?: string; format?: string }>;
 }) {
-  const { id: meetingId } = await params;
-
   const { user, profile } = await getSessionUser();
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
+
   if (profile?.role !== "bishopric") {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Agenda Elements" />
-        <p className="mt-10 text-slate">Only the Bishopric can edit agenda elements.</p>
+        <AppHeader tag="Meeting Templates" />
+        <p className="mt-10 text-slate">Only the Bishopric can edit meeting templates.</p>
       </main>
     );
   }
 
-  const meeting = await getMeetingWithType(meetingId);
-  if (!meeting) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+  const meetingTypes = await getMeetingTypes();
+  if (meetingTypes.length === 0) {
+    return <p className="text-slate">No meeting types configured.</p>;
   }
 
+  const { type: rawType, format: rawFormat } = await searchParams;
+  const selectedType =
+    meetingTypes.find((mt) => mt.slug === rawType) ??
+    meetingTypes.find((mt) => mt.slug === "sacrament-meeting") ??
+    meetingTypes[0];
+  const isSacrament = selectedType.slug === "sacrament-meeting";
+  const formatKey = isSacrament
+    ? SPECIAL_FORMATS.some((f) => f.value === rawFormat)
+      ? (rawFormat as string)
+      : "standard"
+    : null;
+
   const [applicable, included] = await Promise.all([
-    getApplicableElements(meeting.meetingTypeId),
-    getPlannedElements(meetingId),
+    getApplicableElements(selectedType.id),
+    getTemplateElements(selectedType.id, formatKey),
   ]);
 
   const includedElementIds = new Set(included.map((e) => e.element_id));
@@ -58,20 +70,49 @@ export default async function TemplatePage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
-      <AppHeader tag="Agenda Elements" />
+      <AppHeader tag="Meeting Templates" />
+
+      <section className="mt-4">
+        <Link href="/admin" className="text-xs text-slate hover:text-ink">
+          &larr; All tables
+        </Link>
+        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Templates</h1>
+        <p className="mt-2 text-sm text-slate">
+          The default agenda new meetings are seeded with at creation time. Editing here never
+          changes a meeting that already exists &mdash; edit one specific meeting&rsquo;s own agenda
+          from its <em>Agenda Elements</em> page instead (linked from its Planning view).
+        </p>
+      </section>
+
+      <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+        {meetingTypes.map((mt) => (
+          <TabLink
+            key={mt.id}
+            href={`/admin/meeting-templates?type=${mt.slug}`}
+            active={mt.id === selectedType.id}
+            label={mt.name}
+          />
+        ))}
+      </div>
+
+      {isSacrament && (
+        <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+          {SPECIAL_FORMATS.map((f) => (
+            <TabLink
+              key={f.value}
+              href={`/admin/meeting-templates?type=sacrament-meeting&format=${f.value}`}
+              active={f.value === formatKey}
+              label={f.label}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="rounded-lg border border-rule bg-card p-6">
         <h2 className="font-display text-xl">
-          {meeting.meetingTypeName} &mdash; {formatDate(meeting.date)}
+          {selectedType.name}
+          {isSacrament && ` — ${SPECIAL_FORMATS.find((f) => f.value === formatKey)?.label}`}
         </h2>
-        <p className="mt-1 text-xs text-slate">
-          Only affects this meeting &mdash; add, remove, or reorder elements here without changing
-          any other {meeting.meetingTypeName}. New meetings start from the default list managed at{" "}
-          <Link href="/admin/meeting-templates" className="underline">
-            Admin &rsaquo; Meeting Templates
-          </Link>
-          .
-        </p>
 
         <div className="mt-4 flex flex-col gap-2">
           {included.length === 0 ? (
@@ -80,20 +121,20 @@ export default async function TemplatePage({
             included.map((el, idx) => {
               const moveUp = async () => {
                 "use server";
-                await moveTemplateElement(meetingId, el.id, "up");
+                await moveDefaultTemplateElement(selectedType.id, formatKey, el.id, "up");
               };
               const moveDown = async () => {
                 "use server";
-                await moveTemplateElement(meetingId, el.id, "down");
+                await moveDefaultTemplateElement(selectedType.id, formatKey, el.id, "down");
               };
               const remove = async () => {
                 "use server";
-                await removeTemplateElement(meetingId, el.id);
+                await removeDefaultTemplateElement(el.id);
               };
               const setSlots = async (formData: FormData) => {
                 "use server";
                 const value = Number(formData.get("slot_count"));
-                await setTemplateSlotCount(meetingId, el.id, value);
+                await setDefaultTemplateSlotCount(el.id, value);
               };
 
               return (
@@ -157,7 +198,7 @@ export default async function TemplatePage({
             {available.map((el) => {
               const add = async () => {
                 "use server";
-                await addTemplateElement(meetingId, el.id);
+                await addDefaultTemplateElement(selectedType.id, formatKey, el.id);
               };
               return (
                 <div

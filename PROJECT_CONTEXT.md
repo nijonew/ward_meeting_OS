@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 025
+## Current migration number: 026
 
 Migrations `022`–`025` confirmed run by the user (2026-09-04/05).
 Migration `025` (`apply_rotation_assignment` Postgres function, see
@@ -15,8 +15,10 @@ Assignment Rotations below) additionally verified working (2026-09-05)
 via a rollback-safe functional test run directly against production in
 the Supabase SQL editor -- confirmed it assigns the correct person to
 the correct table and advances `next_index` correctly, with everything
-the test wrote rolled back afterward. Next migration should be
-`026_*.sql`. Migrations are plain `.sql` files at
+the test wrote rolled back afterward. Migration `026` (Sacrament Meeting
+Planning redesign, see Table Admin update queue below) written
+2026-09-05, **not yet confirmed run by the user**. Next migration after
+that should be `027_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -44,13 +46,24 @@ before.
   excludes ward business/announcements, which only get folded in at
   `archived`.
 - **Dynamic planning view** (`app/meetings/[id]/planning/page.tsx`): renders
-  each meeting type's configured template elements (from the element
-  catalog, `meeting_elements`/`meeting_templates`) in order, dispatching by
-  `resolution_kind` (`person_role`, `music`, `person_slot`, `free_text`,
-  `person_and_text`, `none`). Most element types write to existing tables
-  (`sacrament_assignments`, `sacrament_music`, `sacrament_speakers_adults/
-  youth`); anything without a clean existing home writes to the generic
-  `meeting_element_notes` table.
+  a meeting's own agenda elements (`meeting_planned_elements`, migration
+  `026`) in order, dispatching by `resolution_kind` (`person_role`,
+  `music`, `person_slot`, `free_text`, `person_and_text`, `none`). Most
+  element types write to existing tables (`sacrament_assignments`,
+  `sacrament_music`, `sacrament_speakers_adults/youth`); anything without
+  a clean existing home writes to the generic `meeting_element_notes`
+  table. `meeting_planned_elements` is per-meeting and freely
+  add/remove/reorderable from that meeting's own "Agenda Elements" page
+  (`/meetings/[id]/template`) without affecting any other meeting --
+  seeded once at creation time from `meeting_templates` (now keyed by
+  meeting type **and**, for Sacrament Meeting, `format_key` matching
+  `special_format` -- see `SPECIAL_FORMATS`), which is itself edited at
+  `/admin/meeting-templates`, not per-meeting. A meeting created before
+  migration `026` has zero `meeting_planned_elements` rows and falls back
+  to rendering the shared `meeting_templates` list directly (no backfill
+  was done, by design). Changing a meeting's `special_format` after the
+  fact never re-seeds its elements -- only affects new meetings going
+  forward.
 - **Assignment Rotations** (`/rotations`): 7 elements rotate automatically
   (Conducting, Opening/Closing Prayer ×3 meeting types, Chorister, Organist,
   Spiritual Thought, Handbook Training presenter). Speaker/Youth Speaker and
@@ -166,21 +179,37 @@ or note partial progress) as each is picked up.
    ~500+ titles from memory risked real inaccuracies; needs a proper
    source -- ask the user how they'd like this populated when picked
    back up).
-3. **Sacrament Planning.** Rename admin label "Sacrament Planning" →
-   "Sacrament Meeting Planning". Bigger redesign, not just a rename: the
-   `special_format` options (Standard, Testimony Meeting, Stake
-   Conference, etc. — see `SPECIAL_FORMATS` in
-   `lib/data/sacrament-constants.ts`) should become default *template*
-   names rather than a plain field. Target workflow (matches the old
-   spreadsheet): a list of upcoming Sundays by date, each pre-populated
-   with standing elements (opening/closing prayer, at least one more) —
-   the user adds an element to a given date, picks its name/type, and
-   fills in detail (person, music info, etc.) — then the actual meeting
-   program for that date pulls in whatever elements are attached to it,
-   reorderable at that point. This effectively describes a per-date
-   element-planning table upstream of the meeting's own program, distinct
-   from (but feeding) the existing dynamic planning view. Needs real
-   design work before touching schema.
+3. ~~**Sacrament Planning.**~~ Done (2026-09-05, migration `026` **not
+   yet confirmed run by the user**): renamed to "Sacrament Meeting
+   Planning" in Table Admin. Redesigned as planned -- `special_format`
+   now actually changes which elements appear (see Dynamic planning view
+   above): each meeting gets its own `meeting_planned_elements` row set,
+   seeded at creation time from `meeting_templates` (now keyed by
+   meeting type + `format_key`), freely add/remove/reorderable per
+   meeting from then on without affecting any other meeting. Generalized
+   to every meeting type per the user's decision, not just Sacrament
+   Meeting. Forward-only, per the user's decision -- no backfill for
+   meetings created before this ships (see fallback behavior above).
+   Default templates for all 10 `special_format` values written into
+   migration `026`: `standard`, `testimony_meeting` ("fast Sunday"), and
+   `missionary_speaker` came from the user's actual real service order;
+   `stake_speakers` confirmed identical to `standard`;
+   `stake_conference`/`general_conference` seeded with a single Ward
+   Business note-placeholder since the ward holds no meeting those
+   Sundays; **`primary_program`, `christmas_meeting`, `easter_meeting`,
+   and `baby_blessing` are NOT confirmed** -- defaulted to a plain copy
+   of `standard`, need the user's review/correction via the new
+   `/admin/meeting-templates` page. Two new `meeting_elements` catalog
+   rows added: `recognize_music` (announcing the rotation-assigned
+   chorister/organist) and `primary_program`. Missionary speakers reuse
+   the existing `speaker` slots (noted via topic/guest name) rather than
+   getting a distinct catalog role, per the user's decision -- a real
+   third speaker category (own table + form, mirroring Speaker/Youth
+   Speaker) remains a legitimate but separate future item if wanted.
+   Also discovered along the way: `meeting_templates` had **zero rows**
+   for Sacrament Meeting before this migration, meaning
+   `MusicArrangeSection`/both `SpeakersForm`s never rendered in
+   production at all until now.
 4. **Releases/New Callings/Records (`sacrament_rabnm`).** Rename to
    "Recognitions/Advancements/Baptisms/New Members". Purpose: ward
    business items outside of callings, for inclusion in the meeting's

@@ -3,6 +3,7 @@ import { getMeetingById } from "@/lib/data/meetings";
 import {
   getMeetingWithType,
   getTemplateElements,
+  getPlannedElements,
   getRoleAssignments,
   type TemplateElementRow,
 } from "@/lib/data/meeting-elements";
@@ -65,14 +66,23 @@ export default async function PlanningViewPage({
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  const [templateElements, people, roleAssignments, elementNotes] = await Promise.all([
-    getTemplateElements(meetingWithType.meetingTypeId),
+  const [plannedElements, people, roleAssignments, elementNotes, sacramentData] = await Promise.all([
+    getPlannedElements(meetingId),
     getActivePeople(),
     getRoleAssignments(meetingId, roleTable),
     getElementNotes(meetingId),
+    isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
   ]);
 
-  const sacramentData = isSacrament ? await getSacramentPlanningData(meetingId) : null;
+  // Meetings created before the per-meeting agenda existed have zero
+  // planned-element rows (nothing was ever seeded for them) -- fall back
+  // to the shared default template by type (+ special_format, for
+  // Sacrament Meeting) so they keep rendering exactly as before.
+  const templateElements =
+    plannedElements.length > 0
+      ? plannedElements
+      : await getTemplateElements(meetingWithType.meetingTypeId, isSacrament ? sacramentData?.planning?.special_format ?? "standard" : null);
+
   const callings = isSacrament ? await getActiveCallings() : [];
   const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
   const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
@@ -162,9 +172,9 @@ export default async function PlanningViewPage({
       {templateElements.length === 0 ? (
         <div className="rounded-lg border border-rule bg-card p-6">
           <p className="text-sm text-slate">
-            No elements configured for this meeting type yet. Add some in the{" "}
+            No agenda elements yet. Add some in the{" "}
             <a href={`/meetings/${meetingId}/template`} className="underline">
-              template builder
+              agenda editor
             </a>
             .
           </p>
