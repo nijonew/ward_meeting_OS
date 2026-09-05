@@ -101,6 +101,64 @@ before.
     `stage` tracks how far along the program is, not whether the meeting
     is happening at all. Lower priority than the auto-archive item.
 
+## Table Admin update queue (FIFO — work top to bottom)
+
+Requested while going through the `/admin` Table Admin feature
+(2026-09-04). Per the user: return to these in the order added, one at a
+time, rather than building ahead. Update this list (strike/remove an item,
+or note partial progress) as each is picked up.
+
+1. **Admin-editable option lists for `calling_status`/`release_status`.**
+   Confirmed with the user: migration `022` is free to use for this. Not
+   yet built — needs a new table (e.g. `admin_select_options`: field key,
+   value, label, sort order) that the two calling_planning select columns
+   read their options from instead of the hardcoded arrays in
+   `lib/admin/registry.ts`, plus an admin UI to add/reorder/remove option
+   rows (the existing Table Admin engine can likely host this table
+   itself once it exists).
+2. **Sacrament Music.** Rename admin label "Sacrament Music" →
+   "Sacrament Meeting Music". Create a hymn/song reference table covering
+   all three current hymnals/songbooks — *Hymns for Home and Church*,
+   *Hymns of The Church of Jesus Christ of Latter-day Saints*,
+   *Children's Songbook of The Church of Jesus Christ of Latter-day
+   Saints* — with each entry's number and title (a real data-entry task,
+   likely needs sourcing the actual hymn lists). Remove the `slot` column
+   from the admin grid/planning flow — user doesn't know what it's for
+   and element ordering is handled by the bishopric/admins directly, not
+   by this field. Remove the `status` column too — bishopric/music
+   coordinator entries don't need a "vetted" status; anything entered is
+   already vetted by virtue of who entered it.
+3. **Sacrament Planning.** Rename admin label "Sacrament Planning" →
+   "Sacrament Meeting Planning". Bigger redesign, not just a rename: the
+   `special_format` options (Standard, Testimony Meeting, Stake
+   Conference, etc. — see `SPECIAL_FORMATS` in
+   `lib/data/sacrament-constants.ts`) should become default *template*
+   names rather than a plain field. Target workflow (matches the old
+   spreadsheet): a list of upcoming Sundays by date, each pre-populated
+   with standing elements (opening/closing prayer, at least one more) —
+   the user adds an element to a given date, picks its name/type, and
+   fills in detail (person, music info, etc.) — then the actual meeting
+   program for that date pulls in whatever elements are attached to it,
+   reorderable at that point. This effectively describes a per-date
+   element-planning table upstream of the meeting's own program, distinct
+   from (but feeding) the existing dynamic planning view. Needs real
+   design work before touching schema.
+4. **Releases/New Callings/Records (`sacrament_rabnm`).** Rename to
+   "Recognitions/Advancements/Baptisms/New Members". Purpose: ward
+   business items outside of callings, for inclusion in the meeting's
+   conducting view. The ward clerk and executive secretary need to be
+   able to add these (that's the typical/primary path), with the
+   bishopric also able to; **note:** "clerk"/"exec sec" are folded into
+   the single shared `bishopric` app role today (see Architecture above)
+   with no way to distinguish them for a narrower permission — may need
+   its own decision if per-person (not per-role) add access matters here.
+   Needs a real per-type form design: which fields are required/shown
+   changes depending on the record type (release vs. new calling vs.
+   baby blessing vs. baptism vs. new member vs. mission call vs.
+   Aaronic Priesthood, etc. — see `RABNM_TYPES` in
+   `lib/data/sacrament-constants.ts` for the current type list), so this
+   isn't a simple flat-column admin grid like the others.
+
 ## Working conventions
 
 - Always run a syntax/type check before considering something done:
