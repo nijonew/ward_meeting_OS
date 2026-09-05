@@ -7,10 +7,13 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 024
+## Current migration number: 025
 
-Migrations `022`–`024` confirmed run by the user (2026-09-04). Next
-migration should be `025_*.sql`. Migrations are plain `.sql` files at
+Migrations `022`–`024` confirmed run by the user (2026-09-04). Migration
+`025` (`apply_rotation_assignment` Postgres function, see Assignment
+Rotations below) written 2026-09-04, **not yet confirmed run by the
+user**. Next migration after that should be `026_*.sql`. Migrations are
+plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -51,7 +54,11 @@ before.
   Presiding/Pianist intentionally do NOT rotate — `/speaker-prayer-history`
   is the manual tool that compensates for that. A rotation's "next" pointer
   advances once per meeting *created*, not per save, so a one-off override
-  doesn't skip anyone in future weeks.
+  doesn't skip anyone in future weeks. The assignment write and the
+  pointer advance happen atomically via the `apply_rotation_assignment`
+  Postgres function (migration `025`) — one RPC call per rotation, not
+  two separate writes — so a failure partway through can't desync the
+  pointer from what was actually assigned.
 - **Meeting Schedule** (`/meeting-schedule`): cadence rules
   (`meeting_schedule_rules`) drive a "Generate Meetings" action. Three
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`

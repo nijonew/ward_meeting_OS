@@ -220,6 +220,15 @@ async function applyFixedSacramentRoles(
  * change whose turn is next for future meetings. For Sacrament Meeting,
  * Presiding and Conducting are handled separately (see
  * applyFixedSacramentRoles) rather than through that generic pointer.
+ *
+ * The assignment write and the pointer advance happen together inside
+ * the apply_rotation_assignment() Postgres function (migration 025) --
+ * one RPC call per rotation, not two separate ones -- so a failure
+ * partway through can't desync the pointer from what was actually
+ * assigned. That function also re-reads next_index live under a row
+ * lock rather than trusting the value fetched here, so it stays correct
+ * even if two meetings for the same rotation were somehow created back
+ * to back.
  */
 export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeId: string, meetingTypeSlug: string): Promise<void> {
   const supabase = await createClient();
@@ -232,7 +241,7 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
 
   const { data: rotations } = await supabase
     .from("rotations")
-    .select("id, element_key, next_index, rotation_members(person_id, sort_order)")
+    .select("id, element_key, rotation_members(person_id, sort_order)")
     .eq("meeting_type_id", meetingTypeId);
 
   if (!rotations) return;
@@ -244,7 +253,6 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
     const r = row as {
       id: string;
       element_key: string;
-      next_index: number;
       rotation_members: { person_id: string; sort_order: number }[] | null;
     };
 
@@ -257,27 +265,22 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
     const members = (r.rotation_members ?? []).sort((a, b) => a.sort_order - b.sort_order);
     if (members.length === 0) continue;
 
-    const index = r.next_index % members.length;
-    const personId = members[index].person_id;
+    const target = personAndTextKeys.has(r.element_key) ? "element_notes" : roleTable;
 
-    if (personAndTextKeys.has(r.element_key)) {
-      await supabase.from("meeting_element_notes").upsert(
-        { meeting_id: meetingId, element_key: r.element_key, person_id: personId },
-        { onConflict: "meeting_id,element_key" }
-      );
-    } else {
-      const assignmentRow: Record<string, unknown> = {
-        meeting_id: meetingId,
-        role: r.element_key,
-        assigned_to_id: personId,
-      };
-      if (isSacrament) assignmentRow.confirmed = false;
-      await supabase.from(roleTable).insert(assignmentRow);
+    const { error } = await supabase.rpc("apply_rotation_assignment", {
+      p_rotation_id: r.id,
+      p_meeting_id: meetingId,
+      p_element_key: r.element_key,
+      p_target: target,
+      p_member_ids: members.map((m) => m.person_id),
+    });
+
+    if (error) {
+      // Best-effort, matching this function's existing behavior (one
+      // rotation failing shouldn't stop the rest from being applied) --
+      // but now at least surfaced instead of silently swallowed, since
+      // the two writes this replaces never checked their errors either.
+      console.error(`applyRotationsToNewMeeting: rotation ${r.id} (${r.element_key}) failed:`, error.message);
     }
-
-    await supabase
-      .from("rotations")
-      .update({ next_index: (index + 1) % members.length })
-      .eq("id", r.id);
   }
 }
