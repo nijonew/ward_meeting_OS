@@ -246,6 +246,46 @@ built and what was done earlier this session:
   presidency_change rows are already excluded from the public program.
   No conflict, no fix needed here.
 
+### Workflow / policy: Adding new people (privacy & data-usage stance)
+
+Deliberate policy, not just a workflow — the user weighed this and
+wants it followed going forward:
+
+1. **No bulk import** of people from a church membership source (e.g.
+   LCR). People get added one at a time, "from memory or introduction
+   over time," only as actually needed for ward business.
+2. **Name only** — no email, age, or other PII copied in from church
+   sources. `people.email` exists as a column but should stay sparsely
+   used, populated only when genuinely known/needed, never bulk-filled.
+3. When a person needs login access: send them an invite to create an
+   authenticated account, then an **admin manually matches** that
+   account to their existing `people` row (or creates one). No
+   automatic matching by email — a human confirms identity first.
+4. Want **labels** on `people` beyond the current single `active`
+   boolean: adult / youth / child, attending / not attending, moved
+   (possibly = archived), etc.
+
+Assessed and endorsed (2026-09-05): bulk-importing official membership
+data would carry real sensitive fields (birthdates, addresses, phone
+numbers, priesthood/membership status) with no corresponding security
+infrastructure to justify holding them — avoiding that is the right
+call for a small, admin-run tool like this. Name-only, added as needed,
+is good data minimization. Manual account-to-person matching (rather
+than auto-matching by email) is a sound safeguard against impersonation
+in a trusted-admin context.
+
+**Known gaps, not yet built:**
+- **No auth-account-to-person link exists at all.** `profiles` (login
+  accounts: role, display_name, email) and `people` (the roster: name,
+  email, active, notes) are entirely separate tables today, no foreign
+  key between them — confirmed by search, not assumed. The "admin
+  matches an authenticated account to a person" step has no data model
+  or UI yet.
+- **`people` only has one boolean (`active`) today**, not the richer
+  label set described (adult/youth/child, attending/not, moved).
+  Concrete, well-scoped gap — good candidate to build once past the
+  vision-gathering phase.
+
 ## Known open items
 
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
