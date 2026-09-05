@@ -419,6 +419,61 @@ that tile has ever actually seen a posted announcement. Replaced with a
 real listing page rendering title/body/organization/type/date
 range/location/link.
 
+### Workflow: Adult leaders planning youth activities (INCOMPLETE — awaiting rotation details)
+
+Continues the "Cadence rules for Youth Activities / Ward Events" open
+item logged 2026-09-04 (the user's note was cut off mid-thought back
+then) — do not build yet, the rotation/combined-week specifics below
+are still to come in a follow-up message.
+
+1. Adult leaders work with youth presidencies to plan a full year of
+   activities at once, up front — entered as **proposed/tentative**,
+   not final.
+2. As each activity's date approaches, a leader comes back to confirm
+   timing and other details. This is a distinct status step from
+   simple draft/published visibility — tentative vs. confirmed is about
+   how settled the plan is, not who can see it.
+3. Standing weekly slot: Wednesday evenings, 7:00 generally. Like other
+   meetings, a cancelled week should still show as a row (not disappear
+   entirely) with a note explaining the cancellation, addable when the
+   cancellation happens.
+4. Six groups rotate planning duty week to week (Deacons, Teachers,
+   Priests, YW 12/13, YW 14/15, YW 16/17). On certain weeks the YW
+   groups combine into one activity for all YW; separately, YM groups
+   combine on certain weeks; a combined YM/YW activity happens monthly.
+   **The user will provide the actual rotation pattern and which weeks
+   are combined in a follow-up message** — don't guess at a rotation
+   shape before that arrives.
+
+**Known conflicts with what's built today:**
+- `YOUTH_ACTIVITY_GROUPS` (`lib/data/youth-activity-constants.ts`)
+  already lists exactly the right values — the six base groups plus
+  "Combined YM," "Combined YW," and "Combined YM/YW" as selectable
+  pseudo-groups — but there's no automatic rotation assigning a group
+  to a given week; `group_name` is picked manually on every entry
+  today, one activity at a time (`app/youth-activities/actions.ts`).
+- `youth_activities.status` is only `draft`/`published` (visibility),
+  with no tentative-vs-confirmed distinction (settledness). Planning a
+  full year as "proposed" and confirming individual weeks later needs a
+  real status dimension that doesn't exist yet.
+- No cancelled-but-still-shown state exists for a week's activity, with
+  or without a note — this is the same underlying need as the
+  already-logged, not-yet-built "Cancel a meeting from the dashboard"
+  item below, now showing up in a second, unrelated table. Worth one
+  shared design (e.g. a status value + optional reason/note column)
+  rather than solving it twice differently.
+- No cadence-based auto-generation exists for `youth_activities` at
+  all — `/meeting-schedule`'s weekly/nth-weekday/relative engine
+  (`lib/data/meeting-schedule.ts`) is tightly coupled to the `meetings`
+  table (`meeting_type_id`, `applyRotationsToNewMeeting`, etc.); reusing
+  its cadence *shapes* for a weekly Wednesday-night slot looks
+  straightforward, but the per-week **group rotation** (including the
+  combined-week overrides) is a materially different problem than
+  "which Sundays does this meeting occur" and needs the pattern details
+  above before it can be designed.
+- No bulk "plan a whole year at once" UI exists — the current
+  `/youth-activities` page only adds one activity at a time.
+
 ## Known open items
 
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
@@ -455,17 +510,16 @@ range/location/link.
     Scheduled/Cancelled, with a reason when cancelled. Likely a new
     column (or two) on `meetings` rather than overloading `stage`, since
     `stage` tracks how far along the program is, not whether the meeting
-    is happening at all. Lower priority than the auto-archive item.
-- **Cadence rules for Youth Activities / Ward Events.** (2026-09-04,
-  user's note was cut off mid-thought -- "We likely need" ... nothing
-  after) Wants the same kind of rule-based pre-scheduling `/meeting-
-  schedule` already does for meetings (weekly / nth-weekday / relative
-  cadence, a "Generate" action) applied to `youth_activities` and
-  `ward_events` too, so recurring activities/events don't have to be
-  entered one at a time. Likely reuses the same cadence-shape concept
-  (see Meeting Schedule above) rather than inventing a new one, but
-  needs the rest of the requirement (whatever came after "We likely
-  need") before designing -- ask when picked up.
+    is happening at all. Lower priority than the auto-archive item. The
+    "Adult leaders planning youth activities" workflow above wants the
+    identical show-not-hide-plus-note behavior for `youth_activities` —
+    worth one shared design once either gets picked up, not two.
+- ~~**Cadence rules for Youth Activities / Ward Events.**~~ Continued
+  2026-09-05 as the "Adult leaders planning youth activities" workflow
+  above (still incomplete -- awaiting the rotation/combined-week
+  specifics before it can be designed). `ward_events` cadence rules are
+  not part of that workflow and remain a fully open, undesigned item on
+  their own.
 - **Consolidate the two Music tiles on the landing page.** (2026-09-05,
   instruction still pending -- user said "see next prompt," not yet
   given as of this note) The two candidate tiles, found in `app/page.tsx`
