@@ -125,6 +125,7 @@ export default async function HomePage() {
               description="Who's next for prayers, chorister, etc."
               href="/rotations"
             />
+            <Tile title="Table Admin" description="Direct edit access to raw data tables" href="/admin" />
           </TileGrid>
         </section>
       )}
