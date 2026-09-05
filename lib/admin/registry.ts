@@ -26,6 +26,18 @@ const PUBLISH_STATUSES = [
   { value: "published", label: "Published" },
 ];
 
+const PERSON_AGE_GROUPS = [
+  { value: "adult", label: "Adult" },
+  { value: "youth", label: "Youth" },
+  { value: "child", label: "Child" },
+];
+
+const PERSON_ATTENDANCE_STATUSES = [
+  { value: "attending", label: "Attending" },
+  { value: "not_attending", label: "Not Attending" },
+  { value: "moved", label: "Moved" },
+];
+
 const SONGBOOKS = [
   { value: "hymns_for_home_and_church", label: "Hymns for Home and Church" },
   { value: "hymns_1985", label: "Hymns of The Church of Jesus Christ of Latter-day Saints" },
@@ -279,10 +291,14 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   people: {
     table: "people",
     label: "People",
+    description:
+      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. active controls whether someone shows up in assignment pickers; Age Group and Attendance Status are informational labels and don't affect that.",
     orderBy: { column: "name", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
       { column: "email", label: "Email", type: "text" },
+      { column: "age_group", label: "Age Group", type: "select", options: PERSON_AGE_GROUPS },
+      { column: "attendance_status", label: "Attendance Status", type: "select", required: true, options: PERSON_ATTENDANCE_STATUSES },
       { column: "active", label: "Active", type: "boolean" },
       { column: "notes", label: "Notes", type: "long_text" },
     ],
