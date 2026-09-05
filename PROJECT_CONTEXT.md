@@ -9,13 +9,11 @@ https://ward-meeting-os.vercel.app
 
 ## Current migration number: 027
 
-Migrations `022`–`024` confirmed run by the user (2026-09-04). `025` was
-used by the user's own project-workflow-review session, outside this
-chat -- exactly the kind of collision this file exists to warn about.
-`026_hymnal_songs_number_as_text.sql` and `027_music_reference_seed.sql`
-exist in the repo but still need to be run (in that order, 026 before
-027 -- 027's data won't fit the old integer column). Next migration
-should be `028_*.sql`. Migrations are plain `.sql` files at
+Migrations `022`–`027` all confirmed run by the user (2026-09-05). `025`
+was used by the user's own project-workflow-review session, outside
+this chat -- exactly the kind of collision this file exists to warn
+about. Next migration should be `028_*.sql`. Migrations are plain
+`.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -118,6 +116,15 @@ before.
   (see Meeting Schedule above) rather than inventing a new one, but
   needs the rest of the requirement (whatever came after "We likely
   need") before designing -- ask when picked up.
+- **Consolidate the two Music tiles on the landing page.** (2026-09-05,
+  instruction still pending -- user said "see next prompt," not yet
+  given as of this note) The two candidate tiles, found in `app/page.tsx`
+  under the "Music" section (visible to `music_planner` + `bishopric`):
+  "Sacrament Music Planning" (→ `/music`, bulk/single hymn entry) and
+  "Music Coordination" (→ `/music-coordination`, a read-only status
+  overview across upcoming meetings). User wants a single tile for
+  "sacrament meeting music planning" instead of these two -- exact
+  merged behavior/routing not yet specified.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 
