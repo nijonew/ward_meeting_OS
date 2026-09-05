@@ -127,13 +127,15 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   agenda_items: {
     table: "agenda_items",
     label: "Agenda Items",
-    description: "Submitted agenda items for bishopric/council meetings.",
+    description:
+      "Submitted agenda items for bishopric/council meetings. The public /submit form now sets Meeting and Status itself (published by default, straight onto that meeting's agenda) -- this grid is mainly for fixing a mistake or adding one directly.",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },
       { column: "body", label: "Body", type: "long_text", required: true },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
+      { column: "time_needed", label: "Time Needed", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
       { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK() },
     ],

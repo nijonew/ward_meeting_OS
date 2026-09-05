@@ -61,6 +61,11 @@ export default async function HomePage() {
             href="/youth-activities"
           />
           <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
+          <Tile
+            title="Meeting Agenda Items"
+            description="Submit an announcement or agenda item"
+            href="/submit"
+          />
         </TileGrid>
       </section>
 
