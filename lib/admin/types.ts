@@ -18,6 +18,14 @@ export type AdminColumnType =
   | "select"
   | "foreign_key";
 
+/** value/label plus an optional raw date, so a "meetings" lookup's
+ *  options can be grouped onto a calendar (see MeetingDatePicker). */
+export interface AdminOption {
+  value: string;
+  label: string;
+  date?: string;
+}
+
 export interface AdminColumnConfig {
   /** Actual database column name. */
   column: string;
@@ -26,9 +34,12 @@ export interface AdminColumnConfig {
   type: AdminColumnType;
   required?: boolean;
   /** Fixed choices, for type: "select". */
-  options?: { value: string; label: string }[];
-  /** Lookup target, for type: "foreign_key". */
-  foreignKey?: { table: string; valueColumn: string; labelColumn: string };
+  options?: AdminOption[];
+  /** Lookup target, for type: "foreign_key". A "meetings" target renders
+   *  as a calendar picker instead of a dropdown (see AdminCellInput);
+   *  meetingTypeSlug narrows it to just that meeting type's dates, since
+   *  most tables that link to a meeting only ever mean one type of it. */
+  foreignKey?: { table: string; valueColumn: string; labelColumn: string; meetingTypeSlug?: string };
   /**
    * Narrows a foreign_key column's choices to just what's relevant to
    * *this* row, based on another column on the same row -- e.g.
@@ -47,7 +58,7 @@ export interface AdminColumnConfig {
    * person. Selecting one sets this column to null and merges `patch`
    * into the rest of the row in the same save.
    */
-  specialOptions?: { value: string; label: string; patch?: Record<string, unknown> }[];
+  specialOptions?: (AdminOption & { patch?: Record<string, unknown> })[];
 }
 
 export interface AdminTableConfig {

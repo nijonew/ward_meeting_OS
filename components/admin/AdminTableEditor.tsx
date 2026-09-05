@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { AdminColumnConfig } from "@/lib/admin/types";
+import type { AdminColumnConfig, AdminOption } from "@/lib/admin/types";
+import { MeetingDatePicker } from "./MeetingDatePicker";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type ActionResult = { success?: true; error?: string };
@@ -29,9 +30,9 @@ export function AdminTableEditor({
   table: string;
   columns: AdminColumnConfig[];
   rows: AdminRow[];
-  fkOptions: Record<string, { value: string; label: string }[]>;
+  fkOptions: Record<string, AdminOption[]>;
   /** Per-column, per-scope-value option overrides -- see AdminColumnConfig.scopedBy. */
-  scopedFkOptions?: Record<string, Record<string, { value: string; label: string }[]>>;
+  scopedFkOptions?: Record<string, Record<string, AdminOption[]>>;
   onUpdate: (table: string, id: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onInsert: (table: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onDelete: (table: string, id: string) => Promise<ActionResult>;
@@ -50,8 +51,8 @@ export function AdminTableEditor({
 
   /** Real FK choices for a column, narrowed to this row's scope if the
    *  column declares scopedBy, plus any config-defined pseudo-choices. */
-  const optionsFor = (column: AdminColumnConfig, row: AdminRow | null): { value: string; label: string }[] => {
-    let base: { value: string; label: string }[];
+  const optionsFor = (column: AdminColumnConfig, row: AdminRow | null): AdminOption[] => {
+    let base: AdminOption[];
     if (column.type === "select") {
       base = column.options ?? [];
     } else if (column.scopedBy && row) {
@@ -207,11 +208,17 @@ function AdminCellInput({
 }: {
   column: AdminColumnConfig;
   value: unknown;
-  options?: { value: string; label: string }[];
+  options?: AdminOption[];
   onChange: (value: unknown) => void;
 }) {
   if (column.type === "boolean") {
     return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+  }
+
+  if (column.type === "foreign_key" && column.foreignKey?.table === "meetings") {
+    return (
+      <MeetingDatePicker value={value} options={options ?? []} required={column.required} onChange={onChange} />
+    );
   }
 
   if (column.type === "select" || column.type === "foreign_key") {

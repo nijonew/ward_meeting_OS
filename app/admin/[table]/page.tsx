@@ -34,7 +34,10 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
   const fkOptionEntries = await Promise.all(
     fkColumns.map(async (c) => {
       const fk = c.foreignKey!;
-      const options = fk.table === "meetings" ? await getMeetingFkOptions() : await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn);
+      const options =
+        fk.table === "meetings"
+          ? await getMeetingFkOptions(fk.meetingTypeSlug)
+          : await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn);
       return [c.column, options] as const;
     })
   );

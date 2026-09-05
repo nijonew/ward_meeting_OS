@@ -42,7 +42,12 @@ const RELEASE_STATUSES = [
   { value: "complete", label: "Complete" },
 ];
 
-const MEETING_FK = { table: "meetings", valueColumn: "id", labelColumn: "date" };
+/** meetingTypeSlug narrows the Meeting calendar picker to just that
+ *  type's dates -- pass none for tables that can reference any meeting
+ *  type (agenda_items, announcements, council_notes, meeting_action_items,
+ *  meeting_element_notes are all genuinely cross-type, per their own
+ *  data-layer comments). */
+const MEETING_FK = (meetingTypeSlug?: string) => ({ table: "meetings", valueColumn: "id", labelColumn: "date", meetingTypeSlug });
 const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
 
 /**
@@ -90,7 +95,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK() },
     ],
   },
 
@@ -105,7 +110,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK() },
     ],
   },
 
@@ -113,7 +118,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "bishopric_assignments",
     label: "Bishopric Meeting Assignment Rotation",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("bishopric-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "confirmed", label: "Confirmed", type: "boolean" },
@@ -147,7 +152,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       },
       { column: "release_status", label: "Release Status", type: "select", required: true, options: RELEASE_STATUSES },
       { column: "notes", label: "Notes", type: "long_text" },
-      { column: "announced_meeting_id", label: "Announced In", type: "foreign_key", foreignKey: MEETING_FK },
+      { column: "announced_meeting_id", label: "Announced In", type: "foreign_key", foreignKey: MEETING_FK("sacrament-meeting") },
     ],
   },
 
@@ -169,7 +174,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "council_notes",
     label: "Council Notes",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
       { column: "notes", label: "Notes", type: "long_text" },
       { column: "next_meeting_date", label: "Next Meeting Date", type: "date" },
     ],
@@ -180,7 +185,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Meeting Action Items",
     orderBy: { column: "created_at", ascending: false },
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
       { column: "description", label: "Description", type: "text", required: true },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "due_date", label: "Due Date", type: "date" },
@@ -191,9 +196,10 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   meeting_element_notes: {
     table: "meeting_element_notes",
     label: "Meeting Element Notes",
-    description: "Generic free-text notes for planning-view elements that don't have their own table.",
+    description:
+      "Free-text for planning-view elements with no table of their own -- e.g. Spiritual Thought and Handbook Training notes on the Bishopric Meeting side (element_key identifies which one). Most tables here have an obvious use; this one is closer to a catch-all, so it's normal not to need it often.",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
       { column: "element_key", label: "Element Key", type: "text", required: true },
       { column: "person_id", label: "Person", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "text_value", label: "Text", type: "long_text" },
@@ -228,9 +234,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_assignments: {
     table: "sacrament_assignments",
-    label: "Sacrament Assignments",
+    label: "Sacrament Meeting Rotations",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "confirmed", label: "Confirmed", type: "boolean" },
@@ -242,7 +248,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Music",
     description: "submitted_by is left out here -- it's an attribution field for the public submission form, not something to reassign.",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...MUSIC_TYPES] },
       { column: "slot", label: "Slot", type: "text" },
       { column: "hymn_number", label: "Hymn #", type: "number" },
@@ -258,7 +264,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_planning",
     label: "Sacrament Planning",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },
       { column: "ward_business", label: "Ward Business", type: "long_text" },
       { column: "stake_business", label: "Stake Business", type: "long_text" },
@@ -272,7 +278,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_rabnm",
     label: "Releases / New Callings / Records",
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },
       { column: "calling_id", label: "Calling", type: "foreign_key", foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
       { column: "detail", label: "Detail", type: "text" },
@@ -285,7 +291,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Speakers (Adult)",
     orderBy: { column: "slot", ascending: true },
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "slot", label: "Slot", type: "select", required: true, options: SPEAKER_SLOT_OPTIONS_ADULT },
       { column: "speaker_id", label: "Speaker", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "guest_speaker_name", label: "Guest Speaker Name", type: "text" },
@@ -300,7 +306,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Speakers (Youth)",
     orderBy: { column: "slot", ascending: true },
     columns: [
-      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
+      { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "slot", label: "Slot", type: "select", required: true, options: SPEAKER_SLOT_OPTIONS_YOUTH },
       { column: "speaker_id", label: "Speaker", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "guest_speaker_name", label: "Guest Speaker Name", type: "text" },

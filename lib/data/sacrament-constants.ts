@@ -18,7 +18,6 @@ export const ASSIGNMENT_ROLES = [
   { value: "closing_prayer", label: "Closing Prayer" },
   { value: "chorister", label: "Chorister" },
   { value: "organist", label: "Organist" },
-  { value: "ushers", label: "Ushers" },
 ] as const;
 
 export const SPEAKER_SLOTS_ADULT = [

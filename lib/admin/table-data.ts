@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { AdminTableConfig } from "./types";
+import type { AdminOption, AdminTableConfig } from "./types";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type MutationResult = { success: true } | { error: string };
@@ -20,7 +20,7 @@ export async function getForeignKeyOptions(
   table: string,
   valueColumn: string,
   labelColumn: string
-): Promise<{ value: string; label: string }[]> {
+): Promise<AdminOption[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from(table)
@@ -35,21 +35,26 @@ export async function getForeignKeyOptions(
 
 /**
  * Same idea as getForeignKeyOptions, but specifically for a "Meeting"
- * dropdown: a bare date (the only column meetings has that reads as a
- * label) isn't enough to tell rows apart when meeting types share dates,
- * so this formats "Sun, Sep 6, 2026 — Sacrament Meeting" instead.
+ * lookup: renders as a calendar (MeetingDatePicker), not a dropdown, so
+ * every option carries its raw `date` for grouping onto the calendar
+ * grid, and the label adds the meeting type name so two meetings on the
+ * same date (different types) are still distinguishable if they ever
+ * show up in the same unscoped list. meetingTypeSlug narrows the list to
+ * one meeting type -- most tables that reference "a meeting" only ever
+ * mean one specific type of it (e.g. every sacrament_* table means
+ * Sacrament Meeting), so this also naturally rules out picking the wrong
+ * meeting's date entirely, rather than just labeling it better.
  */
-export async function getMeetingFkOptions(): Promise<{ value: string; label: string }[]> {
+export async function getMeetingFkOptions(meetingTypeSlug?: string): Promise<AdminOption[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("meetings")
-    .select("id, date, meeting_types(name)")
-    .order("date", { ascending: false });
+  let query = supabase.from("meetings").select("id, date, meeting_types!inner(name, slug)").order("date", { ascending: false });
+  if (meetingTypeSlug) query = query.eq("meeting_types.slug", meetingTypeSlug);
+  const { data } = await query;
 
   return ((data ?? []) as unknown as {
     id: string;
     date: string;
-    meeting_types: { name?: string }[] | { name?: string } | null;
+    meeting_types: { name?: string; slug?: string }[] | { name?: string; slug?: string } | null;
   }[]).map((row) => {
     const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
     const formattedDate = new Date(`${row.date}T00:00:00`).toLocaleDateString("en-US", {
@@ -58,7 +63,8 @@ export async function getMeetingFkOptions(): Promise<{ value: string; label: str
       day: "numeric",
       year: "numeric",
     });
-    return { value: row.id, label: `${formattedDate} — ${meetingType?.name ?? "Meeting"}` };
+    const label = meetingTypeSlug ? formattedDate : `${formattedDate} — ${meetingType?.name ?? "Meeting"}`;
+    return { value: row.id, label, date: row.date };
   });
 }
 
@@ -72,9 +78,9 @@ export async function getMeetingFkOptions(): Promise<{ value: string; label: str
 export async function getScopedFkOptions(
   config: AdminTableConfig,
   rows: AdminRow[]
-): Promise<Record<string, Record<string, { value: string; label: string }[]>>> {
+): Promise<Record<string, Record<string, AdminOption[]>>> {
   const supabase = await createClient();
-  const result: Record<string, Record<string, { value: string; label: string }[]>> = {};
+  const result: Record<string, Record<string, AdminOption[]>> = {};
 
   for (const col of config.columns) {
     if (!col.scopedBy || !col.foreignKey) continue;
@@ -117,9 +123,9 @@ export async function getScopedFkOptions(
       );
     }
 
-    const byScope: Record<string, { value: string; label: string }[]> = {};
+    const byScope: Record<string, AdminOption[]> = {};
     for (const row of typedLookupRows) {
-      const options: { value: string; label: string }[] = [];
+      const options: AdminOption[] = [];
       for (const lc of lookupColumns) {
         const targetId = row[lc];
         if (typeof targetId === "string" && labelsById.has(targetId)) {
