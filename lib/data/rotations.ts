@@ -165,14 +165,70 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
 }
 
 /**
+ * Bishop -> Bishopric First Counselor -> Bishopric Second Counselor, in
+ * that fixed order, cycling every 3 calendar months regardless of how
+ * many Sacrament Meetings fall in between: January/April/July/October
+ * are the Bishop's, February/May/August/November the 1st Counselor's,
+ * March/June/September/December the 2nd Counselor's. This is fixed by
+ * calling name rather than driven by the generic rotations table, since
+ * that engine advances once per meeting *created* (weekly, for Sacrament
+ * Meeting) and has no concept of "hold for the whole month."
+ */
+const CONDUCTING_CALLING_ORDER = ["Bishop", "Bishopric First Counselor", "Bishopric Second Counselor"];
+
+/**
+ * Presiding and Conducting for a new Sacrament Meeting, resolved directly
+ * from the Bishop/counselor callings rather than the generic per-meeting
+ * rotation pointer -- see applyRotationsToNewMeeting. Both stay fully
+ * editable afterward like any other sacrament_assignments row (via the
+ * planning view or the Table Admin grid); this only sets the default.
+ * Silently skips a role if the relevant calling is currently vacant,
+ * matching how the generic rotation path skips an empty member list.
+ */
+async function applyFixedSacramentRoles(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  meetingId: string,
+  date: string
+): Promise<void> {
+  const { data: callingRows } = await supabase
+    .from("callings")
+    .select("name, current_holder_id")
+    .in("name", CONDUCTING_CALLING_ORDER)
+    .eq("active", true);
+
+  const holderByCallingName = new Map(
+    ((callingRows ?? []) as { name: string; current_holder_id: string | null }[]).map((c) => [c.name, c.current_holder_id])
+  );
+
+  const monthIndex = new Date(`${date}T00:00:00`).getMonth() % 3;
+  const roles: { role: string; personId: string | null | undefined }[] = [
+    { role: "presiding", personId: holderByCallingName.get("Bishop") },
+    { role: "conducting", personId: holderByCallingName.get(CONDUCTING_CALLING_ORDER[monthIndex]) },
+  ];
+
+  for (const { role, personId } of roles) {
+    if (!personId) continue;
+    await supabase.from("sacrament_assignments").insert({ meeting_id: meetingId, role, assigned_to_id: personId, confirmed: false });
+  }
+}
+
+/**
  * Called once, right after a new meeting is created. For every rotation
  * configured for that meeting type: writes the next-in-line person as
  * that element's assignment for the new meeting, then advances the
  * rotation's pointer -- so a later override in the planning view doesn't
- * change whose turn is next for future meetings.
+ * change whose turn is next for future meetings. For Sacrament Meeting,
+ * Presiding and Conducting are handled separately (see
+ * applyFixedSacramentRoles) rather than through that generic pointer.
  */
 export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeId: string, meetingTypeSlug: string): Promise<void> {
   const supabase = await createClient();
+  const isSacrament = meetingTypeSlug === "sacrament-meeting";
+
+  if (isSacrament) {
+    const { data: meetingRow } = await supabase.from("meetings").select("date").eq("id", meetingId).single();
+    if (meetingRow?.date) await applyFixedSacramentRoles(supabase, meetingId, meetingRow.date);
+  }
 
   const { data: rotations } = await supabase
     .from("rotations")
@@ -181,7 +237,6 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
 
   if (!rotations) return;
 
-  const isSacrament = meetingTypeSlug === "sacrament-meeting";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
   const personAndTextKeys = new Set(["spiritual_thought", "handbook_training"]);
 
@@ -192,6 +247,13 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
       next_index: number;
       rotation_members: { person_id: string; sort_order: number }[] | null;
     };
+
+    // Conducting is now set by applyFixedSacramentRoles above, not this
+    // generic pointer -- skip it here so a Sacrament Meeting doesn't end
+    // up with two conflicting "conducting" assignment rows. (Its
+    // `rotations` config row, if still configured, is simply unused now.)
+    if (isSacrament && r.element_key === "conducting") continue;
+
     const members = (r.rotation_members ?? []).sort((a, b) => a.sort_order - b.sort_order);
     if (members.length === 0) continue;
 
