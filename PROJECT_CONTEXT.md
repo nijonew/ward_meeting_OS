@@ -29,7 +29,11 @@ before.
   `bishopric` (bishop + counselors + exec sec + clerk, one shared role),
   `music_planner`, `communications_specialist`, plus granular youth roles
   `yw_presidency`, `yw_advisor`, `yw_specialist`, `ym_advisor`, `ym_specialist`
-  (kept granular on purpose, not consolidated).
+  (kept granular on purpose, not consolidated). **Terminology note:** this
+  `bishopric` role value is what the "Vision & Intended Workflows"
+  section below calls **admins**; it reserves the word **bishopric** for
+  the three-person presidency only (Bishop + both counselors). Use that
+  distinction in conversation and new UI copy going forward.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for
@@ -68,6 +72,141 @@ before.
   scoped to exactly what the public UI already filters to client-side
   (`confirmed = true`, `status = 'published'`, etc.) — don't loosen these
   without checking what the public pages actually expose.
+
+## Vision & Intended Workflows (authoritative — read before planning-related work)
+
+Written 2026-09-05 after the user flagged that "some of the original
+vision was lost" through incremental, table-by-table work this session.
+**This section is the source of truth for intent.** The rest of this
+file (Architecture, Known open items, the Table Admin queue) describes
+what's actually built, which does not yet fully match this everywhere —
+each workflow below ends with a "Known conflicts with what's built
+today" list. The user is adding more workflow descriptions in follow-up
+messages; this section will keep growing. Don't start building against
+any of this without re-reading it fresh, since it supersedes earlier
+partial/tentative decisions recorded elsewhere in this file where they
+conflict.
+
+### Glossary (precise usage from here on)
+
+- **Sacrament** (unqualified — "sacrament meeting," "sacrament
+  program," etc.) always means Sacrament Meeting, **except** the
+  specific element "Administration of the Sacrament" — the literal
+  ordinance the meeting exists for.
+- **Sacrament meeting program** = the publicly-viewable subset of the
+  meeting's content.
+- **Sacrament meeting agenda** = the full thing admins build; the
+  program is a subset of it (agenda ⊇ program).
+- **Bishopric** = Bishop, Bishopric First Counselor, Bishopric Second
+  Counselor. Three people, no more.
+- **Admins** = Bishopric (above) + Ward Executive Secretary + Ward
+  Clerk. This is the group the app's single shared `bishopric`
+  `profiles.role` value actually represents today — say "admins" for
+  that permission group from now on, and reserve "bishopric" for the
+  three-person presidency specifically (e.g. the Conducting rotation
+  correctly cycles Bishop → 1st Counselor → 2nd Counselor only, not the
+  wider admin group — that one was already right).
+
+### Workflow: Planning a non-Sacrament meeting (Bishopric Meeting, Ward Council, Youth Council)
+
+1. Each meeting has a name, scheduled date + time, a template format,
+   underlying rotation-assigned data for specific elements only (not
+   every element rotates), and agenda items.
+2. An admin (bishopric member, ward clerk, or ward exec sec) logs in,
+   selects the meeting by name + date, and its underlying data is
+   pulled into the template as a draft.
+3. They edit the draft as needed, then make it live.
+4. Once live, non-admin members with read rights for that meeting **by
+   calling** can view it (e.g. whichever calling(s) seat a given
+   council).
+5. Admins can add notes to specific elements — typically not the
+   rotation-assigned ones, more likely agenda items, meeting topics, or
+   general notes. These notes are hidden from non-admin viewers while
+   the meeting is live, and only become visible to those same
+   read-right viewers once the meeting is archived.
+
+**Known conflicts with what's built today:**
+- No non-admin viewing mechanism exists yet for these meeting types at
+  all. "Known open items" below previously described the planned
+  mechanism as "share-token-based, no-login, security through an
+  unguessable link" — this workflow instead calls for **login +
+  calling-based** read access (via `meeting_type_members`, which
+  already maps callings to meeting types). Treat the calling-based
+  model here as authoritative; the share-token note was likely an
+  oversimplification and should be corrected once this gets built.
+- No live/archived-based visibility split exists anywhere today for
+  admin notes on an element.
+
+### Workflow: Sacrament Meeting planning
+
+1. Each sacrament meeting has a scheduled date + time, a template
+   format, rotation-assigned data for specific elements only
+   (conducting, musicians), ward business of varying types
+   (callings/releases, baby blessings, RABNM, and more the user will
+   specify later) — **all handled in planning environments and
+   imported into the meeting by date** — plus Administration of the
+   Sacrament itself, plus elements that must be planned ahead in a
+   planning environment and imported by date (music, speakers, prayers).
+2. An admin logs in, selects the meeting by name + date, **selects the
+   sacrament meeting template appropriate for that meeting** (i.e.
+   different formats — Standard, Testimony Meeting, Stake Conference,
+   etc. — are meant to select a different default template, not just be
+   a stored label), and the underlying data is pulled into that
+   template as a draft.
+3. The admin manipulates the data — **mostly reordering elements** — as
+   needed, then the draft is made **printable** (sacrament meeting has
+   its own lifecycle wording, distinct from "live").
+4. Once printable, it's shared with whoever prints hard copies of the
+   public view. **Not yet decided:** a sent file vs. a dedicated print
+   portal (for formatting the program, announcements, etc.) — open
+   question, don't assume either way.
+5. On the day of the meeting, the program becomes viewable to the
+   public with no login, for that one day only. (Already matches what's
+   built — `getTodaysPublishedSacramentMeeting`.)
+6. Archived sacrament meetings are **admin-only** — no calling-based
+   public access at all once archived, unlike non-sacrament meetings
+   above (where archived becomes viewable to calling-based read-right
+   viewers, admin notes included). This is a deliberate difference
+   between the two workflows, not an inconsistency to reconcile away.
+7. The agenda/program gets reviewed again during the Bishopric Meeting
+   that precedes it (usually the same Sunday morning) — ward business
+   items get reviewed/confirmed, other polish gets added. **No notes
+   field is needed for this step** — unlike the non-sacrament workflow's
+   admin-only notes.
+8. The meeting stays editable at all times until archived. Archiving
+   happens **automatically at the end of the day Sunday** — not a
+   manual "Archive past meetings" action. (This specifies the
+   "Auto-archive past meetings" item already in Known open items below.)
+9. The public program updates in real time as admins keep adjusting the
+   agenda — no separate "publish the update" step once past printable.
+
+**Known conflicts with what's built today:**
+- `special_format` is currently just a stored label with no effect
+  (confirmed by the user earlier this session, specifically re: the
+  Table Admin grid) — this workflow says format IS meant to drive which
+  default template gets used. These aren't necessarily contradictory
+  (the admin grid not needing to compute a default vs. the real
+  per-meeting flow needing to), but flag for reconciliation before
+  building template-selection — don't assume "just a label for now"
+  still holds once that work starts.
+- No per-meeting (per-date) element reordering exists today — order
+  comes from `meeting_templates.sort_order`, one fixed order per
+  meeting *type*, shared by every instance of that type. This workflow
+  explicitly requires reordering per specific meeting.
+- "Ward business... handled in planning environments and imported into
+  the meeting by date" is partially true today, but scattered:
+  `calling_planning` pushes into `sacrament_rabnm` by date; Music/
+  Speakers/RABNM/Rotations can all be pre-planned against a future date
+  via Table Admin's calendar picker (the recent `createIfMissing`
+  work) — but there's no single unified "planning environment" surface,
+  it's spread across several separate Table Admin grids plus the live
+  per-meeting planning view. Whether that's fine or needs consolidating
+  is exactly the kind of question this section exists to settle before
+  more piecemeal work happens on it.
+- No "printable" lifecycle stage or terminology exists today — current
+  stages are `template → planning → review → ready → live → archived`.
+  Where "printable" maps onto that chain (or whether it replaces part of
+  it) needs deciding, not assumed.
 
 ## Known open items
 
