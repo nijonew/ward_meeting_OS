@@ -208,6 +208,44 @@ conflict.
   Where "printable" maps onto that chain (or whether it replaces part of
   it) needs deciding, not assumed.
 
+### Workflow: Calling planning and calling-specific ward business in Sacrament Meeting
+
+1. Admins can begin a calling planning item at any time, though it's
+   usually initiated by the bishop in Bishopric Meeting.
+2. The admin selects the calling to change (or creates a new one), adds
+   the individual(s) being considered, a status for the change, and
+   short-form notes.
+3. The person to be released is included by default too — a dropdown
+   called in from the calling's own current/backup holder, with an
+   option for "previously vacant" (no one to release / brand-new
+   calling) — plus its own separate status.
+4. Either the calling, the release, or both (by status, in the same
+   meeting) can be marked to announce in Sacrament Meeting, landing in
+   that meeting's ward-business calling/release element.
+5. This is **not** viewable in the public program.
+
+**Status: already matches almost exactly** — unlike the other two
+workflows above, this one confirms rather than conflicts with what's
+built and what was done earlier this session:
+- Calling/candidate/notes/status/release-person/release-status: all
+  exactly `calling_planning`'s existing shape. "Individual(s) being
+  considered" maps to the existing `calling_planning_suggestions`
+  table (multiple candidates + notes, already built) feeding into the
+  single `selected_person_id` once decided.
+- The release-person dropdown "called in from the appropriate table,
+  plus previously vacant" is *exactly* the `scopedBy` (current/backup
+  holder) + "Previously Vacant / New Calling" `specialOptions` work
+  done earlier this session for Table Admin's Calling Planning grid —
+  confirms that design was right.
+- "Either/both, by status, same meeting" is exactly
+  `pushToSacramentMeeting`'s existing logic (checks calling_status and
+  release_status independently, can push both into one `sacrament_rabnm`
+  write against the chosen meeting).
+- Verified directly: `lib/data/public-view.ts` queries `sacrament_rabnm`
+  filtered to `type = 'baby_blessing'` only — calling/release/
+  presidency_change rows are already excluded from the public program.
+  No conflict, no fix needed here.
+
 ## Known open items
 
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
