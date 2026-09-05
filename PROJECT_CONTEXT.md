@@ -76,6 +76,8 @@ before.
 - `AssignmentsForm.tsx` / `BishopricAssignmentsForm.tsx` are unused legacy
   components (superseded by the dynamic planning view) — safe to delete,
   never got around to it.
+- ~~`lib/data/data.ts` was a dead duplicate of `lib/data/rotations.ts`
+  (same three exports, unimported anywhere) — deleted 2026-09-04.~~
 - Agenda items for Bishopric/Ward Council/Youth Council should eventually
   get a share-token-based no-login view for invited attendees (security
   through an unguessable link, not auth) — not built yet.
