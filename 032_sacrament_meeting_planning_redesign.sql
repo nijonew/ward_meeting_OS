@@ -1,4 +1,4 @@
--- 026_sacrament_meeting_planning_redesign.sql
+-- 032_sacrament_meeting_planning_redesign.sql
 --
 -- Table Admin queue item 3: makes meeting agendas per-meeting instead of
 -- shared per-type, and makes special_format actually change which
@@ -26,6 +26,22 @@
 --    behavior); Sacrament Meeting rows get one bucket per special_format
 --    value instead.
 alter table meeting_templates add column if not exists format_key text;
+
+-- The table already had a unique constraint on (meeting_type_id,
+-- element_id) alone, predating format_key -- discovered when the first
+-- run of this migration hit "duplicate key value violates unique
+-- constraint meeting_templates_meeting_type_id_element_id_key" (the same
+-- element, e.g. presiding, legitimately needs a row in both the
+-- 'standard' and 'testimony_meeting' buckets). Replace it with a unique
+-- index that also accounts for format_key. coalesce(format_key, '') --
+-- rather than a plain 3-column unique constraint -- so this stays a real
+-- constraint for non-Sacrament types too: a bare UNIQUE(a, b, c) never
+-- flags two rows as duplicates when b is NULL in both (SQL's NULL <>
+-- NULL rule), which would otherwise silently stop enforcing uniqueness
+-- for every meeting type except Sacrament Meeting.
+alter table meeting_templates drop constraint if exists meeting_templates_meeting_type_id_element_id_key;
+create unique index if not exists meeting_templates_type_format_element_key
+  on meeting_templates (meeting_type_id, coalesce(format_key, ''), element_id);
 
 -- 2. Two new catalog elements needed for the real service order -- both
 --    plain script cues (like Announcements/Agenda Items), no data-entry

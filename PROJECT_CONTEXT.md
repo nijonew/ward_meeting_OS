@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 026
+## Current migration number: 032
 
 Migrations `022`–`025` confirmed run by the user (2026-09-04/05).
 Migration `025` (`apply_rotation_assignment` Postgres function, see
@@ -15,10 +15,16 @@ Assignment Rotations below) additionally verified working (2026-09-05)
 via a rollback-safe functional test run directly against production in
 the Supabase SQL editor -- confirmed it assigns the correct person to
 the correct table and advances `next_index` correctly, with everything
-the test wrote rolled back afterward. Migration `026` (Sacrament Meeting
-Planning redesign, see Table Admin update queue below) written
-2026-09-05, **not yet confirmed run by the user**. Next migration after
-that should be `027_*.sql`. Migrations are plain `.sql` files at
+the test wrote rolled back afterward. Migration `032` (Sacrament Meeting
+Planning redesign, see Table Admin update queue below) -- **numbered
+`026` when first written (2026-09-05), renumbered to `032` by the user
+when running it since `026`–`031` had already been used outside this
+chat** (exactly the numbering-collision risk this section already
+warned about -- ask the user before assuming a gap like this is free
+next time). First run hit a real schema conflict (see below); fixed and
+the corrected file **still needs to be re-run by the user**. Next
+migration after that should be `033_*.sql` -- **confirm with the user
+first**, same as always. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -47,7 +53,7 @@ before.
   `archived`.
 - **Dynamic planning view** (`app/meetings/[id]/planning/page.tsx`): renders
   a meeting's own agenda elements (`meeting_planned_elements`, migration
-  `026`) in order, dispatching by `resolution_kind` (`person_role`,
+  `032`) in order, dispatching by `resolution_kind` (`person_role`,
   `music`, `person_slot`, `free_text`, `person_and_text`, `none`). Most
   element types write to existing tables (`sacrament_assignments`,
   `sacrament_music`, `sacrament_speakers_adults/youth`); anything without
@@ -59,7 +65,7 @@ before.
   meeting type **and**, for Sacrament Meeting, `format_key` matching
   `special_format` -- see `SPECIAL_FORMATS`), which is itself edited at
   `/admin/meeting-templates`, not per-meeting. A meeting created before
-  migration `026` has zero `meeting_planned_elements` rows and falls back
+  migration `032` has zero `meeting_planned_elements` rows and falls back
   to rendering the shared `meeting_templates` list directly (no backfill
   was done, by design). Changing a meeting's `special_format` after the
   fact never re-seeds its elements -- only affects new meetings going
@@ -179,10 +185,17 @@ or note partial progress) as each is picked up.
    ~500+ titles from memory risked real inaccuracies; needs a proper
    source -- ask the user how they'd like this populated when picked
    back up).
-3. ~~**Sacrament Planning.**~~ Done (2026-09-05, migration `026` **not
-   yet confirmed run by the user**): renamed to "Sacrament Meeting
-   Planning" in Table Admin. Redesigned as planned -- `special_format`
-   now actually changes which elements appear (see Dynamic planning view
+3. ~~**Sacrament Planning.**~~ Done (2026-09-05, migration `032`,
+   renumbered from `026` by the user since `026`–`031` were already
+   used outside this chat -- **first run hit a real bug, fixed, still
+   needs to be re-run by the user**: `meeting_templates` already had a
+   unique constraint on `(meeting_type_id, element_id)` alone predating
+   `format_key`, so e.g. `presiding` needing a row in both `standard` and
+   `testimony_meeting` violated it -- replaced with a
+   `coalesce(format_key, '')`-based unique index so it stays enforced
+   for non-Sacrament types too): renamed to "Sacrament Meeting Planning"
+   in Table Admin. Redesigned as planned -- `special_format` now
+   actually changes which elements appear (see Dynamic planning view
    above): each meeting gets its own `meeting_planned_elements` row set,
    seeded at creation time from `meeting_templates` (now keyed by
    meeting type + `format_key`), freely add/remove/reorderable per
@@ -191,7 +204,7 @@ or note partial progress) as each is picked up.
    Meeting. Forward-only, per the user's decision -- no backfill for
    meetings created before this ships (see fallback behavior above).
    Default templates for all 10 `special_format` values written into
-   migration `026`: `standard`, `testimony_meeting` ("fast Sunday"), and
+   migration `032`: `standard`, `testimony_meeting` ("fast Sunday"), and
    `missionary_speaker` came from the user's actual real service order;
    `stake_speakers` confirmed identical to `standard`;
    `stake_conference`/`general_conference` seeded with a single Ward
