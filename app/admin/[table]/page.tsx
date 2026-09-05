@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
-import { getAdminRows, getForeignKeyOptions } from "@/lib/admin/table-data";
+import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions } from "@/lib/admin/table-data";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { updateRow, insertRow, deleteRow } from "./actions";
 
@@ -27,14 +27,22 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
 
   const rows = await getAdminRows(config);
 
+  // Every foreign_key column gets its full, unscoped option list (used
+  // directly for most columns, and as the fallback for a scoped column's
+  // "add new row" case, before any row exists to scope by).
   const fkColumns = config.columns.filter((c) => c.type === "foreign_key" && c.foreignKey);
   const fkOptionEntries = await Promise.all(
     fkColumns.map(async (c) => {
       const fk = c.foreignKey!;
-      return [c.column, await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn)] as const;
+      const options = fk.table === "meetings" ? await getMeetingFkOptions() : await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn);
+      return [c.column, options] as const;
     })
   );
   const fkOptions = Object.fromEntries(fkOptionEntries);
+
+  // Columns with `scopedBy` additionally get a per-row-scope-value option
+  // list (e.g. release_person_id narrowed to each row's own calling).
+  const scopedFkOptions = await getScopedFkOptions(config, rows);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -53,6 +61,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
         columns={config.columns}
         rows={rows}
         fkOptions={fkOptions}
+        scopedFkOptions={scopedFkOptions}
         onUpdate={updateRow}
         onInsert={insertRow}
         onDelete={deleteRow}

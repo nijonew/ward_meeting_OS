@@ -29,6 +29,25 @@ export interface AdminColumnConfig {
   options?: { value: string; label: string }[];
   /** Lookup target, for type: "foreign_key". */
   foreignKey?: { table: string; valueColumn: string; labelColumn: string };
+  /**
+   * Narrows a foreign_key column's choices to just what's relevant to
+   * *this* row, based on another column on the same row -- e.g.
+   * calling_planning.release_person_id should only offer the specific
+   * calling's current/backup holder, not every person in the ward.
+   * scopeColumn: the row's own column to read (e.g. "calling_id").
+   * lookupTable: table to fetch by id using that scope value.
+   * lookupColumns: columns on lookupTable, each holding a foreign key into
+   *   this column's foreignKey.table (e.g. ["current_holder_id",
+   *   "backup_holder_id"]) -- their values become the allowed choices.
+   */
+  scopedBy?: { scopeColumn: string; lookupTable: string; lookupColumns: string[] };
+  /**
+   * Extra pseudo-choices for a foreign_key column that don't correspond to
+   * a real row -- e.g. "Previously Vacant / New Calling" for a release
+   * person. Selecting one sets this column to null and merges `patch`
+   * into the rest of the row in the same save.
+   */
+  specialOptions?: { value: string; label: string; patch?: Record<string, unknown> }[];
 }
 
 export interface AdminTableConfig {

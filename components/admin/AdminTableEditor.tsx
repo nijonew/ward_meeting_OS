@@ -21,6 +21,7 @@ export function AdminTableEditor({
   columns,
   rows,
   fkOptions,
+  scopedFkOptions,
   onUpdate,
   onInsert,
   onDelete,
@@ -29,6 +30,8 @@ export function AdminTableEditor({
   columns: AdminColumnConfig[];
   rows: AdminRow[];
   fkOptions: Record<string, { value: string; label: string }[]>;
+  /** Per-column, per-scope-value option overrides -- see AdminColumnConfig.scopedBy. */
+  scopedFkOptions?: Record<string, Record<string, { value: string; label: string }[]>>;
   onUpdate: (table: string, id: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onInsert: (table: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onDelete: (table: string, id: string) => Promise<ActionResult>;
@@ -45,8 +48,38 @@ export function AdminTableEditor({
   const valueFor = (row: AdminRow, column: string) => drafts[row.id]?.[column] ?? row[column];
   const isDirty = (id: string) => Boolean(drafts[id]);
 
-  const setValue = (row: AdminRow, column: string, value: unknown) => {
-    setDrafts((prev) => ({ ...prev, [row.id]: { ...(prev[row.id] ?? {}), [column]: value } }));
+  /** Real FK choices for a column, narrowed to this row's scope if the
+   *  column declares scopedBy, plus any config-defined pseudo-choices. */
+  const optionsFor = (column: AdminColumnConfig, row: AdminRow | null): { value: string; label: string }[] => {
+    let base: { value: string; label: string }[];
+    if (column.type === "select") {
+      base = column.options ?? [];
+    } else if (column.scopedBy && row) {
+      const scopeValue = valueFor(row, column.scopedBy.scopeColumn);
+      base = scopedFkOptions?.[column.column]?.[String(scopeValue)] ?? fkOptions[column.column] ?? [];
+    } else {
+      base = fkOptions[column.column] ?? [];
+    }
+    return column.specialOptions ? [...base, ...column.specialOptions] : base;
+  };
+
+  // A specialOptions pick (e.g. "Previously Vacant") isn't a real foreign
+  // key value: it sets this column to null and merges its `patch` into
+  // the rest of the row, in one save.
+  const resolveSpecial = (column: AdminColumnConfig, value: unknown) =>
+    typeof value === "string" ? column.specialOptions?.find((o) => o.value === value) : undefined;
+
+  const setValue = (row: AdminRow, column: AdminColumnConfig, value: unknown) => {
+    const special = resolveSpecial(column, value);
+    setDrafts((prev) => ({
+      ...prev,
+      [row.id]: { ...(prev[row.id] ?? {}), [column.column]: special ? null : value, ...(special?.patch ?? {}) },
+    }));
+  };
+
+  const setNewRowValue = (column: AdminColumnConfig, value: unknown) => {
+    const special = resolveSpecial(column, value);
+    setNewRow((prev) => ({ ...prev, [column.column]: special ? null : value, ...(special?.patch ?? {}) }));
   };
 
   const saveRow = (row: AdminRow) => {
@@ -110,8 +143,8 @@ export function AdminTableEditor({
                   <AdminCellInput
                     column={c}
                     value={valueFor(row, c.column)}
-                    options={c.type === "foreign_key" ? fkOptions[c.column] : c.options}
-                    onChange={(v) => setValue(row, c.column, v)}
+                    options={optionsFor(c, row)}
+                    onChange={(v) => setValue(row, c, v)}
                   />
                 </td>
               ))}
@@ -144,8 +177,8 @@ export function AdminTableEditor({
                 <AdminCellInput
                   column={c}
                   value={newRow[c.column]}
-                  options={c.type === "foreign_key" ? fkOptions[c.column] : c.options}
-                  onChange={(v) => setNewRow((prev) => ({ ...prev, [c.column]: v }))}
+                  options={optionsFor(c, null)}
+                  onChange={(v) => setNewRowValue(c, v)}
                 />
               </td>
             ))}

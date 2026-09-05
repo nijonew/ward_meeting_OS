@@ -88,7 +88,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "title", label: "Title", type: "text", required: true },
       { column: "body", label: "Body", type: "long_text", required: true },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
-      { column: "submitted_by_email", label: "Email", type: "text", required: true },
+      { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
       { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK },
     ],
@@ -103,7 +103,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "title", label: "Title", type: "text", required: true },
       { column: "body", label: "Body", type: "long_text", required: true },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
-      { column: "submitted_by_email", label: "Email", type: "text", required: true },
+      { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
       { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK },
     ],
@@ -111,7 +111,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   bishopric_assignments: {
     table: "bishopric_assignments",
-    label: "Bishopric Assignments",
+    label: "Bishopric Meeting Assignment Rotation",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK },
       { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
@@ -123,13 +123,28 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   calling_planning: {
     table: "calling_planning",
     label: "Calling Planning",
+    description:
+      "Calling Status tracks the incoming person, Release Status tracks the outgoing one -- they're independent so you can have someone released before their replacement is even chosen.",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "calling_id", label: "Calling", type: "foreign_key", required: true, foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
       { column: "calling_status", label: "Calling Status", type: "select", required: true, options: CALLING_STATUSES },
       { column: "selected_person_id", label: "Selected Person", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "date_set_apart", label: "Date Set Apart", type: "date" },
-      { column: "release_person_id", label: "Release Person", type: "foreign_key", foreignKey: PERSON_FK },
+      {
+        column: "release_person_id",
+        label: "Release Person",
+        type: "foreign_key",
+        foreignKey: PERSON_FK,
+        // Narrowed to just this row's calling's current/backup holder,
+        // instead of every person in the ward -- see AdminColumnConfig.scopedBy.
+        scopedBy: { scopeColumn: "calling_id", lookupTable: "callings", lookupColumns: ["current_holder_id", "backup_holder_id"] },
+        // Not a real person -- picking this clears release_person_id and
+        // sets release_status to previously_vacant in the same save.
+        specialOptions: [
+          { value: "__previously_vacant__", label: "— Previously Vacant / New Calling —", patch: { release_status: "previously_vacant" } },
+        ],
+      },
       { column: "release_status", label: "Release Status", type: "select", required: true, options: RELEASE_STATUSES },
       { column: "notes", label: "Notes", type: "long_text" },
       { column: "announced_meeting_id", label: "Announced In", type: "foreign_key", foreignKey: MEETING_FK },
