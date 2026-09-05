@@ -155,36 +155,39 @@ or note partial progress) as each is picked up.
    page loads per collection); ask the user before spending that,
    especially on Hymns for Home and Church since it's still being
    released in volumes.
-3. **Sacrament Planning.** Rename admin label "Sacrament Planning" →
-   "Sacrament Meeting Planning". Bigger redesign, not just a rename: the
-   `special_format` options (Standard, Testimony Meeting, Stake
-   Conference, etc. — see `SPECIAL_FORMATS` in
-   `lib/data/sacrament-constants.ts`) should become default *template*
-   names rather than a plain field. Target workflow (matches the old
-   spreadsheet): a list of upcoming Sundays by date, each pre-populated
-   with standing elements (opening/closing prayer, at least one more) —
-   the user adds an element to a given date, picks its name/type, and
-   fills in detail (person, music info, etc.) — then the actual meeting
-   program for that date pulls in whatever elements are attached to it,
-   reorderable at that point. This effectively describes a per-date
-   element-planning table upstream of the meeting's own program, distinct
-   from (but feeding) the existing dynamic planning view. Needs real
-   design work before touching schema.
-4. **Releases/New Callings/Records (`sacrament_rabnm`).** Rename to
-   "Recognitions/Advancements/Baptisms/New Members". Purpose: ward
-   business items outside of callings, for inclusion in the meeting's
-   conducting view. The ward clerk and executive secretary need to be
-   able to add these (that's the typical/primary path), with the
-   bishopric also able to; **note:** "clerk"/"exec sec" are folded into
-   the single shared `bishopric` app role today (see Architecture above)
-   with no way to distinguish them for a narrower permission — may need
-   its own decision if per-person (not per-role) add access matters here.
-   Needs a real per-type form design: which fields are required/shown
-   changes depending on the record type (release vs. new calling vs.
-   baby blessing vs. baptism vs. new member vs. mission call vs.
-   Aaronic Priesthood, etc. — see `RABNM_TYPES` in
-   `lib/data/sacrament-constants.ts` for the current type list), so this
-   isn't a simple flat-column admin grid like the others.
+3. ~~**Sacrament Planning.**~~ Done (2026-09-04): renamed to "Sacrament
+   Meeting Planning". Turned out simpler than the queue note originally
+   described, once the user clarified two things: special_format stays
+   informational only (no default-template behavior), and per-date
+   element reordering doesn't need to live here at all -- true order
+   editing happens later in the real per-meeting planning view, once
+   elements are "called in per the template." So the only real gap was
+   that Table Admin's Meeting picker required an existing `meetings` row
+   -- fixed by generalizing `/music`'s existing "find or create a
+   meeting for this date" pattern into `getOrCreateMeetingId`
+   (lib/data/meetings.ts) and wiring it into every Sacrament Meeting
+   table's calendar picker (`foreignKey.createIfMissing`) -- so you can
+   now plan against any future Sunday directly, meeting row created
+   automatically on save.
+4. ~~**Releases/New Callings/Records (`sacrament_rabnm`).**~~ Done
+   (2026-09-05): renamed to "Recognitions / Advancements / Baptisms /
+   New Members" in Table Admin -- turned out the live per-meeting
+   planning view (`RabnmSection.tsx`) already used that exact name, so
+   this was really a consistency fix. The "clerk/exec sec need access"
+   note turned out to be a non-issue: they're already covered by the
+   single shared `bishopric` role by design (see Architecture above),
+   which already gates this feature everywhere it appears. Built the
+   real per-type form (`components/planning/RabnmAddForm.tsx`, a new
+   client component split out of `RabnmSection.tsx`): the Calling picker
+   only shows for release/new_calling/presidency_change (the only types
+   that plausibly involve one), and the date field is hidden for those
+   three (the announcement happens at the meeting being planned, no
+   separate date to record) but shown with a type-specific label for
+   everything else (Baptism Date, Ordination Date, Birth Date, etc.).
+   This is in the live planning view, not the generic Table Admin grid --
+   the grid still can't attach people to a record since that lives in
+   `sacrament_rabnm_people`, a composite-key join table the generic
+   engine doesn't support (see registry.ts).
 5. **Sacrament Speakers (adult/youth) — rename + re-scope.** *If* these
    tables continue to exist (user's own qualifier — not fully committed
    yet): rename to "Sacrament Meeting Speakers (Adult)" / "(Youth)".
@@ -200,6 +203,11 @@ or note partial progress) as each is picked up.
    probably be designed together: item 3's per-date element planning is
    presumably what *writes* the eventual "spoke on this date" history
    record these tables would hold, once repurposed.
+6. **Sortable column headers in Table Admin.** (2026-09-05, user's own
+   words: "future upgrade") Click a column heading in `AdminTableEditor`
+   to sort the grid by that column, presumably click-again to reverse.
+   Client-side only (re-sort the already-fetched `rows` array in
+   component state) -- doesn't need a schema or server change.
 
 ## Working conventions
 

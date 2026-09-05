@@ -332,7 +332,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_rabnm: {
     table: "sacrament_rabnm",
-    label: "Releases / New Callings / Records",
+    label: "Recognitions / Advancements / Baptisms / New Members",
+    description:
+      "Matches the section already shown in each meeting's planning view. Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },
