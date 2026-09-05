@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import type { AdminOption, AdminTableConfig } from "./types";
+import { getOrCreateMeetingId } from "@/lib/data/meetings";
+import type { MeetingTypeSlug } from "@/lib/types";
+import { decodeCreateMeetingValue, type AdminOption, type AdminTableConfig } from "./types";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type MutationResult = { success: true } | { error: string };
@@ -166,13 +168,41 @@ function sanitizePatch(config: AdminTableConfig, patch: Record<string, unknown>)
   return clean;
 }
 
+/**
+ * Resolves any `createIfMissing` meetings column that's carrying a
+ * "create at this date" sentinel (see encodeCreateMeetingValue) into a
+ * real meetings.id, creating that meeting (with rotations applied, same
+ * as any other creation path) if it doesn't exist yet. Columns without
+ * the sentinel pass through untouched.
+ */
+async function resolvePendingMeetingCreations(
+  config: AdminTableConfig,
+  patch: Record<string, unknown>
+): Promise<{ patch: Record<string, unknown> } | { error: string }> {
+  const resolved = { ...patch };
+  for (const col of config.columns) {
+    const fk = col.foreignKey;
+    if (!fk?.createIfMissing || !fk.meetingTypeSlug) continue;
+    const dateIso = decodeCreateMeetingValue(resolved[col.column]);
+    if (dateIso === null) continue;
+
+    const meetingId = await getOrCreateMeetingId(dateIso, fk.meetingTypeSlug as MeetingTypeSlug);
+    if (!meetingId) return { error: `Could not create a meeting for ${dateIso}.` };
+    resolved[col.column] = meetingId;
+  }
+  return { patch: resolved };
+}
+
 export async function updateAdminRow(
   config: AdminTableConfig,
   id: string,
   patch: Record<string, unknown>
 ): Promise<MutationResult> {
+  const resolved = await resolvePendingMeetingCreations(config, patch);
+  if ("error" in resolved) return resolved;
+
   const supabase = await createClient();
-  const { error } = await supabase.from(config.table).update(sanitizePatch(config, patch)).eq("id", id);
+  const { error } = await supabase.from(config.table).update(sanitizePatch(config, resolved.patch)).eq("id", id);
   if (error) return { error: error.message };
   return { success: true };
 }
@@ -181,8 +211,11 @@ export async function insertAdminRow(
   config: AdminTableConfig,
   patch: Record<string, unknown>
 ): Promise<MutationResult> {
+  const resolved = await resolvePendingMeetingCreations(config, patch);
+  if ("error" in resolved) return resolved;
+
   const supabase = await createClient();
-  const { error } = await supabase.from(config.table).insert(sanitizePatch(config, patch));
+  const { error } = await supabase.from(config.table).insert(sanitizePatch(config, resolved.patch));
   if (error) return { error: error.message };
   return { success: true };
 }

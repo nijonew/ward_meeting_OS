@@ -41,12 +41,24 @@ const SUBMISSION_STATUSES = [
   { value: "archived", label: "Archived" },
 ];
 
-/** meetingTypeSlug narrows the Meeting calendar picker to just that
- *  type's dates -- pass none for tables that can reference any meeting
- *  type (agenda_items, announcements, council_notes, meeting_action_items,
- *  meeting_element_notes are all genuinely cross-type, per their own
- *  data-layer comments). */
-const MEETING_FK = (meetingTypeSlug?: string) => ({ table: "meetings", valueColumn: "id", labelColumn: "date", meetingTypeSlug });
+/**
+ * meetingTypeSlug narrows the Meeting calendar picker to just that
+ * type's dates -- pass none for tables that can reference any meeting
+ * type (agenda_items, announcements, council_notes, meeting_action_items,
+ * meeting_element_notes are all genuinely cross-type, per their own
+ * data-layer comments). Whenever a slug IS given, the picker also lets
+ * you pick a future date with no meeting yet -- it gets created (with
+ * rotations applied) at save time -- since knowing the type is exactly
+ * what's needed to create one; there'd be no safe type to use for the
+ * unscoped columns.
+ */
+const MEETING_FK = (meetingTypeSlug?: string) => ({
+  table: "meetings",
+  valueColumn: "id",
+  labelColumn: "date",
+  meetingTypeSlug,
+  createIfMissing: Boolean(meetingTypeSlug),
+});
 const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
 
 /**
@@ -302,7 +314,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_planning: {
     table: "sacrament_planning",
-    label: "Sacrament Planning",
+    label: "Sacrament Meeting Planning",
+    description:
+      "Pick any upcoming Sunday, even one with no meeting yet -- it's created automatically when you save. Special Format is informational only for now; it doesn't change which elements show up.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },

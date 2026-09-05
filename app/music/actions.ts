@@ -2,59 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getOrCreateMeetingId } from "@/lib/data/meetings";
 import type { ParsedMusicRow } from "@/lib/data/music-parsing";
 
 type ActionResult = { success: true; count: number } | { error: string };
-
-/**
- * Finds the Sacrament Meeting for a given date, or creates one (stage
- * 'template') if it doesn't exist yet -- so bulk music entry can run far
- * ahead of the meetings themselves being individually created.
- */
-async function getOrCreateSacramentMeetingId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  dateIso: string,
-  cache: Map<string, string>
-): Promise<string | null> {
-  if (cache.has(dateIso)) {
-    return cache.get(dateIso)!;
-  }
-
-  const { data: existing } = await supabase
-    .from("meetings")
-    .select("id, meeting_types!inner(slug)")
-    .eq("date", dateIso)
-    .eq("meeting_types.slug", "sacrament-meeting")
-    .maybeSingle();
-
-  if (existing) {
-    cache.set(dateIso, existing.id as string);
-    return existing.id as string;
-  }
-
-  const { data: meetingType } = await supabase
-    .from("meeting_types")
-    .select("id")
-    .eq("slug", "sacrament-meeting")
-    .single();
-
-  if (!meetingType) {
-    return null;
-  }
-
-  const { data: created, error } = await supabase
-    .from("meetings")
-    .insert({ meeting_type_id: meetingType.id, date: dateIso, stage: "template" })
-    .select("id")
-    .single();
-
-  if (error || !created) {
-    return null;
-  }
-
-  cache.set(dateIso, created.id as string);
-  return created.id as string;
-}
 
 export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<ActionResult> {
   const supabase = await createClient();
@@ -76,7 +27,7 @@ export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<Actio
   const insertRows: Record<string, unknown>[] = [];
 
   for (const row of validRows) {
-    const meetingId = await getOrCreateSacramentMeetingId(supabase, row.dateIso!, meetingIdCache);
+    const meetingId = await getOrCreateMeetingId(row.dateIso!, "sacrament-meeting", meetingIdCache);
     if (!meetingId) continue;
 
     insertRows.push({
@@ -127,8 +78,7 @@ export async function addSingleMusicItem(formData: FormData): Promise<ActionResu
     return { error: "Date and type are required." };
   }
 
-  const meetingIdCache = new Map<string, string>();
-  const meetingId = await getOrCreateSacramentMeetingId(supabase, dateIso, meetingIdCache);
+  const meetingId = await getOrCreateMeetingId(dateIso, "sacrament-meeting");
 
   if (!meetingId) {
     return { error: "Could not find or create that meeting." };
