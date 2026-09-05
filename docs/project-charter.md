@@ -1,6 +1,10 @@
 ﻿# Ward Meeting OS
 ## Project Charter
-### Version 1.0 (Draft)
+### Version 1.1 (Draft)
+
+> This is the vision/mission document. For the current implementation's
+> actual state, see [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md); for the
+> supporting technical design, see [architecture.md](../architecture.md).
 
 ---
 
@@ -126,27 +130,19 @@ Support additional meeting types, wards, and future functionality without redesi
 
 # Primary Users
 
-## Bishop
+## Bishopric (Bishop, Counselors, Executive Secretary, Ward Clerk)
 
-Needs visibility into all meetings and planning.
+Today these four callings share a single application role with full
+meeting-editing access, covering the bishop's need for visibility into
+all meetings and planning, the counselors' need for planning tools and
+conducting views, the executive secretary's need for scheduling and
+agenda management, and the ward clerk's need for minutes, action items,
+historical records, and reports.
 
----
-
-## Bishopric Counselors
-
-Need planning tools and conducting views.
-
----
-
-## Executive Secretary
-
-Needs scheduling, planning, reminders, and agenda management.
-
----
-
-## Ward Clerk
-
-Needs meeting minutes, action items, historical records, and reports.
+The app does not yet distinguish between them individually — a known
+gap, tracked in `PROJECT_CONTEXT.md`, that matters most where only one
+of these callings (e.g. clerk/exec sec) should typically act, such as
+recording releases, new callings, and membership records.
 
 ---
 
