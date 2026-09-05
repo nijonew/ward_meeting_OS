@@ -7,24 +7,7 @@ import {
 import type { CallingPlanningRow } from "@/lib/data/calling-planning";
 import type { PersonOption } from "@/lib/data/people";
 import type { Meeting } from "@/lib/types";
-
-const CALLING_STATUSES = [
-  { value: "discussing", label: "Discussing" },
-  { value: "future", label: "Future" },
-  { value: "declined", label: "Declined" },
-  { value: "to_announce", label: "To Announce in Sacrament" },
-  { value: "to_be_set_apart", label: "To Be Set Apart" },
-  { value: "to_record", label: "To Record" },
-  { value: "complete", label: "Complete" },
-];
-
-const RELEASE_STATUSES = [
-  { value: "previously_vacant", label: "Previously Vacant" },
-  { value: "discussing", label: "Discussing" },
-  { value: "to_announce", label: "To Announce in Sacrament" },
-  { value: "to_record", label: "To Record" },
-  { value: "complete", label: "Complete" },
-];
+import type { SelectOption } from "@/lib/data/select-options";
 
 function formatMeetingDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -35,11 +18,15 @@ export function CallingPlanningCard({
   planning,
   people,
   upcomingSacramentMeetings,
+  callingStatusOptions,
+  releaseStatusOptions,
 }: {
   callingId: string;
   planning: CallingPlanningRow;
   people: PersonOption[];
   upcomingSacramentMeetings: Meeting[];
+  callingStatusOptions: SelectOption[];
+  releaseStatusOptions: SelectOption[];
 }) {
   const save = async (formData: FormData) => {
     "use server";
@@ -73,7 +60,7 @@ export function CallingPlanningCard({
               defaultValue={planning.calling_status}
               className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
             >
-              {CALLING_STATUSES.map((s) => (
+              {callingStatusOptions.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
@@ -132,7 +119,7 @@ export function CallingPlanningCard({
               defaultValue={planning.release_status}
               className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
             >
-              {RELEASE_STATUSES.map((s) => (
+              {releaseStatusOptions.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>

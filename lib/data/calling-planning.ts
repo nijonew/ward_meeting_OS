@@ -16,6 +16,28 @@ export interface SuggestionRow {
   note: string | null;
 }
 
+/** Fallback options if admin_select_options has no rows yet for these
+ *  fields -- see lib/data/select-options.ts. Also what the migration
+ *  022_admin_select_options.sql seeds the table with, so switching over
+ *  to the DB-backed list is a no-op until someone actually edits it. */
+export const DEFAULT_CALLING_STATUSES = [
+  { value: "discussing", label: "Discussing" },
+  { value: "future", label: "Future" },
+  { value: "declined", label: "Declined" },
+  { value: "to_announce", label: "To Announce in Sacrament" },
+  { value: "to_be_set_apart", label: "To Be Set Apart" },
+  { value: "to_record", label: "To Record" },
+  { value: "complete", label: "Complete" },
+];
+
+export const DEFAULT_RELEASE_STATUSES = [
+  { value: "previously_vacant", label: "Previously Vacant" },
+  { value: "discussing", label: "Discussing" },
+  { value: "to_announce", label: "To Announce in Sacrament" },
+  { value: "to_record", label: "To Record" },
+  { value: "complete", label: "Complete" },
+];
+
 export interface CallingPlanningRow {
   id: string;
   calling_status: string;

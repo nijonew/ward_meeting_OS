@@ -1,9 +1,15 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getCallingDetail, getCallingPlanningHistory } from "@/lib/data/calling-planning";
+import {
+  getCallingDetail,
+  getCallingPlanningHistory,
+  DEFAULT_CALLING_STATUSES,
+  DEFAULT_RELEASE_STATUSES,
+} from "@/lib/data/calling-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getUpcomingMeetings } from "@/lib/data/meetings";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSelectOptions } from "@/lib/data/select-options";
 import { startCallingPlanning } from "@/app/callings/actions";
 import { CallingPlanningCard } from "@/components/callings/CallingPlanningCard";
 
@@ -35,10 +41,12 @@ export default async function CallingDetailPage({
     return <p className="text-slate">Could not find that calling.</p>;
   }
 
-  const [history, people, meetings] = await Promise.all([
+  const [history, people, meetings, callingStatusOptions, releaseStatusOptions] = await Promise.all([
     getCallingPlanningHistory(callingId),
     getActivePeople(),
     getUpcomingMeetings(),
+    getSelectOptions("calling_planning.calling_status", DEFAULT_CALLING_STATUSES),
+    getSelectOptions("calling_planning.release_status", DEFAULT_RELEASE_STATUSES),
   ]);
 
   const sacramentMeetings = meetings.filter((m) => m.meetingType === "sacrament-meeting");
@@ -78,6 +86,8 @@ export default async function CallingDetailPage({
             planning={planning}
             people={people}
             upcomingSacramentMeetings={sacramentMeetings}
+            callingStatusOptions={callingStatusOptions}
+            releaseStatusOptions={releaseStatusOptions}
           />
         ))
       )}
