@@ -7,13 +7,14 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 027
+## Current migration number: 028
 
 Migrations `022`–`027` all confirmed run by the user (2026-09-05). `025`
 was used by the user's own project-workflow-review session, outside
 this chat -- exactly the kind of collision this file exists to warn
-about. Next migration should be `028_*.sql`. Migrations are plain
-`.sql` files at
+about. `028_agenda_items_time_needed.sql` exists in the repo but still
+needs to be run. Next migration should be `029_*.sql`. Migrations are
+plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -337,7 +338,7 @@ just a distinct verb for "notes, once someone reports on them later."
   non-Sacrament workflow above) still isn't built — reconfirmed here,
   not a new gap.
 
-### Workflow: Adding agenda items for a non-Sacrament meeting
+### ~~Workflow: Adding agenda items for a non-Sacrament meeting~~ — built 2026-09-05
 
 Anyone invited to a non-sacrament meeting should be able to add agenda
 items for their organization: enter the site (via a tile for meeting
@@ -353,27 +354,17 @@ Item (Bishopric / Ward Council / Ward Youth Council), Date of Meeting,
 Description of Agenda Item (one paragraph field, no separate title),
 and How Much Time Do You Need (1–2 / 3–5 / 6+ minutes).
 
-**Known conflicts with what's built today** (checked the real code, not
-assumed):
-- **No tile links to `/submit` at all.** Searched `app/page.tsx` — the
-  "select the tile" step in this workflow has no tile to select yet.
-- **The current `/submit` form doesn't match the reference form's
-  fields.** It has one combined announcement/agenda-item form with
-  title + body + name + email, all four required. It's missing:
-  which meeting type the item is for, which date, and how much time is
-  needed. It also splits into title+body where the real form has just
-  one description field, and requires name where the real form doesn't.
-- **Submitted agenda items always get `meeting_id = null`** — an admin
-  has to manually match each one to a specific meeting afterward (the
-  Dashboard's "Unassigned Agenda Items" section). There's no way today
-  for the submitter to specify the meeting type/date up front, which
-  the real reference form already asks for.
-- **Default visibility is inverted from what's described.**
-  `components/bishopric/AgendaItemsSection.tsx` confirms submitted
-  items start `status = 'pending'` (excluded from the meeting's
-  agenda) and need an admin to explicitly click "Publish" before they
-  appear. The vision calls for **included by default**, with an option
-  to exclude — the opposite default.
+**All four conflicts fixed 2026-09-05** (migration `028`, still needs
+to be run): added the "Meeting Agenda Items" tile; rebuilt `/submit`'s
+agenda-item path (`app/submit/actions.ts`'s `submitAgendaItem`,
+`components/submit/SubmitForm.tsx`) to match the real form's fields
+exactly (email required, name optional, meeting type + date, one
+description, time needed); it now resolves straight to a real meeting
+via `getOrCreateMeetingId` instead of leaving `meeting_id` null; and it
+publishes immediately (included by default) instead of starting
+pending. `submitAnnouncement` was deliberately left untouched (still
+pending by default) — see the blocked event-announcement workflow
+below for why.
 
 ### Terminology question + Workflow: announcing an upcoming event (BLOCKED — needs input)
 
