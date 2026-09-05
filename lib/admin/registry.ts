@@ -300,6 +300,12 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "age_group", label: "Age Group", type: "select", options: PERSON_AGE_GROUPS },
       { column: "attendance_status", label: "Attendance Status", type: "select", required: true, options: PERSON_ATTENDANCE_STATUSES },
       { column: "active", label: "Active", type: "boolean" },
+      {
+        column: "profile_id",
+        label: "Login Account",
+        type: "foreign_key",
+        foreignKey: { table: "profiles", valueColumn: "id", labelColumn: "display_name" },
+      },
       { column: "notes", label: "Notes", type: "long_text" },
     ],
   },
