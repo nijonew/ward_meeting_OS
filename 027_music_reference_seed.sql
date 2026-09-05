@@ -1,4 +1,4 @@
--- 026_music_reference_seed.sql
+-- 027_music_reference_seed.sql
 --
 -- Seeds hymnal_songs with the Children's Songbook, sourced directly from
 -- churchofjesuschrist.org's official title index (fetched letter by
@@ -19,7 +19,7 @@
 --
 -- Idempotent: safe to re-run (on conflict do nothing -- won't overwrite
 -- an entry you've since corrected, or duplicate one you've kept).
--- Requires 025_hymnal_songs_number_as_text.sql to have run first.
+-- Requires 026_hymnal_songs_number_as_text.sql to have run first.
 
 insert into hymnal_songs (songbook, number, title) values
   ('childrens_songbook', '12', 'A Child''s Prayer'),

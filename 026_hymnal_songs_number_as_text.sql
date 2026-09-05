@@ -1,4 +1,4 @@
--- 025_hymnal_songs_number_as_text.sql
+-- 026_hymnal_songs_number_as_text.sql
 --
 -- Fixes a design mistake from migration 024: hymnal_songs.number was
 -- created as `integer`, but real numbering in these collections includes

@@ -7,13 +7,15 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 026
+## Current migration number: 027
 
-Migrations `022`–`024` confirmed run by the user (2026-09-04).
-`025_hymnal_songs_number_as_text.sql` and `026_music_reference_seed.sql`
-exist in the repo but still need to be run (in that order, 025 before
-026 -- 026's data won't fit the old integer column). Next migration
-should be `027_*.sql`. Migrations are plain `.sql` files at
+Migrations `022`–`024` confirmed run by the user (2026-09-04). `025` was
+used by the user's own project-workflow-review session, outside this
+chat -- exactly the kind of collision this file exists to warn about.
+`026_hymnal_songs_number_as_text.sql` and `027_music_reference_seed.sql`
+exist in the repo but still need to be run (in that order, 026 before
+027 -- 027's data won't fit the old integer column). Next migration
+should be `028_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -140,12 +142,12 @@ or note partial progress) as each is picked up.
    dropped from the Table Admin grid. New `hymnal_songs` reference table
    (migration `024`), later renamed to "Music Reference" per the user
    (2026-09-04). `number` had to move from `integer` to `text`
-   (migration `025`) once real data showed lettered variants sharing a
+   (migration `026`) once real data showed lettered variants sharing a
    base number (e.g. Children's Songbook 20a/20b are different songs --
    an integer column can't hold the suffix, and stripping it collides
    two different songs on one key). Populated with the full Children's
    Songbook via WebFetch/WebSearch against churchofjesuschrist.org's
-   official title index, letter by letter (migration `026`) -- a
+   official title index, letter by letter (migration `027`) -- a
    good-faith transcription, not verified-perfect; a handful of entries
    where the source's own views disagreed were left out rather than
    guessed at. The 1985 Hymnal and Hymns for Home and Church are NOT
