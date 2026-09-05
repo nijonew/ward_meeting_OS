@@ -7,14 +7,14 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 028
+## Current migration number: 029
 
 Migrations `022`–`027` all confirmed run by the user (2026-09-05). `025`
 was used by the user's own project-workflow-review session, outside
 this chat -- exactly the kind of collision this file exists to warn
-about. `028_agenda_items_time_needed.sql` exists in the repo but still
-needs to be run. Next migration should be `029_*.sql`. Migrations are
-plain `.sql` files at
+about. `028_agenda_items_time_needed.sql` and `029_people_labels.sql`
+exist in the repo but still need to be run. Next migration should be
+`030_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -282,10 +282,11 @@ in a trusted-admin context.
   key between them — confirmed by search, not assumed. The "admin
   matches an authenticated account to a person" step has no data model
   or UI yet.
-- **`people` only has one boolean (`active`) today**, not the richer
-  label set described (adult/youth/child, attending/not, moved).
-  Concrete, well-scoped gap — good candidate to build once past the
-  vision-gathering phase.
+- ~~`people` only has one boolean (`active`)~~ — **built 2026-09-05**
+  (migration `029`, needs to be run): added `age_group`
+  (adult/youth/child) and `attendance_status`
+  (attending/not_attending/moved), both exposed in Table Admin.
+  `active` itself is untouched, still just picker-list membership.
 
 ### Terminology: "notes" vs. "minutes"
 
