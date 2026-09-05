@@ -24,24 +24,16 @@ export function RecentMusicList({ items }: { items: RecentMusicItem[] }) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex flex-wrap items-center justify-between gap-2 border-b border-rule/40 py-1.5 text-sm last:border-0"
+              className="flex flex-wrap items-center gap-2 border-b border-rule/40 py-1.5 text-sm last:border-0"
             >
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                {formatDate(item.date)}
+              </span>
               <span>
-                <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
-                  {formatDate(item.date)}
-                </span>{" "}
                 &middot; {typeLabel(item.type)}
                 {item.piece_name && <> &mdash; {item.piece_name}</>}
                 {item.hymn_number && <> (Hymn {item.hymn_number})</>}
                 {item.performer && <span className="text-slate"> &middot; {item.performer}</span>}
-              </span>
-              <span
-                className={[
-                  "font-mono text-[10px] uppercase tracking-widest",
-                  item.status === "published" ? "text-sage" : "text-slate/70",
-                ].join(" ")}
-              >
-                {item.status === "published" ? "Approved" : "Pending"}
               </span>
             </li>
           ))}

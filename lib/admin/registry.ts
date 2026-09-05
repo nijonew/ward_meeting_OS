@@ -26,6 +26,12 @@ const PUBLISH_STATUSES = [
   { value: "published", label: "Published" },
 ];
 
+const SONGBOOKS = [
+  { value: "hymns_for_home_and_church", label: "Hymns for Home and Church" },
+  { value: "hymns_1985", label: "Hymns of The Church of Jesus Christ of Latter-day Saints" },
+  { value: "childrens_songbook", label: "Children's Songbook" },
+];
+
 const SPEAKER_SLOT_OPTIONS_ADULT = SPEAKER_SLOTS_ADULT.map((s) => ({ value: s, label: slotLabel(s) }));
 const SPEAKER_SLOT_OPTIONS_YOUTH = SPEAKER_SLOTS_YOUTH.map((s) => ({ value: s, label: slotLabel(s) }));
 
@@ -88,6 +94,19 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "value", label: "Value (stored)", type: "text", required: true },
       { column: "label", label: "Label (shown)", type: "text", required: true },
       { column: "sort_order", label: "Sort Order", type: "number" },
+    ],
+  },
+
+  hymnal_songs: {
+    table: "hymnal_songs",
+    label: "Hymnal / Songbook Reference",
+    description:
+      "Reference list of hymn/song numbers and titles across the three current music collections -- for looking things up while entering Sacrament Meeting Music, not tied to any specific meeting. Not pre-populated yet; add entries here as needed.",
+    orderBy: { column: "songbook", ascending: true },
+    columns: [
+      { column: "songbook", label: "Songbook", type: "select", required: true, options: SONGBOOKS },
+      { column: "number", label: "Number", type: "number", required: true },
+      { column: "title", label: "Title", type: "text", required: true },
     ],
   },
 
@@ -266,8 +285,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_music: {
     table: "sacrament_music",
-    label: "Sacrament Music",
-    description: "submitted_by is left out here -- it's an attribution field for the public submission form, not something to reassign.",
+    label: "Sacrament Meeting Music",
+    description:
+      "submitted_by is left out -- it's attribution for whoever (bishopric/music planner) entered the item, not something to reassign. status is left out too: every entry is now treated as approved the moment it's entered (see the live Music planning view), so there's nothing left to toggle here.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...MUSIC_TYPES] },
@@ -277,7 +297,6 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "individual_id", label: "Individual", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "group_name", label: "Group Name", type: "text" },
       { column: "accompanist_id", label: "Accompanist", type: "foreign_key", foreignKey: PERSON_FK },
-      { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
     ],
   },
 

@@ -90,7 +90,7 @@ export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<Actio
       // text column on this table.
       group_name: row.groupName || (row.matchedIndividualId ? null : row.performerText),
       accompanist_id: row.matchedAccompanistId,
-      status: "pending",
+      status: "published",
       submitted_by: user.id,
     });
   }
@@ -144,7 +144,7 @@ export async function addSingleMusicItem(formData: FormData): Promise<ActionResu
     individual_id: String(formData.get("individual_id") ?? "") || null,
     group_name: String(formData.get("group_name") ?? "").trim() || null,
     accompanist_id: String(formData.get("accompanist_id") ?? "") || null,
-    status: "pending",
+    status: "published",
     submitted_by: user.id,
   });
 

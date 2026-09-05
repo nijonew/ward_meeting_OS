@@ -7,7 +7,6 @@ export interface RecentMusicItem {
   hymn_number: number | null;
   piece_name: string | null;
   performer: string | null;
-  status: string;
 }
 
 export async function getRecentMusic(): Promise<RecentMusicItem[]> {
@@ -17,7 +16,7 @@ export async function getRecentMusic(): Promise<RecentMusicItem[]> {
   const { data, error } = await supabase
     .from("sacrament_music")
     .select(
-      "id, type, hymn_number, piece_name, status, group_name, individual:individual_id(name), meetings!inner(date)"
+      "id, type, hymn_number, piece_name, group_name, individual:individual_id(name), meetings!inner(date)"
     )
     .gte("meetings.date", today)
     .order("date", { foreignTable: "meetings", ascending: true })
@@ -33,7 +32,6 @@ export async function getRecentMusic(): Promise<RecentMusicItem[]> {
       type: string;
       hymn_number: number | null;
       piece_name: string | null;
-      status: string;
       group_name: string | null;
       individual: unknown;
       meetings: { date: string } | { date: string }[];
@@ -50,7 +48,6 @@ export async function getRecentMusic(): Promise<RecentMusicItem[]> {
       hymn_number: r.hymn_number,
       piece_name: r.piece_name,
       performer: r.group_name || individual || null,
-      status: r.status,
     };
   });
 }

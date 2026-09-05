@@ -194,15 +194,11 @@ export async function arrangeMusicItem(
   const supabase = await createClient();
 
   const slot = String(formData.get("slot") ?? "");
-  const publish = formData.get("publish") === "on";
 
-  const { error } = await supabase
-    .from("sacrament_music")
-    .update({
-      slot: slot || null,
-      status: publish ? "published" : "pending",
-    })
-    .eq("id", musicId);
+  // No approval step anymore -- every music item is treated as ready the
+  // moment it's entered (status defaults to 'published' at insert time).
+  // This action now only ever places an item into a slot.
+  const { error } = await supabase.from("sacrament_music").update({ slot: slot || null }).eq("id", musicId);
 
   if (error) {
     return { error: error.message };

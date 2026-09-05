@@ -66,10 +66,7 @@ export default async function MusicCoordinationPage() {
               >
                 <p className="font-display text-lg text-ink">{formatDate(r.date)}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <StatusBadge
-                    ok={r.core_hymns_published === 3}
-                    label={`Hymns ${r.core_hymns_published}/3 published`}
-                  />
+                  <StatusBadge ok={r.core_hymns_set === 3} label={`Hymns ${r.core_hymns_set}/3 set`} />
                   {r.extra_music_count > 0 && (
                     <StatusBadge ok label={`${r.extra_music_count} more music item${r.extra_music_count === 1 ? "" : "s"}`} />
                   )}

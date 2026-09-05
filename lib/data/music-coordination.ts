@@ -7,8 +7,7 @@ export interface MeetingMusicStatus {
   meeting_id: string;
   date: string;
   core_hymns_set: number; // out of 3 (opening/sacrament/closing)
-  core_hymns_published: number;
-  extra_music_count: number; // intermediate hymns + musical numbers, any status
+  extra_music_count: number; // intermediate hymns + musical numbers
   speakers_confirmed: number;
   speakers_total_slots_used: number; // slots with a speaker or guest name entered, any confirm status
   prayers_confirmed: number; // out of 2
@@ -43,7 +42,7 @@ export async function getUpcomingMusicCoordination(limit = 8): Promise<MeetingMu
   const meetingIds = meetings.map((m) => m.id);
 
   const [musicRes, assignmentsRes, adultsRes, youthRes] = await Promise.all([
-    supabase.from("sacrament_music").select("meeting_id, type, status").in("meeting_id", meetingIds),
+    supabase.from("sacrament_music").select("meeting_id, type").in("meeting_id", meetingIds),
     supabase
       .from("sacrament_assignments")
       .select("meeting_id, role, confirmed")
@@ -59,7 +58,7 @@ export async function getUpcomingMusicCoordination(limit = 8): Promise<MeetingMu
       .in("meeting_id", meetingIds),
   ]);
 
-  const music = (musicRes.data ?? []) as { meeting_id: string; type: string; status: string }[];
+  const music = (musicRes.data ?? []) as { meeting_id: string; type: string }[];
   const assignments = (assignmentsRes.data ?? []) as { meeting_id: string; role: string; confirmed: boolean }[];
   const adults = (adultsRes.data ?? []) as {
     meeting_id: string;
@@ -89,7 +88,6 @@ export async function getUpcomingMusicCoordination(limit = 8): Promise<MeetingMu
       meeting_id: m.id,
       date: m.date,
       core_hymns_set: new Set(coreMusic.map((row) => row.type)).size,
-      core_hymns_published: coreMusic.filter((row) => row.status === "published").length,
       extra_music_count: extraMusic.length,
       speakers_confirmed: meetingSpeakers.filter((row) => row.confirmed).length,
       speakers_total_slots_used: meetingSpeakers.length,
