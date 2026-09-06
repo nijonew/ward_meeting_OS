@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 032
+## Current migration number: 033
 
 Migrations `022`–`025` confirmed run by the user (2026-09-04/05).
 Migration `025` (`apply_rotation_assignment` Postgres function, see
@@ -27,8 +27,11 @@ all 10 `special_format` buckets present with the expected element
 counts, both new catalog elements (`recognize_music`, `primary_program`)
 present and linked to Sacrament Meeting, `meeting_planned_elements`
 exists (empty, as expected -- no meeting created since it shipped yet).
-Next migration should be `033_*.sql` -- **confirm with the user first**,
-same as always. Migrations are plain `.sql` files at
+Migration `033` (rotation recalibration + email/backup_holder_id
+cleanup, see below and Known open items) written 2026-09-05, **not yet
+confirmed run by the user**. Next migration after that should be
+`034_*.sql` -- **confirm with the user first**, same as always.
+Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -101,14 +104,39 @@ before.
 
 ## Known open items
 
-- **No rotation has any members yet.** Discovered 2026-09-05 while
-  verifying migration 025: all 11 configured rotations (bishopric-meeting
-  closing/opening prayer + handbook training + spiritual thought,
-  sacrament-meeting chorister/conducting/organist, ward-council and
-  youth-council closing/opening prayer) currently show `member_count = 0`
-  in production. Until people are assigned (via `/rotations`, or its
-  `syncRotationMembership()` logic), every new meeting silently skips all
-  rotation-based assignments -- not a bug, just an unfinished setup step.
+- **Pending migration 033** (2026-09-05, not yet run): also drops
+  `people.email` (unused everywhere) and `callings.backup_holder_id`
+  ("not actually a real thing" for this ward, per the user) -- both
+  removed from `lib/admin/registry.ts` already. Table Admin's
+  `calling_planning` entry was also removed entirely (it already has a
+  dedicated editor at `/callings/[id]` via `CallingPlanningCard` --
+  keeping both was a duplicate-entry hazard) and the landing page's
+  "Callings" tile was renamed to "Calling Planning" (same destination,
+  `/callings`) to reflect that that's the real workflow it leads to.
+- ~~**No rotation has any members yet.**~~ Resolved 2026-09-05: all 11
+  original rotations synced via `/rotations`' existing "Sync from
+  callings/standing attendees" buttons -- 9 populated immediately;
+  Chorister/Organist needed their underlying callings fixed first (the
+  `Chorister` calling existed but was inactive with no current holder;
+  `Organist` didn't exist at all -- both fixed by the user, then synced
+  clean). Membership order and each rotation's "next up" pointer were
+  then recalibrated against the ward's actual real 2026 rotation pattern
+  (migration `033`, **not yet confirmed run**) -- see that migration's
+  comments for the exact person-by-person cycles derived per rotation.
+  Two new rotations added in the same migration: Ward Council and Youth
+  Council Spiritual Thought (the `spiritual_thought` element existed but
+  was only linked to Bishopric Meeting before). Also discovered and
+  fixed in the same pass: Ward Council's Opening/Closing Prayer rotation
+  had picked up the 5 Bishopric members via "standing attendees" sync,
+  but the real pattern never actually gives them a turn -- removed;
+  Youth Council's rotation correctly does include the Bishop, left as
+  synced. Separately, Sacrament Meeting's fixed Conducting cycle
+  (Bishop/1st/2nd Counselor by month, see Assignment Rotations below)
+  was computing correctly all along, but every *already-existing*
+  meeting had it frozen wrong from creation time, before the counselor
+  callings had current holders set -- migration `033` also repairs
+  every existing Sacrament Meeting's `conducting` assignment to match
+  what the (now-correct) monthly cycle actually computes for its date.
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
 - Bishopric-side free-text elements (spiritual thought, handbook training,
   young men coordination, impressions, calling planning, sacrament meeting

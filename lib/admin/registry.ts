@@ -9,7 +9,6 @@ import {
   slotLabel,
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
-import { DEFAULT_CALLING_STATUSES, DEFAULT_RELEASE_STATUSES } from "@/lib/data/calling-planning";
 
 /** Fields whose choices can be edited via the "Dropdown Option Lists"
  *  admin table below (admin_select_options) instead of code. Kept as an
@@ -54,6 +53,10 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  * up at all; only the columns listed for a table are readable/writable.
  *
  * Deliberately excluded, by decision (not just pending):
+ * - calling_planning: has its own purpose-built editor at /callings/[id]
+ *   (CallingPlanningCard -- status, person pickers, suggestions, push-to-
+ *   -meeting) -- a second, flatter editor for the same data would just be
+ *   a duplicate-entry hazard.
  * - bishopric_minutes: PROJECT_CONTEXT.md flags this table's free-text
  *   fields as a known duplicate-entry hazard with the dynamic planning
  *   view -- stays out until that's consolidated, so this grid doesn't
@@ -153,51 +156,6 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     ],
   },
 
-  calling_planning: {
-    table: "calling_planning",
-    label: "Calling Planning",
-    description:
-      "Calling Status tracks the incoming person, Release Status tracks the outgoing one -- they're independent so you can have someone released before their replacement is even chosen.",
-    orderBy: { column: "created_at", ascending: false },
-    columns: [
-      { column: "calling_id", label: "Calling", type: "foreign_key", required: true, foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
-      {
-        column: "calling_status",
-        label: "Calling Status",
-        type: "select",
-        required: true,
-        options: DEFAULT_CALLING_STATUSES,
-        optionsFrom: "calling_planning.calling_status",
-      },
-      { column: "selected_person_id", label: "Selected Person", type: "foreign_key", foreignKey: PERSON_FK },
-      { column: "date_set_apart", label: "Date Set Apart", type: "date" },
-      {
-        column: "release_person_id",
-        label: "Release Person",
-        type: "foreign_key",
-        foreignKey: PERSON_FK,
-        // Narrowed to just this row's calling's current/backup holder,
-        // instead of every person in the ward -- see AdminColumnConfig.scopedBy.
-        scopedBy: { scopeColumn: "calling_id", lookupTable: "callings", lookupColumns: ["current_holder_id", "backup_holder_id"] },
-        // Not a real person -- picking this clears release_person_id and
-        // sets release_status to previously_vacant in the same save.
-        specialOptions: [
-          { value: "__previously_vacant__", label: "— Previously Vacant / New Calling —", patch: { release_status: "previously_vacant" } },
-        ],
-      },
-      {
-        column: "release_status",
-        label: "Release Status",
-        type: "select",
-        required: true,
-        options: DEFAULT_RELEASE_STATUSES,
-        optionsFrom: "calling_planning.release_status",
-      },
-      { column: "notes", label: "Notes", type: "long_text" },
-      { column: "announced_meeting_id", label: "Announced In", type: "foreign_key", foreignKey: MEETING_FK("sacrament-meeting") },
-    ],
-  },
-
   callings: {
     table: "callings",
     label: "Callings",
@@ -206,7 +164,6 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "name", label: "Name", type: "text", required: true },
       { column: "title_prefix", label: "Title Prefix", type: "text" },
       { column: "current_holder_id", label: "Current Holder", type: "foreign_key", foreignKey: PERSON_FK },
-      { column: "backup_holder_id", label: "Backup Holder", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "sort_order", label: "Sort Order", type: "number" },
       { column: "active", label: "Active", type: "boolean" },
     ],
@@ -268,7 +225,6 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     orderBy: { column: "name", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
-      { column: "email", label: "Email", type: "text" },
       { column: "active", label: "Active", type: "boolean" },
       { column: "notes", label: "Notes", type: "long_text" },
     ],

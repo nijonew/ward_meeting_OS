@@ -104,7 +104,11 @@ export default async function HomePage() {
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Administration</p>
           <TileGrid>
-            <Tile title="Callings" description="Manage callings and holders" href="/callings" />
+            <Tile
+              title="Calling Planning"
+              description="Track calling and release status, suggestions, and readiness to announce"
+              href="/callings"
+            />
             <Tile
               title="Meeting Schedule"
               description="Set cadence and generate meetings"
