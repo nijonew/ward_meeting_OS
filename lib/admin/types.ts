@@ -45,8 +45,14 @@ export interface AdminColumnConfig {
   /** Lookup target, for type: "foreign_key". A "meetings" target renders
    *  as a calendar picker instead of a dropdown (see AdminCellInput);
    *  meetingTypeSlug narrows it to just that meeting type's dates, since
-   *  most tables that link to a meeting only ever mean one type of it. */
-  foreignKey?: { table: string; valueColumn: string; labelColumn: string; meetingTypeSlug?: string };
+   *  most tables that link to a meeting only ever mean one type of it.
+   *  createIfMissing (meetings only, requires meetingTypeSlug) lets the
+   *  calendar pick ANY date, not just ones with an existing meeting --
+   *  planning can happen against a future Sunday well before that
+   *  meeting is otherwise created. Resolved server-side (see
+   *  lib/admin/table-data.ts) via lib/data/meetings.ts's
+   *  getOrCreateMeetingId at save time. */
+  foreignKey?: { table: string; valueColumn: string; labelColumn: string; meetingTypeSlug?: string; createIfMissing?: boolean };
   /**
    * Narrows a foreign_key column's choices to just what's relevant to
    * *this* row, based on another column on the same row -- e.g.
@@ -75,4 +81,23 @@ export interface AdminTableConfig {
   description?: string;
   orderBy?: { column: string; ascending?: boolean };
   columns: AdminColumnConfig[];
+}
+
+/**
+ * A `foreignKey.createIfMissing` meetings column doesn't always carry a
+ * real meetings.id -- picking a date with no meeting yet produces this
+ * sentinel instead, which lib/admin/table-data.ts resolves (creating the
+ * meeting, applying rotations same as any other creation path) before
+ * the row is actually written. Pure string encoding, safe to import from
+ * a client component (MeetingDatePicker) as well as server code.
+ */
+const CREATE_MEETING_PREFIX = "__create_meeting__:";
+
+export function encodeCreateMeetingValue(dateIso: string): string {
+  return `${CREATE_MEETING_PREFIX}${dateIso}`;
+}
+
+export function decodeCreateMeetingValue(value: unknown): string | null {
+  if (typeof value !== "string" || !value.startsWith(CREATE_MEETING_PREFIX)) return null;
+  return value.slice(CREATE_MEETING_PREFIX.length);
 }

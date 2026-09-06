@@ -1,5 +1,7 @@
--- 034_youth_ward_event_cadence_rules.sql
--- Confirm this number is still free before running.
+-- 035_youth_ward_event_cadence_rules.sql
+-- Already run (under number 034) before this branch merged with main;
+-- renumbered to 035 since main had independently gone as far as 032 by
+-- then. Nothing to re-run here.
 --
 -- Extends the same cadence-rule + "Generate" mechanism /meeting-schedule
 -- already has (weekly / nth-weekday / relative, see lib/data/cadence.ts)

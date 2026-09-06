@@ -16,6 +16,8 @@ interface MergedEvent {
   title: string;
   subtitle: string;
   kind: "Youth" | "Ward";
+  cancelled: boolean;
+  cancellationNote: string | null;
 }
 
 function formatDate(iso: string) {
@@ -64,8 +66,10 @@ export default async function ScheduledEventsPage({
       date: a.activity_date,
       time: a.activity_time,
       title: a.title,
-      subtitle: a.group_name,
+      subtitle: a.planning_group ? `${a.group_name} — planned by ${a.planning_group}` : a.group_name,
       kind: "Youth" as const,
+      cancelled: a.cancelled,
+      cancellationNote: a.cancellation_note,
     })),
     ...wardEvents.map((e) => ({
       key: `ward-${e.id}`,
@@ -74,6 +78,8 @@ export default async function ScheduledEventsPage({
       title: e.title,
       subtitle: e.location ?? "",
       kind: "Ward" as const,
+      cancelled: false,
+      cancellationNote: null,
     })),
   ].sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")));
 
@@ -96,15 +102,32 @@ export default async function ScheduledEventsPage({
         ) : (
           <ul className="flex flex-col gap-2">
             {merged.map((item) => (
-              <li key={item.key} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+              <li
+                key={item.key}
+                className={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
+                ].join(" ")}
+              >
                 <span className="text-ink">
                   <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
                     {formatDate(item.date)}
                     {item.time ? ` \u00b7 ${item.time}` : ""} \u00b7 {item.kind}
                   </span>{" "}
                   {item.title}
+                  {item.cancelled && (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
+                      Cancelled
+                    </span>
+                  )}
                 </span>
-                {item.subtitle && <p className="mt-1 text-slate">{item.subtitle}</p>}
+                {item.cancelled ? (
+                  <p className="mt-1 text-red-700">
+                    This activity has been cancelled{item.cancellationNote ? `: ${item.cancellationNote}` : "."}
+                  </p>
+                ) : (
+                  item.subtitle && <p className="mt-1 text-slate">{item.subtitle}</p>
+                )}
               </li>
             ))}
           </ul>

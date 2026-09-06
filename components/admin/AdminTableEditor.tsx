@@ -217,7 +217,13 @@ function AdminCellInput({
 
   if (column.type === "foreign_key" && column.foreignKey?.table === "meetings") {
     return (
-      <MeetingDatePicker value={value} options={options ?? []} required={column.required} onChange={onChange} />
+      <MeetingDatePicker
+        value={value}
+        options={options ?? []}
+        required={column.required}
+        allowCreate={column.foreignKey.createIfMissing}
+        onChange={onChange}
+      />
     );
   }
 

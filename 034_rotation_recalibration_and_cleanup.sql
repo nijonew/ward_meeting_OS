@@ -1,7 +1,8 @@
--- 033_rotation_recalibration_and_cleanup.sql
--- Confirm this number is still free before running -- next migration
--- after 032 should be 033, but confirm first per this project's own
--- numbering-collision caveat.
+-- 034_rotation_recalibration_and_cleanup.sql
+-- Renumbered from 033 during the merge with main (which had
+-- independently claimed 032 for a different migration by the time this
+-- branch merged back in) -- already run under its old number; this file
+-- reflects that renumbering for the repo's history, nothing to re-run.
 --
 -- Three unrelated changes bundled because they came out of the same
 -- conversation:

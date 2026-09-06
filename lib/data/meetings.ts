@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import type { Meeting, MeetingLifecycleStage, MeetingType, MeetingTypeSlug } from "@/lib/types";
 
 // NOTE: no generated Database types are wired up yet (would need the
@@ -90,6 +91,55 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
 
   const meetings = data.map(mapMeetingRow);
   return meetings.find((m) => m.meetingType === "sacrament-meeting") ?? null;
+}
+
+/**
+ * Finds the meeting of a given type on a given date, or creates one
+ * (stage 'template', rotations applied same as any other meeting
+ * creation path) if it doesn't exist yet -- so planning can happen
+ * against a future date well before that meeting is otherwise touched,
+ * matching the old spreadsheet workflow of listing Sundays out in
+ * advance rather than requiring each one to be individually created
+ * first. Pass `cache` when resolving many dates in one call (e.g. a bulk
+ * import) to avoid a repeat lookup/insert for the same date.
+ */
+export async function getOrCreateMeetingId(
+  dateIso: string,
+  meetingTypeSlug: MeetingTypeSlug,
+  cache?: Map<string, string>
+): Promise<string | null> {
+  if (cache?.has(dateIso)) {
+    return cache.get(dateIso)!;
+  }
+
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("meetings")
+    .select("id, meeting_types!inner(slug)")
+    .eq("date", dateIso)
+    .eq("meeting_types.slug", meetingTypeSlug)
+    .maybeSingle();
+
+  if (existing) {
+    cache?.set(dateIso, existing.id as string);
+    return existing.id as string;
+  }
+
+  const { data: meetingType } = await supabase.from("meeting_types").select("id").eq("slug", meetingTypeSlug).single();
+  if (!meetingType) return null;
+
+  const { data: created, error } = await supabase
+    .from("meetings")
+    .insert({ meeting_type_id: meetingType.id, date: dateIso, stage: "template" })
+    .select("id")
+    .single();
+  if (error || !created) return null;
+
+  await applyRotationsToNewMeeting(created.id as string, meetingType.id as string, meetingTypeSlug);
+
+  cache?.set(dateIso, created.id as string);
+  return created.id as string;
 }
 
 export async function getMeetingById(id: string): Promise<Meeting | null> {

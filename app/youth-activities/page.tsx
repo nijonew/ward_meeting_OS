@@ -1,12 +1,15 @@
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
-import { getYouthActivityScheduleRules } from "@/lib/data/youth-activity-schedule";
+import { getYouthActivityScheduleRules } from "@/lib/data/youth-activity-cadence-rules";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
 import {
   addYouthActivity,
   setYouthActivityStatus,
   deleteYouthActivity,
+  toggleYouthActivityConfirmed,
+  setYouthActivityCancellation,
+  uncancelYouthActivity,
 } from "@/app/youth-activities/actions";
 import {
   addScheduleRule,
@@ -17,6 +20,7 @@ import {
 } from "@/app/youth-activities/schedule-actions";
 import { YouthActivityScheduleManager } from "@/components/schedule/YouthActivityScheduleManager";
 import { GenerateForm } from "@/components/schedule/GenerateForm";
+import { GenerateYouthActivitiesForm } from "@/components/youth-activities/GenerateYouthActivitiesForm";
 
 const MANAGE_ROLES = [
   "bishopric",
@@ -68,12 +72,26 @@ export default async function YouthActivitiesPage() {
                   item.status === "published" ? "draft" : "published"
                 );
               };
+              const toggleConfirmed = async () => {
+                "use server";
+                await toggleYouthActivityConfirmed(item.id, !item.confirmed);
+              };
+              const uncancel = async () => {
+                "use server";
+                await uncancelYouthActivity(item.id);
+              };
               const remove = async () => {
                 "use server";
                 await deleteYouthActivity(item.id);
               };
               return (
-                <li key={item.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+                <li
+                  key={item.id}
+                  className={[
+                    "rounded-md border px-3 py-2 text-sm",
+                    item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
+                  ].join(" ")}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
                       <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
@@ -81,9 +99,19 @@ export default async function YouthActivitiesPage() {
                         {item.activity_time ? ` · ${item.activity_time}` : ""}
                       </span>{" "}
                       {item.title}
+                      {item.cancelled && (
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
+                          Cancelled
+                        </span>
+                      )}
+                      {!item.confirmed && !item.cancelled && (
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-brass">
+                          Tentative
+                        </span>
+                      )}
                     </span>
                     {canManage && (
-                      <span className="flex items-center gap-2">
+                      <span className="flex flex-wrap items-center gap-2">
                         <span
                           className={[
                             "font-mono text-[10px] uppercase tracking-widest",
@@ -97,6 +125,37 @@ export default async function YouthActivitiesPage() {
                             {item.status === "published" ? "Unpublish" : "Publish"}
                           </button>
                         </form>
+                        <form action={toggleConfirmed}>
+                          <button type="submit" className="text-xs text-slate hover:text-ink">
+                            {item.confirmed ? "Mark Tentative" : "Confirm"}
+                          </button>
+                        </form>
+                        {item.cancelled ? (
+                          <form action={uncancel}>
+                            <button type="submit" className="text-xs text-slate hover:text-ink">
+                              Un-cancel
+                            </button>
+                          </form>
+                        ) : (
+                          <form
+                            action={async (formData: FormData) => {
+                              "use server";
+                              await setYouthActivityCancellation(formData);
+                            }}
+                            className="flex items-center gap-1"
+                          >
+                            <input type="hidden" name="id" value={item.id} />
+                            <input
+                              type="text"
+                              name="cancellation_note"
+                              placeholder="Reason (optional)"
+                              className="w-32 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
+                            />
+                            <button type="submit" className="text-xs text-slate hover:text-ink">
+                              Cancel
+                            </button>
+                          </form>
+                        )}
                         <form action={remove}>
                           <button type="submit" className="text-xs text-slate hover:text-ink">
                             Delete
@@ -105,11 +164,18 @@ export default async function YouthActivitiesPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-slate">
-                    {item.group_name}
-                    {item.development_category ? ` — ${item.development_category}` : ""}
-                    {item.location ? ` — ${item.location}` : ""}
-                  </p>
+                  {item.cancelled ? (
+                    <p className="mt-1 text-red-700">
+                      This activity has been cancelled{item.cancellation_note ? `: ${item.cancellation_note}` : "."}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-slate">
+                      {item.group_name}
+                      {item.planning_group ? ` — planned by ${item.planning_group}` : ""}
+                      {item.development_category ? ` — ${item.development_category}` : ""}
+                      {item.location ? ` — ${item.location}` : ""}
+                    </p>
+                  )}
                   {(item.youth_lead || item.advisor_lead) && (
                     <p className="mt-1 text-[11px] text-slate/60">
                       {item.youth_lead ? `Youth lead: ${item.youth_lead}` : ""}
@@ -124,6 +190,8 @@ export default async function YouthActivitiesPage() {
           </ul>
         )}
       </div>
+
+      {canManage && <GenerateYouthActivitiesForm />}
 
       {canManage && (
         <div className="rounded-lg border border-rule bg-card p-6">

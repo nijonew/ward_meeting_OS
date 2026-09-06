@@ -96,7 +96,7 @@ function mapTemplateRow(row: {
  * The *default* element list for a meeting type -- for non-Sacrament
  * types this is the one shared template (formatKey null); for Sacrament
  * Meeting, formatKey picks which of the 10 special_format buckets to
- * read (see migration 032). This is what new meetings get seeded from
+ * read (see migration 033). This is what new meetings get seeded from
  * (seedPlannedElementsForMeeting) and what /admin/meeting-templates
  * edits -- it is NOT what the planning view renders directly anymore
  * (see getPlannedElements).

@@ -25,6 +25,18 @@ const PUBLISH_STATUSES = [
   { value: "published", label: "Published" },
 ];
 
+const PERSON_AGE_GROUPS = [
+  { value: "adult", label: "Adult" },
+  { value: "youth", label: "Youth" },
+  { value: "child", label: "Child" },
+];
+
+const PERSON_ATTENDANCE_STATUSES = [
+  { value: "attending", label: "Attending" },
+  { value: "not_attending", label: "Not Attending" },
+  { value: "moved", label: "Moved" },
+];
+
 const SONGBOOKS = [
   { value: "hymns_for_home_and_church", label: "Hymns for Home and Church" },
   { value: "hymns_1985", label: "Hymns of The Church of Jesus Christ of Latter-day Saints" },
@@ -40,12 +52,24 @@ const SUBMISSION_STATUSES = [
   { value: "archived", label: "Archived" },
 ];
 
-/** meetingTypeSlug narrows the Meeting calendar picker to just that
- *  type's dates -- pass none for tables that can reference any meeting
- *  type (agenda_items, announcements, council_notes, meeting_action_items,
- *  meeting_element_notes are all genuinely cross-type, per their own
- *  data-layer comments). */
-const MEETING_FK = (meetingTypeSlug?: string) => ({ table: "meetings", valueColumn: "id", labelColumn: "date", meetingTypeSlug });
+/**
+ * meetingTypeSlug narrows the Meeting calendar picker to just that
+ * type's dates -- pass none for tables that can reference any meeting
+ * type (agenda_items, announcements, council_notes, meeting_action_items,
+ * meeting_element_notes are all genuinely cross-type, per their own
+ * data-layer comments). Whenever a slug IS given, the picker also lets
+ * you pick a future date with no meeting yet -- it gets created (with
+ * rotations applied) at save time -- since knowing the type is exactly
+ * what's needed to create one; there'd be no safe type to use for the
+ * unscoped columns.
+ */
+const MEETING_FK = (meetingTypeSlug?: string) => ({
+  table: "meetings",
+  valueColumn: "id",
+  labelColumn: "date",
+  meetingTypeSlug,
+  createIfMissing: Boolean(meetingTypeSlug),
+});
 const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
 
 /**
@@ -104,13 +128,15 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   hymnal_songs: {
     table: "hymnal_songs",
-    label: "Hymnal / Songbook Reference",
+    label: "Music Reference",
     description:
-      "Reference list of hymn/song numbers and titles across the three current music collections -- for looking things up while entering Sacrament Meeting Music, not tied to any specific meeting. Not pre-populated yet; add entries here as needed.",
+      "Reference list of hymn/song numbers and titles across the three current music collections -- for looking things up while entering Sacrament Meeting Music, not tied to any specific meeting.",
     orderBy: { column: "songbook", ascending: true },
     columns: [
       { column: "songbook", label: "Songbook", type: "select", required: true, options: SONGBOOKS },
-      { column: "number", label: "Number", type: "number", required: true },
+      // Text, not number: several entries share a base number with a
+      // lettered suffix (e.g. "20a"/"20b" are two different songs).
+      { column: "number", label: "Number", type: "text", required: true },
       { column: "title", label: "Title", type: "text", required: true },
     ],
   },
@@ -118,13 +144,15 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   agenda_items: {
     table: "agenda_items",
     label: "Agenda Items",
-    description: "Submitted agenda items for bishopric/council meetings.",
+    description:
+      "Submitted agenda items for bishopric/council meetings. The public /submit form now sets Meeting and Status itself (published by default, straight onto that meeting's agenda) -- this grid is mainly for fixing a mistake or adding one directly.",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },
       { column: "body", label: "Body", type: "long_text", required: true },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
+      { column: "time_needed", label: "Time Needed", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
       { column: "meeting_id", label: "Meeting", type: "foreign_key", foreignKey: MEETING_FK() },
     ],
@@ -133,11 +161,22 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   announcements: {
     table: "announcements",
     label: "Announcements",
-    description: "Submitted announcements, published to the public landing page when marked Published.",
+    description:
+      "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one. Organization/Type are free text (not a fixed dropdown) since the real form's \"Other\" answers shouldn't get stranded outside a fixed list; Audience/Where Announced are comma-separated (the form's checkbox questions -- no multi-select column type yet).",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },
       { column: "body", label: "Body", type: "long_text", required: true },
+      { column: "organization", label: "Organization", type: "text" },
+      { column: "announcement_type", label: "Type", type: "text" },
+      { column: "audience", label: "Audience", type: "text" },
+      { column: "where_announced", label: "Where Announced", type: "text" },
+      { column: "start_date", label: "Start Date", type: "date" },
+      { column: "start_time", label: "Start Time", type: "time" },
+      { column: "end_date", label: "End Date", type: "date" },
+      { column: "end_time", label: "End Time", type: "time" },
+      { column: "location", label: "Location", type: "text" },
+      { column: "link_url", label: "Link", type: "text" },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
@@ -222,10 +261,20 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   people: {
     table: "people",
     label: "People",
+    description:
+      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. active controls whether someone shows up in assignment pickers; Age Group and Attendance Status are informational labels and don't affect that.",
     orderBy: { column: "name", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
+      { column: "age_group", label: "Age Group", type: "select", options: PERSON_AGE_GROUPS },
+      { column: "attendance_status", label: "Attendance Status", type: "select", required: true, options: PERSON_ATTENDANCE_STATUSES },
       { column: "active", label: "Active", type: "boolean" },
+      {
+        column: "profile_id",
+        label: "Login Account",
+        type: "foreign_key",
+        foreignKey: { table: "profiles", valueColumn: "id", labelColumn: "display_name" },
+      },
       { column: "notes", label: "Notes", type: "long_text" },
     ],
   },
@@ -261,6 +310,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   sacrament_planning: {
     table: "sacrament_planning",
     label: "Sacrament Meeting Planning",
+    description:
+      "Pick any upcoming Sunday, even one with no meeting yet -- it's created automatically when you save. Special Format actually changes which elements appear on that meeting's own planning view (its starting agenda is seeded from the matching default template at /admin/meeting-templates) -- changing it here after the fact doesn't re-seed elements already on the meeting.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },
@@ -275,6 +326,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   sacrament_rabnm: {
     table: "sacrament_rabnm",
     label: "Recognitions / Advancements / Baptisms / New Members",
+    description:
+      "Matches the section already shown in each meeting's planning view. Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to the Bishopric role.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },
@@ -287,6 +340,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   sacrament_speakers_adults: {
     table: "sacrament_speakers_adults",
     label: "Sacrament Meeting Speakers (Adult)",
+    description:
+      "Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -302,6 +357,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   sacrament_speakers_youth: {
     table: "sacrament_speakers_youth",
     label: "Sacrament Meeting Speakers (Youth)",
+    description:
+      "Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -331,18 +388,29 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   youth_activities: {
     table: "youth_activities",
     label: "Youth Activities",
+    description:
+      "For a combined week, Group is the attendee scope (Combined YM/Combined YW/Combined YM/YW -- everyone in that scope attends) and Planning Group is which single class is on rotation to plan it -- editing Planning Group here is how to override the automatic rotation for one week without disturbing it going forward. Confirmed/Cancelled are independent of Status (which only controls public visibility).",
     orderBy: { column: "activity_date", ascending: true },
     columns: [
       { column: "activity_date", label: "Date", type: "date", required: true },
       { column: "activity_time", label: "Time", type: "time" },
       { column: "title", label: "Title", type: "text", required: true },
       { column: "group_name", label: "Group", type: "select", required: true, options: YOUTH_ACTIVITY_GROUPS },
+      {
+        column: "planning_group",
+        label: "Planning Group",
+        type: "select",
+        options: YOUTH_ACTIVITY_GROUPS,
+      },
       { column: "location", label: "Location", type: "text" },
       { column: "development_category", label: "Development Category", type: "select", options: YOUTH_DEVELOPMENT_CATEGORIES },
       { column: "youth_lead", label: "Youth Lead", type: "text" },
       { column: "advisor_lead", label: "Advisor Lead", type: "text" },
       { column: "notes", label: "Notes", type: "long_text" },
       { column: "status", label: "Status", type: "select", required: true, options: PUBLISH_STATUSES },
+      { column: "confirmed", label: "Confirmed", type: "boolean" },
+      { column: "cancelled", label: "Cancelled", type: "boolean" },
+      { column: "cancellation_note", label: "Cancellation Note", type: "text" },
     ],
   },
 };

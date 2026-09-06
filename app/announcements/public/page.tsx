@@ -1,118 +1,90 @@
 import { AppHeader } from "@/components/AppHeader";
-import { Tile, TileGrid } from "@/components/Tile";
-import { WARD_NAME } from "@/lib/config";
-import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
-import type { AppRole } from "@/lib/supabase/get-session-user";
+import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
 
 /**
- * The single landing page for everyone -- ward members, meeting
- * participants, youth leaders, music coordinators, and the bishopric all
- * land here. Tiles are filtered in or out below based on login state and
- * role; tapping a tile navigates to that feature's own existing page.
- * See /areas/ward-meeting-os.md for the full tile/role matrix this
- * implements.
+ * The actual public "Announcements" page linked from the landing
+ * page's Tier 0 tile -- no login required (RLS on `announcements`
+ * already limits anon/other visitors to `status = 'published'` rows).
+ *
+ * Fixed 2026-09-05: this file previously contained a stray duplicate
+ * of the landing page's HomePage component -- getPublishedAnnouncements
+ * existed but was never called from anywhere, so the "Announcements"
+ * tile silently opened a second copy of the home page instead of any
+ * actual announcement. Found while extending `announcements` for the
+ * event-announcement workflow.
  */
 
-const YOUTH_LEADER_ROLES: AppRole[] = [
-  "yw_presidency",
-  "yw_advisor",
-  "yw_specialist",
-  "ym_advisor",
-  "ym_specialist",
-];
+function formatDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
 
-export default async function HomePage() {
-  const { user, profile } = await getSessionUser();
-  const role = profile?.role ?? null;
+function formatDateRange(a: {
+  start_date: string | null;
+  start_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+}): string | null {
+  if (!a.start_date) return null;
+  let text = formatDate(a.start_date);
+  if (a.start_time) text += ` · ${a.start_time}`;
+  if (a.end_date && a.end_date !== a.start_date) {
+    text += ` – ${formatDate(a.end_date)}`;
+    if (a.end_time) text += ` · ${a.end_time}`;
+  } else if (a.end_time) {
+    text += ` – ${a.end_time}`;
+  }
+  return text;
+}
 
-  const isBishopric = role === "bishopric";
-  const isMusicPlanner = role === "music_planner" || isBishopric;
-  const isYouthLeader = (role && YOUTH_LEADER_ROLES.includes(role)) || isBishopric;
-
-  const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
+export default async function PublicAnnouncementsPage() {
+  const announcements = await getPublishedAnnouncements();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-      <AppHeader tag={WARD_NAME} />
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
+      <AppHeader tag="Announcements" />
 
-      <section className="mt-10">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">{WARD_NAME}</h1>
-        {!user && <p className="mt-2 text-slate">Sign in for meeting and planning tools.</p>}
+      <section className="mt-4">
+        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Announcements</h1>
       </section>
 
-      {/* Tier 0 -- everyone, no login required */}
-      <section className="mt-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-slate">This week</p>
-        <TileGrid>
-          {todaysSacramentMeeting && (
-            <Tile
-              title="Sacrament Meeting Program"
-              description="Today's program"
-              href={`/meetings/${todaysSacramentMeeting.id}/public`}
-            />
-          )}
-          <Tile title="Announcements" description="Ward-wide announcements" href="/announcements/public" />
-          <Tile
-            title="Youth Activities"
-            description="Planned activities for YW and YM"
-            href="/youth-activities"
-          />
-          <Tile title="Scheduled Events" comingSoon />
-        </TileGrid>
-      </section>
-
-      {/* Tier 1 -- any logged-in user */}
-      {user && (
-        <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">My meetings</p>
-          <TileGrid>
-            <Tile title="Meetings" description="Meetings you're part of" href="/dashboard" />
-          </TileGrid>
-        </section>
-      )}
-
-      {/* Tier 3 -- music coordinator + bishopric */}
-      {isMusicPlanner && (
-        <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Music</p>
-          <TileGrid>
-            <Tile title="Sacrament Music Planning" description="Enter upcoming hymns and music" href="/music" />
-            <Tile title="Music Coordination" comingSoon />
-          </TileGrid>
-        </section>
-      )}
-
-      {/* Tier 3 -- youth leaders + bishopric (edit access; page itself handles the split) */}
-      {isYouthLeader && !isBishopric && (
-        <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Youth program</p>
-          <TileGrid>
-            <Tile title="Teaching Calendar" comingSoon />
-          </TileGrid>
-        </section>
-      )}
-
-      {/* Tier 4 -- bishopric only */}
-      {isBishopric && (
-        <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Administration</p>
-          <TileGrid>
-            <Tile title="Callings" description="Manage callings and holders" href="/callings" />
-            <Tile
-              title="Manage Announcements"
-              description="Review and publish submissions"
-              href="/announcements"
-            />
-            <Tile title="Speaker & Prayer History" comingSoon />
-            <Tile title="Assignment Rotations" comingSoon />
-          </TileGrid>
-        </section>
-      )}
-
-      <footer className="mt-auto pt-16 text-xs text-slate">
-        Ward OS &mdash; planning, conducting, and publishing meetings from one source of truth.
-      </footer>
+      <div className="rounded-lg border border-rule bg-card p-6">
+        {announcements.length === 0 ? (
+          <p className="text-sm text-slate">Nothing posted yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {announcements.map((a) => {
+              const dateRange = formatDateRange(a);
+              const meta = [a.organization, a.announcement_type].filter(Boolean).join(" · ");
+              return (
+                <li key={a.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <span className="font-display text-base text-ink">{a.title}</span>
+                    {dateRange && (
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                        {dateRange}
+                      </span>
+                    )}
+                  </div>
+                  {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-slate/60">{meta}</p>}
+                  {a.body && <p className="mt-2 whitespace-pre-wrap text-slate">{a.body}</p>}
+                  {a.location && <p className="mt-1 text-[11px] text-slate/70">Location: {a.location}</p>}
+                  {a.link_url && (
+                    <p className="mt-1 text-[11px]">
+                      <a href={a.link_url} className="underline text-slate hover:text-ink">
+                        More info
+                      </a>
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </main>
   );
 }

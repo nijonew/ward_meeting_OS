@@ -1,4 +1,8 @@
--- 032_sacrament_meeting_planning_redesign.sql
+-- 033_sacrament_meeting_planning_redesign.sql
+-- Already run (under number 032) and verified before this branch merged
+-- with main, which had independently claimed 032 for a different
+-- migration -- renumbered to 033 for the repo's history; nothing to
+-- re-run here.
 --
 -- Table Admin queue item 3: makes meeting agendas per-meeting instead of
 -- shared per-type, and makes special_format actually change which
