@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 031
+## Current migration number: 032
 
 Migrations `022`–`031` all confirmed run by the user (2026-09-05). `025`
 was used by the user's own project-workflow-review session, outside
@@ -18,8 +18,9 @@ working and found all 11 configured rotations currently have zero
 members in production -- worth pulling into `main`'s own Known open
 items once that branch is reviewed/merged, not duplicated here
 blind -- that branch's own work is being finished before it comes back
-to this one for re-evaluation. Next migration should be `032_*.sql`.
-Migrations are plain `.sql` files at
+to this one for re-evaluation. `032_youth_activity_rotations.sql`
+exists in the repo but still needs to be run. Next migration should be
+`033_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -419,87 +420,83 @@ that tile has ever actually seen a posted announcement. Replaced with a
 real listing page rendering title/body/organization/type/date
 range/location/link.
 
-### Workflow: Adult leaders planning youth activities (INCOMPLETE — awaiting individual-group rotation)
+### ~~Workflow: Adult leaders planning youth activities~~ — combined weeks built 2026-09-05
 
-Continues the "Cadence rules for Youth Activities / Ward Events" open
-item logged 2026-09-04 (the user's note was cut off mid-thought back
-then). The user provided the real 2026 combined-week rotation data
-2026-09-05 -- kept in its own file,
-[youth-activities-2026-schedule.md](youth-activities-2026-schedule.md),
-since it's a literal one-year dataset rather than an architecture
-decision. **Still explicitly not building yet** -- the user's own
-decision (2026-09-05): wait until the individual-group weekly rotation
-(the non-combined Wednesdays) is also worked out before starting,
-rather than build against a half-finished schedule.
+Continued the "Cadence rules for Youth Activities / Ward Events" open
+item logged 2026-09-04. Real 2026 rotation data and 4 upstream
+decisions are in
+[youth-activities-2026-schedule.md](youth-activities-2026-schedule.md).
+The user then gave the missing cadence rule and said to continue:
+Wednesdays at 7:00pm by default; Combined YM = 1st Wednesday; Combined
+YW = 2nd & 4th; Combined YM/YW = 3rd; the given 2026 data is "a starter
+... may be updated at a later time."
 
-Four decisions made 2026-09-05 while reviewing that data (detail and
-rationale in the reference file above):
-1. **Group renaming.** `YW 12-13`/`14-15`/`16-17` were permanently
-   renamed to `Gatherers of Light`/`Messengers of Hope`/`Builders of
-   Faith` partway through 2026. `YOUTH_ACTIVITY_GROUPS`
-   (`lib/data/youth-activity-constants.ts`) should switch to the three
-   named groups once this gets built.
-2. **Rotation overrides reuse the existing `/rotations` pattern.** A
-   one-off exception (found in the real December 2026 Combined YM data)
-   should be a per-instance dropdown override, same as every other
-   rotation-assigned element already in the app -- the underlying
-   rotation pointer keeps advancing normally regardless of an override,
-   so nobody gets skipped in future occurrences.
-3. **All three combined-week patterns get automated**, not just the
-   two clean monthly ones -- including Combined YW despite its visibly
-   less regular schedule. Exactly how to encode its rotation is still
-   unresolved (see the reference file's "Combined YW" section) and
-   needs the user's input once building starts, not a guess.
-4. **Hold the build** until the individual-group (non-combined) weekly
-   rotation is provided.
-
-1. Adult leaders work with youth presidencies to plan a full year of
-   activities at once, up front — entered as **proposed/tentative**,
-   not final.
-2. As each activity's date approaches, a leader comes back to confirm
-   timing and other details. This is a distinct status step from
-   simple draft/published visibility — tentative vs. confirmed is about
-   how settled the plan is, not who can see it.
-3. Standing weekly slot: Wednesday evenings, 7:00 generally. Like other
-   meetings, a cancelled week should still show as a row (not disappear
-   entirely) with a note explaining the cancellation, addable when the
-   cancellation happens.
-4. Six groups rotate planning duty week to week (Deacons, Teachers,
-   Priests, YW 12/13, YW 14/15, YW 16/17). On certain weeks the YW
-   groups combine into one activity for all YW; separately, YM groups
-   combine on certain weeks; a combined YM/YW activity happens monthly.
-   **The user will provide the actual rotation pattern and which weeks
-   are combined in a follow-up message** — don't guess at a rotation
-   shape before that arrives.
-
-**Known conflicts with what's built today:**
+**Built:**
+- Migration `032_youth_activity_rotations.sql` (needs to be run):
+  - `youth_activities` gains `confirmed` (tentative vs. confirmed,
+    independent of `status`'s draft/published *visibility*),
+    `cancelled` + `cancellation_note` (shown, not hidden — same
+    show-don't-hide pattern the "Cancel a meeting" open item below
+    wants for meetings), and `planning_group`.
+  - `planning_group` vs. `group_name`: for a combined week, `group_name`
+    stays the *attendee* scope (`Combined YM`/`Combined YW`/`Combined
+    YM/YW` — the existing pseudo-values already in
+    `YOUTH_ACTIVITY_GROUPS`, unchanged), while `planning_group` records
+    which single class is *on the hook to plan it* that time. A
+    non-combined activity leaves `planning_group` null.
+  - New `youth_activity_rotations`/`youth_activity_rotation_members`
+    tables — a lightweight rotation engine deliberately separate from
+    the existing `rotations`/`rotation_members` (those rotate *people*
+    via a hard FK onto a *meeting*-scoped role; this rotates *plain-text
+    groups* onto a `youth_activities` row on a monthly nth-Wednesday
+    cadence unrelated to `meetings`). Same design principle though: an
+    ordered member list + a `next_index` pointer that advances once per
+    occurrence *generated*, so an override never skips anyone later —
+    confirms the design the user asked for when reviewing the real
+    December 2026 Combined YM exception.
+  - Seeded all three rotations from the schedule the user gave,
+    simplified to a clean repeating cycle (documented in
+    youth-activities-2026-schedule.md), and seeded the real,
+    already-known Sept 2026–Feb 2027 activities as literal rows
+    (verified nth-Wednesday dates independently, not from memory) —
+    `next_index` on each rotation is set to continue correctly *after*
+    that seeded stretch.
+- `lib/data/youth-activity-schedule.ts`: `generateCombinedYouthActivities(throughDateISO)`
+  — the actual cadence engine (fixed rule, not a rules table like
+  `/meeting-schedule`, since there's exactly one pattern here). Skips
+  the 5th Wednesday of a month entirely (individual-group weeks still
+  aren't designed) and skips any date that already has an activity.
 - `YOUTH_ACTIVITY_GROUPS` (`lib/data/youth-activity-constants.ts`)
-  already lists exactly the right values — the six base groups plus
-  "Combined YM," "Combined YW," and "Combined YM/YW" as selectable
-  pseudo-groups — but there's no automatic rotation assigning a group
-  to a given week; `group_name` is picked manually on every entry
-  today, one activity at a time (`app/youth-activities/actions.ts`).
-- `youth_activities.status` is only `draft`/`published` (visibility),
-  with no tentative-vs-confirmed distinction (settledness). Planning a
-  full year as "proposed" and confirming individual weeks later needs a
-  real status dimension that doesn't exist yet.
-- No cancelled-but-still-shown state exists for a week's activity, with
-  or without a note — this is the same underlying need as the
-  already-logged, not-yet-built "Cancel a meeting from the dashboard"
-  item below, now showing up in a second, unrelated table. Worth one
-  shared design (e.g. a status value + optional reason/note column)
-  rather than solving it twice differently.
-- No cadence-based auto-generation exists for `youth_activities` at
-  all — `/meeting-schedule`'s weekly/nth-weekday/relative engine
-  (`lib/data/meeting-schedule.ts`) is tightly coupled to the `meetings`
-  table (`meeting_type_id`, `applyRotationsToNewMeeting`, etc.); reusing
-  its cadence *shapes* for a weekly Wednesday-night slot looks
-  straightforward, but the per-week **group rotation** (including the
-  combined-week overrides) is a materially different problem than
-  "which Sundays does this meeting occur" and needs the pattern details
-  above before it can be designed.
-- No bulk "plan a whole year at once" UI exists — the current
-  `/youth-activities` page only adds one activity at a time.
+  switched to the three renamed classes; old age-based values kept
+  commented out for reading historical rows.
+- `/youth-activities`: new "Generate Combined Activities" panel
+  (mirrors `/meeting-schedule`'s Generate button); Confirm/Mark
+  Tentative and Cancel (with a note)/Un-cancel controls per row;
+  cancelled rows render with a red "Cancelled" badge and the note
+  instead of their normal group/category/location line, still fully
+  shown, not hidden. `/events`' merged public listing does the same for
+  cancelled youth activities.
+- Table Admin's Youth Activities grid gained Planning Group, Confirmed,
+  Cancelled, and Cancellation Note columns — editing Planning Group per
+  row *is* the override mechanism (no separate UI needed, matches how
+  every other rotation-assigned element in the app is already
+  overridden via its own admin grid).
+
+**Deliberately not built / left for later:**
+- Individual-group (non-combined) weekly activities — still no
+  rotation pattern provided; those Wednesdays (and any 5th Wednesday)
+  simply generate nothing yet.
+- No dedicated UI to reorder/edit the three rotations' membership
+  lists — `/rotations` has its own page for the people-based rotations
+  for the same reason (membership isn't exposed through generic Table
+  Admin there either); a parallel UI for these wasn't built this round.
+  For now, correcting the base cycle means updating
+  `youth_activity_rotation_members` directly in Supabase.
+- Bulk "plan a whole year at once, then edit details later" is now
+  possible via Generate + per-row editing, but there's still no
+  single-page "review this whole year and fill in every TBD" view --
+  admins currently do that from the flat `/youth-activities` list or
+  Table Admin grid.
 
 ## Known open items
 
@@ -537,10 +534,11 @@ rationale in the reference file above):
     Scheduled/Cancelled, with a reason when cancelled. Likely a new
     column (or two) on `meetings` rather than overloading `stage`, since
     `stage` tracks how far along the program is, not whether the meeting
-    is happening at all. Lower priority than the auto-archive item. The
-    "Adult leaders planning youth activities" workflow above wants the
-    identical show-not-hide-plus-note behavior for `youth_activities` —
-    worth one shared design once either gets picked up, not two.
+    is happening at all. Lower priority than the auto-archive item.
+    `youth_activities` got exactly this treatment (`cancelled` +
+    `cancellation_note`, shown not hidden) built 2026-09-05 as part of
+    the "Adult leaders planning youth activities" workflow — worth
+    reusing that same shape for `meetings` when this gets picked up.
 - ~~**Cadence rules for Youth Activities / Ward Events.**~~ Continued
   2026-09-05 as the "Adult leaders planning youth activities" workflow
   above (still incomplete -- awaiting the rotation/combined-week

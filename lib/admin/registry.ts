@@ -430,18 +430,29 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   youth_activities: {
     table: "youth_activities",
     label: "Youth Activities",
+    description:
+      "For a combined week, Group is the attendee scope (Combined YM/Combined YW/Combined YM/YW -- everyone in that scope attends) and Planning Group is which single class is on rotation to plan it -- editing Planning Group here is how to override the automatic rotation for one week without disturbing it going forward. Confirmed/Cancelled are independent of Status (which only controls public visibility).",
     orderBy: { column: "activity_date", ascending: true },
     columns: [
       { column: "activity_date", label: "Date", type: "date", required: true },
       { column: "activity_time", label: "Time", type: "time" },
       { column: "title", label: "Title", type: "text", required: true },
       { column: "group_name", label: "Group", type: "select", required: true, options: YOUTH_ACTIVITY_GROUPS },
+      {
+        column: "planning_group",
+        label: "Planning Group",
+        type: "select",
+        options: YOUTH_ACTIVITY_GROUPS,
+      },
       { column: "location", label: "Location", type: "text" },
       { column: "development_category", label: "Development Category", type: "select", options: YOUTH_DEVELOPMENT_CATEGORIES },
       { column: "youth_lead", label: "Youth Lead", type: "text" },
       { column: "advisor_lead", label: "Advisor Lead", type: "text" },
       { column: "notes", label: "Notes", type: "long_text" },
       { column: "status", label: "Status", type: "select", required: true, options: PUBLISH_STATUSES },
+      { column: "confirmed", label: "Confirmed", type: "boolean" },
+      { column: "cancelled", label: "Cancelled", type: "boolean" },
+      { column: "cancellation_note", label: "Cancellation Note", type: "text" },
     ],
   },
 };

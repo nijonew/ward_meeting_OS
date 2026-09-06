@@ -5,11 +5,16 @@ Pasted by the user 2026-09-05 as the concrete rotation data for the
 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md). Kept in its own file (not
 inline in PROJECT_CONTEXT.md) since it's a literal one-year dataset,
 not an architecture decision — PROJECT_CONTEXT.md links here rather
-than duplicating it. Not yet loaded into the database; nothing has been
-built against this yet (per the user's own "wait until the full
-picture is settled" decision, 2026-09-05) — individual-group weekly
-activities (the non-combined Wednesdays) still need their own
-rotation before building starts.
+than duplicating it.
+
+**Built 2026-09-05** once the user supplied the missing cadence rule
+(Wednesdays 7pm; Combined YM = 1st Wed; Combined YW = 2nd & 4th;
+Combined YM/YW = 3rd) and said to continue — see PROJECT_CONTEXT.md's
+workflow entry for what shipped (migration `032`, the
+`youth_activity_rotations` engine, `/youth-activities`' Generate panel,
+confirmed/cancelled controls). This file's analysis below is what that
+build was based on. Individual-group (non-combined) weekly activities
+still have no rotation provided and remain unbuilt.
 
 ## Group naming — decided 2026-09-05
 

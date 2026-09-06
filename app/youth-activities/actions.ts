@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { generateCombinedYouthActivities } from "@/lib/data/youth-activity-schedule";
 
 export type ActionResult = { success: true } | { error: string };
 
@@ -68,4 +69,74 @@ export async function deleteYouthActivity(id: string): Promise<ActionResult> {
 
   revalidatePath("/youth-activities");
   return { success: true };
+}
+
+/** Tentative -> confirmed, or back. Independent of `status`
+ *  (draft/published visibility) -- see PROJECT_CONTEXT.md. */
+export async function toggleYouthActivityConfirmed(id: string, confirmed: boolean): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("youth_activities").update({ confirmed }).eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/youth-activities");
+  revalidatePath("/events");
+  return { success: true };
+}
+
+/** Marks a week cancelled (with an optional note) or un-cancels it.
+ *  Cancelled weeks stay visible everywhere -- shown with the note
+ *  instead of disappearing, per the workflow's "much like other
+ *  meetings, show a cancelled week with a note" requirement. */
+export async function setYouthActivityCancellation(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  const note = String(formData.get("cancellation_note") ?? "").trim() || null;
+  if (!id) return { error: "Missing activity id." };
+
+  const { error } = await supabase
+    .from("youth_activities")
+    .update({ cancelled: true, cancellation_note: note })
+    .eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/youth-activities");
+  revalidatePath("/events");
+  return { success: true };
+}
+
+export async function uncancelYouthActivity(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("youth_activities")
+    .update({ cancelled: false, cancellation_note: null })
+    .eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/youth-activities");
+  revalidatePath("/events");
+  return { success: true };
+}
+
+export async function generateYouthActivities(
+  _prevState: unknown,
+  formData: FormData
+): Promise<{ error?: string; created?: number; skippedExisting?: number }> {
+  const throughDate = String(formData.get("through_date") ?? "");
+  if (!throughDate) return { error: "Choose an end date." };
+
+  const result = await generateCombinedYouthActivities(throughDate);
+  if ("error" in result) return { error: result.error };
+
+  revalidatePath("/youth-activities");
+  revalidatePath("/events");
+  return { created: result.created, skippedExisting: result.skippedExisting };
 }
