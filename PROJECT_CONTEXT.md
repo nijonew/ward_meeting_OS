@@ -246,21 +246,19 @@ or note partial progress) as each is picked up.
    the conducting script) -- Person(s)/Detail/Event Date stayed visible
    for every type per the user's decision, since those aren't confusing
    the way an irrelevant Calling picker was.
-5. **Sacrament Speakers (adult/youth) — rename + re-scope.** *If* these
-   tables continue to exist (user's own qualifier — not fully committed
-   yet): rename to "Sacrament Meeting Speakers (Adult)" / "(Youth)".
-   More importantly, the user sees their actual purpose differently than
-   how they're built today: `sacrament_speakers_adults/youth` are
-   currently forward-planning tables (a `meeting_id` FK ties a speaker
-   directly to one specific upcoming meeting) — but the user wants them
-   to be a **history log** of who has spoken in the past (informs future
-   planning, e.g. via `/speaker-prayer-history`'s existing "who's due"
-   view), not the live planning surface itself. The live planning
-   surface for a specific date is item 3 above (the Sacrament Meeting
-   Planning redesign) — these two items are closely related and should
-   probably be designed together: item 3's per-date element planning is
-   presumably what *writes* the eventual "spoke on this date" history
-   record these tables would hold, once repurposed.
+5. ~~**Sacrament Speakers (adult/youth) — rename + re-scope.**~~ Done
+   (2026-09-05): renamed Table Admin labels to "Sacrament Meeting
+   Speakers (Adult)" / "(Youth)". The "re-scope" half turned out to be
+   moot once checked -- `/speaker-prayer-history` already reads these
+   same tables filtered to `stage = 'archived'` meetings and already
+   builds its "who's due" view from them, so the history-log behavior
+   the user wanted already existed; confirmed with the user that no
+   structural change was needed (label-only fix). The tables stay
+   dual-purpose: live planning surface via `SpeakersForm` until a
+   meeting is archived, history source after.
+
+The Table Admin update queue (5 items, started 2026-09-04) is now
+fully worked through.
 
 ## Working conventions
 

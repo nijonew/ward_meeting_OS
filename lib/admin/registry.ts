@@ -330,7 +330,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_speakers_adults: {
     table: "sacrament_speakers_adults",
-    label: "Sacrament Speakers (Adult)",
+    label: "Sacrament Meeting Speakers (Adult)",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -345,7 +345,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_speakers_youth: {
     table: "sacrament_speakers_youth",
-    label: "Sacrament Speakers (Youth)",
+    label: "Sacrament Meeting Speakers (Youth)",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
