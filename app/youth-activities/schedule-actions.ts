@@ -8,7 +8,7 @@ import {
   deleteYouthActivityScheduleRule as deleteRule,
   toggleYouthActivityScheduleRuleActive as toggleRule,
   generateYouthActivitiesFromRules,
-} from "@/lib/data/youth-activity-schedule";
+} from "@/lib/data/youth-activity-cadence-rules";
 
 type ActionResult = { success: true } | { error: string };
 

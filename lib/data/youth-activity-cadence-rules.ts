@@ -1,6 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { candidateDatesForCadence, readCadenceFields, type CadenceShape } from "@/lib/data/cadence";
 
+/**
+ * A general, user-configurable cadence-rule engine for Youth Activities
+ * -- same mechanism as /meeting-schedule, applied here. Deliberately
+ * separate from lib/data/youth-activity-schedule.ts, which is a
+ * different, unrelated feature (a fixed nth-Wednesday rotation across
+ * the three "combined week" activities, backed by
+ * youth_activity_rotations/youth_activity_rotation_members) that
+ * happened to be named the same thing independently -- this file is
+ * named -cadence-rules to keep the two apart. Both are legitimate and
+ * coexist: this one is "don't re-enter a recurring activity every
+ * week"; that one is "which combined group meets this Wednesday."
+ */
+
 export interface YouthActivityScheduleRule {
   id: string;
   cadence: CadenceShape;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import type { YouthActivityScheduleRule } from "@/lib/data/youth-activity-schedule";
+import type { YouthActivityScheduleRule } from "@/lib/data/youth-activity-cadence-rules";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
 import { CadenceFields, CADENCE_SELECT_CLASS, describeCadence } from "@/components/schedule/CadenceFields";
 
