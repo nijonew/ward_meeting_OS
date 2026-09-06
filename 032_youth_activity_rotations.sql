@@ -144,22 +144,30 @@ on conflict (rotation_id, sort_order) do nothing;
 -- confirmed one-off override, not part of the base cycle -- see
 -- PROJECT_CONTEXT.md. The rotation's next_index above already accounts
 -- for it (continues as if this month had been 'Deacons').
+--
+-- development_category has a pre-existing check constraint limited to
+-- YOUTH_DEVELOPMENT_CATEGORIES' single values (Spiritual/Physical/
+-- Social/Intellectual/Service) -- several of the user's real
+-- categories were compound (e.g. "Physical/Social"). Narrowed each to
+-- its closest single category rather than widen the constraint, since
+-- every other row in this table (and the admin dropdown) already
+-- assumes one category.
 insert into youth_activities (activity_date, activity_time, title, group_name, planning_group, development_category, status, confirmed)
 select v.activity_date::date, '19:00'::time, v.title, v.group_name, v.planning_group, v.development_category, 'draft', false
 from (values
   -- Combined YM/YW -- 3rd Wednesday
   ('2026-09-16', 'Youth Conference 18-20 / Temple Trip', 'Combined YM/YW', 'Gatherers of Light', 'Spiritual'),
-  ('2026-10-21', 'Capture the Flag', 'Combined YM/YW', 'Teachers', 'Physical/Social'),
-  ('2026-11-18', 'Etiquette Dinner', 'Combined YM/YW', 'Messengers of Hope', 'Social/Intellectual'),
+  ('2026-10-21', 'Capture the Flag', 'Combined YM/YW', 'Teachers', 'Physical'),
+  ('2026-11-18', 'Etiquette Dinner', 'Combined YM/YW', 'Messengers of Hope', 'Social'),
   ('2026-12-16', 'Service/Care Packages/Sub for Santa', 'Combined YM/YW', 'Builders of Faith', 'Service'),
-  ('2027-01-20', 'Bowling', 'Combined YM/YW', 'Deacons', 'Physical/Social'),
-  ('2027-02-17', 'USU Tour', 'Combined YM/YW', 'Priests', 'Intellectual/Social'),
+  ('2027-01-20', 'Bowling', 'Combined YM/YW', 'Deacons', 'Physical'),
+  ('2027-02-17', 'USU Tour', 'Combined YM/YW', 'Priests', 'Intellectual'),
   -- Combined YM -- 1st Wednesday
-  ('2026-09-02', 'Internet-based game', 'Combined YM', 'Deacons', 'Intellectual/Social'),
+  ('2026-09-02', 'Internet-based game', 'Combined YM', 'Deacons', 'Intellectual'),
   ('2026-10-07', 'Tour MTC', 'Combined YM', 'Priests', 'Spiritual'),
   ('2026-11-04', 'Glow in the dark Frisbee', 'Combined YM', 'Teachers', 'Physical'),
   ('2026-12-02', 'Indoor hockey', 'Combined YM', 'Teachers', 'Physical'),
-  ('2027-01-06', 'Ice fishing', 'Combined YM', 'Deacons', 'Physical/Intellectual'),
+  ('2027-01-06', 'Ice fishing', 'Combined YM', 'Deacons', 'Physical'),
   ('2027-02-03', 'Tour Hanks work', 'Combined YM', 'Priests', 'Intellectual'),
   -- Combined YW -- 2nd & 4th Wednesday (December's 4th Wednesday has no
   -- given activity -- a real gap in the source data, left ungenerated)

@@ -56,6 +56,15 @@ analysis below for what a clean base cycle might look like once the
 transition-period and special-event rows are treated as one-off
 overrides rather than pattern data.
 
+**Category note (2026-09-06):** `youth_activities.development_category`
+has a pre-existing check constraint limited to
+`YOUTH_DEVELOPMENT_CATEGORIES`'s single values (Spiritual/Physical/
+Social/Intellectual/Service). The tables below keep the user's original
+compound categories (e.g. "Physical/Social") verbatim as given; the
+actual seeded rows in migration `032` narrow each to its single closest
+category instead, since every other row in this table already assumes
+one.
+
 ---
 
 ## Combined YM/YW (monthly — third Wednesday)
