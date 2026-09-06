@@ -419,12 +419,39 @@ that tile has ever actually seen a posted announcement. Replaced with a
 real listing page rendering title/body/organization/type/date
 range/location/link.
 
-### Workflow: Adult leaders planning youth activities (INCOMPLETE — awaiting rotation details)
+### Workflow: Adult leaders planning youth activities (INCOMPLETE — awaiting individual-group rotation)
 
 Continues the "Cadence rules for Youth Activities / Ward Events" open
 item logged 2026-09-04 (the user's note was cut off mid-thought back
-then) — do not build yet, the rotation/combined-week specifics below
-are still to come in a follow-up message.
+then). The user provided the real 2026 combined-week rotation data
+2026-09-05 -- kept in its own file,
+[youth-activities-2026-schedule.md](youth-activities-2026-schedule.md),
+since it's a literal one-year dataset rather than an architecture
+decision. **Still explicitly not building yet** -- the user's own
+decision (2026-09-05): wait until the individual-group weekly rotation
+(the non-combined Wednesdays) is also worked out before starting,
+rather than build against a half-finished schedule.
+
+Four decisions made 2026-09-05 while reviewing that data (detail and
+rationale in the reference file above):
+1. **Group renaming.** `YW 12-13`/`14-15`/`16-17` were permanently
+   renamed to `Gatherers of Light`/`Messengers of Hope`/`Builders of
+   Faith` partway through 2026. `YOUTH_ACTIVITY_GROUPS`
+   (`lib/data/youth-activity-constants.ts`) should switch to the three
+   named groups once this gets built.
+2. **Rotation overrides reuse the existing `/rotations` pattern.** A
+   one-off exception (found in the real December 2026 Combined YM data)
+   should be a per-instance dropdown override, same as every other
+   rotation-assigned element already in the app -- the underlying
+   rotation pointer keeps advancing normally regardless of an override,
+   so nobody gets skipped in future occurrences.
+3. **All three combined-week patterns get automated**, not just the
+   two clean monthly ones -- including Combined YW despite its visibly
+   less regular schedule. Exactly how to encode its rotation is still
+   unresolved (see the reference file's "Combined YW" section) and
+   needs the user's input once building starts, not a guess.
+4. **Hold the build** until the individual-group (non-combined) weekly
+   rotation is provided.
 
 1. Adult leaders work with youth presidencies to plan a full year of
    activities at once, up front — entered as **proposed/tentative**,
