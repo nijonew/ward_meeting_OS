@@ -28,10 +28,15 @@ counts, both new catalog elements (`recognize_music`, `primary_program`)
 present and linked to Sacrament Meeting, `meeting_planned_elements`
 exists (empty, as expected -- no meeting created since it shipped yet).
 Migration `033` (rotation recalibration + email/backup_holder_id
-cleanup, see below and Known open items) written 2026-09-05, **not yet
-confirmed run by the user**. Next migration after that should be
-`034_*.sql` -- **confirm with the user first**, same as always.
-Migrations are plain `.sql` files at
+cleanup, see below and Known open items) confirmed run and verified
+(2026-09-05) via read-only checks: `people.email`/
+`callings.backup_holder_id` confirmed gone; all 10 recalibrated
+rotations' cycle order and next-up pointer match exactly (Ward Council
+confirmed to no longer list any Bishopric member); all 21 existing
+Sacrament Meetings' `conducting` now correctly cycles Bishop/1st/2nd
+Counselor by month. Next migration should be `034_*.sql` -- **confirm
+with the user first**, same as always. Migrations are plain `.sql`
+files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -104,15 +109,16 @@ before.
 
 ## Known open items
 
-- **Pending migration 033** (2026-09-05, not yet run): also drops
-  `people.email` (unused everywhere) and `callings.backup_holder_id`
-  ("not actually a real thing" for this ward, per the user) -- both
-  removed from `lib/admin/registry.ts` already. Table Admin's
-  `calling_planning` entry was also removed entirely (it already has a
-  dedicated editor at `/callings/[id]` via `CallingPlanningCard` --
-  keeping both was a duplicate-entry hazard) and the landing page's
-  "Callings" tile was renamed to "Calling Planning" (same destination,
-  `/callings`) to reflect that that's the real workflow it leads to.
+- ~~**Migration 033 pending.**~~ Confirmed run and verified
+  2026-09-05. Also dropped `people.email` (unused everywhere) and
+  `callings.backup_holder_id` ("not actually a real thing" for this
+  ward, per the user) -- both removed from `lib/admin/registry.ts` too.
+  Table Admin's `calling_planning` entry was also removed entirely (it
+  already has a dedicated editor at `/callings/[id]` via
+  `CallingPlanningCard` -- keeping both was a duplicate-entry hazard)
+  and the landing page's "Callings" tile was renamed to "Calling
+  Planning" (same destination, `/callings`) to reflect that that's the
+  real workflow it leads to.
 - ~~**No rotation has any members yet.**~~ Resolved 2026-09-05: all 11
   original rotations synced via `/rotations`' existing "Sync from
   callings/standing attendees" buttons -- 9 populated immediately;
@@ -121,7 +127,7 @@ before.
   `Organist` didn't exist at all -- both fixed by the user, then synced
   clean). Membership order and each rotation's "next up" pointer were
   then recalibrated against the ward's actual real 2026 rotation pattern
-  (migration `033`, **not yet confirmed run**) -- see that migration's
+  (migration `033`, confirmed run and verified) -- see that migration's
   comments for the exact person-by-person cycles derived per rotation.
   Two new rotations added in the same migration: Ward Council and Youth
   Council Spiritual Thought (the `spiritual_thought` element existed but
