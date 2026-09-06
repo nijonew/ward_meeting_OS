@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 035
+## Current migration number: 036
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -37,8 +37,11 @@ reconstructed from both:
   cleanup -- renumbered from `033`): confirmed run and verified.
 - `035` (Youth Activity / Ward Event cadence rules -- renumbered from
   `034`): confirmed run.
+- `036` (corrected Primary Program/Christmas/Easter sacrament templates
+  per the user's review -- see Table Admin queue item 3 below): still
+  needs to be run.
 
-Next migration should be `036_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `037_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -709,10 +712,21 @@ or note partial progress) as each is picked up.
    `stake_speakers` confirmed identical to `standard`;
    `stake_conference`/`general_conference` seeded with a single Ward
    Business note-placeholder since the ward holds no meeting those
-   Sundays; **`primary_program`, `christmas_meeting`, `easter_meeting`,
-   and `baby_blessing` are NOT confirmed** -- defaulted to a plain copy
-   of `standard`, need the user's review/correction via
-   `/admin/meeting-templates`. Two new `meeting_elements` catalog rows
+   Sundays; ~~`primary_program`, `christmas_meeting`, `easter_meeting`,
+   and `baby_blessing` were NOT confirmed~~ -- **corrected 2026-09-06**
+   (migration `036`) per the user's review: every format keeps Visiting
+   Authorities, Stake Business, and Closing Hymn (Primary Program's
+   original best-effort guess had wrongly dropped all three).
+   `primary_program` leaves out Speaker/Youth Speaker/the
+   `intermediate_hymn` slot (musical numbers), replaced with the
+   `primary_program` element. `christmas_meeting`/`easter_meeting` are
+   identical to each other -- Standard minus Speaker/Youth
+   Speaker/musical numbers, with no replacement element: those get added
+   per-meeting later via that meeting's own Agenda Elements page, not
+   as a template default. `baby_blessing` is confirmed identical to
+   Standard as given -- the blessing itself is recorded through the
+   existing Ward Business element (`sacrament_rabnm`'s `baby_blessing`
+   type), no template change needed. Two new `meeting_elements` catalog rows
    added: `recognize_music` (announcing the rotation-assigned
    chorister/organist) and `primary_program`. Missionary speakers reuse
    the existing `speaker` slots (noted via topic/guest name) rather than
