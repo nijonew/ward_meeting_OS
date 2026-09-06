@@ -21,10 +21,14 @@ Planning redesign, see Table Admin update queue below) -- **numbered
 when running it since `026`–`031` had already been used outside this
 chat** (exactly the numbering-collision risk this section already
 warned about -- ask the user before assuming a gap like this is free
-next time). First run hit a real schema conflict (see below); fixed and
-the corrected file **still needs to be re-run by the user**. Next
-migration after that should be `033_*.sql` -- **confirm with the user
-first**, same as always. Migrations are plain `.sql` files at
+next time). First run hit a real schema conflict (see below); fixed,
+re-run, and confirmed via read-only verification queries (2026-09-05):
+all 10 `special_format` buckets present with the expected element
+counts, both new catalog elements (`recognize_music`, `primary_program`)
+present and linked to Sacrament Meeting, `meeting_planned_elements`
+exists (empty, as expected -- no meeting created since it shipped yet).
+Next migration should be `033_*.sql` -- **confirm with the user first**,
+same as always. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -187,13 +191,12 @@ or note partial progress) as each is picked up.
    back up).
 3. ~~**Sacrament Planning.**~~ Done (2026-09-05, migration `032`,
    renumbered from `026` by the user since `026`–`031` were already
-   used outside this chat -- **first run hit a real bug, fixed, still
-   needs to be re-run by the user**: `meeting_templates` already had a
-   unique constraint on `(meeting_type_id, element_id)` alone predating
-   `format_key`, so e.g. `presiding` needing a row in both `standard` and
-   `testimony_meeting` violated it -- replaced with a
-   `coalesce(format_key, '')`-based unique index so it stays enforced
-   for non-Sacrament types too): renamed to "Sacrament Meeting Planning"
+   used outside this chat -- first run hit a real bug (`meeting_templates`
+   already had a unique constraint on `(meeting_type_id, element_id)`
+   alone predating `format_key`, so e.g. `presiding` needing a row in
+   both `standard` and `testimony_meeting` violated it), fixed with a
+   `coalesce(format_key, '')`-based unique index, re-run, and confirmed
+   via verification queries): renamed to "Sacrament Meeting Planning"
    in Table Admin. Redesigned as planned -- `special_format` now
    actually changes which elements appear (see Dynamic planning view
    above): each meeting gets its own `meeting_planned_elements` row set,
