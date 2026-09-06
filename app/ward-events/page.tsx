@@ -1,7 +1,17 @@
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getWardEvents } from "@/lib/data/ward-events";
+import { getWardEventScheduleRules } from "@/lib/data/ward-event-schedule";
 import { addWardEvent, setWardEventStatus, deleteWardEvent } from "@/app/ward-events/actions";
+import {
+  addScheduleRule,
+  updateScheduleRule,
+  deleteScheduleRule,
+  toggleScheduleRuleActive,
+  generateEvents,
+} from "@/app/ward-events/schedule-actions";
+import { WardEventScheduleManager } from "@/components/schedule/WardEventScheduleManager";
+import { GenerateForm } from "@/components/schedule/GenerateForm";
 
 const MANAGE_ROLES = ["bishopric", "communications_specialist"];
 
@@ -20,6 +30,7 @@ export default async function WardEventsPage() {
   const canManage = Boolean(profile?.role && MANAGE_ROLES.includes(profile.role));
 
   const events = await getWardEvents();
+  const scheduleRules = canManage ? await getWardEventScheduleRules() : [];
 
   const add = async (formData: FormData) => {
     "use server";
@@ -148,6 +159,29 @@ export default async function WardEventsPage() {
             </button>
           </form>
         </div>
+      )}
+
+      {canManage && (
+        <>
+          <WardEventScheduleManager
+            rules={scheduleRules}
+            onAdd={addScheduleRule}
+            onUpdate={updateScheduleRule}
+            onDelete={deleteScheduleRule}
+            onToggle={toggleScheduleRuleActive}
+          />
+          <p className="-mt-3 text-[11px] text-slate/60">
+            For a recurring event like a monthly Ward Temple Night, add one rule here instead of
+            entering it month by month. Use Edit to change a rule in place, or Copy to start a new
+            one from its values.
+          </p>
+          <GenerateForm
+            action={generateEvents}
+            heading="Generate Events"
+            itemLabelSingular="event"
+            itemLabelPlural="events"
+          />
+        </>
       )}
     </main>
   );

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
+import { candidateDatesForCadence, readCadenceFields } from "@/lib/data/cadence";
 
 export interface ScheduleRule {
   id: string;
@@ -63,68 +64,18 @@ export async function getScheduleRules(): Promise<ScheduleRule[]> {
 
 type ActionResult = { success: true } | { error: string };
 
-/** Reads and validates the cadence-dependent fields shared by add and update. */
-function readRuleFields(formData: FormData):
-  | {
-      cadence: string;
-      time_of_day: string;
-      duration_minutes: number;
-      day_of_week: number | null;
-      nth_occurrence: number | null;
-      anchor_day_of_week: number | null;
-      anchor_nth_occurrence: number | null;
-      offset_days: number | null;
-    }
-  | { error: string } {
-  const cadence = String(formData.get("cadence") ?? "");
+/** Adds this rule type's own fields (time/duration) on top of the shared cadence fields. */
+function readRuleFields(formData: FormData) {
+  const cadenceFields = readCadenceFields(formData);
+  if ("error" in cadenceFields) return cadenceFields;
+
   const time_of_day = String(formData.get("time_of_day") ?? "");
   const duration_minutes = Number(formData.get("duration_minutes"));
-
-  if (!cadence || !time_of_day || !duration_minutes) {
+  if (!time_of_day || !duration_minutes) {
     return { error: "All fields are required." };
   }
 
-  let day_of_week: number | null = null;
-  let nth_occurrence: number | null = null;
-  let anchor_day_of_week: number | null = null;
-  let anchor_nth_occurrence: number | null = null;
-  let offset_days: number | null = null;
-
-  if (cadence === "weekly") {
-    const raw = formData.get("day_of_week");
-    if (raw === null || raw === "") return { error: "Choose a day of the week." };
-    day_of_week = Number(raw);
-  } else if (cadence === "nth_weekday") {
-    const dayRaw = formData.get("day_of_week");
-    const nthRaw = formData.get("nth_occurrence");
-    if (dayRaw === null || dayRaw === "") return { error: "Choose a day of the week." };
-    if (nthRaw === null || nthRaw === "") return { error: "Choose 1st through 5th." };
-    day_of_week = Number(dayRaw);
-    nth_occurrence = Number(nthRaw);
-  } else if (cadence === "relative") {
-    const anchorDayRaw = formData.get("anchor_day_of_week");
-    const anchorNthRaw = formData.get("anchor_nth_occurrence");
-    const offsetRaw = formData.get("offset_days");
-    if (anchorDayRaw === null || anchorDayRaw === "") return { error: "Choose the anchor day of the week." };
-    if (anchorNthRaw === null || anchorNthRaw === "") return { error: "Choose the anchor's 1st through 5th." };
-    if (offsetRaw === null || offsetRaw === "") return { error: "Enter a day offset." };
-    anchor_day_of_week = Number(anchorDayRaw);
-    anchor_nth_occurrence = Number(anchorNthRaw);
-    offset_days = Number(offsetRaw);
-  } else {
-    return { error: "Unknown cadence." };
-  }
-
-  return {
-    cadence,
-    time_of_day,
-    duration_minutes,
-    day_of_week,
-    nth_occurrence,
-    anchor_day_of_week,
-    anchor_nth_occurrence,
-    offset_days,
-  };
+  return { ...cadenceFields, time_of_day, duration_minutes };
 }
 
 export async function addScheduleRule(formData: FormData): Promise<ActionResult> {
@@ -191,82 +142,6 @@ export async function toggleScheduleRuleActive(id: string, active: boolean): Pro
   return { success: true };
 }
 
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/** All dates matching day_of_week between start and end (inclusive), for a 'weekly' rule. */
-function weeklyDates(start: Date, end: Date, dayOfWeek: number): string[] {
-  const dates: string[] = [];
-  const d = new Date(start);
-  while (d.getDay() !== dayOfWeek) d.setDate(d.getDate() + 1);
-  while (d <= end) {
-    dates.push(toISODate(d));
-    d.setDate(d.getDate() + 7);
-  }
-  return dates;
-}
-
-/** The Nth occurrence of dayOfWeek in the given month, or null if that month doesn't have one (e.g. no 5th). */
-function nthOccurrenceInMonth(year: number, month: number, dayOfWeek: number, nth: number): Date | null {
-  const matches: Date[] = [];
-  for (let day = 1; day <= 31; day++) {
-    const candidate = new Date(year, month, day);
-    if (candidate.getMonth() !== month) break; // ran past end of month
-    if (candidate.getDay() === dayOfWeek) matches.push(candidate);
-  }
-  return matches[nth - 1] ?? null;
-}
-
-/** The Nth occurrence of day_of_week in each month between start and end (inclusive). */
-function nthWeekdayDates(start: Date, end: Date, dayOfWeek: number, nth: number): string[] {
-  const dates: string[] = [];
-  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-  const last = new Date(end.getFullYear(), end.getMonth(), 1);
-
-  while (cursor <= last) {
-    const picked = nthOccurrenceInMonth(cursor.getFullYear(), cursor.getMonth(), dayOfWeek, nth);
-    if (picked && picked >= start && picked <= end) {
-      dates.push(toISODate(picked));
-    }
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-  return dates;
-}
-
-/**
- * Dates computed as "offsetDays days after (or before, if negative) the
- * Nth occurrence of anchorDayOfWeek" in each month -- e.g. "2 days after
- * the 3rd Sunday" (the Tuesday that follows it, whichever numbered
- * Tuesday that happens to be that month). Iterates one month of padding
- * on each side of the range so an offset that crosses a month boundary
- * still gets caught.
- */
-function relativeDates(
-  start: Date,
-  end: Date,
-  anchorDayOfWeek: number,
-  anchorNth: number,
-  offsetDays: number
-): string[] {
-  const dates: string[] = [];
-  const cursor = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-  const last = new Date(end.getFullYear(), end.getMonth() + 1, 1);
-
-  while (cursor <= last) {
-    const anchor = nthOccurrenceInMonth(cursor.getFullYear(), cursor.getMonth(), anchorDayOfWeek, anchorNth);
-    if (anchor) {
-      const candidate = new Date(anchor);
-      candidate.setDate(candidate.getDate() + offsetDays);
-      if (candidate >= start && candidate <= end) {
-        dates.push(toISODate(candidate));
-      }
-    }
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-  return dates;
-}
-
 export interface GenerateResult {
   created: number;
   skippedExisting: number;
@@ -297,21 +172,7 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
   let skippedExisting = 0;
 
   for (const rule of rules) {
-    let candidateDates: string[];
-    if (rule.cadence === "weekly") {
-      candidateDates = weeklyDates(today, through, rule.day_of_week ?? 0);
-    } else if (rule.cadence === "nth_weekday") {
-      candidateDates = nthWeekdayDates(today, through, rule.day_of_week ?? 0, rule.nth_occurrence ?? 1);
-    } else {
-      candidateDates = relativeDates(
-        today,
-        through,
-        rule.anchor_day_of_week ?? 0,
-        rule.anchor_nth_occurrence ?? 1,
-        rule.offset_days ?? 0
-      );
-    }
-
+    const candidateDates = candidateDatesForCadence(today, through, rule.cadence, rule);
     if (candidateDates.length === 0) continue;
 
     const { data: existing } = await supabase

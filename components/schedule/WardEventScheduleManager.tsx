@@ -1,30 +1,93 @@
 "use client";
 
-import { useState } from "react";
-import type { ScheduleRule } from "@/lib/data/meeting-schedule";
-import { RuleForm } from "@/components/schedule/AddRuleForm";
-import { describeCadence } from "@/components/schedule/CadenceFields";
-
-function formatTime(t: string) {
-  const [h, m] = t.split(":").map(Number);
-  const period = h >= 12 ? "PM" : "AM";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
-}
+import { useActionState, useEffect, useState } from "react";
+import type { WardEventScheduleRule } from "@/lib/data/ward-event-schedule";
+import { CadenceFields, CADENCE_SELECT_CLASS, describeCadence } from "@/components/schedule/CadenceFields";
 
 type FormResult = { success?: true; error?: string };
-type Mode = { kind: "blank" } | { kind: "copy"; rule: ScheduleRule } | { kind: "edit"; rule: ScheduleRule };
+const initialFormState: FormResult = {};
+type Mode = { kind: "blank" } | { kind: "copy"; rule: WardEventScheduleRule } | { kind: "edit"; rule: WardEventScheduleRule };
 
-export function RulesManager({
+function RuleForm({
+  initialValues,
+  submitLabel,
+  onSubmit,
+  onSuccess,
+  onCancel,
+}: {
+  initialValues?: Partial<WardEventScheduleRule>;
+  submitLabel: string;
+  onSubmit: (formData: FormData) => Promise<FormResult>;
+  onSuccess: () => void;
+  onCancel?: () => void;
+}) {
+  const [state, formAction, pending] = useActionState(
+    async (_prev: FormResult, formData: FormData) => onSubmit(formData),
+    initialFormState
+  );
+
+  useEffect(() => {
+    if (state.success) onSuccess();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.success]);
+
+  return (
+    <form action={formAction} className="mt-6 flex flex-col gap-3 border-t border-rule/60 pt-6">
+      <input
+        type="text"
+        name="title"
+        required
+        placeholder="Title (e.g. Ward Temple Night)"
+        defaultValue={initialValues?.title}
+        className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <CadenceFields initialValues={initialValues} defaultCadence={initialValues?.cadence ?? "weekly"} />
+        <input
+          type="time"
+          name="event_time"
+          defaultValue={initialValues?.event_time?.slice(0, 5) ?? ""}
+          className={CADENCE_SELECT_CLASS}
+        />
+      </div>
+
+      <input
+        type="text"
+        name="location"
+        placeholder="Location (optional)"
+        defaultValue={initialValues?.location ?? ""}
+        className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+      />
+
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-fit rounded-md bg-ink px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+        >
+          {pending ? "Saving..." : submitLabel}
+        </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-xs text-slate hover:text-ink">
+            Cancel
+          </button>
+        )}
+      </div>
+
+      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+    </form>
+  );
+}
+
+export function WardEventScheduleManager({
   rules,
-  meetingTypes,
   onAdd,
   onUpdate,
   onDelete,
   onToggle,
 }: {
-  rules: ScheduleRule[];
-  meetingTypes: { slug: string; name: string }[];
+  rules: WardEventScheduleRule[];
   onAdd: (formData: FormData) => Promise<FormResult>;
   onUpdate: (id: string, formData: FormData) => Promise<FormResult>;
   onDelete: (id: string) => Promise<FormResult>;
@@ -43,13 +106,11 @@ export function RulesManager({
       <h2 className="font-display text-xl">Cadence</h2>
 
       {rules.length > 0 && (
-        <table className="mt-4 w-full min-w-[640px] text-sm">
+        <table className="mt-4 w-full min-w-[520px] text-sm">
           <thead>
             <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
-              <th className="pb-2 pr-3">Meeting Type</th>
+              <th className="pb-2 pr-3">Title</th>
               <th className="pb-2 pr-3">Schedule</th>
-              <th className="pb-2 pr-3">Time</th>
-              <th className="pb-2 pr-3">Duration</th>
               <th className="pb-2 pr-3">Active</th>
               <th className="pb-2" />
             </tr>
@@ -57,10 +118,8 @@ export function RulesManager({
           <tbody>
             {rules.map((r) => (
               <tr key={r.id} className="border-b border-rule/40 last:border-0">
-                <td className="py-2 pr-3 text-ink">{r.meeting_type_name}</td>
+                <td className="py-2 pr-3 text-ink">{r.title}</td>
                 <td className="py-2 pr-3 text-slate">{describeCadence(r)}</td>
-                <td className="py-2 pr-3 text-slate">{formatTime(r.time_of_day)}</td>
-                <td className="py-2 pr-3 text-slate">{r.duration_minutes} min</td>
                 <td className="py-2 pr-3">
                   <button
                     type="button"
@@ -108,7 +167,6 @@ export function RulesManager({
 
       <RuleForm
         key={formKey}
-        meetingTypes={meetingTypes}
         initialValues={mode.kind === "blank" ? undefined : mode.rule}
         submitLabel={mode.kind === "edit" ? "Save Changes" : "Add Rule"}
         onSubmit={(formData) => (mode.kind === "edit" ? onUpdate(mode.rule.id, formData) : onAdd(formData))}

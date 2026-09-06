@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 033
+## Current migration number: 034
 
 Migrations `022`–`025` confirmed run by the user (2026-09-04/05).
 Migration `025` (`apply_rotation_assignment` Postgres function, see
@@ -34,9 +34,11 @@ cleanup, see below and Known open items) confirmed run and verified
 rotations' cycle order and next-up pointer match exactly (Ward Council
 confirmed to no longer list any Bishopric member); all 21 existing
 Sacrament Meetings' `conducting` now correctly cycles Bishop/1st/2nd
-Counselor by month. Next migration should be `034_*.sql` -- **confirm
-with the user first**, same as always. Migrations are plain `.sql`
-files at
+Counselor by month. Migration `034` (Youth Activity / Ward Event
+cadence rules, see Known open items) written 2026-09-05, **not yet
+confirmed run by the user**. Next migration after that should be
+`035_*.sql` -- **confirm with the user first**, same as always.
+Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -84,7 +86,9 @@ before.
   forward.
 - **Assignment Rotations** (`/rotations`): 7 elements rotate automatically
   (Conducting, Opening/Closing Prayer ×3 meeting types, Chorister, Organist,
-  Spiritual Thought, Handbook Training presenter). Speaker/Youth Speaker and
+  Spiritual Thought ×3 meeting types (Bishopric/Ward Council/Youth Council,
+  the latter two added migration `033`), Handbook Training presenter).
+  Speaker/Youth Speaker and
   Presiding/Pianist intentionally do NOT rotate — `/speaker-prayer-history`
   is the manual tool that compensates for that. A rotation's "next" pointer
   advances once per meeting *created*, not per save, so a one-off override
@@ -98,7 +102,12 @@ before.
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`
   (e.g. "2 days after the 3rd Sunday" — computed from the anchor each month,
   not stored as its own fixed nth-weekday, since which numbered weekday that
-  lands on varies month to month).
+  lands on varies month to month). The cadence date-math and shared
+  cadence-picker UI live in `lib/data/cadence.ts` /
+  `components/schedule/CadenceFields.tsx` (extracted migration `034`) so
+  Youth Activity Schedule and Ward Event Schedule (see below) reuse the
+  exact same logic rather than a second, drifted copy of the month-
+  boundary handling.
 - **RLS:** enabled on every table (app uses the anon key everywhere, not
   service role). Most tables: any authenticated user, app code already
   gates by role. A handful of public-facing tables (announcements,
@@ -186,16 +195,22 @@ before.
     column (or two) on `meetings` rather than overloading `stage`, since
     `stage` tracks how far along the program is, not whether the meeting
     is happening at all. Lower priority than the auto-archive item.
-- **Cadence rules for Youth Activities / Ward Events.** (2026-09-04,
-  user's note was cut off mid-thought -- "We likely need" ... nothing
-  after) Wants the same kind of rule-based pre-scheduling `/meeting-
-  schedule` already does for meetings (weekly / nth-weekday / relative
-  cadence, a "Generate" action) applied to `youth_activities` and
-  `ward_events` too, so recurring activities/events don't have to be
-  entered one at a time. Likely reuses the same cadence-shape concept
-  (see Meeting Schedule above) rather than inventing a new one, but
-  needs the rest of the requirement (whatever came after "We likely
-  need") before designing -- ask when picked up.
+- ~~**Cadence rules for Youth Activities / Ward Events.**~~ Done
+  (2026-09-05, migration `034`, **not yet confirmed run by the user**).
+  The 2026-09-04 note's missing "We likely need..." turned out to be
+  nothing more than the same mechanism, reused as-is -- confirmed with
+  the user rather than assumed. New `youth_activity_schedule_rules` /
+  `ward_event_schedule_rules` tables, same three cadence shapes, a
+  "Generate" action on each of `/youth-activities` and `/ward-events`
+  (not a new page -- folded into the existing management UI on each,
+  unlike `/meeting-schedule` which is separate because it spans multiple
+  meeting types). Gated by each page's own existing manage-roles (youth
+  leaders + bishopric for activities; communications specialist +
+  bishopric for events), not restricted to bishopric-only like Meeting
+  Schedule is. Cadence date-math and the cadence-picker UI were
+  extracted out of `lib/data/meeting-schedule.ts` into shared
+  `lib/data/cadence.ts` / `components/schedule/CadenceFields.tsx` so all
+  three features share one implementation.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

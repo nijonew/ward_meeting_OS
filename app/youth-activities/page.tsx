@@ -1,12 +1,22 @@
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
+import { getYouthActivityScheduleRules } from "@/lib/data/youth-activity-schedule";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
 import {
   addYouthActivity,
   setYouthActivityStatus,
   deleteYouthActivity,
 } from "@/app/youth-activities/actions";
+import {
+  addScheduleRule,
+  updateScheduleRule,
+  deleteScheduleRule,
+  toggleScheduleRuleActive,
+  generateActivities,
+} from "@/app/youth-activities/schedule-actions";
+import { YouthActivityScheduleManager } from "@/components/schedule/YouthActivityScheduleManager";
+import { GenerateForm } from "@/components/schedule/GenerateForm";
 
 const MANAGE_ROLES = [
   "bishopric",
@@ -32,6 +42,7 @@ export default async function YouthActivitiesPage() {
   const canManage = Boolean(profile?.role && MANAGE_ROLES.includes(profile.role));
 
   const activities = await getYouthActivities();
+  const scheduleRules = canManage ? await getYouthActivityScheduleRules() : [];
 
   const add = async (formData: FormData) => {
     "use server";
@@ -229,6 +240,29 @@ export default async function YouthActivitiesPage() {
             </button>
           </form>
         </div>
+      )}
+
+      {canManage && (
+        <>
+          <YouthActivityScheduleManager
+            rules={scheduleRules}
+            onAdd={addScheduleRule}
+            onUpdate={updateScheduleRule}
+            onDelete={deleteScheduleRule}
+            onToggle={toggleScheduleRuleActive}
+          />
+          <p className="-mt-3 text-[11px] text-slate/60">
+            For a recurring activity like a weekly Wednesday night, add one rule here instead of
+            entering it week by week. Use Edit to change a rule in place, or Copy to start a new
+            one from its values.
+          </p>
+          <GenerateForm
+            action={generateActivities}
+            heading="Generate Activities"
+            itemLabelSingular="activity"
+            itemLabelPlural="activities"
+          />
+        </>
       )}
     </main>
   );
