@@ -46,10 +46,11 @@ export default async function PlanningViewPage({
 }) {
   const { id: meetingId } = await params;
 
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
   if (!user) {
     redirect("/login");
   }
+  const canEditRabnm = profile?.role === "bishopric";
 
   const meeting = await getMeetingById(meetingId);
   if (!meeting) {
@@ -213,7 +214,13 @@ export default async function PlanningViewPage({
       )}
 
       {isSacrament && sacramentData && (
-        <RabnmSection meetingId={meetingId} items={sacramentData.rabnm} people={people} callings={callings} />
+        <RabnmSection
+          meetingId={meetingId}
+          items={sacramentData.rabnm}
+          people={people}
+          callings={callings}
+          canEdit={canEditRabnm}
+        />
       )}
 
       {isBishopric && bishopricData && (

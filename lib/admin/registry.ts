@@ -318,7 +318,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
 
   sacrament_rabnm: {
     table: "sacrament_rabnm",
-    label: "Releases / New Callings / Records",
+    label: "Recognitions / Advancements / Baptisms / New Members",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },

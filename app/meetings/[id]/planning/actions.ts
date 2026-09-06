@@ -2,9 +2,28 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { ASSIGNMENT_ROLES, SPEAKER_SLOTS_ADULT, SPEAKER_SLOTS_YOUTH } from "@/lib/data/sacrament-constants";
 
 type ActionResult = { success: true } | { error: string };
+
+/**
+ * RABNM entries (recognitions/advancements/baptisms/new members) are
+ * restricted to the Bishopric role -- ward clerk and executive secretary
+ * are folded into that shared role today (see PROJECT_CONTEXT.md), so
+ * this is the closest available scoping. Re-checked here rather than
+ * only gating the UI, matching the enforcement-boundary pattern used by
+ * every other role-gated action in this app (e.g.
+ * app/admin/[table]/actions.ts). Nothing else in this file is
+ * role-gated -- this restriction is specific to RABNM per the user's
+ * decision, not a change to who can edit the rest of Sacrament Meeting
+ * planning.
+ */
+async function requireBishopric(): Promise<ActionResult | null> {
+  const { profile } = await getSessionUser();
+  if (profile?.role !== "bishopric") return { error: "Not authorized." };
+  return null;
+}
 
 export async function savePlanningInfo(meetingId: string, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
@@ -129,6 +148,9 @@ export async function saveYouthSpeakers(meetingId: string, formData: FormData): 
 }
 
 export async function addRabnmItem(meetingId: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requireBishopric();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const type = String(formData.get("type") ?? "");
@@ -175,6 +197,9 @@ export async function addRabnmItem(meetingId: string, formData: FormData): Promi
 }
 
 export async function deleteRabnmItem(rabnmId: string, meetingId: string): Promise<ActionResult> {
+  const denied = await requireBishopric();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("sacrament_rabnm").delete().eq("id", rabnmId);
 

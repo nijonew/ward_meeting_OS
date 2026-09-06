@@ -226,21 +226,26 @@ or note partial progress) as each is picked up.
    for Sacrament Meeting before this migration, meaning
    `MusicArrangeSection`/both `SpeakersForm`s never rendered in
    production at all until now.
-4. **Releases/New Callings/Records (`sacrament_rabnm`).** Rename to
-   "Recognitions/Advancements/Baptisms/New Members". Purpose: ward
-   business items outside of callings, for inclusion in the meeting's
-   conducting view. The ward clerk and executive secretary need to be
-   able to add these (that's the typical/primary path), with the
-   bishopric also able to; **note:** "clerk"/"exec sec" are folded into
-   the single shared `bishopric` app role today (see Architecture above)
-   with no way to distinguish them for a narrower permission — may need
-   its own decision if per-person (not per-role) add access matters here.
-   Needs a real per-type form design: which fields are required/shown
-   changes depending on the record type (release vs. new calling vs.
-   baby blessing vs. baptism vs. new member vs. mission call vs.
-   Aaronic Priesthood, etc. — see `RABNM_TYPES` in
-   `lib/data/sacrament-constants.ts` for the current type list), so this
-   isn't a simple flat-column admin grid like the others.
+4. ~~**Releases/New Callings/Records (`sacrament_rabnm`).**~~ Done
+   (2026-09-05): renamed to "Recognitions / Advancements / Baptisms /
+   New Members" everywhere (Table Admin label, planning-view heading).
+   Turned out to already be included in the conducting script
+   (`lib/data/conducting.ts`'s `rabnmPrompt`) -- that part needed no
+   work. Access restricted to the `bishopric` role (ward clerk/exec sec
+   are folded into it, per the user's decision -- "may need its own
+   decision" resolved as: not worth a finer-grained role split right
+   now) -- previously **any logged-in user could add/remove these with
+   no gating at all**, re-checked in the server actions themselves
+   (`addRabnmItem`/`deleteRabnmItem` in
+   `app/meetings/[id]/planning/actions.ts`), matching the
+   enforcement-boundary pattern used everywhere else in this app; the
+   add form and Remove buttons are hidden in the UI for non-bishopric
+   viewers too. `RabnmSection.tsx` is now a client component: the
+   Calling picker only shows for `release`/`new_calling`/
+   `presidency_change` (the only types that actually use a calling in
+   the conducting script) -- Person(s)/Detail/Event Date stayed visible
+   for every type per the user's decision, since those aren't confusing
+   the way an irrelevant Calling picker was.
 5. **Sacrament Speakers (adult/youth) — rename + re-scope.** *If* these
    tables continue to exist (user's own qualifier — not fully committed
    yet): rename to "Sacrament Meeting Speakers (Adult)" / "(Youth)".
