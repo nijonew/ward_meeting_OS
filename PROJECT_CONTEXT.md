@@ -660,12 +660,32 @@ avoid confusing the two.
 - **Suggestion, not yet built (2026-09-06): a Conference Schedule
   page.** The user's own framing ("I would also like to suggest") --
   recorded only, no build started. One place to enter Stake Conference
-  / General Conference dates that then automatically:
-  1. Shows every scheduled meeting (not just Sacrament Meeting --
-     "inform all scheduled meetings") as cancelled for that Sunday.
-  2. Shows youth activities cancelled for the week leading up to
-     General Conference specifically (as stated -- not clearly said to
-     also apply to Stake Conference; don't assume it does).
+  / General Conference date ranges (a conference spans more than one
+  day, so this needs start+end date, not a single date) that then
+  automatically cancels affected rows:
+  1. **General Conference:** every meeting (any type) on the conference
+     dates themselves, *and* every meeting in the week leading up to
+     it, *and* youth activities in that same lead-up week -- all
+     cancelled. The user's own words, given directly: "every meeting
+     the dates of the conference would be cancelled, as well as any
+     meeting in the week leading up to the conference" -- confirms this
+     is broader than the original ask (which only mentioned youth
+     activities for the lead-up week); any meeting in that week is
+     included too, not just activities.
+  2. **Stake Conference:** every meeting scheduled on the conference
+     dates themselves -- no lead-up week, and youth activities aren't
+     mentioned for Stake Conference at all. **Two remaining assumptions,
+     not yet confirmed by the user -- flag before building, don't just
+     build to these:**
+     - Whether Stake Conference should *also* cancel youth activities
+       falling on its dates (the user described General Conference's
+       effect on meetings and activities separately and explicitly,
+       then only mentioned "meetings" for Stake Conference -- reads as
+       deliberate, but worth a direct confirmation rather than assumed).
+     - Exact date-math for "the week leading up to" General Conference
+       -- current best guess is the 7 calendar days immediately before
+       the conference's start date, not a preceding Sunday-to-Saturday
+       calendar week.
   Real pieces already in place this could build on rather than
   reinvent: `special_format` already has `stake_conference`/
   `general_conference` values (migration `033`, seeded with a single
@@ -675,20 +695,20 @@ avoid confusing the two.
   `cancelled` at all. `meetings.cancelled`/`cancellation_note`
   (migration `037`) and `youth_activities.cancelled`/`cancellation_note`
   (migration `032`) already exist and are already "shown, not hidden"
-  everywhere they're displayed -- a conference-dates table could very
-  plausibly just be the thing that *sets* those existing flags in bulk
-  across every affected row for the relevant date range, rather than
-  needing a parallel cancellation concept of its own. Needs real design
-  before building: a new table for conference dates (with an
-  admin page/section to manage them), exactly which meeting types get
-  auto-cancelled for the conference Sunday itself, the precise "week
-  leading up to" date-math (does "week" mean the preceding Sunday-to-
-  Saturday, the preceding 7 days, the preceding Wednesday only since
-  that's the only youth-activity night, etc.), and whether this needs
-  to run as a one-time write when a conference date is entered (simple,
-  but a later-added meeting/activity in that window wouldn't get
-  caught) or as a live computed check everywhere cancelled status is
-  read (more robust, more invasive).
+  everywhere they're displayed -- a conference-dates table can just be
+  the thing that *sets* those existing flags in bulk across every
+  affected row, rather than needing a parallel cancellation concept of
+  its own. Leaning toward implementing the actual cancellation as a
+  lazy sweep (same pattern as `autoArchivePastMeetings` in
+  `lib/data/meetings.ts`) run whenever the relevant list is read, rather
+  than a one-time write at the moment a conference date is saved -- a
+  sweep also catches a meeting/activity added *after* the conference
+  date was entered, which a one-time write would miss. The sweep should
+  only ever *add* a cancellation, never auto-remove one (e.g. if a
+  conference's dates are later corrected or the row deleted) -- an
+  admin can always manually un-cancel via the existing per-row controls,
+  which avoids needing to track "cancelled by which conference" just to
+  know what to safely reverse.
 - **HIGH PRIORITY, not yet built (2026-09-06): split "My meetings" into
   per-meeting-type tiles.** The user's own words: recorded as an
   upcoming architecture change, explicitly not a build-now instruction
