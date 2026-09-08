@@ -227,31 +227,20 @@ exclusive access.
       for that role is left untouched, same "override wins, pointer
       only advances for what's actually applied" rule used everywhere
       else in this app.
-      - **Known limitation, flagged by the user immediately after this
-        shipped, NOT yet handled by either `pushRotationToUpcomingMeetings`
-        or `applyRotationsToNewMeeting`:** Bishopric Meeting has a
-        recurring exception the push (and the original at-creation-time
-        assignment) doesn't know about. The user's own words: "the
-        tuesday meeting that follows the shortened sunday meeting on
-        the third sunday should have the same rotations assigned as
-        the previous sunday because those meetings are shortened and
-        often many of the assignments are skipped until there is more
-        time in the tuesday meeting." This is very likely the exact
-        Bishopric Meeting instance already described as a `relative`
-        Meeting Schedule cadence example elsewhere in this file ("2
-        days after the 3rd Sunday"), which would make it straightforward
-        to *identify* programmatically (that Tuesday's `meetings` row
-        has a date exactly 2 days after a Sunday matching "3rd Sunday of
-        the month," itself a Bishopric Meeting). What's genuinely
-        unresolved and needs the user's input before building anything,
-        not a guess: exactly which roles carry over from the shortened
-        Sunday to the following Tuesday ("many... are skipped," not
-        stated as all), whether the rotation pointer should advance at
-        all for the Tuesday occurrence (copying Sunday's person rather
-        than pulling "next" would double-count that person's turn across
-        two meetings unless the pointer is deliberately held), and
-        whether "the previous Sunday" always means the immediately
-        preceding Bishopric Meeting or specifically the 3rd Sunday's.
+      - **Considered, then explicitly declined by the user (2026-09-08)
+        -- not a gap, don't revisit without new instruction:** the user
+        initially described a possible exception where the Tuesday
+        meeting following a shortened 3rd-Sunday Bishopric Meeting would
+        copy that Sunday's rotation assignments rather than rotate on
+        its own. After being asked the specific questions needed to
+        design it (which roles would carry over, snapshot-vs-live-copy,
+        whether the rotation pointer should hold), the user changed
+        their mind: "let's not make a rule on this... we don't need to
+        hold the rotation and it can be treated like any other meeting
+        and rotate as normal." No special-case behavior exists or is
+        planned for this Tuesday meeting -- it rotates exactly like any
+        other Bishopric Meeting occurrence, same as before this was
+        ever raised.
 - **Meeting Schedule** (`/meeting-schedule`): cadence rules
   (`meeting_schedule_rules`) drive a "Generate Meetings" action. Three
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`
