@@ -10,7 +10,7 @@ export interface MeetingMusicStatus {
   extra_music_count: number; // intermediate hymns + musical numbers
   speakers_confirmed: number;
   speakers_total_slots_used: number; // slots with a speaker or guest name entered, any confirm status
-  prayers_confirmed: number; // out of 2
+  prayers_assigned: number; // out of 2 -- sacrament_assignments has no confirmed column (migration 041); a row existing means it's filled
 }
 
 /**
@@ -45,7 +45,7 @@ export async function getUpcomingMusicCoordination(limit = 8): Promise<MeetingMu
     supabase.from("sacrament_music").select("meeting_id, type").in("meeting_id", meetingIds),
     supabase
       .from("sacrament_assignments")
-      .select("meeting_id, role, confirmed")
+      .select("meeting_id, role")
       .in("meeting_id", meetingIds)
       .in("role", PRAYER_ROLES),
     supabase
@@ -59,7 +59,7 @@ export async function getUpcomingMusicCoordination(limit = 8): Promise<MeetingMu
   ]);
 
   const music = (musicRes.data ?? []) as { meeting_id: string; type: string }[];
-  const assignments = (assignmentsRes.data ?? []) as { meeting_id: string; role: string; confirmed: boolean }[];
+  const assignments = (assignmentsRes.data ?? []) as { meeting_id: string; role: string }[];
   const adults = (adultsRes.data ?? []) as {
     meeting_id: string;
     speaker_id: string | null;
@@ -91,7 +91,7 @@ export async function getUpcomingMusicCoordination(limit = 8): Promise<MeetingMu
       extra_music_count: extraMusic.length,
       speakers_confirmed: meetingSpeakers.filter((row) => row.confirmed).length,
       speakers_total_slots_used: meetingSpeakers.length,
-      prayers_confirmed: meetingPrayers.filter((row) => row.confirmed).length,
+      prayers_assigned: meetingPrayers.length,
     };
   });
 }

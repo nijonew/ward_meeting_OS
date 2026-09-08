@@ -74,7 +74,7 @@ export default async function MusicCoordinationPage() {
                     ok={r.speakers_confirmed >= 2}
                     label={`Speakers ${r.speakers_confirmed} confirmed`}
                   />
-                  <StatusBadge ok={r.prayers_confirmed === 2} label={`Prayers ${r.prayers_confirmed}/2 confirmed`} />
+                  <StatusBadge ok={r.prayers_assigned === 2} label={`Prayers ${r.prayers_assigned}/2 assigned`} />
                 </div>
               </Link>
             </li>

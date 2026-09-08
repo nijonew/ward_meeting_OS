@@ -18,8 +18,12 @@ export interface DueEntry {
 /**
  * Every prayer/speaker assignment from ARCHIVED sacrament meetings only
  * -- meetings still in planning/ready/live can still change, so they're
- * excluded until the record is final. Confirmed=false rows are excluded
- * too (never actually happened as planned).
+ * excluded until the record is final. For speakers, confirmed=false rows
+ * are excluded too (never actually happened as planned) -- prayers have
+ * no equivalent flag since sacrament_assignments.confirmed was dropped
+ * (migration 041, 2026-09-08): an archived meeting's prayer assignment
+ * is taken as having happened once it's filled, same as everything else
+ * on that table.
  */
 export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
   const supabase = await createClient();
@@ -44,10 +48,9 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
   const [assignmentsRes, adultsRes, youthRes, peopleRes] = await Promise.all([
     supabase
       .from("sacrament_assignments")
-      .select("meeting_id, role, assigned_to_id, confirmed")
+      .select("meeting_id, role, assigned_to_id")
       .in("meeting_id", meetingIds)
-      .in("role", ["opening_prayer", "closing_prayer"])
-      .eq("confirmed", true),
+      .in("role", ["opening_prayer", "closing_prayer"]),
     supabase
       .from("sacrament_speakers_adults")
       .select("meeting_id, speaker_id, guest_speaker_name, topic, confirmed")

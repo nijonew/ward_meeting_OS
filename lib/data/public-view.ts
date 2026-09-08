@@ -55,8 +55,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     supabase
       .from("sacrament_assignments")
       .select("role, assigned_to_id")
-      .eq("meeting_id", meetingId)
-      .eq("confirmed", true),
+      .eq("meeting_id", meetingId),
     supabase
       .from("sacrament_speakers_adults")
       .select("slot, speaker_id, guest_speaker_name, topic")

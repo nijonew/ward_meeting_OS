@@ -15,7 +15,6 @@ export interface PlanningInfo {
 export interface AssignmentRow {
   role: string;
   assigned_to_id: string | null;
-  confirmed: boolean;
 }
 
 export interface SpeakerRow {
@@ -75,7 +74,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
       .maybeSingle(),
     supabase
       .from("sacrament_assignments")
-      .select("role, assigned_to_id, confirmed")
+      .select("role, assigned_to_id")
       .eq("meeting_id", meetingId),
     supabase
       .from("sacrament_speakers_adults")

@@ -61,7 +61,6 @@ export async function saveAssignmentGrid(
 
       if (assignedToId) {
         const row: Record<string, unknown> = { meeting_id: meetingId, role: roleKey, assigned_to_id: assignedToId };
-        if (table === "sacrament_assignments") row.confirmed = false;
         const { error: insertError } = await supabase.from(table).insert(row);
         if (insertError) return { error: insertError.message };
       }

@@ -192,7 +192,6 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("bishopric-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...BISHOPRIC_ASSIGNMENT_ROLES] },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
-      { column: "confirmed", label: "Confirmed", type: "boolean" },
     ],
   },
 
@@ -289,7 +288,6 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
-      { column: "confirmed", label: "Confirmed", type: "boolean" },
     ],
   },
 

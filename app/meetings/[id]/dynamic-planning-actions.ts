@@ -8,9 +8,12 @@ type ActionResult = { success: true } | { error: string };
 /**
  * Saves a single person-role element (presiding, conducting, prayers,
  * chorister, organist, pianist, etc.) for one meeting. `table` decides
- * where it's written: sacrament meetings use sacrament_assignments
- * (which needs `confirmed` -- the public view filters on it); every other
- * meeting type reuses bishopric_assignments.
+ * where it's written: sacrament meetings use sacrament_assignments;
+ * every other meeting type reuses bishopric_assignments. Both tables
+ * have the same shape now that sacrament_assignments.confirmed was
+ * dropped (migration 041, 2026-09-08) -- an assignment counts as ready
+ * the moment it's filled; the meeting's own stage gates the public
+ * program.
  */
 export async function saveElementPersonRole(
   meetingId: string,
@@ -35,9 +38,6 @@ export async function saveElementPersonRole(
       role: elementKey,
       assigned_to_id: assignedToId,
     };
-    if (table === "sacrament_assignments") {
-      row.confirmed = formData.get("confirmed") === "on";
-    }
 
     const { error: insertError } = await supabase.from(table).insert(row);
     if (insertError) return { error: insertError.message };

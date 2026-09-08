@@ -55,12 +55,6 @@ export function PersonRoleField({
     <form action={save} className={FIELD_WRAPPER}>
       <p className={LABEL}>{label}</p>
       <PersonSelect name="assigned_to_id" people={people} defaultValue={value?.assigned_to_id ?? null} />
-      {table === "sacrament_assignments" && (
-        <label className="mt-2 flex items-center gap-1.5 text-xs text-slate">
-          <input type="checkbox" name="confirmed" defaultChecked={value?.confirmed ?? false} />
-          Confirmed
-        </label>
-      )}
       <button type="submit" className={SAVE_BTN}>
         Save
       </button>

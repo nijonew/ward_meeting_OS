@@ -268,7 +268,6 @@ export async function pushRotationToUpcomingMeetings(
     }
     const personId = members[nextIndex % members.length].person_id;
     const row: Record<string, unknown> = { meeting_id: meeting.id, role: rotation.element_key, assigned_to_id: personId };
-    if (table === "sacrament_assignments") row.confirmed = false;
     const { error: insertError } = await supabase.from(table).insert(row);
     if (insertError) return { error: insertError.message };
     nextIndex = (nextIndex + 1) % members.length;
@@ -326,7 +325,7 @@ async function applyFixedSacramentRoles(
 
   for (const { role, personId } of roles) {
     if (!personId) continue;
-    await supabase.from("sacrament_assignments").insert({ meeting_id: meetingId, role, assigned_to_id: personId, confirmed: false });
+    await supabase.from("sacrament_assignments").insert({ meeting_id: meetingId, role, assigned_to_id: personId });
   }
 }
 

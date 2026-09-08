@@ -176,15 +176,18 @@ export async function seedPlannedElementsForMeeting(
 
 export interface RoleAssignmentValue {
   assigned_to_id: string | null;
-  confirmed: boolean;
 }
 
 /**
  * Person-role assignments for a meeting, keyed by role (== element key).
  * `table` picks which underlying table to read: sacrament meetings use
- * sacrament_assignments (which has a `confirmed` column consumed by the
- * public view); every other meeting type reuses bishopric_assignments
- * (meeting-agnostic despite the name -- see architecture notes).
+ * sacrament_assignments; every other meeting type reuses
+ * bishopric_assignments (meeting-agnostic despite the name -- see
+ * architecture notes). Both tables have the same shape now that
+ * sacrament_assignments.confirmed was dropped (migration 041, 2026-09-08)
+ * -- an assignment is treated as ready the moment it's filled, same as
+ * bishopric_assignments always worked; the meeting's own stage is what
+ * gates the public program, not a per-row flag.
  */
 export async function getRoleAssignments(
   meetingId: string,
@@ -192,17 +195,11 @@ export async function getRoleAssignments(
 ): Promise<Record<string, RoleAssignmentValue>> {
   const supabase = await createClient();
 
-  const { data } =
-    table === "sacrament_assignments"
-      ? await supabase.from(table).select("role, assigned_to_id, confirmed").eq("meeting_id", meetingId)
-      : await supabase.from(table).select("role, assigned_to_id").eq("meeting_id", meetingId);
+  const { data } = await supabase.from(table).select("role, assigned_to_id").eq("meeting_id", meetingId);
 
   const result: Record<string, RoleAssignmentValue> = {};
-  for (const row of (data ?? []) as { role: string; assigned_to_id: string | null; confirmed?: boolean }[]) {
-    result[row.role] = {
-      assigned_to_id: row.assigned_to_id,
-      confirmed: row.confirmed ?? true,
-    };
+  for (const row of (data ?? []) as { role: string; assigned_to_id: string | null }[]) {
+    result[row.role] = { assigned_to_id: row.assigned_to_id };
   }
   return result;
 }

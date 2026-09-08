@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 040
+## Current migration number: 041
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -49,8 +49,11 @@ reconstructed from both:
 - `040` (seeds `hymnal_songs` with the 1985 Hymnal and Hymns for Home
   and Church, completing Music Reference -- see Table Admin queue item
   2 below): still needs to be run.
+- `041` (drops `sacrament_assignments.confirmed`, re-defines
+  `apply_rotation_assignment` to match -- priority queue item, see Known
+  open items below): still needs to be run.
 
-Next migration should be `041_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `042_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -782,9 +785,11 @@ avoid confusing the two.
 bottom:** ~~unified sacrament-meeting planning environment~~ (done) ->
 ~~calling-based non-admin viewer~~ (done) -> ~~non-admin post-archive
 visibility~~ (done, came along with the viewer) -> ~~sortable Table
-Admin headers~~ (done, see Known open items above for detail) -> drop
-`confirmed` from rotation-assignment tables -> Music tile merge ->
-sign-out bug -> Teaching Calendar scope. Bishopric-side
+Admin headers~~ (done, see Known open items above for detail) -> ~~drop
+`confirmed` from rotation-assignment tables~~ (done, see Known open
+items above -- also surfaced a new, not-yet-scoped "print portal" idea,
+see that same entry) -> Music tile merge -> sign-out bug -> Teaching
+Calendar scope. Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed
@@ -999,12 +1004,51 @@ before guessing further.
   migration 038 (re)documents the DB-side check constraint explicitly
   (it predates this repo's migration history and was never captured in
   a file).
-- **Future: drop `confirmed` from the rotation-assignment tables**
-  (`sacrament_assignments`/`bishopric_assignments`). Noted by the user
-  2026-09-06 while hitting the role-check bug above -- not acted on yet,
-  just recorded so it isn't lost. Ask what should replace it (if
-  anything) before removing -- the public program currently reads
-  `confirmed` to decide what to print (see `lib/data/public-view.ts`).
+- ~~**Drop `confirmed` from the rotation-assignment tables.**~~ Done
+  2026-09-08 (migration `041`, still needs to be run). Turned out to
+  only ever exist on `sacrament_assignments` -- `bishopric_assignments`
+  never had this column (confirmed while tracing every read site; see
+  the bug fix noted just below). Asked the user what should replace it;
+  answer: "treat every assignment as ready once filled" -- exactly how
+  `bishopric_assignments` (Bishopric Meeting/Ward Council/Youth Council)
+  already worked, with no per-row confirm step at all. What now gates
+  the public program is the meeting's own stage (ready/live), per the
+  Vision & Intended Workflows section, not a second per-row flag.
+  Removed the "Confirmed" checkbox from `PersonRoleField`
+  (`components/planning/DynamicElementField.tsx`) for sacrament role
+  assignments, the `.eq("confirmed", true)` filter in
+  `lib/data/public-view.ts`, the `confirmed: false` writes on insert in
+  `lib/data/rotations.ts`/`app/rotations/actions.ts`/the
+  `apply_rotation_assignment` Postgres function (re-defined by migration
+  `041`), and the `confirmed` column from `sacrament_assignments` select
+  statements in `lib/data/meeting-elements.ts`, `sacrament-planning.ts`,
+  and `speaker-prayer-history.ts` (the last two would have started
+  erroring on an unknown column the moment the DB column was dropped, so
+  fixing them wasn't optional). Music Coordination's `prayers_confirmed`
+  readiness count is renamed `prayers_assigned` (now just "does a row
+  exist" instead of a separate confirm flag) -- `speakers_confirmed`
+  is untouched, since that reads `sacrament_speakers_adults/youth
+  .confirmed`, a distinct field on a different pair of tables that Table
+  Admin queue item 5 already decided to keep exactly as-is.
+  **Incidental bug found and fixed while tracing this:** Table Admin's
+  "Bishopric Meeting Assignment Rotation" grid (`bishopric_assignments`
+  in `lib/admin/registry.ts`) offered a "Confirmed" checkbox column that
+  never corresponded to a real column on that table at all -- editing it
+  would have errored (or silently done nothing, depending on how the
+  generic update path handles an unknown column). Removed; unrelated to
+  the still-unreproduced `/rotations` "server error" report below, which
+  is about the page failing to load, not a save failing on this grid.
+  **New idea raised while answering this, not yet scoped:** the user
+  suggested a standing, always-current print/preview view of the
+  sacrament program -- available to admins and whoever prints it, its
+  own template (not the day-of public page), ready once every element is
+  filled regardless of meeting stage. This is exactly the "sent file vs.
+  dedicated print portal" question the Vision & Intended Workflows
+  section flagged as undecided, and likely overlaps with the "printable"
+  lifecycle stage the user separately grouped under the larger
+  meeting-display redesign (items 4/10/12, deliberately deferred) --
+  don't start building this without checking with the user which of
+  those two conversations it belongs to.
 - **Bug report: sign-out doesn't seem to take effect.** (2026-09-06,
   not yet reproduced/fixed) Reviewed `app/auth/actions.ts`'s `signOut`
   (calls `supabase.auth.signOut()` then `redirect("/login")`) and
