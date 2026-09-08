@@ -385,16 +385,27 @@ conflict.
   design (generalized to every meeting type, not just Sacrament
   Meeting, per the user's explicit choice when reconciling this with a
   narrower alternative built in a separate parallel session).
-- "Ward business... handled in planning environments and imported into
-  the meeting by date" is partially true today, but scattered:
-  `calling_planning` pushes into `sacrament_rabnm` by date; Music/
-  Speakers/RABNM/Rotations/Planning can all be pre-planned against a
-  future date via Table Admin's calendar picker (`createIfMissing`) --
-  but there's no single unified "planning environment" surface, it's
-  spread across several separate Table Admin grids plus the live
-  per-meeting planning view. Whether that's fine or needs consolidating
-  is exactly the kind of question this section exists to settle before
-  more piecemeal work happens on it.
+- ~~No single unified "planning environment" surface -- scattered
+  across several Table Admin grids plus the live per-meeting planning
+  view.~~ **Resolved 2026-09-08** (top of the user's priority queue,
+  answered "fewer entry points, one screen per meeting" when asked
+  which direction to take this): each meeting's own Planning view
+  (`/meetings/[id]/planning`) was already functionally unifying Music,
+  Speakers, RABNM, Rotations, and Ward Business/Special Format for one
+  meeting -- the real problem was that Table Admin's six matching
+  sacrament tables (`sacrament_assignments`/`sacrament_music`/
+  `sacrament_planning`/`sacrament_rabnm`/`sacrament_speakers_adults/
+  youth`) looked like equally-valid everyday entry points sitting right
+  alongside it, `createIfMissing` calendar picker and all. `/admin` now
+  splits those six into their own "Sacrament Meeting Content" section
+  with an explicit note to use the meeting's own Planning view instead
+  for everyday work, and each of the six tables' own description says
+  the same ("raw-data fallback for troubleshooting or a bulk fix").
+  Nothing was removed -- Table Admin still works exactly as before for
+  the rare troubleshooting/bulk-fix case; `/meetings/new` +
+  `/dashboard` already cover "start planning a future date with no
+  meeting yet" without needing Table Admin's calendar-picker trick, so
+  there was no real capability gap to fill first.
 - No "printable" lifecycle stage or terminology exists today — current
   stages are `template → planning → review → ready → live → archived`.
   Where "printable" maps onto that chain (or whether it replaces part of
@@ -713,10 +724,11 @@ avoid confusing the two.
 ## Known open items
 
 **Current priority queue (set by the user 2026-09-08), work top to
-bottom:** unified sacrament-meeting planning environment -> calling-based
-non-admin viewer -> non-admin post-archive visibility -> sortable Table
-Admin headers -> drop `confirmed` from rotation-assignment tables ->
-Music tile merge -> sign-out bug -> Teaching Calendar scope. Bishopric-side
+bottom:** ~~unified sacrament-meeting planning environment~~ (done, see
+below) -> calling-based non-admin viewer -> non-admin post-archive
+visibility -> sortable Table Admin headers -> drop `confirmed` from
+rotation-assignment tables -> Music tile merge -> sign-out bug ->
+Teaching Calendar scope. Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed

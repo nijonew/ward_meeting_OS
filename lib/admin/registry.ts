@@ -283,6 +283,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   sacrament_assignments: {
     table: "sacrament_assignments",
     label: "Sacrament Meeting Rotations",
+    description:
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday assigning, use the applied-assignment grid at /rotations or that meeting's own Planning view instead.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
@@ -295,7 +297,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_music",
     label: "Sacrament Meeting Music",
     description:
-      "submitted_by is left out -- it's attribution for whoever (bishopric/music planner) entered the item, not something to reassign. status is left out too: every entry is now treated as approved the moment it's entered (see the live Music planning view), so there's nothing left to toggle here.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. submitted_by is left out -- it's attribution for whoever (bishopric/music planner) entered the item, not something to reassign. status is left out too: every entry is now treated as approved the moment it's entered (see the live Music planning view), so there's nothing left to toggle here.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...MUSIC_TYPES] },
@@ -312,7 +314,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_planning",
     label: "Sacrament Meeting Planning",
     description:
-      "Pick any upcoming Sunday, even one with no meeting yet -- it's created automatically when you save. Special Format actually changes which elements appear on that meeting's own planning view (its starting agenda is seeded from the matching default template at /admin/meeting-templates) -- changing it here after the fact doesn't re-seed elements already on the meeting.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. Pick any upcoming Sunday, even one with no meeting yet -- it's created automatically when you save. Special Format actually changes which elements appear on that meeting's own planning view (its starting agenda is seeded from the matching default template at /admin/meeting-templates) -- changing it here after the fact doesn't re-seed elements already on the meeting.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },
@@ -328,7 +330,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_rabnm",
     label: "Recognitions / Advancements / Baptisms / New Members",
     description:
-      "Matches the section already shown in each meeting's planning view. Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to the Bishopric role.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday use, add these from that meeting's own Planning view instead. Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to the Bishopric role.",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },
@@ -342,7 +344,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_speakers_adults",
     label: "Sacrament Meeting Speakers (Adult)",
     description:
-      "Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -359,7 +361,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_speakers_youth",
     label: "Sacrament Meeting Speakers (Youth)",
     description:
-      "Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },

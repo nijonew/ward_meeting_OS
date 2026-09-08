@@ -3,6 +3,38 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { ADMIN_TABLES } from "@/lib/admin/registry";
+import type { AdminTableConfig } from "@/lib/admin/types";
+
+// These overlap almost entirely with what each Sacrament Meeting's own
+// Planning view already renders in one place -- per the user's decision
+// (2026-09-08, "fewer entry points, one screen per meeting"), Table
+// Admin stays available for them as a raw-data fallback (troubleshooting,
+// a bulk fix) rather than the everyday way to plan a meeting, which is
+// why they're split into their own section below instead of the flat
+// list every other table gets.
+const SACRAMENT_CONTENT_TABLES = new Set([
+  "sacrament_assignments",
+  "sacrament_music",
+  "sacrament_planning",
+  "sacrament_rabnm",
+  "sacrament_speakers_adults",
+  "sacrament_speakers_youth",
+]);
+
+function TableList({ tables }: { tables: AdminTableConfig[] }) {
+  return (
+    <ul className="divide-y divide-rule rounded-lg border border-rule bg-card">
+      {tables.map((t) => (
+        <li key={t.table}>
+          <Link href={`/admin/${t.table}`} className="flex items-baseline justify-between px-6 py-4 hover:bg-paper">
+            <span className="font-medium text-ink">{t.label}</span>
+            {t.description && <span className="ml-4 truncate text-xs text-slate">{t.description}</span>}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default async function AdminIndexPage() {
   const { user, profile } = await getSessionUser();
@@ -17,7 +49,9 @@ export default async function AdminIndexPage() {
     );
   }
 
-  const tables = Object.values(ADMIN_TABLES);
+  const allTables = Object.values(ADMIN_TABLES);
+  const everydayTables = allTables.filter((t) => !SACRAMENT_CONTENT_TABLES.has(t.table));
+  const sacramentTables = allTables.filter((t) => SACRAMENT_CONTENT_TABLES.has(t.table));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -32,19 +66,24 @@ export default async function AdminIndexPage() {
         </p>
       </section>
 
-      {tables.length === 0 ? (
+      {everydayTables.length === 0 ? (
         <p className="text-sm text-slate">No tables configured yet.</p>
       ) : (
-        <ul className="divide-y divide-rule rounded-lg border border-rule bg-card">
-          {tables.map((t) => (
-            <li key={t.table}>
-              <Link href={`/admin/${t.table}`} className="flex items-baseline justify-between px-6 py-4 hover:bg-paper">
-                <span className="font-medium text-ink">{t.label}</span>
-                {t.description && <span className="ml-4 truncate text-xs text-slate">{t.description}</span>}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <TableList tables={everydayTables} />
+      )}
+
+      {sacramentTables.length > 0 && (
+        <section>
+          <h2 className="font-display text-xl">Sacrament Meeting Content</h2>
+          <p className="mt-1 text-xs text-slate">
+            Raw-data fallback for troubleshooting or a bulk fix &mdash; for everyday planning, open that
+            meeting&rsquo;s own Planning view instead. It already brings Music, Speakers, RABNM, and
+            Rotations together in one screen for that meeting.
+          </p>
+          <div className="mt-3">
+            <TableList tables={sacramentTables} />
+          </div>
+        </section>
       )}
 
       <section>
