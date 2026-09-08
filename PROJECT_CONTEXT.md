@@ -222,8 +222,9 @@ exclusive access.
       meeting of that type from that date forward, advancing the
       pointer once per meeting actually filled. Solves the real
       backlog case: a meeting created back when a rotation had zero
-      members (the still-not-merged empty-rotation-membership finding
-      elsewhere in this file) never got its assignment row written by
+      members (see the empty-rotation-membership finding -- the user is
+      populating real membership directly, 2026-09-08: "working on it")
+      never got its assignment row written by
       `applyRotationsToNewMeeting` at creation time, and the grid alone
       has no way to retroactively fill that blank. Only ever fills a
       currently-blank cell -- a meeting that already has an assignment
@@ -519,10 +520,12 @@ just a distinct verb for "notes, once someone reports on them later."
   sessions. Multiple admins in the same meeting would need to manually
   reload to see each other's notes appear. Supabase Realtime could
   cover this but nothing subscribes to live changes today.
-- **Action items can only be assigned to a person today**
-  (`meeting_action_items.assigned_to_id` is a single FK to `people`) —
-  no concept of assigning to an *organization* (a quorum, auxiliary,
-  class, etc.) exists in the schema at all.
+- ~~Action items can only be assigned to a person today, not an
+  organization.~~ **Decided 2026-09-08: not a gap.** The user's own
+  words: "let's eliminate this from the list. items should be assigned
+  to individuals." `meeting_action_items.assigned_to_id` staying a
+  single FK to `people` is the intended design, not a limitation to
+  fix.
 - ~~No distinct "view an archived meeting" experience exists.~~ --
   **built 2026-09-06**: `app/meetings/[id]/archived` renders the
   finalized agenda read-only (element order exactly as it was when
@@ -708,6 +711,27 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Current priority queue (set by the user 2026-09-08), work top to
+bottom:** unified sacrament-meeting planning environment -> calling-based
+non-admin viewer -> non-admin post-archive visibility -> sortable Table
+Admin headers -> drop `confirmed` from rotation-assignment tables ->
+Music tile merge -> sign-out bug -> Teaching Calendar scope. Bishopric-side
+duplicate free-text entry points, real-time notes sync, and the
+"printable" lifecycle stage are deliberately NOT in this queue -- the
+user grouped those three together as related to a larger, not-yet-detailed
+architecture change to how meetings are displayed generally ("less like
+a form and more like a condensed, easier to view format") -- don't
+start any of the three without that larger discussion happening first.
+**New, not yet triaged:** the user hit "This page couldn't load. A
+server error occurred." on what's believed to be `/rotations` (context:
+they'd gone back to recheck the Conducting-only-one-person
+investigation). Not reproduced yet -- no local Supabase credentials
+exist in this environment to run the dev server against production
+data, and a careful static re-read of `lib/data/rotations.ts`/
+`app/rotations/*` didn't turn up an obvious unguarded crash. Get the
+exact URL and, if possible, the real error from Vercel's function logs
+before guessing further.
 
 - ~~**Conference Schedule page.**~~ **Built, then generalized, 2026-09-06.**
   First built as a narrow General/Stake Conference-only feature, then
