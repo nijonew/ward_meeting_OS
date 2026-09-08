@@ -627,6 +627,29 @@ avoid confusing the two.
 
 ## Known open items
 
+- **HIGH PRIORITY, not yet built (2026-09-06): split "My meetings" into
+  per-meeting-type tiles.** The user's own words: recorded as an
+  upcoming architecture change, explicitly not a build-now instruction
+  -- don't start without confirming that's changed. Today, the landing
+  page's (`app/page.tsx`) "My meetings" section (any logged-in user) has
+  exactly one tile, "Meetings" -> `/dashboard`, and `/dashboard` itself
+  shows every meeting of every type on one flat list, oldest first (no
+  filter -- see `getUpcomingMeetings()`, `lib/data/meetings.ts`). The
+  user wants that single tile replaced with one tile *per meeting type*
+  directly in "My meetings" -- removing the now-redundant intermediate
+  tile -- which "would also declutter the list... that is currently a
+  hodgepodge of all meetings and all dates," i.e. each new tile should
+  lead to that type's own meetings only, not the shared flat list.
+  **Real open question to settle before building, not to assume:** which
+  roles should see which type tiles? "My meetings" today is gated only
+  to `{user}` (any logged-in account, no role check) -- but no
+  calling-based visibility into *which* meeting types a given non-admin
+  account should even see exists yet (`meeting_type_members` is
+  currently only read internally for rotation eligibility, never for
+  page-level access -- see the not-yet-built calling-based non-admin
+  viewer elsewhere in this file). Showing all four type tiles to every
+  logged-in user regardless of role is the simplest option, but may not
+  be what's wanted long-term once that viewer exists.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark
