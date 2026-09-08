@@ -38,8 +38,8 @@ reconstructed from both:
 - `035` (Youth Activity / Ward Event cadence rules -- renumbered from
   `034`): confirmed run.
 - `036` (corrected Primary Program/Christmas/Easter sacrament templates
-  per the user's review -- see Table Admin queue item 3 below): still
-  needs to be run.
+  per the user's review -- see Table Admin queue item 3 below):
+  confirmed run.
 
 Next migration should be `037_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
