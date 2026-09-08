@@ -41,10 +41,7 @@ export default async function CallingDetailPage({
       </Link>
 
       <div className="rounded-lg border border-rule bg-card p-6 sm:p-8">
-        <h1 className="font-display text-3xl leading-tight">
-          {calling.title_prefix ? `${calling.title_prefix} ` : ""}
-          {calling.name}
-        </h1>
+        <h1 className="font-display text-3xl leading-tight">{calling.name}</h1>
         <p className="mt-1 text-slate">
           Current holder: {calling.current_holder_name ?? "Vacant"}
         </p>

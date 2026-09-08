@@ -616,6 +616,24 @@ still right:**
   wasn't added now either, matching the "favorite grid format"
   simplicity principle -- flag if that turns out to matter in practice.
 
+**Bug found and fixed 2026-09-08, immediately after this rebuild
+shipped:** every calling-name display in the app (`/calling-planning`'s
+two Calling dropdowns and its "Ready to Announce" list, `/callings`'
+roster list, `/callings/[id]`'s heading) was rendering
+`${calling.title_prefix} ${calling.name}` -- e.g. "Bishop Bishop" or
+"President Relief Society President." Per the user: `title_prefix` is
+**how to address the calling's holder** ("Bishop [Nielsen]", "President
+[Johnson]"), not a prefix on the calling's own name at all -- concatenating
+it onto `calling.name` was simply wrong everywhere it was done, not a
+data problem to clean up. Fixed by dropping the `title_prefix`
+concatenation from all five display sites -- every calling name now
+shows as just `calling.name` alone. `title_prefix` itself is untouched
+in the schema, Table Admin's Callings grid, and the roster's "Add
+Calling" form (still capturable) -- it currently has **no correct
+usage anywhere in the app** (nothing combines it with a holder's name
+either), so it's real but unused data until/unless a future feature
+actually addresses someone by calling-title + name.
+
 ### Workflow / policy: Adding new people (privacy & data-usage stance)
 
 Deliberate policy, not just a workflow — the user weighed this and

@@ -80,7 +80,6 @@ export function CallingPlanningGridForm({
                   <select name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>
                     {callingOptions.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.title_prefix ? `${c.title_prefix} ` : ""}
                         {c.name}
                       </option>
                     ))}

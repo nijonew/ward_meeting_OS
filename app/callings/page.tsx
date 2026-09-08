@@ -70,10 +70,7 @@ export default async function CallingsListPage({
                 className="flex items-center justify-between gap-4 rounded-lg border border-rule bg-card p-4 transition-colors hover:bg-ink/5"
               >
                 <span>
-                  <span className="font-medium text-ink">
-                    {calling.title_prefix ? `${calling.title_prefix} ` : ""}
-                    {calling.name}
-                  </span>
+                  <span className="font-medium text-ink">{calling.name}</span>
                   {!calling.active && (
                     <span className="ml-2 text-xs uppercase tracking-wide text-slate">Inactive</span>
                   )}

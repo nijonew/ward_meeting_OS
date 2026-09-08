@@ -98,7 +98,6 @@ export default async function CallingPlanningPage({
               </option>
               {callingOptions.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.title_prefix ? `${c.title_prefix} ` : ""}
                   {c.name}
                 </option>
               ))}
@@ -144,10 +143,7 @@ export default async function CallingPlanningPage({
           <ul className="mt-4 flex flex-col gap-4">
             {readyToAnnounce.map((r) => (
               <li key={r.id} className="rounded-md border border-rule/60 p-4">
-                <p className="text-sm text-ink">
-                  {r.calling_title_prefix ? `${r.calling_title_prefix} ` : ""}
-                  {r.calling_name}
-                </p>
+                <p className="text-sm text-ink">{r.calling_name}</p>
                 <div className="mt-2">
                   <PushCallingForm
                     planningId={r.id}
