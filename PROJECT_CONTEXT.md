@@ -781,9 +781,10 @@ avoid confusing the two.
 **Current priority queue (set by the user 2026-09-08), work top to
 bottom:** ~~unified sacrament-meeting planning environment~~ (done) ->
 ~~calling-based non-admin viewer~~ (done) -> ~~non-admin post-archive
-visibility~~ (done, came along with the viewer) -> sortable Table Admin
-headers -> drop `confirmed` from rotation-assignment tables -> Music
-tile merge -> sign-out bug -> Teaching Calendar scope. Bishopric-side
+visibility~~ (done, came along with the viewer) -> ~~sortable Table
+Admin headers~~ (done, see Known open items above for detail) -> drop
+`confirmed` from rotation-assignment tables -> Music tile merge ->
+sign-out bug -> Teaching Calendar scope. Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed
@@ -974,11 +975,15 @@ before guessing further.
   overview across upcoming meetings). User wants a single tile for
   "sacrament meeting music planning" instead of these two -- exact
   merged behavior/routing not yet specified.
-- **Sortable column headers in Table Admin.** (2026-09-05, user's own
-  words: "future upgrade") Click a column heading in `AdminTableEditor`
-  to sort the grid by that column, presumably click-again to reverse.
-  Client-side only (re-sort the already-fetched `rows` array in
-  component state) -- doesn't need a schema or server change.
+- ~~**Sortable column headers in Table Admin.**~~ Done 2026-09-08:
+  `components/admin/AdminTableEditor.tsx` gained click-to-sort `<th>`
+  buttons (▲/▼ indicator, third click clears back to server/insertion
+  order) exactly as scoped -- purely client-side, sorting a `useMemo`'d
+  copy of the already-fetched `rows` prop, no schema or server change.
+  `select`/`foreign_key` columns sort by their displayed option label
+  (e.g. a person's name) rather than the raw id/UUID, falling back to
+  the raw value if a row's value has no matching option; blanks/nulls
+  always sort last regardless of direction.
 - ~~**Bug: `bishopric_assignments` role check violation.**~~ **Fixed
   2026-09-06** (migration `038`): Table Admin's "Bishopric Meeting
   Assignment Rotation" grid offered the full Sacrament Meeting role

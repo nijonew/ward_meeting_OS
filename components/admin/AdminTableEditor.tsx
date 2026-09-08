@@ -1,11 +1,28 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { AdminColumnConfig, AdminOption } from "@/lib/admin/types";
 import { MeetingDatePicker } from "./MeetingDatePicker";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type ActionResult = { success?: true; error?: string };
+type SortDirection = "asc" | "desc";
+
+/** Nulls/blanks always sort last regardless of direction -- a common
+ *  enough convention that "reversing" a sort doesn't also mean hunting
+ *  for blanks at the top. Numbers and booleans compare natively;
+ *  everything else (including dates/times, which are ISO strings) is a
+ *  locale-aware string compare with numeric awareness ("2" < "10"). */
+function compareValues(a: unknown, b: unknown): number {
+  const aBlank = a === null || a === undefined || a === "";
+  const bBlank = b === null || b === undefined || b === "";
+  if (aBlank && bBlank) return 0;
+  if (aBlank) return 1;
+  if (bBlank) return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "boolean" && typeof b === "boolean") return a === b ? 0 : a ? 1 : -1;
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+}
 
 const INPUT_CLASS = "w-full min-w-[120px] rounded border border-rule bg-paper px-2 py-1 text-xs text-ink";
 
@@ -41,6 +58,41 @@ export function AdminTableEditor({
   const [newRow, setNewRow] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [sort, setSort] = useState<{ column: string; direction: SortDirection } | null>(null);
+
+  const toggleSort = (columnKey: string) => {
+    setSort((prev) => {
+      if (!prev || prev.column !== columnKey) return { column: columnKey, direction: "asc" };
+      if (prev.direction === "asc") return { column: columnKey, direction: "desc" };
+      return null; // third click clears the sort, back to server/insertion order
+    });
+  };
+
+  // Client-side only, per the open item this closes: re-sort the already-
+  // fetched `rows` prop in place for display, nothing server-side or
+  // persisted. select/foreign_key columns sort by their displayed label
+  // (name, etc.) rather than the raw id, since sorting by UUID would be
+  // meaningless -- falls back to the raw value if no option matches.
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const column = columns.find((c) => c.column === sort.column);
+    if (!column) return rows;
+
+    let labels: Map<string, string> | null = null;
+    if (column.type === "select" || column.type === "foreign_key") {
+      const opts = column.type === "select" ? (column.options ?? []) : (fkOptions[column.column] ?? []);
+      labels = new Map(opts.map((o) => [o.value, o.label]));
+    }
+
+    const sorted = [...rows].sort((a, b) => {
+      const rawA = a[sort.column];
+      const rawB = b[sort.column];
+      const va = labels ? (labels.get(String(rawA)) ?? rawA) : rawA;
+      const vb = labels ? (labels.get(String(rawB)) ?? rawB) : rawB;
+      return compareValues(va, vb);
+    });
+    return sort.direction === "desc" ? sorted.reverse() : sorted;
+  }, [rows, sort, columns, fkOptions]);
 
   // No local copy of `rows`: onUpdate/onInsert/onDelete are server actions
   // called inside startTransition, so Next refreshes this route's props
@@ -130,14 +182,24 @@ export function AdminTableEditor({
           <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
             {columns.map((c) => (
               <th key={c.column} className="pb-2 pr-3">
-                {c.label}
+                <button
+                  type="button"
+                  onClick={() => toggleSort(c.column)}
+                  className="flex items-center gap-1 hover:text-ink"
+                  title="Sort by this column"
+                >
+                  {c.label}
+                  <span className="w-2.5 text-[9px]">
+                    {sort?.column === c.column ? (sort.direction === "asc" ? "▲" : "▼") : ""}
+                  </span>
+                </button>
               </th>
             ))}
             <th className="pb-2" />
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {sortedRows.map((row) => (
             <tr key={row.id} className="border-b border-rule/40 last:border-0">
               {columns.map((c) => (
                 <td key={c.column} className="py-2 pr-3">
