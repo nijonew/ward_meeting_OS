@@ -101,26 +101,67 @@ exclusive access.
   Sunday with no `meetings` row yet creates one automatically on save
   (with rotations applied), so planning can start against any date
   without running Generate Meetings first.
-- **Assignment Rotations** (`/rotations`): 7 elements rotate automatically
-  (Conducting, Opening/Closing Prayer ×3 meeting types, Chorister, Organist,
-  Spiritual Thought ×3 meeting types (Bishopric/Ward Council/Youth Council,
-  the latter two added migration `034`), Handbook Training presenter).
-  Speaker/Youth Speaker and
-  Presiding/Pianist intentionally do NOT rotate — `/speaker-prayer-history`
-  is the manual tool that compensates for that. A rotation's "next" pointer
-  advances once per meeting *created*, not per save, so a one-off override
-  doesn't skip anyone in future weeks. The assignment write and the
-  pointer advance happen atomically via the `apply_rotation_assignment`
-  Postgres function (migration `025`) — one RPC call per rotation, not
-  two separate writes — so a failure partway through can't desync the
-  pointer from what was actually assigned. Every rotation's member order
-  and "next up" pointer were calibrated against the ward's actual real
-  2026 rotation pattern (migration `034`) -- see that migration's
-  comments for the exact person-by-person cycles derived per rotation.
-  Separate and unrelated: `youth_activity_rotations`/
-  `youth_activity_rotation_members` (migration `032`) rotate plain-text
-  *groups* (not people) onto `youth_activities` rows on a fixed
-  nth-Wednesday cadence -- see Vision & Intended Workflows below.
+- **Assignment Rotations** (`/rotations`): two genuinely different
+  mechanisms, previously documented (and displayed on `/rotations`) as
+  if they were one, which turned out to be a real source of confusion
+  (see the 2026-09-06 investigation below):
+  - **Generic, `rotation_members`-driven** (6 elements): Opening/Closing
+    Prayer ×3 meeting types, Chorister, Organist, Spiritual Thought ×3
+    meeting types (Bishopric/Ward Council/Youth Council, the latter two
+    added migration `034`), Handbook Training presenter. A rotation's
+    "next" pointer advances once per meeting *created*, not per save, so
+    a one-off override doesn't skip anyone in future weeks. The
+    assignment write and the pointer advance happen atomically via the
+    `apply_rotation_assignment` Postgres function (migration `025`) —
+    one RPC call per rotation, not two separate writes. Every rotation's
+    member order and "next up" pointer were calibrated against the
+    ward's actual real 2026 rotation pattern (migration `034`).
+  - **Fixed by calling, no `rotation_members` list at all** (Presiding,
+    Conducting — Sacrament Meeting only): `applyFixedSacramentRoles`
+    (`lib/data/rotations.ts`) sets Presiding to whoever currently holds
+    the `Bishop` calling (never rotates), and Conducting by cycling
+    Bishop → Bishopric First Counselor → Bishopric Second Counselor
+    based on calendar month (`month % 3`) — reading each calling's
+    *current holder* fresh every time, not a stored member order. A
+    stale/unused `rotations` row can still exist for either (older
+    data, or an artifact of once being configured differently) —
+    `applyRotationsToNewMeeting` explicitly skips both for Sacrament
+    Meeting, so any such row is inert. `/rotations` now hides
+    `presiding`/`conducting` from the rotation-order cards entirely
+    (they had no real effect and looked like a normal editable rotation)
+    and explains the fixed-by-calling mechanism in its own note instead.
+  - Speaker/Youth Speaker/Pianist do not auto-assign at all —
+    `/speaker-prayer-history` is the manual tool that compensates for
+    Speaker/Youth Speaker specifically.
+  - **Investigated 2026-09-06** (user report: "conducting is only
+    pulling one person from the bishopric"): root cause not confirmed
+    without live DB access, but the most likely explanation is that the
+    `Bishopric First Counselor`/`Bishopric Second Counselor` callings
+    don't currently have a `current_holder_id` set in production (only
+    `Bishop` does) — `applyFixedSacramentRoles` silently skips inserting
+    an assignment when a calling has no holder, so 2 of every 3 months
+    would get no Conducting assignment at all rather than a wrong one.
+    Ask the user to check Table Admin → Callings for both counselor
+    callings' current holder before assuming anything else is wrong;
+    the new grid below (a `/rotations` addition) makes this immediately
+    visible without needing to check the database directly.
+  - Separate and unrelated: `youth_activity_rotations`/
+    `youth_activity_rotation_members` (migration `032`) rotate plain-text
+    *groups* (not people) onto `youth_activities` rows on a fixed
+    nth-Wednesday cadence -- see Vision & Intended Workflows below.
+  - **Applied-assignment grid** (`/rotations`, built 2026-09-06, the
+    user's own request): meetings down the Y axis, roles across the X
+    axis, a person-picker per cell -- reads/writes the exact same
+    `sacrament_assignments`/`bishopric_assignments` rows every other
+    view does, tabbed by meeting type, filtered to a "through date"
+    range. Per the user's framing ("the rotation order is secondary to
+    the actual applied order by meeting and all assignments"), this is
+    now the primary way to see and fix who's assigned to what,
+    regardless of whether that value came from a fixed calling order, a
+    rotation pointer, or a manual pick -- editing a cell never touches
+    any rotation's member order or pointer, so it can't desync future
+    meetings. The rotation-order cards below it remain for correcting
+    the *default* new meetings get seeded with.
 - **Meeting Schedule** (`/meeting-schedule`): cadence rules
   (`meeting_schedule_rules`) drive a "Generate Meetings" action. Three
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`
@@ -734,23 +775,13 @@ avoid confusing the two.
   Church remain unpopulated (fetch-heavy, ask before spending the
   WebFetch budget on it, especially Hymns for Home and Church since
   it's still being released in volumes).
-- **Feature request: pre-fill rotation Table Admin grids with every
-  upcoming meeting × role combination.** (2026-09-06, not built) The
-  user wants `/admin`'s "Sacrament Meeting Rotations"/"Bishopric
-  Meeting Assignment Rotation" grids to show a row for every applicable
-  role on every upcoming meeting up front (ready to just fill in
-  "Assigned To"), instead of only showing rows that already exist and
-  requiring "+ Add Row" one at a time for anything missing. The generic
-  Table Admin engine only ever renders real DB rows today -- synthesizing
-  "virtual" placeholder rows for missing combinations would be a real
-  engine feature, not a config tweak. Likely related: if rotation
-  membership is populated (see the empty-rotation-membership finding
-  logged under migration 025 above, on the not-yet-merged
-  `claude/project-workflow-review-226b91` branch), `applyRotationsToNewMeeting`
-  should already auto-create most of these rows at meeting-creation
-  time, which would reduce -- maybe eliminate -- the need for this UI
-  work; worth checking rotation membership state before building the
-  engine feature itself.
+- ~~**Feature request: pre-fill rotation grids with every upcoming
+  meeting × role combination.**~~ **Built 2026-09-06** as the
+  applied-assignment grid on `/rotations` (see the Assignment Rotations
+  architecture entry above) -- a bespoke page, not a Table Admin engine
+  feature, which sidesteps the "Table Admin only ever renders real DB
+  rows" limitation entirely: the grid always shows one row per upcoming
+  meeting whether or not an assignment row exists yet for it.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

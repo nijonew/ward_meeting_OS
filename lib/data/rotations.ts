@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import type { MeetingTypeSlug } from "@/lib/types";
 
 export interface RotationMember {
   id: string; // rotation_members row id
@@ -283,4 +284,124 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
       console.error(`applyRotationsToNewMeeting: rotation ${r.id} (${r.element_key}) failed:`, error.message);
     }
   }
+}
+
+// ---------------------------------------------------------------------
+// Applied-assignment grid (meetings × roles), per the user's own request
+// (2026-09-06): "the rotation order is secondary to the actual applied
+// order by meeting and all assignments." This reads/writes the exact
+// same per-meeting rows every other view does (sacrament_assignments/
+// bishopric_assignments) -- it's a different, more direct way to see
+// and edit them, not a new data source. It also happens to be the
+// clearest way to see whether Presiding/Conducting (fixed by calling,
+// not a rotation_members list -- see applyFixedSacramentRoles above)
+// are actually varying month to month, since those roles have no
+// membership list of their own to inspect on the regular /rotations
+// cards below.
+
+export interface GridColumn {
+  key: string;
+  label: string;
+}
+
+export interface GridCell {
+  assignedToId: string | null;
+  assignedToName: string | null;
+}
+
+export interface GridRow {
+  meetingId: string;
+  date: string;
+  cells: Record<string, GridCell>;
+}
+
+const GRID_COLUMNS_BY_TYPE: Record<MeetingTypeSlug, GridColumn[]> = {
+  "sacrament-meeting": [
+    { key: "presiding", label: "Presiding" },
+    { key: "conducting", label: "Conducting" },
+    { key: "chorister", label: "Chorister" },
+    { key: "organist", label: "Organist" },
+  ],
+  "bishopric-meeting": [
+    { key: "opening_prayer", label: "Opening Prayer" },
+    { key: "closing_prayer", label: "Closing Prayer" },
+    { key: "spiritual_thought", label: "Spiritual Thought" },
+    { key: "handbook_training", label: "Handbook Training" },
+  ],
+  "ward-council": [
+    { key: "opening_prayer", label: "Opening Prayer" },
+    { key: "closing_prayer", label: "Closing Prayer" },
+    { key: "spiritual_thought", label: "Spiritual Thought" },
+  ],
+  "youth-council": [
+    { key: "opening_prayer", label: "Opening Prayer" },
+    { key: "closing_prayer", label: "Closing Prayer" },
+    { key: "spiritual_thought", label: "Spiritual Thought" },
+  ],
+};
+
+export function gridColumnsFor(meetingTypeSlug: MeetingTypeSlug): GridColumn[] {
+  return GRID_COLUMNS_BY_TYPE[meetingTypeSlug] ?? [];
+}
+
+export function gridTableFor(meetingTypeSlug: MeetingTypeSlug): "sacrament_assignments" | "bishopric_assignments" {
+  return meetingTypeSlug === "sacrament-meeting" ? "sacrament_assignments" : "bishopric_assignments";
+}
+
+/**
+ * One row per upcoming meeting of the given type (today through
+ * throughDateISO), one cell per applicable role -- the actual assigned
+ * person right now, whatever put it there (a fixed-by-calling rule, the
+ * generic rotation pointer, or a manual override). Meetings with none
+ * created yet in that window simply won't appear -- run Generate
+ * Meetings / Meeting Schedule first if a date is missing.
+ */
+export async function getAssignmentGrid(
+  meetingTypeSlug: MeetingTypeSlug,
+  throughDateISO: string
+): Promise<{ columns: GridColumn[]; rows: GridRow[] }> {
+  const columns = gridColumnsFor(meetingTypeSlug);
+  const table = gridTableFor(meetingTypeSlug);
+  const supabase = await createClient();
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: meetingRows } = await supabase
+    .from("meetings")
+    .select("id, date, meeting_types!inner(slug)")
+    .eq("meeting_types.slug", meetingTypeSlug)
+    .gte("date", today)
+    .lte("date", throughDateISO)
+    .order("date", { ascending: true });
+
+  const meetings = (meetingRows ?? []) as { id: string; date: string }[];
+  if (meetings.length === 0) return { columns, rows: [] };
+
+  const meetingIds = meetings.map((m) => m.id);
+  const { data: assignmentRows } = await supabase
+    .from(table)
+    .select("meeting_id, role, assigned_to_id, people(name)")
+    .in("meeting_id", meetingIds);
+
+  const byMeeting = new Map<string, Record<string, GridCell>>();
+  for (const row of (assignmentRows ?? []) as unknown[]) {
+    const r = row as {
+      meeting_id: string;
+      role: string;
+      assigned_to_id: string | null;
+      people: { name?: string }[] | { name?: string } | null;
+    };
+    const person = Array.isArray(r.people) ? r.people[0] : r.people;
+    const cells = byMeeting.get(r.meeting_id) ?? {};
+    cells[r.role] = { assignedToId: r.assigned_to_id, assignedToName: person?.name ?? null };
+    byMeeting.set(r.meeting_id, cells);
+  }
+
+  const rows: GridRow[] = meetings.map((m) => ({
+    meetingId: m.id,
+    date: m.date,
+    cells: byMeeting.get(m.id) ?? {},
+  }));
+
+  return { columns, rows };
 }

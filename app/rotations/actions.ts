@@ -2,9 +2,50 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { syncRotationMembership } from "@/lib/data/rotations";
+import { syncRotationMembership, gridColumnsFor, gridTableFor } from "@/lib/data/rotations";
+import type { MeetingTypeSlug } from "@/lib/types";
 
 type ActionResult = { success: true } | { error: string };
+
+/**
+ * Saves every column in one grid row at once (see getAssignmentGrid) --
+ * same delete-then-insert-if-set approach as saveElementPersonRole
+ * (app/meetings/[id]/dynamic-planning-actions.ts), just applied to
+ * several roles for one meeting in a single submit instead of one
+ * role at a time. Purely a direct edit of the applied assignment --
+ * never touches any rotation's member order or next_index pointer, so
+ * saving here doesn't skip anyone in future meetings.
+ */
+export async function saveAssignmentGridRow(
+  meetingId: string,
+  meetingTypeSlug: MeetingTypeSlug,
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const table = gridTableFor(meetingTypeSlug);
+  const columns = gridColumnsFor(meetingTypeSlug);
+
+  for (const col of columns) {
+    const assignedToId = String(formData.get(col.key) ?? "") || null;
+
+    const { error: deleteError } = await supabase
+      .from(table)
+      .delete()
+      .eq("meeting_id", meetingId)
+      .eq("role", col.key);
+    if (deleteError) return { error: deleteError.message };
+
+    if (assignedToId) {
+      const row: Record<string, unknown> = { meeting_id: meetingId, role: col.key, assigned_to_id: assignedToId };
+      if (table === "sacrament_assignments") row.confirmed = false;
+      const { error: insertError } = await supabase.from(table).insert(row);
+      if (insertError) return { error: insertError.message };
+    }
+  }
+
+  revalidatePath("/rotations");
+  return { success: true };
+}
 
 export async function syncRotation(rotationId: string): Promise<ActionResult> {
   const result = await syncRotationMembership(rotationId);

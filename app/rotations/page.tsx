@@ -1,9 +1,17 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
-import { getAllRotations, type RotationRow } from "@/lib/data/rotations";
-import { getActivePeople } from "@/lib/data/people";
-import { syncRotation, addRotationMember, removeRotationMember, moveRotationMember } from "@/app/rotations/actions";
+import { getAllRotations, getAssignmentGrid, type RotationRow } from "@/lib/data/rotations";
+import { getActivePeople, type PersonOption } from "@/lib/data/people";
+import {
+  syncRotation,
+  addRotationMember,
+  removeRotationMember,
+  moveRotationMember,
+  saveAssignmentGridRow,
+} from "@/app/rotations/actions";
+import type { MeetingTypeSlug } from "@/lib/types";
 
 const ELEMENT_LABELS: Record<string, string> = {
   conducting: "Conducting",
@@ -15,7 +23,81 @@ const ELEMENT_LABELS: Record<string, string> = {
   handbook_training: "Handbook Training",
 };
 
-function RotationCard({ rotation, people }: { rotation: RotationRow; people: { id: string; name: string }[] }) {
+// Presiding/Conducting are fixed by calling (Bishop -> 1st Counselor ->
+// 2nd Counselor, cycling by calendar month -- see
+// applyFixedSacramentRoles in lib/data/rotations.ts), not driven by a
+// rotation_members list at all. Any leftover `rotations` row for either
+// is inert -- applyRotationsToNewMeeting explicitly skips 'conducting'
+// for Sacrament Meeting -- and showing it here as if it were a normal
+// editable rotation is exactly the kind of thing that reads as "only
+// pulling one person" when the real cause is upstream (see the grid's
+// own note below).
+const FIXED_BY_CALLING_KEYS = new Set(["presiding", "conducting"]);
+
+const MEETING_TYPE_TABS: { slug: MeetingTypeSlug; label: string }[] = [
+  { slug: "sacrament-meeting", label: "Sacrament Meeting" },
+  { slug: "bishopric-meeting", label: "Bishopric Meeting" },
+  { slug: "ward-council", label: "Ward Council" },
+  { slug: "youth-council", label: "Youth Council" },
+];
+
+function formatDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function defaultThroughDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 3);
+  return d.toISOString().slice(0, 10);
+}
+
+function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boolean; label: string }) {
+  return (
+    <Link
+      href={`/rotations?type=${slug}`}
+      className={[
+        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
+        active ? "bg-ink text-paper" : "text-slate hover:text-ink",
+      ].join(" ")}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function PersonCell({
+  name,
+  form,
+  people,
+  value,
+}: {
+  name: string;
+  form: string;
+  people: PersonOption[];
+  value: string | null;
+}) {
+  return (
+    <select
+      name={name}
+      form={form}
+      defaultValue={value ?? ""}
+      className="w-full min-w-[9rem] rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+    >
+      <option value="">&mdash; Unassigned &mdash;</option>
+      {people.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function RotationCard({ rotation, people }: { rotation: RotationRow; people: PersonOption[] }) {
   const sync = async () => {
     "use server";
     await syncRotation(rotation.id);
@@ -123,7 +205,11 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: { i
   );
 }
 
-export default async function RotationsPage() {
+export default async function RotationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; through?: string }>;
+}) {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
@@ -136,22 +222,144 @@ export default async function RotationsPage() {
     );
   }
 
-  const [rotations, people] = await Promise.all([getAllRotations(), getActivePeople()]);
+  const { type: rawType, through: rawThrough } = await searchParams;
+  const selectedType: MeetingTypeSlug = MEETING_TYPE_TABS.some((t) => t.slug === rawType)
+    ? (rawType as MeetingTypeSlug)
+    : "sacrament-meeting";
+  const throughDate = rawThrough || defaultThroughDate();
+
+  const [rotations, people, grid] = await Promise.all([
+    getAllRotations(),
+    getActivePeople(),
+    getAssignmentGrid(selectedType, throughDate),
+  ]);
+
+  const visibleRotations = rotations.filter((r) => !FIXED_BY_CALLING_KEYS.has(r.element_key));
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Assignment Rotations" />
 
       <section className="mt-4">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
         <p className="mt-2 text-sm text-slate">
-          Whoever&rsquo;s next gets pre-filled automatically when a new meeting is created. Overriding
-          it for one meeting doesn&rsquo;t change whose turn is next.
+          Every upcoming meeting down one side, every role across the top &mdash; fill in who&rsquo;s
+          actually assigned. This is the real, applied assignment for that meeting, however it got
+          there (a fixed calling order, a rotation, or a manual pick) &mdash; editing a cell here
+          never changes whose turn is next for the rotations below, it only overrides this one
+          meeting.
+        </p>
+      </section>
+
+      <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+        {MEETING_TYPE_TABS.map((t) => (
+          <TypeTab key={t.slug} slug={t.slug} active={t.slug === selectedType} label={t.label} />
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-rule bg-card p-6">
+        <form method="get" className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="type" value={selectedType} />
+          <label className="text-xs text-slate">
+            Through
+            <input
+              type="date"
+              name="through"
+              defaultValue={throughDate}
+              className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+            />
+          </label>
+          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+            Update range
+          </button>
+        </form>
+
+        {selectedType === "sacrament-meeting" && (
+          <p className="mt-3 text-[11px] text-slate/60">
+            Presiding and Conducting cycle automatically by calendar month (Bishop &rarr; 1st
+            Counselor &rarr; 2nd Counselor) based on who currently holds each calling &mdash; if a
+            column here shows the same person every month, check that both counselor callings
+            actually have a current holder set (Table Admin &rarr; Callings).
+          </p>
+        )}
+
+        {grid.rows.length === 0 ? (
+          <p className="mt-4 text-sm text-slate">
+            No {MEETING_TYPE_TABS.find((t) => t.slug === selectedType)?.label} meetings scheduled in
+            this range yet.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                    Meeting
+                  </th>
+                  {grid.columns.map((c) => (
+                    <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                      {c.label}
+                    </th>
+                  ))}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {grid.rows.map((row) => {
+                  const rowFormId = `grid-row-${row.meetingId}`;
+                  const saveRow = async (formData: FormData) => {
+                    "use server";
+                    await saveAssignmentGridRow(row.meetingId, selectedType, formData);
+                  };
+                  return (
+                    <tr key={row.meetingId} className="border-t border-rule/60">
+                      <td className="px-2 py-2 align-top text-xs text-ink">
+                        {formatDate(row.date)}
+                        {/* Empty form -- every cell below references it via the
+                            HTML `form` attribute instead of nesting, since a
+                            <form> can't legally wrap multiple <td>s. */}
+                        <form id={rowFormId} action={saveRow} />
+                      </td>
+                      {grid.columns.map((c) => (
+                        <td key={c.key} className="px-2 py-1.5 align-top">
+                          <PersonCell
+                            name={c.key}
+                            form={rowFormId}
+                            people={people}
+                            value={row.cells[c.key]?.assignedToId ?? null}
+                          />
+                        </td>
+                      ))}
+                      <td className="px-2 py-1.5 align-top">
+                        <button
+                          type="submit"
+                          form={rowFormId}
+                          className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90"
+                        >
+                          Save
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <section className="mt-2">
+        <h2 className="font-display text-xl">Rotation Order</h2>
+        <p className="mt-1 text-sm text-slate">
+          Whoever&rsquo;s next gets pre-filled automatically when a new meeting is created. This is
+          secondary to the grid above -- it only sets the *default* for a meeting that doesn&rsquo;t
+          have one yet, or after everyone above has had a turn. Presiding and Conducting aren&rsquo;t
+          configured here at all (fixed by calling -- see the note above).
         </p>
       </section>
 
       <div className="flex flex-col gap-4">
-        {rotations.map((r) => (
+        {visibleRotations.map((r) => (
           <RotationCard key={r.id} rotation={r} people={people} />
         ))}
       </div>
