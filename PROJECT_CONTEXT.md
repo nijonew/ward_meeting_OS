@@ -586,6 +586,34 @@ avoid confusing the two.
 
 ## Known open items
 
+- ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
+  pages have a back link"). Audited all 28 `page.tsx` routes. Most
+  already had one implicitly via `AppHeader`'s "Ward OS" wordmark
+  (→ `/`) -- kept that as the app's baseline "back" for top-level
+  feature pages reachable straight from the landing page. Added an
+  explicit breadcrumb-style `&larr; <Parent>` link (matching
+  `/admin/[table]`'s pre-existing `&larr; All tables` pattern) to the
+  pages nested a level deeper that were missing one:
+  `app/meetings/[id]/layout.tsx` (`&larr; Meetings`, shared by every
+  meeting sub-page including the new Archived view), `app/meetings/new`
+  (`&larr; Meetings`), and `app/callings/[id]` (`&larr; Callings`). The
+  three pre-auth pages (`/login`, `/auth/reset-password`,
+  `/auth/update-password`) had no `AppHeader` (a client component can't
+  use it -- it's an async server component checking session state) and
+  so no way back at all -- each now gets its own `&larr; Home` /
+  `&larr; Sign in` link.
+  - **Bug found and fixed along the way:** `/auth/reset-password` was a
+    byte-for-byte duplicate of `/auth/update-password` -- both called
+    `updatePassword` (which needs an active Supabase session to
+    succeed). `requestPasswordReset` (send-a-reset-email) existed in
+    `app/auth/actions.ts` but was never wired to any page. A first-time
+    user or anyone who'd actually forgotten their password, following
+    login's "Forgot your password, or signing in for the first time?"
+    link, would land on a form trying to set a password with no session
+    to update instead of ever receiving a reset email. `/auth/reset-password`
+    is now the real "send me a reset link" step; `/auth/update-password`
+    (reached from that emailed link) is unchanged, still the "type your
+    new password" step.
 - Teaching Calendar (youth leader tile) — scope not yet defined, deferred
 - Bishopric-side free-text elements (spiritual thought, handbook training,
   young men coordination, impressions, calling planning, sacrament meeting

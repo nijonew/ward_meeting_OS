@@ -60,7 +60,10 @@ export default async function MeetingLayout({
       <AppHeader tag={meeting.title} />
 
       <section className="mt-10 rounded-lg border border-rule bg-card p-6 sm:p-8">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">{meeting.title}</h1>
+        <Link href="/dashboard" className="text-xs text-slate hover:text-ink">
+          &larr; Meetings
+        </Link>
+        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{meeting.title}</h1>
         <p className="mt-1 text-slate">{formatMeetingDate(meeting.date)}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 overflow-x-auto pb-1">

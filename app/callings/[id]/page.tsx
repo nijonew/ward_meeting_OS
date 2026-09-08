@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import {
   getCallingDetail,
@@ -55,6 +56,10 @@ export default async function CallingDetailPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Callings" />
+
+      <Link href="/callings" className="text-xs text-slate hover:text-ink">
+        &larr; Callings
+      </Link>
 
       <div className="rounded-lg border border-rule bg-card p-6 sm:p-8">
         <h1 className="font-display text-3xl leading-tight">

@@ -1,33 +1,42 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
-import { updatePassword } from "@/app/auth/actions";
+import { requestPasswordReset } from "@/app/auth/actions";
 
-const initialState: { error?: string } = {};
+const initialState: { error?: string; success?: boolean } = {};
 
-export default function UpdatePasswordPage() {
-  const [state, formAction, pending] = useActionState(updatePassword, initialState);
+/**
+ * Fixed 2026-09-06: this page was a byte-for-byte duplicate of
+ * /auth/update-password (both called updatePassword, which requires an
+ * active Supabase session) -- requestPasswordReset existed but was
+ * never wired to any page. A first-time user or someone who'd forgotten
+ * their password, following login's "Forgot your password, or signing
+ * in for the first time?" link here, would hit a form trying to set a
+ * password with no session to update instead of ever getting an email.
+ * This is now the actual "send me a reset link" step; /auth/update-password
+ * is the "type your new password" step reached from that email.
+ */
+export default function ResetPasswordPage() {
+  const [state, formAction, pending] = useActionState(requestPasswordReset, initialState);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <h1 className="font-display text-2xl">Set your password</h1>
-      <p className="mt-2 text-sm text-slate">Choose a password you&rsquo;ll use to sign in from now on.</p>
+      <Link href="/login" className="text-xs text-slate hover:text-ink">
+        &larr; Sign in
+      </Link>
+      <h1 className="mt-2 font-display text-2xl">Reset your password</h1>
+      <p className="mt-2 text-sm text-slate">
+        Enter your email and we&rsquo;ll send a link to set a password &mdash; use this the first
+        time you sign in too.
+      </p>
 
       <form action={formAction} className="mt-6 flex flex-col gap-3">
         <input
-          type="password"
-          name="password"
+          type="email"
+          name="email"
           required
-          minLength={8}
-          placeholder="New password (8+ characters)"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
-        />
-        <input
-          type="password"
-          name="confirm"
-          required
-          minLength={8}
-          placeholder="Confirm password"
+          placeholder="you@example.com"
           className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
         />
         <button
@@ -35,9 +44,12 @@ export default function UpdatePasswordPage() {
           disabled={pending}
           className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
         >
-          {pending ? "Saving..." : "Set password"}
+          {pending ? "Sending..." : "Send reset link"}
         </button>
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state.success && (
+          <p className="text-sm text-ink">Check your email for a link to set your password.</p>
+        )}
       </form>
     </main>
   );

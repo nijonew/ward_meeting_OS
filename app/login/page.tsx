@@ -11,7 +11,10 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <h1 className="font-display text-2xl">Ward OS</h1>
+      <Link href="/" className="text-xs text-slate hover:text-ink">
+        &larr; Home
+      </Link>
+      <h1 className="mt-2 font-display text-2xl">Ward OS</h1>
       <p className="mt-2 text-sm text-slate">Sign in with your email and password.</p>
 
       <form action={formAction} className="mt-6 flex flex-col gap-3">
