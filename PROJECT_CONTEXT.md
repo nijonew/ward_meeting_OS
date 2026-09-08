@@ -44,8 +44,8 @@ reconstructed from both:
   from the dashboard) and `038` (re-documents/corrects the
   `bishopric_assignments_role_check` constraint): confirmed run.
 - `039` (new `meeting_cancellations` table -- generalized from an
-  earlier conference-only design, see Known open items below): still
-  needs to be run.
+  earlier conference-only design, see Known open items below):
+  confirmed run.
 
 Next migration should be `040_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
