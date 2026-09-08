@@ -50,11 +50,20 @@ export default async function PlanningViewPage({
   if (!user) {
     redirect("/login");
   }
-  const canEditRabnm = profile?.role === "bishopric";
+  const isAdmin = profile?.role === "bishopric";
+  const canEditRabnm = isAdmin;
 
   const meeting = await getMeetingById(meetingId);
   if (!meeting) {
     return <p className="text-slate">Could not load this meeting.</p>;
+  }
+  // Editing is admin-only (2026-09-08 -- this page previously had no
+  // role check at all, so any logged-in account could edit any
+  // meeting's assignments/music/speakers/free-text elements). Everyone
+  // else gets redirected to the read-only view, which enforces its own
+  // calling-based access and stage rules from there.
+  if (!isAdmin) {
+    redirect(`/meetings/${meetingId}/archived`);
   }
   // Archived meetings are read-only from here on -- see
   // app/meetings/[id]/archived (the "agenda as it was finalized" view).

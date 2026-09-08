@@ -70,8 +70,16 @@ function MeetingRow({
     </div>
   );
 
+  // Admins land on the meeting's own hub (tabs for Planning/Conducting/
+  // Public, or Template/Planning/Live) same as always; everyone else
+  // goes straight to whichever read-only view actually applies to them
+  // -- the public program for Sacrament Meeting, the calling-based
+  // read-only view (which enforces its own access) for the other three.
+  const nonAdminHref = meeting.meetingType === "sacrament-meeting" ? "public" : "archived";
+  const href = canManage ? `/meetings/${meeting.id}` : `/meetings/${meeting.id}/${nonAdminHref}`;
+
   const linked = isBuilt ? (
-    <Link href={`/meetings/${meeting.id}`} className="block">
+    <Link href={href} className="block">
       {card}
     </Link>
   ) : (

@@ -20,7 +20,15 @@ export async function getMeetingTypes(): Promise<MeetingType[]> {
   return data.map((row) => ({
     slug: row.slug as MeetingTypeSlug,
     name: row.name as string,
-    isBuilt: row.slug === "sacrament-meeting" || row.slug === "bishopric-meeting",
+    // Was stale: only Sacrament/Bishopric Meeting were ever true here,
+    // but Ward Council and Youth Council have had full Template/
+    // Planning/Live/Archived support for a while now (both branch
+    // through as "isCouncil" throughout those pages) -- left at false
+    // this whole time, every dashboard row for those two types showed
+    // as a non-clickable "Coming soon" regardless of role. Fixed
+    // 2026-09-08 while wiring the calling-based non-admin viewer, which
+    // depends on these rows actually being clickable.
+    isBuilt: true,
   }));
 }
 

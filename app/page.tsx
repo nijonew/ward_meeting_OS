@@ -45,11 +45,15 @@ export default async function HomePage() {
   // to be recorded against their own account; everyone else only sees a
   // tile for a type their calling actually maps to (meeting_type_members)
   // -- per the user's own request (2026-09-06): "only show the meetings
-  // that apply to the person by nature of their calling."
+  // that apply to the person by nature of their calling." Sacrament
+  // Meeting is a deliberate exception (2026-09-08): its live view is
+  // exactly the existing public program, already visible with no login
+  // or calling at all, so gating the tile itself by calling would add
+  // no real access control -- just show it to any logged-in account.
   const visibleMeetingTypes = isBishopric
     ? ALL_MEETING_TYPES
     : user
-      ? await getVisibleMeetingTypesForUser(user.id)
+      ? Array.from(new Set(["sacrament-meeting" as const, ...(await getVisibleMeetingTypesForUser(user.id))]))
       : [];
 
   return (

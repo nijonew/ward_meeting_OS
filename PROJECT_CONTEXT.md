@@ -319,17 +319,74 @@ conflict.
    the meeting is live, and only become visible to those same
    read-right viewers once the meeting is archived.
 
-**Known conflicts with what's built today:**
-- No non-admin viewing mechanism exists yet for these meeting types at
-  all. "Known open items" below previously described the planned
-  mechanism as "share-token-based, no-login, security through an
-  unguessable link" — this workflow instead calls for **login +
-  calling-based** read access (via `meeting_type_members`, which
-  already maps callings to meeting types). Treat the calling-based
-  model here as authoritative; the share-token note was likely an
-  oversimplification and should be corrected once this gets built.
-- No live/archived-based visibility split exists anywhere today for
-  admin notes on an element.
+**Built 2026-09-08** (priority queue items #2 and #3), closing what
+used to be two separate conflicts here:
+- **Calling-based non-admin viewing**, via `meeting_type_members`
+  exactly as this workflow specifies (not the "share-token, no-login"
+  idea "Known open items" used to describe, which was superseded and is
+  now removed rather than left as a stale note). New
+  `getVisibleMeetingTypesForUser` (`lib/data/meeting-type-access.ts`,
+  built earlier the same day for the "My meetings" tiles) resolves
+  auth user -> `people` row -> callings held -> `meeting_type_members`
+  -> meeting types; `app/meetings/[id]/archived` (kept that route name
+  despite now serving more than archived meetings, per the user's own
+  choice to extend it rather than build a second renderer) checks it
+  for Bishopric Meeting/Ward Council/Youth Council. Reachable from the
+  same per-type "My meetings" tile -> `/dashboard?type=X` -> click a
+  meeting row, per the user's own choice of entry point -- a non-admin
+  now lands on this read-only view instead of the edit form.
+- **Live/archived visibility split for notes**, scoped deliberately
+  narrow: only the Minutes/Action Items/Council Notes sections are
+  suppressed for a non-admin until the meeting is archived (`showRealTimeNotes`
+  in that page) -- the rest of the agenda (role assignments, ward
+  business, music, speakers, RABNM) is visible the moment a meeting
+  goes live, matching this workflow's own step 4 ("once live... can
+  view it") rather than waiting for archiving. This split may need
+  revisiting once the bigger meeting-display redesign (still to be
+  discussed, see Known open items) lands -- flagged in that page's own
+  comment.
+
+**Real, pre-existing security gap found and fixed while building
+this:** `/meetings/[id]/planning` and `/meetings/[id]/live` had *no
+role check at all* before 2026-09-08 -- any logged-in account
+(music_planner, communications_specialist, any youth role) could edit
+any meeting's assignments/music/speakers/free-text elements, for any
+meeting type, and `/live` didn't even require login. Editing is now
+admin-only (bishopric role) on both; a non-admin hitting either gets
+redirected to the read-only view instead. This wasn't something the
+user asked to fix directly -- it surfaced while scoping how a
+non-admin would actually reach the new viewer, and confirming it
+mattered enough to lock down now rather than let a "read-only viewer"
+coexist with the old wide-open edit surface. The Sacrament Meeting
+public program page (`/meetings/[id]/public`) had a related, milder
+version of the same gap -- no stage check at all, so it would return
+real content even for a meeting still in `template`/`planning`/`review`,
+or one already `archived` (the Vision workflow's own "no calling-based
+*or* public access at all once archived" rule) -- now restricted to
+`ready`/`live` for anyone who isn't an admin (admins can still preview
+it at any stage).
+
+**Also found and fixed along the way:** `getMeetingTypes()`'s `isBuilt`
+flag (`lib/data/meetings.ts`) had been `true` only for Sacrament
+Meeting and Bishopric Meeting this whole time, despite Ward Council and
+Youth Council having full Template/Planning/Live/Archived support for
+a while now -- every dashboard row for those two types was rendering as
+a non-clickable "Coming soon" regardless of role. Fixed to `true` for
+all four types; this was blocking the calling-based viewer from being
+reachable for exactly those two types, which is what surfaced it.
+
+**Sacrament Meeting is deliberately excluded from this same viewer**
+(the user's own decision, 2026-09-08, after flagging the tension with
+this file's own prior "admin-only once archived, deliberate difference"
+note): a calling-holder's Sacrament Meeting tile links straight to the
+existing `/meetings/[id]/public` page while `ready`/`live` -- no new
+content, exactly what the public program already shows, per the user's
+explicit choice -- and reverts to admin-only once archived, preserving
+the original rule unchanged. The "My meetings" tile for Sacrament
+Meeting itself isn't calling-gated at all (unlike the other three) --
+its content is already visible with no login or calling, so gating the
+tile would add no real access control; it shows for any logged-in
+account.
 
 ### Workflow: Sacrament Meeting planning
 
@@ -550,11 +607,9 @@ just a distinct verb for "notes, once someone reports on them later."
   redirect here once `stage === 'archived'` (editing after archiving
   would contradict "the agenda as it was finalized"); Conducting/Public
   were left alone (already naturally moot/date-gated post-archive).
-  **Admin-only for now** — the non-admin post-archive visibility rule
-  (item 5 in the non-Sacrament workflow above) still isn't built, since
-  it depends on the calling-based non-admin viewer, a separate
-  not-yet-picked-up item; this view is scoped so that feature can reuse
-  it later rather than needing a second read-only renderer.
+  ~~Admin-only for now~~ -- **extended to non-admins 2026-09-08** once
+  the calling-based viewer (item 5 in the non-Sacrament workflow above)
+  was built on top of it, exactly as planned when this was scoped.
 
 ### ~~Workflow: Adding agenda items for a non-Sacrament meeting~~ — built 2026-09-05
 
@@ -724,11 +779,11 @@ avoid confusing the two.
 ## Known open items
 
 **Current priority queue (set by the user 2026-09-08), work top to
-bottom:** ~~unified sacrament-meeting planning environment~~ (done, see
-below) -> calling-based non-admin viewer -> non-admin post-archive
-visibility -> sortable Table Admin headers -> drop `confirmed` from
-rotation-assignment tables -> Music tile merge -> sign-out bug ->
-Teaching Calendar scope. Bishopric-side
+bottom:** ~~unified sacrament-meeting planning environment~~ (done) ->
+~~calling-based non-admin viewer~~ (done) -> ~~non-admin post-archive
+visibility~~ (done, came along with the viewer) -> sortable Table Admin
+headers -> drop `confirmed` from rotation-assignment tables -> Music
+tile merge -> sign-out bug -> Teaching Calendar scope. Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed
@@ -849,11 +904,11 @@ before guessing further.
   review) can currently be entered in TWO places — new dynamic per-element
   fields AND the old `BishopricMinutesForm`'s similarly-named fixed columns.
   Not consolidated yet; ask before changing either.
-- Agenda items for Bishopric/Ward Council/Youth Council should eventually
-  get a share-token-based no-login view for invited attendees (security
-  through an unguessable link, not auth) — not built yet. **Superseded by
-  the Vision & Intended Workflows section above**, which instead calls
-  for login + calling-based read access — treat that as authoritative.
+- ~~Agenda items for Bishopric/Ward Council/Youth Council should
+  eventually get a share-token-based no-login view for invited
+  attendees.~~ Superseded by the Vision & Intended Workflows section's
+  login + calling-based model, which **built 2026-09-08** -- see the
+  non-Sacrament workflow above.
 - ~~Dashboard shows every meeting, past and future, oldest first — no
   auto-archive or cancel control.~~ **Both built 2026-09-06:**
   - **Auto-archive past meetings.** `getUpcomingMeetings()`
