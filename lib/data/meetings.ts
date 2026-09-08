@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
+import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import type { Meeting, MeetingLifecycleStage, MeetingType, MeetingTypeSlug } from "@/lib/types";
 
 // NOTE: no generated Database types are wired up yet (would need the
@@ -131,6 +132,13 @@ async function autoArchivePastMeetings(): Promise<Set<string>> {
 }
 
 export async function getUpcomingMeetings(): Promise<Meeting[]> {
+  // Order matters: a meeting inside a cancelled window (see
+  // meeting_cancellations) should already be marked cancelled before
+  // the archive sweep decides whether it "had real activity" -- a
+  // cancelled meeting auto-archives regardless (see
+  // autoArchivePastMeetings), so cancelling first avoids a one-render
+  // lag where it briefly shows as "No Activity" instead.
+  await sweepMeetingCancellations();
   const noActivityIds = await autoArchivePastMeetings();
 
   const supabase = await createClient();

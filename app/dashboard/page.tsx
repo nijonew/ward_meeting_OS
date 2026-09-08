@@ -6,7 +6,7 @@ import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
 import { cancelMeeting, uncancelMeeting } from "@/app/dashboard/actions";
-import type { Meeting } from "@/lib/types";
+import { MEETING_TYPE_LABELS, type Meeting, type MeetingTypeSlug } from "@/lib/types";
 
 function formatMeetingDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -120,7 +120,16 @@ function MeetingRow({
   );
 }
 
-export default async function DashboardPage() {
+const MEETING_TYPE_SLUGS = new Set<string>(["sacrament-meeting", "bishopric-meeting", "ward-council", "youth-council"]);
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}) {
+  const { type: rawType } = await searchParams;
+  const typeFilter: MeetingTypeSlug | null = rawType && MEETING_TYPE_SLUGS.has(rawType) ? (rawType as MeetingTypeSlug) : null;
+
   const { user, profile } = await getSessionUser();
 
   if (!user) {
@@ -138,7 +147,8 @@ export default async function DashboardPage() {
     );
   }
 
-  const [meetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
+  const [allMeetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
+  const meetings = typeFilter ? allMeetings.filter((m) => m.meetingType === typeFilter) : allMeetings;
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
   const canCreate = profile?.role === "bishopric";
   const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
@@ -176,7 +186,7 @@ export default async function DashboardPage() {
                       <option value="" disabled>
                         Choose a meeting&hellip;
                       </option>
-                      {meetings.map((m) => (
+                      {allMeetings.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.title} &mdash; {formatMeetingDate(m.date)}
                         </option>
@@ -198,7 +208,14 @@ export default async function DashboardPage() {
 
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Meetings</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-slate">
+            {typeFilter ? MEETING_TYPE_LABELS[typeFilter] : "Meetings"}
+            {typeFilter && (
+              <Link href="/dashboard" className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink">
+                Show all types
+              </Link>
+            )}
+          </p>
           {canCreate && (
             <span className="flex items-center gap-3">
               <Link href="/meeting-schedule" className="text-xs text-slate hover:text-ink">

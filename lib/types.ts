@@ -30,6 +30,13 @@ export type MeetingTypeSlug =
   | "ward-council"
   | "youth-council";
 
+export const MEETING_TYPE_LABELS: Record<MeetingTypeSlug, string> = {
+  "sacrament-meeting": "Sacrament Meeting",
+  "bishopric-meeting": "Bishopric Meeting",
+  "ward-council": "Ward Council",
+  "youth-council": "Youth Council",
+};
+
 export interface MeetingType {
   slug: MeetingTypeSlug;
   name: string;

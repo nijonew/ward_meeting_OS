@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { syncRotationMembership, gridColumnsFor, gridTableFor } from "@/lib/data/rotations";
+import { syncRotationMembership, gridColumnsFor, gridTableFor, pushRotationToUpcomingMeetings } from "@/lib/data/rotations";
 import type { MeetingTypeSlug } from "@/lib/types";
 
 type ActionResult = { success: true } | { error: string };
+type PushActionResult = { error?: string; filled?: number; skippedExisting?: number };
+type SaveGridActionResult = { error?: string; success?: boolean };
 
 /** Grid field names are "<meetingId>::<roleKey>" so one <form> can carry
  *  every row's selects at once (see app/rotations/page.tsx) -- this
@@ -30,8 +32,9 @@ function parseGridFieldName(name: string): { meetingId: string; roleKey: string 
  */
 export async function saveAssignmentGrid(
   meetingTypeSlug: MeetingTypeSlug,
+  _prevState: unknown,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<SaveGridActionResult> {
   const supabase = await createClient();
   const table = gridTableFor(meetingTypeSlug);
   const columnKeys = new Set(gridColumnsFor(meetingTypeSlug).map((c) => c.key));
@@ -67,6 +70,21 @@ export async function saveAssignmentGrid(
 
   revalidatePath("/rotations");
   return { success: true };
+}
+
+export async function pushRotation(
+  rotationId: string,
+  _prevState: unknown,
+  formData: FormData
+): Promise<PushActionResult> {
+  const fromDate = String(formData.get("from_date") ?? "");
+  if (!fromDate) return { error: "Choose a start date." };
+
+  const result = await pushRotationToUpcomingMeetings(rotationId, fromDate);
+  if ("error" in result) return result;
+
+  revalidatePath("/rotations");
+  return result;
 }
 
 export async function syncRotation(rotationId: string): Promise<ActionResult> {

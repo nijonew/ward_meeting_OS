@@ -2,8 +2,17 @@ import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { WARD_NAME } from "@/lib/config";
 import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
+import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import type { AppRole } from "@/lib/supabase/get-session-user";
+import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
+
+const ALL_MEETING_TYPES: MeetingTypeSlug[] = [
+  "sacrament-meeting",
+  "bishopric-meeting",
+  "ward-council",
+  "youth-council",
+];
 
 /**
  * The single landing page for everyone -- ward members, meeting
@@ -31,6 +40,17 @@ export default async function HomePage() {
   const isYouthLeader = (role && YOUTH_LEADER_ROLES.includes(role)) || isBishopric;
 
   const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
+
+  // Admins manage every meeting type regardless of which calling happens
+  // to be recorded against their own account; everyone else only sees a
+  // tile for a type their calling actually maps to (meeting_type_members)
+  // -- per the user's own request (2026-09-06): "only show the meetings
+  // that apply to the person by nature of their calling."
+  const visibleMeetingTypes = isBishopric
+    ? ALL_MEETING_TYPES
+    : user
+      ? await getVisibleMeetingTypesForUser(user.id)
+      : [];
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -69,12 +89,22 @@ export default async function HomePage() {
         </TileGrid>
       </section>
 
-      {/* Tier 1 -- any logged-in user */}
-      {user && (
+      {/* Tier 1 -- any logged-in user, but only meeting types their own
+          calling actually maps to (meeting_type_members) -- admins see
+          all four regardless. Replaces the old single "Meetings" tile,
+          which just linked to /dashboard's unfiltered hodgepodge of
+          every meeting type. */}
+      {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">My meetings</p>
           <TileGrid>
-            <Tile title="Meetings" description="Meetings you're part of" href="/dashboard" />
+            {visibleMeetingTypes.map((slug) => (
+              <Tile
+                key={slug}
+                title={MEETING_TYPE_LABELS[slug]}
+                href={`/dashboard?type=${slug}`}
+              />
+            ))}
           </TileGrid>
         </section>
       )}
@@ -118,6 +148,11 @@ export default async function HomePage() {
               title="Meeting Schedule"
               description="Set cadence and generate meetings"
               href="/meeting-schedule"
+            />
+            <Tile
+              title="Meeting Cancellations"
+              description="Conferences, holidays, etc. -- auto-cancels affected meetings"
+              href="/meeting-cancellations"
             />
             <Tile
               title="Manage Announcements"

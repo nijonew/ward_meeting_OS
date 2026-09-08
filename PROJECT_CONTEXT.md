@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 038
+## Current migration number: 039
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -43,8 +43,11 @@ reconstructed from both:
 - `037` (`meetings.cancelled`/`cancellation_note` -- Cancel a meeting
   from the dashboard) and `038` (re-documents/corrects the
   `bishopric_assignments_role_check` constraint): confirmed run.
+- `039` (new `meeting_cancellations` table -- generalized from an
+  earlier conference-only design, see Known open items below): still
+  needs to be run.
 
-Next migration should be `039_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `040_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -192,6 +195,63 @@ exclusive access.
       Changes" button. Field names are `"<meetingId>::<roleKey>"` so one
       submit carries every row's selects; the action groups them back
       apart before writing.
+    - **Visible save feedback + a disabled-until-dirty button**
+      (2026-09-06, the user's own follow-up: "there does not seem to be
+      any response and thus there is no confidence that anything
+      happened"): the grid moved into its own client component,
+      `components/rotations/AssignmentGridForm.tsx`, since dirty-tracking
+      and a pending/success indicator both need client state -- a plain
+      server-action `<form>` gives neither. The button reads "Saving..."
+      while pending and is disabled until the form actually changes (an
+      `onChange` on the `<form>` itself, which change events bubble up
+      to naturally); after a successful save it shows "Saved." until the
+      next edit. Resets the dirty flag by comparing `useActionState`'s
+      returned state object across renders during render itself, not in
+      a `useEffect` -- React's own guidance for "respond to a value that
+      just changed," and avoids an eslint `react-hooks/set-state-in-effect`
+      violation calling `setState` synchronously inside an effect would
+      have caused.
+    - **"Push rotations starting `<date>`"** (2026-09-06, the user's own
+      request, "will help with manual input"): each rotation-order card
+      below the grid gained a small form -- pick a date, and
+      `pushRotationToUpcomingMeetings` (`lib/data/rotations.ts`) fills
+      the grid from that rotation's own member order for every upcoming
+      meeting of that type from that date forward, advancing the
+      pointer once per meeting actually filled. Solves the real
+      backlog case: a meeting created back when a rotation had zero
+      members (the still-not-merged empty-rotation-membership finding
+      elsewhere in this file) never got its assignment row written by
+      `applyRotationsToNewMeeting` at creation time, and the grid alone
+      has no way to retroactively fill that blank. Only ever fills a
+      currently-blank cell -- a meeting that already has an assignment
+      for that role is left untouched, same "override wins, pointer
+      only advances for what's actually applied" rule used everywhere
+      else in this app.
+      - **Known limitation, flagged by the user immediately after this
+        shipped, NOT yet handled by either `pushRotationToUpcomingMeetings`
+        or `applyRotationsToNewMeeting`:** Bishopric Meeting has a
+        recurring exception the push (and the original at-creation-time
+        assignment) doesn't know about. The user's own words: "the
+        tuesday meeting that follows the shortened sunday meeting on
+        the third sunday should have the same rotations assigned as
+        the previous sunday because those meetings are shortened and
+        often many of the assignments are skipped until there is more
+        time in the tuesday meeting." This is very likely the exact
+        Bishopric Meeting instance already described as a `relative`
+        Meeting Schedule cadence example elsewhere in this file ("2
+        days after the 3rd Sunday"), which would make it straightforward
+        to *identify* programmatically (that Tuesday's `meetings` row
+        has a date exactly 2 days after a Sunday matching "3rd Sunday of
+        the month," itself a Bishopric Meeting). What's genuinely
+        unresolved and needs the user's input before building anything,
+        not a guess: exactly which roles carry over from the shortened
+        Sunday to the following Tuesday ("many... are skipped," not
+        stated as all), whether the rotation pointer should advance at
+        all for the Tuesday occurrence (copying Sunday's person rather
+        than pulling "next" would double-count that person's turn across
+        two meetings unless the pointer is deliberately held), and
+        whether "the previous Sunday" always means the immediately
+        preceding Bishopric Meeting or specifically the 3rd Sunday's.
 - **Meeting Schedule** (`/meeting-schedule`): cadence rules
   (`meeting_schedule_rules`) drive a "Generate Meetings" action. Three
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`
@@ -657,71 +717,66 @@ avoid confusing the two.
 
 ## Known open items
 
-- **Suggestion, not yet built (2026-09-06): a Conference Schedule
-  page.** The user's own framing ("I would also like to suggest") --
-  recorded only, no build started. One place to enter Stake Conference
-  / General Conference date ranges (a conference spans more than one
-  day, so this needs start+end date, not a single date) that then
-  automatically cancels affected rows:
-  1. **General Conference:** every meeting (any type) on the conference
-     dates themselves, *and* every meeting in the week leading up to
-     it, *and* youth activities in that same lead-up week -- all
-     cancelled. The user's own words, given directly: "every meeting
-     the dates of the conference would be cancelled, as well as any
-     meeting in the week leading up to the conference" -- confirms this
-     is broader than the original ask (which only mentioned youth
-     activities for the lead-up week); any meeting in that week is
-     included too, not just activities.
-  2. **Stake Conference:** every meeting scheduled on the conference
-     dates themselves -- no lead-up week, and youth activities aren't
-     mentioned for Stake Conference at all. **Two remaining assumptions,
-     not yet confirmed by the user -- flag before building, don't just
-     build to these:**
-     - Whether Stake Conference should *also* cancel youth activities
-       falling on its dates (the user described General Conference's
-       effect on meetings and activities separately and explicitly,
-       then only mentioned "meetings" for Stake Conference -- reads as
-       deliberate, but worth a direct confirmation rather than assumed).
-     - Exact date-math for "the week leading up to" General Conference
-       -- current best guess is the 7 calendar days immediately before
-       the conference's start date, not a preceding Sunday-to-Saturday
-       calendar week.
-  Real pieces already in place this could build on rather than
-  reinvent: `special_format` already has `stake_conference`/
-  `general_conference` values (migration `033`, seeded with a single
-  Ward Business placeholder template since no real meeting happens
-  those Sundays) -- but that only affects a Sacrament Meeting's own
-  agenda, not other meeting types that day, and doesn't touch
-  `cancelled` at all. `meetings.cancelled`/`cancellation_note`
+- ~~**Conference Schedule page.**~~ **Built, then generalized, 2026-09-06.**
+  First built as a narrow General/Stake Conference-only feature, then
+  the user asked to broaden it immediately after: "instead of calling
+  it a conference schedule table it can be called a meeting
+  cancellation table. Because there are other specific holidays and
+  events where sacrament meeting is held but other meetings on that day
+  should be cancelled. So it could be a date, a reason, and a list of
+  meeting cancellations for the date." Shipped as that generalized
+  version, not the narrower one -- `/meeting-cancellations`
+  (Bishopric-only), a new `meeting_cancellations` table (migration
+  `039`: `start_date`, `end_date`, `reason` free text, `meeting_type_slugs`
+  a real Postgres `text[]` -- fine here since this is a bespoke page,
+  not the generic Table Admin engine which has no array column type --
+  and `cancel_youth_activities` boolean). Nothing about General/Stake
+  Conference is hardcoded in application code at all now -- an admin
+  enters both as two examples with whatever date range, reason, and
+  affected-types/youth-activities they choose, the same as any other
+  holiday or event. For General Conference specifically that means
+  entering the start date as the Monday of its own church-calendar week
+  and the end date as its closing Sunday (the user's own words on that
+  date math: "the church week ends on Sundays... conferences are
+  Saturdays and Sundays... the week leading up to the conference would
+  be Monday thru the Sunday of the conference") and checking all four
+  meeting types plus "cancel youth activities"; for Stake Conference,
+  just its own two dates and the meeting types, with youth activities
+  left unchecked (confirmed directly by the user: Stake Conference
+  never touches youth activities).
+  `lib/data/meeting-cancellations.ts`'s `sweepMeetingCancellations()` --
+  a lazy sweep matching `autoArchivePastMeetings`'s own pattern, run
+  from both `getUpcomingMeetings()` and `getYouthActivities()` so a
+  meeting/activity added *after* a cancellation was entered still gets
+  caught -- reuses the existing `meetings.cancelled`/`cancellation_note`
   (migration `037`) and `youth_activities.cancelled`/`cancellation_note`
-  (migration `032`) already exist and are already "shown, not hidden"
-  everywhere they're displayed -- a conference-dates table can just be
-  the thing that *sets* those existing flags in bulk across every
-  affected row, rather than needing a parallel cancellation concept of
-  its own. Leaning toward implementing the actual cancellation as a
-  lazy sweep (same pattern as `autoArchivePastMeetings` in
-  `lib/data/meetings.ts`) run whenever the relevant list is read, rather
-  than a one-time write at the moment a conference date is saved -- a
-  sweep also catches a meeting/activity added *after* the conference
-  date was entered, which a one-time write would miss. The sweep should
-  only ever *add* a cancellation, never auto-remove one (e.g. if a
-  conference's dates are later corrected or the row deleted) -- an
-  admin can always manually un-cancel via the existing per-row controls,
-  which avoids needing to track "cancelled by which conference" just to
-  know what to safely reverse.
-- **HIGH PRIORITY, not yet built (2026-09-06): split "My meetings" into
-  per-meeting-type tiles.** The user's own words: recorded as an
-  upcoming architecture change, explicitly not a build-now instruction
-  -- don't start without confirming that's changed. Today, the landing
-  page's (`app/page.tsx`) "My meetings" section (any logged-in user) has
-  exactly one tile, "Meetings" -> `/dashboard`, and `/dashboard` itself
-  shows every meeting of every type on one flat list, oldest first (no
-  filter -- see `getUpcomingMeetings()`, `lib/data/meetings.ts`). The
-  user wants that single tile replaced with one tile *per meeting type*
-  directly in "My meetings" -- removing the now-redundant intermediate
-  tile -- which "would also declutter the list... that is currently a
-  hodgepodge of all meetings and all dates," i.e. each new tile should
-  lead to that type's own meetings only, not the shared flat list.
+  (migration `032`) columns rather than a new cancellation concept, and
+  only ever sets `cancelled = true` on a row that isn't already
+  cancelled (`.eq("cancelled", false)`), so it can never clobber an
+  existing manual cancellation's note, and never auto-reverses anything
+  even if a cancellation's dates are later corrected or deleted (an
+  admin can always manually un-cancel via the existing per-row
+  controls).
+- ~~**Split "My meetings" into per-meeting-type tiles.**~~ **Built
+  2026-09-06**, including the one open question from when this was
+  first recorded: the user answered "only show the meetings that apply
+  to the person by nature of their calling." New
+  `lib/data/meeting-type-access.ts`'s `getVisibleMeetingTypesForUser`
+  resolves auth user -> `people` row (via `people.profile_id`) ->
+  callings currently held -> `meeting_type_members` (the same
+  calling-to-meeting-type mapping `lib/data/rotations.ts` already uses
+  for rotation eligibility) -> meeting types -- the landing page's "My
+  meetings" section now renders one tile per resolved type instead of
+  one generic "Meetings" tile, each linking to `/dashboard?type=<slug>`
+  (a new filter `/dashboard` now supports, with a "Show all types" link
+  back). Bishopric sees all four types regardless of their own calling,
+  since admins manage everything. **Important scope note:** this only
+  controls which *tile* shows up -- it is NOT the calling-based
+  non-admin *viewing* mechanism itself (still not built, see the
+  non-Sacrament workflow above). A non-admin whose calling resolves a
+  tile still lands on the admin-oriented `/dashboard` list filtered to
+  that type, which has real limits for them (e.g. `MeetingRow` still
+  gates on `isBuilt`/`canManage`) until that viewer exists.
   **Real open question to settle before building, not to assume:** which
   roles should see which type tiles? "My meetings" today is gated only
   to `{user}` (any logged-in account, no role check) -- but no

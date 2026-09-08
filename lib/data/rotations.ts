@@ -193,6 +193,95 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
   return {};
 }
 
+export interface PushRotationResult {
+  filled: number;
+  skippedExisting: number;
+}
+
+/**
+ * "Push rotations starting <date>" (the user's own request, 2026-09-06)
+ * -- fills in the applied-assignment grid from a rotation's own member
+ * order for every upcoming meeting of that type from the chosen date
+ * forward, to help with manual input (e.g. meetings created before a
+ * rotation had any members at all -- see the empty-rotation-membership
+ * finding elsewhere in PROJECT_CONTEXT.md -- never got their assignment
+ * row written by applyRotationsToNewMeeting at creation time). Only
+ * ever fills a blank cell -- a meeting that already has an assignment
+ * for this role is left alone, matching every other "override wins"
+ * rule already used throughout this app, and the pointer only advances
+ * for the ones actually filled, so this can't skip anyone's turn.
+ */
+export async function pushRotationToUpcomingMeetings(
+  rotationId: string,
+  fromDateISO: string
+): Promise<PushRotationResult | { error: string }> {
+  const supabase = await createClient();
+
+  const { data: rotation, error: rotationError } = await supabase
+    .from("rotations")
+    .select("id, meeting_type_id, element_key, next_index, meeting_types(slug), rotation_members(person_id, sort_order)")
+    .eq("id", rotationId)
+    .single();
+
+  if (rotationError || !rotation) {
+    return { error: rotationError?.message ?? "Rotation not found." };
+  }
+
+  const meetingType = Array.isArray(rotation.meeting_types) ? rotation.meeting_types[0] : rotation.meeting_types;
+  const slug = (meetingType as { slug?: string } | null)?.slug as MeetingTypeSlug | undefined;
+  if (!slug) return { error: "Could not determine this rotation's meeting type." };
+
+  const members = ((rotation.rotation_members ?? []) as { person_id: string; sort_order: number }[]).sort(
+    (a, b) => a.sort_order - b.sort_order
+  );
+  if (members.length === 0) return { error: "This rotation has no members yet." };
+
+  const table = gridTableFor(slug);
+
+  const { data: meetingRows } = await supabase
+    .from("meetings")
+    .select("id, date, meeting_types!inner(slug)")
+    .eq("meeting_types.slug", slug)
+    .gte("date", fromDateISO)
+    .order("date", { ascending: true });
+  const meetings = (meetingRows ?? []) as { id: string; date: string }[];
+  if (meetings.length === 0) return { filled: 0, skippedExisting: 0 };
+
+  const { data: existingAssignments } = await supabase
+    .from(table)
+    .select("meeting_id")
+    .eq("role", rotation.element_key)
+    .in(
+      "meeting_id",
+      meetings.map((m) => m.id)
+    );
+  const alreadyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+
+  let nextIndex = rotation.next_index;
+  let filled = 0;
+  let skippedExisting = 0;
+
+  for (const meeting of meetings) {
+    if (alreadyAssigned.has(meeting.id)) {
+      skippedExisting += 1;
+      continue;
+    }
+    const personId = members[nextIndex % members.length].person_id;
+    const row: Record<string, unknown> = { meeting_id: meeting.id, role: rotation.element_key, assigned_to_id: personId };
+    if (table === "sacrament_assignments") row.confirmed = false;
+    const { error: insertError } = await supabase.from(table).insert(row);
+    if (insertError) return { error: insertError.message };
+    nextIndex = (nextIndex + 1) % members.length;
+    filled += 1;
+  }
+
+  if (filled > 0) {
+    await supabase.from("rotations").update({ next_index: nextIndex }).eq("id", rotationId);
+  }
+
+  return { filled, skippedExisting };
+}
+
 /**
  * Bishop -> Bishopric First Counselor -> Bishopric Second Counselor, in
  * that fixed order, cycling every 3 calendar months regardless of how

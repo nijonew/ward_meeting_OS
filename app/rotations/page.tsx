@@ -4,12 +4,13 @@ import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAllRotations, getAssignmentGrid, type RotationRow } from "@/lib/data/rotations";
 import { getActivePeople, type PersonOption } from "@/lib/data/people";
+import { PushRotationForm } from "@/components/rotations/PushRotationForm";
+import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
 import {
   syncRotation,
   addRotationMember,
   removeRotationMember,
   moveRotationMember,
-  saveAssignmentGrid,
 } from "@/app/rotations/actions";
 import type { MeetingTypeSlug } from "@/lib/types";
 
@@ -66,31 +67,6 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
     >
       {label}
     </Link>
-  );
-}
-
-function PersonCell({
-  name,
-  people,
-  value,
-}: {
-  name: string;
-  people: PersonOption[];
-  value: string | null;
-}) {
-  return (
-    <select
-      name={name}
-      defaultValue={value ?? ""}
-      className="w-full min-w-[9rem] rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
-    >
-      <option value="">&mdash; Unassigned &mdash;</option>
-      {people.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -198,6 +174,8 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
           </button>
         </form>
       )}
+
+      {rotation.members.length > 0 && <PushRotationForm rotationId={rotation.id} />}
     </div>
   );
 }
@@ -288,69 +266,12 @@ export default async function RotationsPage({
             this range yet.
           </p>
         ) : (
-          <form
-            action={async (formData: FormData) => {
-              "use server";
-              await saveAssignmentGrid(selectedType, formData);
-            }}
-          >
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr>
-                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
-                      Meeting
-                    </th>
-                    {grid.columns.map((c) => (
-                      <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
-                        {c.label}
-                        {c.eligiblePeople.length === 0 && (
-                          <span className="mt-0.5 block normal-case tracking-normal text-red-700">
-                            No one eligible &mdash; check callings
-                          </span>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {grid.rows.map((row) => (
-                    <tr key={row.meetingId} className="border-t border-rule/60">
-                      <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.date)}</td>
-                      {grid.columns.map((c) => {
-                        const cell = row.cells[c.key];
-                        // Always keep the currently-assigned person selectable
-                        // even if they no longer show up as eligible (a
-                        // calling changed since) -- restricting the list to
-                        // "who could be assigned" shouldn't silently blank
-                        // out who actually IS assigned.
-                        const options =
-                          cell?.assignedToId && !c.eligiblePeople.some((p) => p.id === cell.assignedToId)
-                            ? [...c.eligiblePeople, { id: cell.assignedToId, name: `${cell.assignedToName ?? "Unknown"} (no longer eligible)` }]
-                            : c.eligiblePeople;
-                        return (
-                          <td key={c.key} className="px-2 py-1.5 align-top">
-                            <PersonCell
-                              name={`${row.meetingId}::${c.key}`}
-                              people={options}
-                              value={cell?.assignedToId ?? null}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <button
-              type="submit"
-              className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
-            >
-              Save All Changes
-            </button>
-          </form>
+          <AssignmentGridForm
+            meetingTypeSlug={selectedType}
+            columns={grid.columns}
+            rows={grid.rows}
+            formatDate={formatDate}
+          />
         )}
       </div>
 
