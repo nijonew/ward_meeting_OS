@@ -9,7 +9,7 @@ import {
   addRotationMember,
   removeRotationMember,
   moveRotationMember,
-  saveAssignmentGridRow,
+  saveAssignmentGrid,
 } from "@/app/rotations/actions";
 import type { MeetingTypeSlug } from "@/lib/types";
 
@@ -71,19 +71,16 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
 
 function PersonCell({
   name,
-  form,
   people,
   value,
 }: {
   name: string;
-  form: string;
   people: PersonOption[];
   value: string | null;
 }) {
   return (
     <select
       name={name}
-      form={form}
       defaultValue={value ?? ""}
       className="w-full min-w-[9rem] rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
     >
@@ -291,42 +288,35 @@ export default async function RotationsPage({
             this range yet.
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
-                    Meeting
-                  </th>
-                  {grid.columns.map((c) => (
-                    <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
-                      {c.label}
-                      {c.eligiblePeople.length === 0 && (
-                        <span className="mt-0.5 block normal-case tracking-normal text-red-700">
-                          No one eligible &mdash; check callings
-                        </span>
-                      )}
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await saveAssignmentGrid(selectedType, formData);
+            }}
+          >
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                      Meeting
                     </th>
-                  ))}
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {grid.rows.map((row) => {
-                  const rowFormId = `grid-row-${row.meetingId}`;
-                  const saveRow = async (formData: FormData) => {
-                    "use server";
-                    await saveAssignmentGridRow(row.meetingId, selectedType, formData);
-                  };
-                  return (
+                    {grid.columns.map((c) => (
+                      <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                        {c.label}
+                        {c.eligiblePeople.length === 0 && (
+                          <span className="mt-0.5 block normal-case tracking-normal text-red-700">
+                            No one eligible &mdash; check callings
+                          </span>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grid.rows.map((row) => (
                     <tr key={row.meetingId} className="border-t border-rule/60">
-                      <td className="px-2 py-2 align-top text-xs text-ink">
-                        {formatDate(row.date)}
-                        {/* Empty form -- every cell below references it via the
-                            HTML `form` attribute instead of nesting, since a
-                            <form> can't legally wrap multiple <td>s. */}
-                        <form id={rowFormId} action={saveRow} />
-                      </td>
+                      <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.date)}</td>
                       {grid.columns.map((c) => {
                         const cell = row.cells[c.key];
                         // Always keep the currently-assigned person selectable
@@ -341,29 +331,26 @@ export default async function RotationsPage({
                         return (
                           <td key={c.key} className="px-2 py-1.5 align-top">
                             <PersonCell
-                              name={c.key}
-                              form={rowFormId}
+                              name={`${row.meetingId}::${c.key}`}
                               people={options}
                               value={cell?.assignedToId ?? null}
                             />
                           </td>
                         );
                       })}
-                      <td className="px-2 py-1.5 align-top">
-                        <button
-                          type="submit"
-                          form={rowFormId}
-                          className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90"
-                        >
-                          Save
-                        </button>
-                      </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <button
+              type="submit"
+              className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+            >
+              Save All Changes
+            </button>
+          </form>
         )}
       </div>
 

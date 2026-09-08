@@ -7,39 +7,61 @@ import type { MeetingTypeSlug } from "@/lib/types";
 
 type ActionResult = { success: true } | { error: string };
 
+/** Grid field names are "<meetingId>::<roleKey>" so one <form> can carry
+ *  every row's selects at once (see app/rotations/page.tsx) -- this
+ *  splits them back apart. ":" never appears in a UUID or a role key,
+ *  so this can't collide/misparse. */
+function parseGridFieldName(name: string): { meetingId: string; roleKey: string } | null {
+  const idx = name.indexOf("::");
+  if (idx === -1) return null;
+  return { meetingId: name.slice(0, idx), roleKey: name.slice(idx + 2) };
+}
+
 /**
- * Saves every column in one grid row at once (see getAssignmentGrid) --
- * same delete-then-insert-if-set approach as saveElementPersonRole
- * (app/meetings/[id]/dynamic-planning-actions.ts), just applied to
- * several roles for one meeting in a single submit instead of one
- * role at a time. Purely a direct edit of the applied assignment --
- * never touches any rotation's member order or next_index pointer, so
- * saving here doesn't skip anyone in future meetings.
+ * Saves every cell on the grid (every meeting × every role currently
+ * shown) in one submit, per the user's own request (2026-09-06: "one
+ * single button on the page to save all changes"). Same
+ * delete-then-insert-if-set approach as saveElementPersonRole
+ * (app/meetings/[id]/dynamic-planning-actions.ts) -- just applied to
+ * every row at once instead of one meeting's roles at a time. Purely a
+ * direct edit of the applied assignment -- never touches any rotation's
+ * member order or next_index pointer, so saving here doesn't skip
+ * anyone in future meetings.
  */
-export async function saveAssignmentGridRow(
-  meetingId: string,
+export async function saveAssignmentGrid(
   meetingTypeSlug: MeetingTypeSlug,
   formData: FormData
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const table = gridTableFor(meetingTypeSlug);
-  const columns = gridColumnsFor(meetingTypeSlug);
+  const columnKeys = new Set(gridColumnsFor(meetingTypeSlug).map((c) => c.key));
 
-  for (const col of columns) {
-    const assignedToId = String(formData.get(col.key) ?? "") || null;
+  const byMeeting = new Map<string, Record<string, string>>();
+  for (const [name, value] of formData.entries()) {
+    const parsed = parseGridFieldName(name);
+    if (!parsed || !columnKeys.has(parsed.roleKey)) continue;
+    const values = byMeeting.get(parsed.meetingId) ?? {};
+    values[parsed.roleKey] = String(value);
+    byMeeting.set(parsed.meetingId, values);
+  }
 
-    const { error: deleteError } = await supabase
-      .from(table)
-      .delete()
-      .eq("meeting_id", meetingId)
-      .eq("role", col.key);
-    if (deleteError) return { error: deleteError.message };
+  for (const [meetingId, values] of byMeeting) {
+    for (const roleKey of columnKeys) {
+      const assignedToId = values[roleKey] || null;
 
-    if (assignedToId) {
-      const row: Record<string, unknown> = { meeting_id: meetingId, role: col.key, assigned_to_id: assignedToId };
-      if (table === "sacrament_assignments") row.confirmed = false;
-      const { error: insertError } = await supabase.from(table).insert(row);
-      if (insertError) return { error: insertError.message };
+      const { error: deleteError } = await supabase
+        .from(table)
+        .delete()
+        .eq("meeting_id", meetingId)
+        .eq("role", roleKey);
+      if (deleteError) return { error: deleteError.message };
+
+      if (assignedToId) {
+        const row: Record<string, unknown> = { meeting_id: meetingId, role: roleKey, assigned_to_id: assignedToId };
+        if (table === "sacrament_assignments") row.confirmed = false;
+        const { error: insertError } = await supabase.from(table).insert(row);
+        if (insertError) return { error: insertError.message };
+      }
     }
   }
 

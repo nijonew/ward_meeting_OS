@@ -183,6 +183,15 @@ exclusive access.
       selectable even if a calling change since means they're no longer
       "eligible," so an old assignment can't be silently blanked out by
       the narrower list.
+    - **One save button, not one per row** (2026-09-06, the user's own
+      follow-up): the whole grid is now a single `<form>` (a `<table>`
+      nests inside a `<form>` fine -- the earlier per-row-`<form>`
+      workaround, spanning `<td>`s via the HTML `form` attribute, was
+      only needed because a `<form>` itself can't wrap multiple `<td>`s)
+      submitting one `saveAssignmentGrid` action with a single "Save All
+      Changes" button. Field names are `"<meetingId>::<roleKey>"` so one
+      submit carries every row's selects; the action groups them back
+      apart before writing.
 - **Meeting Schedule** (`/meeting-schedule`): cadence rules
   (`meeting_schedule_rules`) drive a "Generate Meetings" action. Three
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`
@@ -648,6 +657,38 @@ avoid confusing the two.
 
 ## Known open items
 
+- **Suggestion, not yet built (2026-09-06): a Conference Schedule
+  page.** The user's own framing ("I would also like to suggest") --
+  recorded only, no build started. One place to enter Stake Conference
+  / General Conference dates that then automatically:
+  1. Shows every scheduled meeting (not just Sacrament Meeting --
+     "inform all scheduled meetings") as cancelled for that Sunday.
+  2. Shows youth activities cancelled for the week leading up to
+     General Conference specifically (as stated -- not clearly said to
+     also apply to Stake Conference; don't assume it does).
+  Real pieces already in place this could build on rather than
+  reinvent: `special_format` already has `stake_conference`/
+  `general_conference` values (migration `033`, seeded with a single
+  Ward Business placeholder template since no real meeting happens
+  those Sundays) -- but that only affects a Sacrament Meeting's own
+  agenda, not other meeting types that day, and doesn't touch
+  `cancelled` at all. `meetings.cancelled`/`cancellation_note`
+  (migration `037`) and `youth_activities.cancelled`/`cancellation_note`
+  (migration `032`) already exist and are already "shown, not hidden"
+  everywhere they're displayed -- a conference-dates table could very
+  plausibly just be the thing that *sets* those existing flags in bulk
+  across every affected row for the relevant date range, rather than
+  needing a parallel cancellation concept of its own. Needs real design
+  before building: a new table for conference dates (with an
+  admin page/section to manage them), exactly which meeting types get
+  auto-cancelled for the conference Sunday itself, the precise "week
+  leading up to" date-math (does "week" mean the preceding Sunday-to-
+  Saturday, the preceding 7 days, the preceding Wednesday only since
+  that's the only youth-activity night, etc.), and whether this needs
+  to run as a one-time write when a conference date is entered (simple,
+  but a later-added meeting/activity in that window wouldn't get
+  caught) or as a live computed check everywhere cancelled status is
+  read (more robust, more invasive).
 - **HIGH PRIORITY, not yet built (2026-09-06): split "My meetings" into
   per-meeting-type tiles.** The user's own words: recorded as an
   upcoming architecture change, explicitly not a build-now instruction
