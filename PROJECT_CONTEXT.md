@@ -48,10 +48,16 @@ reconstructed from both:
   confirmed run.
 - `040` (seeds `hymnal_songs` with the 1985 Hymnal and Hymns for Home
   and Church, completing Music Reference -- see Table Admin queue item
-  2 below): still needs to be run.
+  2 below): confirmed run.
 - `041` (drops `sacrament_assignments.confirmed`, re-defines
   `apply_rotation_assignment` to match -- priority queue item, see Known
-  open items below): still needs to be run.
+  open items below): **first attempt failed in production** -- two
+  anon-facing RLS policies gated on `confirmed` predated this repo's
+  migration history and blocked the column drop (`cannot drop column
+  confirmed ... because other objects depend on it`). File updated to
+  drop those two policies by name and replace them with one gated on
+  meeting stage instead (matching this migration's own new rule) --
+  still needs to be re-run with the corrected version.
 
 Next migration should be `042_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -1004,8 +1010,18 @@ before guessing further.
   migration 038 (re)documents the DB-side check constraint explicitly
   (it predates this repo's migration history and was never captured in
   a file).
-- ~~**Drop `confirmed` from the rotation-assignment tables.**~~ Done
-  2026-09-08 (migration `041`, still needs to be run). Turned out to
+- ~~**Drop `confirmed` from the rotation-assignment tables.**~~ Built
+  2026-09-08, **migration needed a second pass** (see migration history
+  above) -- ran `040`/`041` and `041` errored: two anon-facing RLS
+  policies on `sacrament_assignments` (`"public can view confirmed
+  assignments"`, `"public read confirmed"`) predated this repo's
+  migration history and blocked the column drop. Same situation
+  migration `038` hit for the `bishopric_assignments` check constraint
+  -- undocumented DB objects created directly in the SQL editor before
+  this file's migration history started. `041` now drops both by name
+  first and replaces them with one policy gated on the meeting's own
+  stage (`ready`/`live`) instead of the disappearing per-row flag --
+  still needs to be re-run with the corrected file. Turned out to
   only ever exist on `sacrament_assignments` -- `bishopric_assignments`
   never had this column (confirmed while tracing every read site; see
   the bug fix noted just below). Asked the user what should replace it;

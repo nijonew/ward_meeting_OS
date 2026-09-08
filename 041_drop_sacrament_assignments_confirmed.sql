@@ -17,10 +17,40 @@
 -- as "recently had a turn" -- unrelated concept, unrelated column, on a
 -- different pair of tables).
 --
--- Idempotent: `drop column if exists` and `create or replace function`
--- are both safe to re-run.
+-- Idempotent: `drop policy if exists`, `drop column if exists`, and
+-- `create or replace function` are all safe to re-run.
+--
+-- First attempt at this migration failed in production with:
+--   ERROR: 2BP01: cannot drop column confirmed of table
+--   sacrament_assignments because other objects depend on it
+--   DETAIL: policy "public can view confirmed assignments" ... depends
+--   on column confirmed ...; policy "public read confirmed" ... depends
+--   on column confirmed ...
+-- Both anon-facing RLS policies predate this repo's migration history
+-- (never captured in a file, same situation migration 038 found for
+-- the bishopric_assignments check constraint) -- they gated the public
+-- Sacrament Meeting program's anon read access on confirmed = true.
+-- Dropped explicitly below and replaced with a single policy gated on
+-- the meeting's own stage instead, matching the new rule this migration
+-- establishes app-wide: the meeting's stage (ready/live), not a
+-- per-row flag, is what makes an assignment visible to the public.
+
+drop policy if exists "public can view confirmed assignments" on sacrament_assignments;
+drop policy if exists "public read confirmed" on sacrament_assignments;
 
 alter table sacrament_assignments drop column if exists confirmed;
+
+drop policy if exists "public read ready sacrament assignments" on sacrament_assignments;
+create policy "public read ready sacrament assignments"
+  on sacrament_assignments for select
+  to anon
+  using (
+    exists (
+      select 1 from meetings
+      where meetings.id = sacrament_assignments.meeting_id
+        and meetings.stage in ('ready', 'live')
+    )
+  );
 
 -- Re-defines apply_rotation_assignment (migration 025) without the
 -- confirmed argument to its sacrament_assignments insert -- the column
