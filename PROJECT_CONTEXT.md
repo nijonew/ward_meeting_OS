@@ -663,6 +663,47 @@ Candidates down to exactly one person before announcing" message in
 both the server action's own error and the "Ready to Announce" list on
 the page (rather than silently guessing which candidate was meant).
 
+**Candidates picker replaced with a chip-style multi-select, and
+sort/filter added, same day (2026-09-08), per two more user follow-ups
+right after the above shipped.** A native `<select multiple>` requires
+holding Ctrl/Cmd to pick more than one option and always shows the
+entire list, not just what's chosen -- the user asked for something
+closer to a spreadsheet's data-validation dropdown instead: "only
+showing what is selected... easy multi-select without a cntrl click."
+New `components/calling-planning/MultiPersonSelect.tsx`: selected
+people render as removable chips (&times; to remove), plus one plain
+single-choice `<select>` below them to add another (already excludes
+whoever's picked, so nothing can be added twice) -- no modifier key,
+and the closed dropdown never shows anyone already chosen. It's
+uncontrolled by the parent grid (its own `useState` seeded from
+`value`, same pattern as every other field in this grid) and renders
+its own hidden `<input>`s under the shared field name so
+`saveCallingPlanningGrid`'s existing `formData.getAll(name)` handling
+picks it up exactly like the native multi-select did -- no server
+action changes needed for this part. Since adding/removing a chip
+doesn't fire a native DOM change event the form's own `onChange`
+bubbling would catch, it takes an explicit `onDirty` callback instead,
+called directly on every add/remove.
+
+The user then also asked, in the same breath, for **filter and sort on
+the grid's columns** -- added to `CallingPlanningGridForm.tsx` itself:
+a sortable `<th>` per column (click to sort ascending/descending, third
+click clears -- identical convention to `AdminTableEditor.tsx`'s
+sortable headers) plus a small filter text box under each heading,
+purely client-side over the already-fetched `rows` prop, matching that
+same file's own scoping precedent. One thing genuinely different from
+`AdminTableEditor`'s version: a **filtered-out row stays mounted in the
+DOM** (`hidden` attribute on its `<tr>`, not removed from the array
+being rendered) rather than actually being excluded -- this grid is one
+big `<form>` covering every row's every field via uncontrolled inputs,
+so removing a row from the render tree would drop its current
+(possibly just-edited, not-yet-saved) values from the next Save All
+Changes submission the moment a filter happens to hide it. Sort and
+filter both compare against each column's last-saved/committed value
+(via a shared `cellText(row, column)` lookup -- calling/status/release
+names resolved from their id, not shown raw), not whatever's currently
+sitting in an open, unsaved input.
+
 ### Workflow / policy: Adding new people (privacy & data-usage stance)
 
 Deliberate policy, not just a workflow — the user weighed this and
