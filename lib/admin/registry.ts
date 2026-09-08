@@ -1,6 +1,7 @@
 import type { AdminTableConfig } from "./types";
 import {
   ASSIGNMENT_ROLES,
+  BISHOPRIC_ASSIGNMENT_ROLES,
   MUSIC_TYPES,
   RABNM_TYPES,
   SPECIAL_FORMATS,
@@ -189,7 +190,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Bishopric Meeting Assignment Rotation",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("bishopric-meeting") },
-      { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
+      { column: "role", label: "Role", type: "select", required: true, options: [...BISHOPRIC_ASSIGNMENT_ROLES] },
       { column: "assigned_to_id", label: "Assigned To", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "confirmed", label: "Confirmed", type: "boolean" },
     ],

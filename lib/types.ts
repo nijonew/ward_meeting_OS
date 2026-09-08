@@ -47,4 +47,13 @@ export interface Meeting {
   /** "HH:MM" 24-hour, or null if not set (older meetings predate this field). */
   timeOfDay: string | null;
   durationMinutes: number | null;
+  /** Independent of `stage` -- a cancelled meeting is still shown (with
+   *  the note), not hidden, same shape as youth_activities.cancelled. */
+  cancelled: boolean;
+  cancellationNote: string | null;
+  /** Computed, not persisted: true when a past meeting was left
+   *  un-archived by the auto-archive sweep because no real content was
+   *  ever entered for it (see lib/data/meetings.ts). Only meaningful on
+   *  rows returned by getUpcomingMeetings(). */
+  noActivity?: boolean;
 }

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getMeetingById } from "@/lib/data/meetings";
 import {
   getMeetingWithType,
   getApplicableElements,
@@ -46,6 +47,13 @@ export default async function TemplatePage({
   const meeting = await getMeetingWithType(meetingId);
   if (!meeting) {
     return <p className="text-slate">Could not load this meeting.</p>;
+  }
+  // Archived meetings are read-only from here on -- editing the agenda
+  // after the fact would contradict "the agenda as it was finalized"
+  // (see app/meetings/[id]/archived).
+  const meetingStage = await getMeetingById(meetingId);
+  if (meetingStage?.stage === "archived") {
+    redirect(`/meetings/${meetingId}/archived`);
   }
 
   const [applicable, included] = await Promise.all([

@@ -5,6 +5,7 @@ import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
+import { cancelMeeting, uncancelMeeting } from "@/app/dashboard/actions";
 import type { Meeting } from "@/lib/types";
 
 function formatMeetingDate(iso: string) {
@@ -15,12 +16,20 @@ function formatMeetingDate(iso: string) {
   });
 }
 
-function MeetingRow({ meeting, isBuilt }: { meeting: Meeting; isBuilt: boolean }) {
+function MeetingRow({
+  meeting,
+  isBuilt,
+  canManage,
+}: {
+  meeting: Meeting;
+  isBuilt: boolean;
+  canManage: boolean;
+}) {
   const card = (
     <div
       className={[
         "flex flex-col gap-3 rounded-md border px-5 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between",
-        isBuilt ? "border-rule bg-card hover:border-ink/30" : "border-rule/60",
+        meeting.cancelled ? "border-red-900/30 bg-red-950/5" : isBuilt ? "border-rule bg-card hover:border-ink/30" : "border-rule/60",
       ].join(" ")}
     >
       <div>
@@ -29,10 +38,25 @@ function MeetingRow({ meeting, isBuilt }: { meeting: Meeting; isBuilt: boolean }
         </p>
         <p className={["font-display text-lg", isBuilt ? "text-ink" : "text-ink/40"].join(" ")}>
           {meeting.title}
+          {meeting.cancelled && (
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
+              Cancelled
+            </span>
+          )}
+          {meeting.noActivity && !meeting.cancelled && (
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-slate/50">
+              No Activity
+            </span>
+          )}
         </p>
         <p className={isBuilt ? "text-sm text-slate" : "text-sm text-slate/60"}>
           {formatMeetingDate(meeting.date)}
         </p>
+        {meeting.cancelled && (
+          <p className="mt-1 text-xs text-red-700">
+            Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
@@ -46,15 +70,52 @@ function MeetingRow({ meeting, isBuilt }: { meeting: Meeting; isBuilt: boolean }
     </div>
   );
 
-  if (!isBuilt) {
-    return <li>{card}</li>;
+  const linked = isBuilt ? (
+    <Link href={`/meetings/${meeting.id}`} className="block">
+      {card}
+    </Link>
+  ) : (
+    card
+  );
+
+  if (!canManage || meeting.stage === "archived") {
+    return <li>{linked}</li>;
   }
 
+  const uncancel = async () => {
+    "use server";
+    await uncancelMeeting(meeting.id);
+  };
+  const cancel = async (formData: FormData) => {
+    "use server";
+    await cancelMeeting(formData);
+  };
+
   return (
-    <li>
-      <Link href={`/meetings/${meeting.id}`} className="block">
-        {card}
-      </Link>
+    <li className="flex flex-col gap-1.5">
+      {linked}
+      <div className="flex items-center gap-2 px-1">
+        {meeting.cancelled ? (
+          <form action={uncancel}>
+            <button type="submit" className="text-xs text-slate hover:text-ink">
+              Un-cancel
+            </button>
+          </form>
+        ) : (
+          <form action={cancel} className="flex items-center gap-1">
+            <input type="hidden" name="id" value={meeting.id} />
+            <input
+              type="text"
+              name="cancellation_note"
+              placeholder="Reason (optional)"
+              className="w-40 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
+            />
+            <button type="submit" className="text-xs text-slate hover:text-ink">
+              Cancel Meeting
+            </button>
+          </form>
+        )}
+      </div>
     </li>
   );
 }
@@ -159,6 +220,7 @@ export default async function DashboardPage() {
               key={meeting.id}
               meeting={meeting}
               isBuilt={builtSlugs.has(meeting.meetingType)}
+              canManage={canCreate}
             />
           ))}
         </ul>

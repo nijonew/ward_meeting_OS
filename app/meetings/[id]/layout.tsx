@@ -49,7 +49,11 @@ export default async function MeetingLayout({
     notFound();
   }
 
-  const tabs = meeting.meetingType === "sacrament-meeting" ? SACRAMENT_TABS : COLLABORATIVE_TABS;
+  const baseTabs = meeting.meetingType === "sacrament-meeting" ? SACRAMENT_TABS : COLLABORATIVE_TABS;
+  // Once archived, the meeting is read-only (see app/meetings/[id]/archived) --
+  // add that tab rather than replace the others, since Public/Conducting
+  // still make sense to glance at for a Sacrament Meeting.
+  const tabs = meeting.stage === "archived" ? [...baseTabs, { slug: "archived", label: "Archived" }] : baseTabs;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -59,8 +63,13 @@ export default async function MeetingLayout({
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">{meeting.title}</h1>
         <p className="mt-1 text-slate">{formatMeetingDate(meeting.date)}</p>
 
-        <div className="mt-6 overflow-x-auto pb-1">
+        <div className="mt-6 flex flex-wrap items-center gap-3 overflow-x-auto pb-1">
           <LifecycleBadge stage={meeting.stage} />
+          {meeting.cancelled && (
+            <span className="whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-red-700">
+              Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
+            </span>
+          )}
         </div>
       </section>
 

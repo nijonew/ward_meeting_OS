@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 036
+## Current migration number: 038
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -40,8 +40,12 @@ reconstructed from both:
 - `036` (corrected Primary Program/Christmas/Easter sacrament templates
   per the user's review -- see Table Admin queue item 3 below):
   confirmed run.
+- `037` (`meetings.cancelled`/`cancellation_note` -- Cancel a meeting
+  from the dashboard) and `038` (re-documents/corrects the
+  `bishopric_assignments_role_check` constraint): both still need to be
+  run.
 
-Next migration should be `037_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `039_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -397,15 +401,24 @@ just a distinct verb for "notes, once someone reports on them later."
   (`meeting_action_items.assigned_to_id` is a single FK to `people`) —
   no concept of assigning to an *organization* (a quorum, auxiliary,
   class, etc.) exists in the schema at all.
-- **No distinct "view an archived meeting" experience exists.**
-  Confirmed by checking every route under `app/meetings/[id]/` — none
-  branches on `stage === 'archived'`. An archived meeting is presumably
-  still shown through the same editable planning form as any other,
-  with no read-only finalized-agenda view, and no visual treatment
-  distinguishing notes from the elements they describe.
-- The non-admin post-archive visibility rule (item 5 in the
-  non-Sacrament workflow above) still isn't built — reconfirmed here,
-  not a new gap.
+- ~~No distinct "view an archived meeting" experience exists.~~ --
+  **built 2026-09-06**: `app/meetings/[id]/archived` renders the
+  finalized agenda read-only (element order exactly as it was when
+  archived, via the same `getPlannedElements`/`getTemplateElements`
+  fallback Planning uses), with note-style content (free-text/
+  person-and-text values, RABNM detail, action item descriptions,
+  bishopric minutes free-text fields, council notes, agenda item
+  bodies) rendered in a highlighted box distinct from plain resolved
+  content (assigned names, hymns, speakers) — the font-color
+  distinction this workflow asked for. Planning/Live/Template all
+  redirect here once `stage === 'archived'` (editing after archiving
+  would contradict "the agenda as it was finalized"); Conducting/Public
+  were left alone (already naturally moot/date-gated post-archive).
+  **Admin-only for now** — the non-admin post-archive visibility rule
+  (item 5 in the non-Sacrament workflow above) still isn't built, since
+  it depends on the calling-based non-admin viewer, a separate
+  not-yet-picked-up item; this view is scoped so that feature can reuse
+  it later rather than needing a second read-only renderer.
 
 ### ~~Workflow: Adding agenda items for a non-Sacrament meeting~~ — built 2026-09-05
 
@@ -585,34 +598,40 @@ avoid confusing the two.
   through an unguessable link, not auth) — not built yet. **Superseded by
   the Vision & Intended Workflows section above**, which instead calls
   for login + calling-based read access — treat that as authoritative.
-- Dashboard shows every meeting, past and future, oldest first —
-  `getUpcomingMeetings()` (lib/data/meetings.ts) has no date or stage
-  filter at all despite the name. Two follow-ups noticed while using it
-  day to day (2026-09-04), not yet built:
-  - **Auto-archive past meetings.** Once a meeting's date has passed: if
-    real data was entered for it (assignments/music/planning/notes rows
-    exist for that meeting_id), move its `stage` to `archived`
-    automatically instead of leaving it sitting in whatever stage it was
-    last saved at. If nothing was ever entered, don't force it to
-    `archived` — mark it some other way (e.g. a "No activity" badge) so
-    it's visually distinct from a past meeting that was actually run.
-    Needs a decision before building: what exactly counts as "data was
-    added" (which tables/columns to check per meeting type), and how the
-    transition gets triggered (computed on dashboard render vs. a
-    scheduled job vs. a manual "Archive past meetings" action). **The
-    Vision & Intended Workflows section above specifies this for
-    Sacrament Meeting**: automatic at end-of-day Sunday, not a manual
-    action -- reconcile with this note once picked up.
-  - **Cancel a meeting from the dashboard.** A status control separate
-    from the planning-progress `stage` field — something like
-    Scheduled/Cancelled, with a reason when cancelled. Likely a new
-    column (or two) on `meetings` rather than overloading `stage`, since
-    `stage` tracks how far along the program is, not whether the meeting
-    is happening at all. Lower priority than the auto-archive item.
-    `youth_activities` got exactly this treatment (`cancelled` +
-    `cancellation_note`, shown not hidden) built 2026-09-05 as part of
-    the "Adult leaders planning youth activities" workflow above — worth
-    reusing that same shape for `meetings` when this gets picked up.
+- ~~Dashboard shows every meeting, past and future, oldest first — no
+  auto-archive or cancel control.~~ **Both built 2026-09-06:**
+  - **Auto-archive past meetings.** `getUpcomingMeetings()`
+    (`lib/data/meetings.ts`) now runs `autoArchivePastMeetings()` on
+    every call: any meeting whose date is in the past and isn't already
+    `archived` gets archived if it had real activity, or is left alone
+    and flagged `noActivity` (computed, not persisted) for the
+    dashboard's "No Activity" badge otherwise. No scheduled-job
+    infrastructure exists in this app (no Vercel Cron / Supabase
+    pg_cron), so this is a **lazy sweep on dashboard render**, not
+    exactly at end-of-day per the Sacrament Meeting workflow's wording
+    above — eventually consistent (archives on the next page view after
+    the date passes) rather than at midnight, which is fine for a tool
+    nobody is watching in real time. "Real activity" deliberately checks
+    only tables that are *never* auto-seeded at meeting creation
+    (`meeting_element_notes`, `sacrament_music`,
+    `sacrament_speakers_adults/youth`, `sacrament_rabnm`,
+    `agenda_items`, `meeting_action_items`, `council_notes`,
+    `bishopric_minutes`) -- `sacrament_assignments`/
+    `bishopric_assignments` (rotation-seeded at creation via
+    `applyRotationsToNewMeeting`) and `sacrament_planning` (inserted at
+    creation too) were deliberately excluded, since their mere
+    existence proves nothing about whether anyone actually did
+    anything -- the open item's original "assignments/planning rows
+    exist" wording would have flagged every meeting as "real activity"
+    immediately, which isn't what was wanted.
+  - **Cancel a meeting from the dashboard.** Migration `037` adds
+    `meetings.cancelled`/`cancellation_note`, same shape as
+    `youth_activities` (migration `032`) -- shown, not hidden. Per-row
+    Cancel (with an optional reason)/Un-cancel controls on `/dashboard`,
+    bishopric-only; a cancelled meeting shows a red badge + note there
+    and in the meeting's own header (`app/meetings/[id]/layout.tsx`). A
+    cancelled meeting auto-archives once its date passes regardless of
+    activity -- being cancelled already explains the lack of it.
 - ~~**Cadence rules for Youth Activities / Ward Events.**~~ Done
   2026-09-05, two complementary pieces built independently in parallel
   sessions (see the note under "Adult leaders planning youth activities"
@@ -649,6 +668,62 @@ avoid confusing the two.
   to sort the grid by that column, presumably click-again to reverse.
   Client-side only (re-sort the already-fetched `rows` array in
   component state) -- doesn't need a schema or server change.
+- ~~**Bug: `bishopric_assignments` role check violation.**~~ **Fixed
+  2026-09-06** (migration `038`): Table Admin's "Bishopric Meeting
+  Assignment Rotation" grid offered the full Sacrament Meeting role
+  list (Presiding/Conducting/Chorister/Organist/prayers) for
+  `bishopric_assignments.role` -- `lib/admin/registry.ts` had been
+  reusing `ASSIGNMENT_ROLES` wholesale, but Presiding/Conducting/
+  Chorister/Organist only ever go into `sacrament_assignments`.
+  Confirmed against migration `034`'s real rotation seed data that
+  `bishopric_assignments` (shared by Bishopric Meeting, Ward Council,
+  Youth Council) only ever configures opening_prayer/closing_prayer/
+  spiritual_thought/handbook_training -- new `BISHOPRIC_ASSIGNMENT_ROLES`
+  constant (`lib/data/sacrament-constants.ts`) reflects that, and
+  migration 038 (re)documents the DB-side check constraint explicitly
+  (it predates this repo's migration history and was never captured in
+  a file).
+- **Future: drop `confirmed` from the rotation-assignment tables**
+  (`sacrament_assignments`/`bishopric_assignments`). Noted by the user
+  2026-09-06 while hitting the role-check bug above -- not acted on yet,
+  just recorded so it isn't lost. Ask what should replace it (if
+  anything) before removing -- the public program currently reads
+  `confirmed` to decide what to print (see `lib/data/public-view.ts`).
+- **Bug report: sign-out doesn't seem to take effect.** (2026-09-06,
+  not yet reproduced/fixed) Reviewed `app/auth/actions.ts`'s `signOut`
+  (calls `supabase.auth.signOut()` then `redirect("/login")`) and
+  `lib/supabase/server.ts`'s cookie adapter (`setAll` does call
+  `cookieStore.set(...)`, only swallowing the specific
+  Server-Component-render error via try/catch -- which shouldn't apply
+  inside a Server Action) -- both look correct on static review, and no
+  `middleware.ts` exists to be silently re-establishing the session.
+  Root cause not found by reading code alone; needs live reproduction
+  (check the browser's cookies/network tab after clicking Sign Out)
+  next time it's picked up.
+- **Reminder: 1985 Hymnal / newly-released hymns still not in Music
+  Reference.** Re-flagged by the user 2026-09-06 -- unchanged from the
+  Table Admin queue's own note (item 2 below): only the Children's
+  Songbook is populated so far; the 1985 Hymnal and Hymns for Home and
+  Church remain unpopulated (fetch-heavy, ask before spending the
+  WebFetch budget on it, especially Hymns for Home and Church since
+  it's still being released in volumes).
+- **Feature request: pre-fill rotation Table Admin grids with every
+  upcoming meeting × role combination.** (2026-09-06, not built) The
+  user wants `/admin`'s "Sacrament Meeting Rotations"/"Bishopric
+  Meeting Assignment Rotation" grids to show a row for every applicable
+  role on every upcoming meeting up front (ready to just fill in
+  "Assigned To"), instead of only showing rows that already exist and
+  requiring "+ Add Row" one at a time for anything missing. The generic
+  Table Admin engine only ever renders real DB rows today -- synthesizing
+  "virtual" placeholder rows for missing combinations would be a real
+  engine feature, not a config tweak. Likely related: if rotation
+  membership is populated (see the empty-rotation-membership finding
+  logged under migration 025 above, on the not-yet-merged
+  `claude/project-workflow-review-226b91` branch), `applyRotationsToNewMeeting`
+  should already auto-create most of these rows at meeting-creation
+  time, which would reduce -- maybe eliminate -- the need for this UI
+  work; worth checking rotation membership state before building the
+  engine feature itself.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 
@@ -728,7 +803,15 @@ or note partial progress) as each is picked up.
    existing Ward Business element (`sacrament_rabnm`'s `baby_blessing`
    type), no template change needed. Two new `meeting_elements` catalog rows
    added: `recognize_music` (announcing the rotation-assigned
-   chorister/organist) and `primary_program`. Missionary speakers reuse
+   chorister/organist) and `primary_program`. **Confirmed 2026-09-06**
+   (the user pointed out a printed-program-vs-conducting-script
+   distinction, already matching what's built): the public program
+   (`lib/data/public-view.ts`) lists Chorister and Organist as their own
+   named lines, while the conducting script (`lib/data/conducting.ts`)
+   has no separate lines for them at all -- Recognize Music is one
+   spoken cue naming both ("We would like to thank {chorister}... and
+   {organist}...") rather than two individual introductions. No change
+   needed. Missionary speakers reuse
    the existing `speaker` slots (noted via topic/guest name) rather than
    getting a distinct catalog role, per the user's decision -- a real
    third speaker category (own table + form, mirroring Speaker/Youth

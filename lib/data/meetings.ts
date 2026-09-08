@@ -23,12 +23,17 @@ export async function getMeetingTypes(): Promise<MeetingType[]> {
   }));
 }
 
+const MEETING_SELECT_COLUMNS =
+  "id, date, stage, time_of_day, duration_minutes, cancelled, cancellation_note, meeting_types(slug, name)";
+
 function mapMeetingRow(row: {
   id: string;
   date: string;
   stage: string;
   time_of_day: string | null;
   duration_minutes: number | null;
+  cancelled?: boolean | null;
+  cancellation_note?: string | null;
   meeting_types: { slug: string; name: string }[] | { slug: string; name: string } | null;
 }): Meeting {
   const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
@@ -41,21 +46,104 @@ function mapMeetingRow(row: {
     stage: row.stage as MeetingLifecycleStage,
     timeOfDay: row.time_of_day,
     durationMinutes: row.duration_minutes,
+    cancelled: row.cancelled ?? false,
+    cancellationNote: row.cancellation_note ?? null,
   };
 }
 
+/**
+ * Tables that only ever gain a row for a given meeting_id through real
+ * human action -- never auto-seeded at meeting-creation time. Used by
+ * the auto-archive sweep below to tell "nothing happened here yet"
+ * apart from "the meeting was actually run."
+ *
+ * Deliberately EXCLUDES sacrament_assignments/bishopric_assignments and
+ * sacrament_planning: applyRotationsToNewMeeting/applyFixedSacramentRoles
+ * (lib/data/rotations.ts) write rotation-assigned roles (Presiding,
+ * Conducting, Chorister, Organist, prayers, etc.) into the assignments
+ * tables the moment a meeting is *created*, and app/meetings/new/actions.ts
+ * inserts a sacrament_planning row at creation too -- so those tables
+ * having rows proves nothing about whether anyone actually did anything
+ * with the meeting. meeting_planned_elements is excluded for the same
+ * reason (seeded from the template at creation, migration 033).
+ */
+const REAL_ACTIVITY_TABLES = [
+  "meeting_element_notes",
+  "sacrament_music",
+  "sacrament_speakers_adults",
+  "sacrament_speakers_youth",
+  "sacrament_rabnm",
+  "agenda_items",
+  "meeting_action_items",
+  "council_notes",
+  "bishopric_minutes",
+] as const;
+
+async function meetingHasRealActivity(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  meetingId: string
+): Promise<boolean> {
+  for (const table of REAL_ACTIVITY_TABLES) {
+    const { data } = await supabase.from(table).select("meeting_id").eq("meeting_id", meetingId).limit(1);
+    if (data && data.length > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * No scheduled-job infrastructure exists in this app (no Vercel Cron /
+ * Supabase pg_cron wired up), so "automatic at end of day" is
+ * implemented as a lazy sweep run on every dashboard load instead --
+ * eventually consistent (archives on the next page view after the
+ * meeting's date passes) rather than exactly at midnight, which is
+ * fine for a ward planning tool nobody is watching in real time.
+ *
+ * A meeting whose date has passed either gets archived (if real
+ * activity was recorded, or if it was cancelled -- being cancelled
+ * already explains why nothing was entered) or is left as-is and
+ * reported back as "no activity" so the dashboard can badge it
+ * distinctly from a meeting that was actually run, per the
+ * "Auto-archive past meetings" open item in PROJECT_CONTEXT.md.
+ */
+async function autoArchivePastMeetings(): Promise<Set<string>> {
+  const supabase = await createClient();
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const { data: pastMeetings } = await supabase
+    .from("meetings")
+    .select("id, cancelled")
+    .lt("date", todayIso)
+    .neq("stage", "archived");
+
+  const noActivityIds = new Set<string>();
+  if (!pastMeetings) return noActivityIds;
+
+  for (const m of pastMeetings as { id: string; cancelled: boolean | null }[]) {
+    const shouldArchive = m.cancelled || (await meetingHasRealActivity(supabase, m.id));
+    if (shouldArchive) {
+      await supabase.from("meetings").update({ stage: "archived" }).eq("id", m.id);
+    } else {
+      noActivityIds.add(m.id);
+    }
+  }
+
+  return noActivityIds;
+}
+
 export async function getUpcomingMeetings(): Promise<Meeting[]> {
+  const noActivityIds = await autoArchivePastMeetings();
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, stage, time_of_day, duration_minutes, meeting_types(slug, name)")
+    .select(MEETING_SELECT_COLUMNS)
     .order("date", { ascending: true });
 
   if (error || !data) {
     return [];
   }
 
-  return data.map(mapMeetingRow);
+  return data.map((row) => ({ ...mapMeetingRow(row), noActivity: noActivityIds.has(row.id) }));
 }
 
 export async function getUpcomingMeeting(): Promise<Meeting | null> {
@@ -81,7 +169,7 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
 
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, stage, time_of_day, duration_minutes, meeting_types(slug, name)")
+    .select(MEETING_SELECT_COLUMNS)
     .eq("date", today)
     .in("stage", ["ready", "live"]);
 
@@ -146,7 +234,7 @@ export async function getMeetingById(id: string): Promise<Meeting | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, stage, time_of_day, duration_minutes, meeting_types(slug, name)")
+    .select(MEETING_SELECT_COLUMNS)
     .eq("id", id)
     .single();
 

@@ -20,6 +20,27 @@ export const ASSIGNMENT_ROLES = [
   { value: "organist", label: "Organist" },
 ] as const;
 
+/**
+ * The person_role rotation elements that actually apply to
+ * bishopric_assignments (shared by Bishopric Meeting, Ward Council, and
+ * Youth Council -- see roleTable in app/meetings/[id]/planning/page.tsx).
+ * Presiding/Conducting/Chorister/Organist are Sacrament-Meeting-only
+ * concepts that only ever go into sacrament_assignments (Conducting is
+ * fixed by calling via applyFixedSacramentRoles, not this rotation
+ * table, in fact) -- confirmed against migration 034's real rotation
+ * seed data, which only configures opening_prayer/closing_prayer/
+ * spiritual_thought/handbook_training rotations for these three types.
+ * 2026-09-06: registry.ts's Table Admin config for bishopric_assignments
+ * had been reusing the full sacrament ASSIGNMENT_ROLES list, letting an
+ * admin pick "Presiding" and hit bishopric_assignments_role_check.
+ */
+export const BISHOPRIC_ASSIGNMENT_ROLES = [
+  { value: "opening_prayer", label: "Opening Prayer" },
+  { value: "closing_prayer", label: "Closing Prayer" },
+  { value: "spiritual_thought", label: "Spiritual Thought" },
+  { value: "handbook_training", label: "Handbook Training" },
+] as const;
+
 export const SPEAKER_SLOTS_ADULT = [
   "speaker_1",
   "speaker_2",

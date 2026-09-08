@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getBishopricMeetingData } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
@@ -13,6 +14,11 @@ export default async function LiveViewPage({
 
   if (!meeting) {
     return <p className="text-slate">Could not load this meeting.</p>;
+  }
+  // Archived meetings are read-only from here on -- see
+  // app/meetings/[id]/archived (the "agenda as it was finalized" view).
+  if (meeting.stage === "archived") {
+    redirect(`/meetings/${meetingId}/archived`);
   }
 
   if (meeting.meetingType === "bishopric-meeting") {

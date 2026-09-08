@@ -56,6 +56,11 @@ export default async function PlanningViewPage({
   if (!meeting) {
     return <p className="text-slate">Could not load this meeting.</p>;
   }
+  // Archived meetings are read-only from here on -- see
+  // app/meetings/[id]/archived (the "agenda as it was finalized" view).
+  if (meeting.stage === "archived") {
+    redirect(`/meetings/${meetingId}/archived`);
+  }
 
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) {
