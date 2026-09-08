@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 039
+## Current migration number: 040
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -46,8 +46,11 @@ reconstructed from both:
 - `039` (new `meeting_cancellations` table -- generalized from an
   earlier conference-only design, see Known open items below):
   confirmed run.
+- `040` (seeds `hymnal_songs` with the 1985 Hymnal and Hymns for Home
+  and Church, completing Music Reference -- see Table Admin queue item
+  2 below): still needs to be run.
 
-Next migration should be `040_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `041_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -917,13 +920,17 @@ avoid confusing the two.
   Root cause not found by reading code alone; needs live reproduction
   (check the browser's cookies/network tab after clicking Sign Out)
   next time it's picked up.
-- **Reminder: 1985 Hymnal / newly-released hymns still not in Music
-  Reference.** Re-flagged by the user 2026-09-06 -- unchanged from the
-  Table Admin queue's own note (item 2 below): only the Children's
-  Songbook is populated so far; the 1985 Hymnal and Hymns for Home and
-  Church remain unpopulated (fetch-heavy, ask before spending the
-  WebFetch budget on it, especially Hymns for Home and Church since
-  it's still being released in volumes).
+- ~~**1985 Hymnal / newly-released hymns not in Music Reference.**~~
+  **Fully populated 2026-09-08** (migration `040`): the user pasted the
+  complete title list for both remaining collections directly (with
+  real hymn numbers), so unlike the Children's Songbook (migration
+  `027`, fetched page-by-page from churchofjesuschrist.org) this needed
+  no WebFetch budget at all -- straight transcription from what was
+  given. `hymns_1985`: all 341 hymns, 1-341, contiguous. `hymns_for_home_and_church`:
+  82 entries across its two released number blocks (1001-1072, 1201-1210)
+  -- that gap is the hymnal's own real numbering scheme (categories
+  reserved for volumes not yet released), not a transcription gap. Music
+  Reference is now fully populated across all three collections.
 - ~~**Feature request: pre-fill rotation grids with every upcoming
   meeting × role combination.**~~ **Built 2026-09-06** as the
   applied-assignment grid on `/rotations` (see the Assignment Rotations
@@ -962,11 +969,11 @@ or note partial progress) as each is picked up.
    official title index, letter by letter (migration `027`) -- a
    good-faith transcription, not verified-perfect; a handful of entries
    where the source's own views disagreed were left out rather than
-   guessed at. The 1985 Hymnal and Hymns for Home and Church are NOT
-   populated yet -- same approach works but is very fetch-heavy (~20-30
-   page loads per collection); ask the user before spending that,
-   especially on Hymns for Home and Church since it's still being
-   released in volumes.
+   guessed at. The 1985 Hymnal and Hymns for Home and Church were later
+   populated too (migration `040`, 2026-09-08) -- the user pasted both
+   collections' full title lists directly, so that one needed no
+   WebFetch budget at all. Music Reference is now fully populated
+   across all three collections.
 3. ~~**Sacrament Planning.**~~ Done (2026-09-05/06, migration `033`,
    see full history in "Current migration number" above): renamed to
    "Sacrament Meeting Planning" in Table Admin. **Two different-scoped
