@@ -704,6 +704,27 @@ filter both compare against each column's last-saved/committed value
 names resolved from their id, not shown raw), not whatever's currently
 sitting in an open, unsaved input.
 
+**Bug found and fixed 2026-09-08: the Calling dropdown was missing
+vacant callings.** The user's report: "the list of potential callings
+seems to pull only from callings that are already filled." `getCallingOptions()`
+(`lib/data/calling-planning.ts`) filtered `.eq("active", true")` --
+harmless in principle (`active` means "still a recognized calling in
+this ward," unrelated to whether it currently has a holder, per how
+`computeEligiblePersonIds` in `lib/data/rotations.ts` uses the same
+column), but planning a *change* is precisely the workflow that most
+needs to reach a calling with no current holder, and apparently enough
+of this ward's genuinely-vacant callings are also marked inactive in
+practice that the filter was hiding them. Removed the filter entirely
+-- the dropdown now lists every row in `callings`, filled or vacant,
+active or not. **If a calling still doesn't show up after this fix, it
+means that calling has no row in the `callings` table at all yet** --
+the Vision & Intended Workflows section's "selects the calling to
+change (**or creates a new one**)" isn't built as an inline option on
+this dropdown; a genuinely new calling still has to be added via
+`/callings` (the roster page, linked from this page) first. Ask before
+building an inline "add a calling" control here if that turns out to
+still be needed.
+
 ### Workflow / policy: Adding new people (privacy & data-usage stance)
 
 Deliberate policy, not just a workflow — the user weighed this and

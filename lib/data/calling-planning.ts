@@ -83,15 +83,23 @@ export async function getCallingDetail(callingId: string): Promise<CallingDetail
   };
 }
 
-/** Every active calling, for the grid's "Calling" dropdown -- ordered
- *  the same way the roster itself is (sort_order), not alphabetically,
- *  so it matches whatever order the ward already thinks of callings in. */
+/**
+ * Every calling, filled or vacant, active or not -- for the grid's
+ * "Calling" dropdown. Deliberately unfiltered (2026-09-08, the user's
+ * own report: "the list of potential callings seems to pull only from
+ * callings that are already filled... I need to include any and all
+ * callings") -- planning a change is exactly the workflow that needs
+ * to reach a calling with no current holder, so filtering on
+ * `active`/`current_holder_id` here would work directly against the
+ * feature's own purpose. Ordered the same way the roster itself is
+ * (sort_order), not alphabetically, so it matches whatever order the
+ * ward already thinks of callings in.
+ */
 export async function getCallingOptions(): Promise<CallingOption[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("callings")
     .select("id, name, title_prefix")
-    .eq("active", true)
     .order("sort_order");
 
   return error || !data ? [] : data;
