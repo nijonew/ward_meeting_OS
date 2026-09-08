@@ -795,7 +795,8 @@ Admin headers~~ (done, see Known open items above for detail) -> ~~drop
 `confirmed` from rotation-assignment tables~~ (done, see Known open
 items above -- also surfaced a new, not-yet-scoped "print portal" idea,
 see that same entry) -> ~~Music tile merge~~ (done, see Known open
-items above for detail) -> sign-out bug -> Teaching Calendar scope.
+items above for detail) -> ~~sign-out bug~~ (not actually a bug, see
+Known open items above for detail) -> Teaching Calendar scope.
 Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
@@ -1074,17 +1075,20 @@ before guessing further.
   meeting-display redesign (items 4/10/12, deliberately deferred) --
   don't start building this without checking with the user which of
   those two conversations it belongs to.
-- **Bug report: sign-out doesn't seem to take effect.** (2026-09-06,
-  not yet reproduced/fixed) Reviewed `app/auth/actions.ts`'s `signOut`
-  (calls `supabase.auth.signOut()` then `redirect("/login")`) and
-  `lib/supabase/server.ts`'s cookie adapter (`setAll` does call
-  `cookieStore.set(...)`, only swallowing the specific
-  Server-Component-render error via try/catch -- which shouldn't apply
-  inside a Server Action) -- both look correct on static review, and no
-  `middleware.ts` exists to be silently re-establishing the session.
-  Root cause not found by reading code alone; needs live reproduction
-  (check the browser's cookies/network tab after clicking Sign Out)
-  next time it's picked up.
+- ~~**Bug report: sign-out doesn't seem to take effect.**~~ **Not
+  actually a functional bug -- root-caused and fixed 2026-09-08.** The
+  user's own follow-up once asked to reproduce: sign-out does log the
+  user out on click; hovering the button beforehand just never showed a
+  hand cursor, so it looked inert. Cause: Tailwind v4's Preflight resets
+  `<button>` to `cursor: default` (matching native browser behavior --
+  a deliberate change from v3, which defaulted to pointer), and nothing
+  in this app opted a button back into `cursor: pointer` anywhere, Sign
+  out included. Fixed once, globally, in `app/globals.css`
+  (`button:not(:disabled), [role="button"]:not(:disabled) { cursor:
+  pointer; }`) rather than patching every button component
+  individually -- every button in the app gets the hand cursor now, not
+  just this one. The original `signOut`/cookie-adapter code review from
+  2026-09-06 was correct that nothing was actually wrong there.
 - ~~**1985 Hymnal / newly-released hymns not in Music Reference.**~~
   **Fully populated 2026-09-08** (migration `040`): the user pasted the
   complete title list for both remaining collections directly (with

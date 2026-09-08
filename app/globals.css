@@ -30,4 +30,17 @@
     outline: 2px solid var(--color-brass);
     outline-offset: 2px;
   }
+
+  /* Tailwind v4's Preflight resets <button> to cursor: default (matching
+     native browser behavior), unlike v3 which defaulted it to pointer.
+     Every clickable button in this app (Sign out, every form's Save,
+     etc.) was working fine on click but gave no hand-cursor hover
+     affordance -- reported 2026-09-08 against the Sign out button
+     specifically, but it's app-wide since nothing here opted back in
+     per-component. Fixed once, globally, rather than adding
+     cursor-pointer to every button individually. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
