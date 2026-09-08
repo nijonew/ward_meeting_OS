@@ -42,8 +42,7 @@ reconstructed from both:
   confirmed run.
 - `037` (`meetings.cancelled`/`cancellation_note` -- Cancel a meeting
   from the dashboard) and `038` (re-documents/corrects the
-  `bishopric_assignments_role_check` constraint): both still need to be
-  run.
+  `bishopric_assignments_role_check` constraint): confirmed run.
 
 Next migration should be `039_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
