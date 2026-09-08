@@ -161,7 +161,28 @@ exclusive access.
     rotation pointer, or a manual pick -- editing a cell never touches
     any rotation's member order or pointer, so it can't desync future
     meetings. The rotation-order cards below it remain for correcting
-    the *default* new meetings get seeded with.
+    the *default* new meetings get seeded with. **Refined 2026-09-06**
+    per the user's follow-up feedback:
+    - **No Presiding column** -- it always defaults to the Bishop, so
+      there was never anything to pick.
+    - **Each column's dropdown is scoped to who could actually hold
+      that role by calling**, not every active person in the ward. For
+      Conducting (Sacrament Meeting), that's whichever of Bishop/1st
+      Counselor/2nd Counselor currently has a holder, straight from the
+      same three callings `applyFixedSacramentRoles` itself reads. For
+      every other column, it's computed fresh from that role's real
+      `rotations` row (`eligibility_source`/`eligibility_calling_names`)
+      via a new `computeEligiblePersonIds` helper shared with
+      `syncRotationMembership` -- not the possibly-stale stored
+      `rotation_members` list, so it can't drift out of sync with who
+      actually holds the relevant calling(s) today. A column with no
+      one currently eligible shows a "No one eligible — check callings"
+      hint rather than silently falling back to everyone (that fallback
+      would have masked exactly the kind of vacant-calling bug being
+      investigated above). The currently-assigned person always stays
+      selectable even if a calling change since means they're no longer
+      "eligible," so an old assignment can't be silently blanked out by
+      the narrower list.
 - **Meeting Schedule** (`/meeting-schedule`): cadence rules
   (`meeting_schedule_rules`) drive a "Generate Meetings" action. Three
   cadence shapes: `weekly`, `nth_weekday` (e.g. "3rd Tuesday"), `relative`

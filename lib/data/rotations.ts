@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { MeetingTypeSlug } from "@/lib/types";
+import type { PersonOption } from "@/lib/data/people";
 
 export interface RotationMember {
   id: string; // rotation_members row id
@@ -71,6 +72,60 @@ export async function getAllRotations(): Promise<RotationRow[]> {
 }
 
 /**
+ * The actual eligible-people computation for a rotation's configured
+ * source -- pulled out of syncRotationMembership so the assignment
+ * grid (see getAssignmentGrid below) can compute "who could even be
+ * assigned here, by calling" fresh, without needing to first sync (and
+ * so without the possibility of showing a stale stored member list).
+ * 'manual' rotations have no computable source -- callers get an empty
+ * list back, same as syncRotationMembership's own early return.
+ */
+async function computeEligiblePersonIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eligibilitySource: "standing_attendees" | "calling_names" | "manual",
+  eligibilityCallingNames: string[] | null,
+  meetingTypeId: string
+): Promise<string[]> {
+  if (eligibilitySource === "calling_names") {
+    const names = eligibilityCallingNames ?? [];
+    const { data: callings } = await supabase
+      .from("callings")
+      .select("current_holder_id")
+      .in("name", names)
+      .eq("active", true);
+
+    return Array.from(
+      new Set(
+        ((callings ?? []) as { current_holder_id: string | null }[])
+          .map((c) => c.current_holder_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+  }
+
+  if (eligibilitySource === "standing_attendees") {
+    const { data: rows } = await supabase
+      .from("meeting_type_members")
+      .select("callings(current_holder_id)")
+      .eq("meeting_type_id", meetingTypeId);
+
+    return Array.from(
+      new Set(
+        ((rows ?? []) as unknown[])
+          .map((row) => {
+            const r = row as { callings: { current_holder_id: string | null }[] | { current_holder_id: string | null } | null };
+            const calling = Array.isArray(r.callings) ? r.callings[0] : r.callings;
+            return calling?.current_holder_id ?? null;
+          })
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+  }
+
+  return [];
+}
+
+/**
  * Finds eligible people for a rotation based on its configured source, and
  * replaces its membership list with them (preserving existing sort order
  * for anyone still eligible, appending anyone new at the end, and
@@ -89,44 +144,17 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
     return { error: rotationError?.message ?? "Rotation not found." };
   }
 
-  let eligiblePersonIds: string[] = [];
-
-  if (rotation.eligibility_source === "calling_names") {
-    const names = rotation.eligibility_calling_names ?? [];
-    const { data: callings } = await supabase
-      .from("callings")
-      .select("current_holder_id")
-      .in("name", names)
-      .eq("active", true);
-
-    eligiblePersonIds = Array.from(
-      new Set(
-        ((callings ?? []) as { current_holder_id: string | null }[])
-          .map((c) => c.current_holder_id)
-          .filter((id): id is string => Boolean(id))
-      )
-    );
-  } else if (rotation.eligibility_source === "standing_attendees") {
-    const { data: rows } = await supabase
-      .from("meeting_type_members")
-      .select("callings(current_holder_id)")
-      .eq("meeting_type_id", rotation.meeting_type_id);
-
-    eligiblePersonIds = Array.from(
-      new Set(
-        ((rows ?? []) as unknown[])
-          .map((row) => {
-            const r = row as { callings: { current_holder_id: string | null }[] | { current_holder_id: string | null } | null };
-            const calling = Array.isArray(r.callings) ? r.callings[0] : r.callings;
-            return calling?.current_holder_id ?? null;
-          })
-          .filter((id): id is string => Boolean(id))
-      )
-    );
-  } else {
+  if (rotation.eligibility_source === "manual") {
     // 'manual' rotations are never auto-synced.
     return {};
   }
+
+  const eligiblePersonIds = await computeEligiblePersonIds(
+    supabase,
+    rotation.eligibility_source,
+    rotation.eligibility_calling_names,
+    rotation.meeting_type_id
+  );
 
   const { data: existingMembers } = await supabase
     .from("rotation_members")
@@ -175,7 +203,7 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
  * that engine advances once per meeting *created* (weekly, for Sacrament
  * Meeting) and has no concept of "hold for the whole month."
  */
-const CONDUCTING_CALLING_ORDER = ["Bishop", "Bishopric First Counselor", "Bishopric Second Counselor"];
+export const CONDUCTING_CALLING_ORDER = ["Bishop", "Bishopric First Counselor", "Bishopric Second Counselor"];
 
 /**
  * Presiding and Conducting for a new Sacrament Meeting, resolved directly
@@ -302,6 +330,12 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
 export interface GridColumn {
   key: string;
   label: string;
+  /** Who could even be assigned here, by calling -- computed fresh from
+   *  callings/meeting_type_members each time (see computeEligiblePersonIds),
+   *  not the possibly-stale rotation_members list. Empty for a column
+   *  with no calling-based eligibility rule configured at all (falls
+   *  back to showing everyone, in the page). */
+  eligiblePeople: PersonOption[];
 }
 
 export interface GridCell {
@@ -315,9 +349,11 @@ export interface GridRow {
   cells: Record<string, GridCell>;
 }
 
-const GRID_COLUMNS_BY_TYPE: Record<MeetingTypeSlug, GridColumn[]> = {
+// Presiding is deliberately not a column -- it always defaults to the
+// Bishop (see applyFixedSacramentRoles) and was never meant to be
+// picked from a dropdown, per the user's own call (2026-09-06).
+const GRID_COLUMN_KEYS_BY_TYPE: Record<MeetingTypeSlug, { key: string; label: string }[]> = {
   "sacrament-meeting": [
-    { key: "presiding", label: "Presiding" },
     { key: "conducting", label: "Conducting" },
     { key: "chorister", label: "Chorister" },
     { key: "organist", label: "Organist" },
@@ -340,12 +376,87 @@ const GRID_COLUMNS_BY_TYPE: Record<MeetingTypeSlug, GridColumn[]> = {
   ],
 };
 
-export function gridColumnsFor(meetingTypeSlug: MeetingTypeSlug): GridColumn[] {
-  return GRID_COLUMNS_BY_TYPE[meetingTypeSlug] ?? [];
-}
-
 export function gridTableFor(meetingTypeSlug: MeetingTypeSlug): "sacrament_assignments" | "bishopric_assignments" {
   return meetingTypeSlug === "sacrament-meeting" ? "sacrament_assignments" : "bishopric_assignments";
+}
+
+/** Just the keys/labels (no eligibility lookup) -- for saving a grid
+ *  row, which only needs to know which form fields to read. */
+export function gridColumnsFor(meetingTypeSlug: MeetingTypeSlug): { key: string; label: string }[] {
+  return GRID_COLUMN_KEYS_BY_TYPE[meetingTypeSlug] ?? [];
+}
+
+async function personOptionsByIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[]
+): Promise<PersonOption[]> {
+  if (ids.length === 0) return [];
+  const { data } = await supabase.from("people").select("id, name").in("id", ids).order("name");
+  return (data ?? []) as PersonOption[];
+}
+
+/**
+ * The eligible-people list for every column of a meeting type's grid,
+ * computed fresh from callings each call -- "only those who could be
+ * assigned in that rotation by virtue of their calling" (the user's
+ * own words, 2026-09-06), not everyone active in the ward. Conducting
+ * (Sacrament Meeting) is fixed-by-calling rather than rotation-table-
+ * driven, so it's handled separately, straight from the same three
+ * callings applyFixedSacramentRoles itself reads.
+ */
+async function eligiblePeopleByColumn(
+  meetingTypeSlug: MeetingTypeSlug,
+  meetingTypeId: string,
+  columns: { key: string; label: string }[]
+): Promise<Record<string, PersonOption[]>> {
+  const supabase = await createClient();
+  const result: Record<string, PersonOption[]> = {};
+
+  if (meetingTypeSlug === "sacrament-meeting") {
+    const { data } = await supabase
+      .from("callings")
+      .select("name, current_holder_id, people:current_holder_id(name)")
+      .in("name", CONDUCTING_CALLING_ORDER)
+      .eq("active", true);
+    const rows = (data ?? []) as unknown as { name: string; current_holder_id: string | null; people: { name?: string }[] | { name?: string } | null }[];
+    const byName = new Map(rows.map((r) => [r.name, r]));
+    result["conducting"] = CONDUCTING_CALLING_ORDER.map((name) => byName.get(name))
+      .filter((r): r is (typeof rows)[number] => Boolean(r?.current_holder_id))
+      .map((r) => {
+        const person = Array.isArray(r.people) ? r.people[0] : r.people;
+        return { id: r.current_holder_id as string, name: person?.name ?? "Unknown" };
+      });
+  }
+
+  const remaining = columns.filter((c) => !result[c.key]);
+  if (remaining.length > 0) {
+    const { data: rotationRows } = await supabase
+      .from("rotations")
+      .select("element_key, eligibility_source, eligibility_calling_names")
+      .eq("meeting_type_id", meetingTypeId);
+    const byKey = new Map(
+      ((rotationRows ?? []) as { element_key: string; eligibility_source: "standing_attendees" | "calling_names" | "manual"; eligibility_calling_names: string[] | null }[]).map(
+        (r) => [r.element_key, r]
+      )
+    );
+
+    for (const col of remaining) {
+      const rotation = byKey.get(col.key);
+      if (!rotation || rotation.eligibility_source === "manual") {
+        result[col.key] = [];
+        continue;
+      }
+      const ids = await computeEligiblePersonIds(
+        supabase,
+        rotation.eligibility_source,
+        rotation.eligibility_calling_names,
+        meetingTypeId
+      );
+      result[col.key] = await personOptionsByIds(supabase, ids);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -360,9 +471,15 @@ export async function getAssignmentGrid(
   meetingTypeSlug: MeetingTypeSlug,
   throughDateISO: string
 ): Promise<{ columns: GridColumn[]; rows: GridRow[] }> {
-  const columns = gridColumnsFor(meetingTypeSlug);
+  const columnKeys = GRID_COLUMN_KEYS_BY_TYPE[meetingTypeSlug] ?? [];
   const table = gridTableFor(meetingTypeSlug);
   const supabase = await createClient();
+
+  const { data: meetingType } = await supabase.from("meeting_types").select("id").eq("slug", meetingTypeSlug).single();
+  const eligibleByColumn = meetingType
+    ? await eligiblePeopleByColumn(meetingTypeSlug, meetingType.id as string, columnKeys)
+    : {};
+  const columns: GridColumn[] = columnKeys.map((c) => ({ ...c, eligiblePeople: eligibleByColumn[c.key] ?? [] }));
 
   const today = new Date().toISOString().slice(0, 10);
 

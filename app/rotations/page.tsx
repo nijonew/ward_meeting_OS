@@ -276,10 +276,12 @@ export default async function RotationsPage({
 
         {selectedType === "sacrament-meeting" && (
           <p className="mt-3 text-[11px] text-slate/60">
-            Presiding and Conducting cycle automatically by calendar month (Bishop &rarr; 1st
-            Counselor &rarr; 2nd Counselor) based on who currently holds each calling &mdash; if a
-            column here shows the same person every month, check that both counselor callings
-            actually have a current holder set (Table Admin &rarr; Callings).
+            No Presiding column &mdash; it always defaults to whoever holds the Bishop calling.
+            Conducting cycles automatically by calendar month (Bishop &rarr; 1st Counselor &rarr; 2nd
+            Counselor) based on who currently holds each calling &mdash; if it shows the same person
+            every month, check that both counselor callings actually have a current holder set
+            (Table Admin &rarr; Callings). The dropdown itself already only offers whichever of the
+            three currently has a holder.
           </p>
         )}
 
@@ -299,6 +301,11 @@ export default async function RotationsPage({
                   {grid.columns.map((c) => (
                     <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
                       {c.label}
+                      {c.eligiblePeople.length === 0 && (
+                        <span className="mt-0.5 block normal-case tracking-normal text-red-700">
+                          No one eligible &mdash; check callings
+                        </span>
+                      )}
                     </th>
                   ))}
                   <th />
@@ -320,16 +327,28 @@ export default async function RotationsPage({
                             <form> can't legally wrap multiple <td>s. */}
                         <form id={rowFormId} action={saveRow} />
                       </td>
-                      {grid.columns.map((c) => (
-                        <td key={c.key} className="px-2 py-1.5 align-top">
-                          <PersonCell
-                            name={c.key}
-                            form={rowFormId}
-                            people={people}
-                            value={row.cells[c.key]?.assignedToId ?? null}
-                          />
-                        </td>
-                      ))}
+                      {grid.columns.map((c) => {
+                        const cell = row.cells[c.key];
+                        // Always keep the currently-assigned person selectable
+                        // even if they no longer show up as eligible (a
+                        // calling changed since) -- restricting the list to
+                        // "who could be assigned" shouldn't silently blank
+                        // out who actually IS assigned.
+                        const options =
+                          cell?.assignedToId && !c.eligiblePeople.some((p) => p.id === cell.assignedToId)
+                            ? [...c.eligiblePeople, { id: cell.assignedToId, name: `${cell.assignedToName ?? "Unknown"} (no longer eligible)` }]
+                            : c.eligiblePeople;
+                        return (
+                          <td key={c.key} className="px-2 py-1.5 align-top">
+                            <PersonCell
+                              name={c.key}
+                              form={rowFormId}
+                              people={options}
+                              value={cell?.assignedToId ?? null}
+                            />
+                          </td>
+                        );
+                      })}
                       <td className="px-2 py-1.5 align-top">
                         <button
                           type="submit"
