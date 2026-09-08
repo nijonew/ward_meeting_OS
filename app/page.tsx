@@ -113,16 +113,23 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 3 -- music coordinator + bishopric */}
+      {/* Tier 3 -- music coordinator + bishopric. Was two tiles
+          (Sacrament Music Planning + a separate Music Coordination
+          status overview) -- merged into one 2026-09-08 per the user's
+          own call: the per-meeting Planning view (unified 2026-09-08,
+          priority queue item 1 above) already covers everyday status
+          for one meeting at a time, so a separate weeks-at-a-glance
+          overview page added an entry point without adding a real
+          capability. /music-coordination and its data module were
+          removed outright, not just unlinked. */}
       {isMusicPlanner && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Music</p>
           <TileGrid>
-            <Tile title="Sacrament Music Planning" description="Enter upcoming hymns and music" href="/music" />
             <Tile
-              title="Music Coordination"
-              description="Status across upcoming meetings"
-              href="/music-coordination"
+              title="Sacrament Meeting Music Planning"
+              description="Enter and plan upcoming hymns and music"
+              href="/music"
             />
           </TileGrid>
         </section>

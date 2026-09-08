@@ -794,8 +794,9 @@ visibility~~ (done, came along with the viewer) -> ~~sortable Table
 Admin headers~~ (done, see Known open items above for detail) -> ~~drop
 `confirmed` from rotation-assignment tables~~ (done, see Known open
 items above -- also surfaced a new, not-yet-scoped "print portal" idea,
-see that same entry) -> Music tile merge -> sign-out bug -> Teaching
-Calendar scope. Bishopric-side
+see that same entry) -> ~~Music tile merge~~ (done, see Known open
+items above for detail) -> sign-out bug -> Teaching Calendar scope.
+Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed
@@ -977,15 +978,23 @@ before guessing further.
     features (Meeting Schedule, this one, and the combined-week
     rotation's own date math stayed separate on purpose, see above)
     share one implementation where they actually overlap.
-- **Consolidate the two Music tiles on the landing page.** (2026-09-05,
-  instruction still pending -- user said "see next prompt," not yet
-  given as of this note) The two candidate tiles, found in `app/page.tsx`
-  under the "Music" section (visible to `music_planner` + `bishopric`):
-  "Sacrament Music Planning" (→ `/music`, bulk/single hymn entry) and
-  "Music Coordination" (→ `/music-coordination`, a read-only status
-  overview across upcoming meetings). User wants a single tile for
-  "sacrament meeting music planning" instead of these two -- exact
-  merged behavior/routing not yet specified.
+- ~~**Consolidate the two Music tiles on the landing page.**~~ Done
+  2026-09-08. The two candidates, found in `app/page.tsx` under the
+  "Music" section (visible to `music_planner` + `bishopric`): "Sacrament
+  Music Planning" (→ `/music`, bulk/single hymn entry) and "Music
+  Coordination" (→ `/music-coordination`, a read-only status overview
+  across upcoming meetings). Per the user: a single "entering/planning
+  music for the future" tile is enough now -- the unified per-meeting
+  Planning view (priority queue item 1, 2026-09-08) already covers
+  everyday status for one meeting at a time, so the standalone
+  weeks-at-a-glance overview added an entry point without a real
+  capability gap left to fill. Kept `/music` (renamed "Sacrament Meeting
+  Music Planning" on the tile) as the one entry point; **removed**
+  `/music-coordination` and `lib/data/music-coordination.ts` outright
+  rather than leaving them unlinked -- nothing else in the app
+  referenced either (confirmed by grep before deleting). If a
+  multi-meeting-at-a-glance view is wanted again later, it'd need to be
+  rebuilt from scratch, not just re-linked.
 - ~~**Sortable column headers in Table Admin.**~~ Done 2026-09-08:
   `components/admin/AdminTableEditor.tsx` gained click-to-sort `<th>`
   buttons (▲/▼ indicator, third click clears back to server/insertion
