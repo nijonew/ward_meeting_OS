@@ -37,9 +37,13 @@ export interface CallingPlanningRow {
   calling_name: string;
   calling_title_prefix: string | null;
   date_initiated: string | null;
-  candidates_text: string | null;
+  /** Who's under consideration -- multi-select, real people (migration
+   *  044 replaced the free-text Candidates field and the single-select
+   *  Selected Person with this one multi-valued column). Once narrowed
+   *  to exactly one, that's who the Sacrament Meeting push treats as
+   *  decided -- see pushCallingToSacramentMeeting. */
+  candidate_person_ids: string[];
   calling_status: string;
-  selected_person_id: string | null;
   date_set_apart: string | null;
   release_person_id: string | null;
   release_status: string;
@@ -105,7 +109,7 @@ export async function getAllCallingPlanningRows(callingId?: string): Promise<Cal
   let query = supabase
     .from("calling_planning")
     .select(
-      "id, calling_id, date_initiated, candidates_text, calling_status, selected_person_id, date_set_apart, release_person_id, release_status, notes, announced_meeting_id, created_at, callings(name, title_prefix)"
+      "id, calling_id, date_initiated, candidate_person_ids, calling_status, date_set_apart, release_person_id, release_status, notes, announced_meeting_id, created_at, callings(name, title_prefix)"
     )
     .order("created_at", { ascending: false });
 
@@ -121,9 +125,8 @@ export async function getAllCallingPlanningRows(callingId?: string): Promise<Cal
       id: string;
       calling_id: string;
       date_initiated: string | null;
-      candidates_text: string | null;
+      candidate_person_ids: string[] | null;
       calling_status: string;
-      selected_person_id: string | null;
       date_set_apart: string | null;
       release_person_id: string | null;
       release_status: string;
@@ -140,9 +143,8 @@ export async function getAllCallingPlanningRows(callingId?: string): Promise<Cal
       calling_name: calling?.name ?? "(unknown calling)",
       calling_title_prefix: calling?.title_prefix ?? null,
       date_initiated: r.date_initiated,
-      candidates_text: r.candidates_text,
+      candidate_person_ids: r.candidate_person_ids ?? [],
       calling_status: r.calling_status,
-      selected_person_id: r.selected_person_id,
       date_set_apart: r.date_set_apart,
       release_person_id: r.release_person_id,
       release_status: r.release_status,

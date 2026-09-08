@@ -41,14 +41,14 @@ function parseFieldName(name: string): { planningId: string; field: string } | n
 const EDITABLE_FIELDS = [
   "calling_id",
   "date_initiated",
-  "candidates_text",
-  "selected_person_id",
   "calling_status",
   "date_set_apart",
   "notes",
   "release_person_id",
   "release_status",
 ] as const;
+
+type RowPatch = Record<string, string | null> & { candidate_person_ids?: string[] };
 
 /**
  * Saves every row's every field in one submit -- the "our favorite grid
@@ -58,16 +58,39 @@ const EDITABLE_FIELDS = [
  * delete-then-insert-per-cell approach those two use, since a calling
  * planning row already has a real id to update rather than being a
  * sparse per-cell record).
+ *
+ * candidate_person_ids is handled separately from every other field: a
+ * <select multiple> submits one form-data entry per selected option
+ * under the same name, so it needs formData.getAll(name) instead of the
+ * single-value get() every other field uses -- and, since a multi-select
+ * with nothing selected submits no entry at all, the grid renders a
+ * hidden fallback input of the same name so "deselect everyone" is
+ * still detectable as an explicit empty array rather than "field not
+ * submitted, leave whatever was there."
  */
 export async function saveCallingPlanningGrid(_prevState: unknown, formData: FormData): Promise<SaveGridActionResult> {
   const supabase = await createClient();
 
-  const byRow = new Map<string, Record<string, string | null>>();
-  for (const [name, value] of formData.entries()) {
+  const byRow = new Map<string, RowPatch>();
+  const seenNames = new Set<string>();
+
+  for (const [name] of formData.entries()) {
+    if (seenNames.has(name)) continue;
+    seenNames.add(name);
+
     const parsed = parseFieldName(name);
-    if (!parsed || !EDITABLE_FIELDS.includes(parsed.field as (typeof EDITABLE_FIELDS)[number])) continue;
+    if (!parsed) continue;
+
+    if (parsed.field === "candidate_person_ids") {
+      const patch = byRow.get(parsed.planningId) ?? {};
+      patch.candidate_person_ids = formData.getAll(name).map(String).filter(Boolean);
+      byRow.set(parsed.planningId, patch);
+      continue;
+    }
+
+    if (!EDITABLE_FIELDS.includes(parsed.field as (typeof EDITABLE_FIELDS)[number])) continue;
     const patch = byRow.get(parsed.planningId) ?? {};
-    patch[parsed.field] = String(value).trim() || null;
+    patch[parsed.field] = String(formData.get(name)).trim() || null;
     byRow.set(parsed.planningId, patch);
   }
 
@@ -119,7 +142,7 @@ export async function pushCallingToSacramentMeeting(
 
   const { data: planning, error: fetchError } = await supabase
     .from("calling_planning")
-    .select("calling_status, selected_person_id, release_person_id, release_status")
+    .select("calling_status, candidate_person_ids, release_person_id, release_status")
     .eq("id", planningId)
     .single();
 
@@ -127,11 +150,16 @@ export async function pushCallingToSacramentMeeting(
     return { error: fetchError?.message ?? "Could not load this planning record." };
   }
 
+  const candidateIds = (planning.candidate_person_ids ?? []) as string[];
+  if (planning.calling_status === "to_announce" && candidateIds.length > 1) {
+    return { error: "Narrow Candidates down to exactly one person before announcing the new calling." };
+  }
+
   const inserts: { type: string; person_id: string }[] = [];
   const statusUpdates: Record<string, string> = {};
 
-  if (planning.calling_status === "to_announce" && planning.selected_person_id) {
-    inserts.push({ type: "new_calling", person_id: planning.selected_person_id });
+  if (planning.calling_status === "to_announce" && candidateIds.length === 1) {
+    inserts.push({ type: "new_calling", person_id: candidateIds[0] });
     statusUpdates.calling_status = "to_be_set_apart";
   }
   if (planning.release_status === "to_announce" && planning.release_person_id) {

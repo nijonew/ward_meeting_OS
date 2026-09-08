@@ -59,7 +59,6 @@ export function CallingPlanningGridForm({
                 "Calling",
                 "Date Initiated",
                 "Candidates",
-                "Selected Person",
                 "Status",
                 "Date Set Apart",
                 "Notes",
@@ -94,16 +93,19 @@ export function CallingPlanningGridForm({
                   />
                 </td>
                 <td className="px-2 py-1.5">
-                  <textarea
-                    name={`${row.id}::candidates_text`}
-                    defaultValue={row.candidates_text ?? ""}
-                    rows={2}
+                  {/* Hidden fallback with the same name: a <select multiple>
+                      submits nothing at all when every option is deselected,
+                      so without this, "remove every candidate" would leave
+                      the field missing from formData entirely and the save
+                      action would skip it -- see saveCallingPlanningGrid. */}
+                  <input type="hidden" name={`${row.id}::candidate_person_ids`} value="" />
+                  <select
+                    name={`${row.id}::candidate_person_ids`}
+                    multiple
+                    size={4}
+                    defaultValue={row.candidate_person_ids}
                     className={INPUT_CLASS}
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <select name={`${row.id}::selected_person_id`} defaultValue={row.selected_person_id ?? ""} className={INPUT_CLASS}>
-                    <option value="">&mdash; Not yet decided &mdash;</option>
+                  >
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}

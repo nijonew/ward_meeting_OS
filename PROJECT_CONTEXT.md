@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 043
+## Current migration number: 044
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -62,9 +62,13 @@ reconstructed from both:
   open items below): confirmed run.
 - `043` (`calling_planning` gains `date_initiated`/`candidates_text` --
   Calling Planning flat-grid rebuild, see the Calling planning workflow
-  section above): still needs to be run.
+  section above): confirmed run.
+- `044` (`calling_planning` gains `candidate_person_ids uuid[]`, drops
+  `candidates_text` and `selected_person_id` -- Candidates
+  multi-select, see the Calling planning workflow section above): still
+  needs to be run.
 
-Next migration should be `044_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `045_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -588,8 +592,9 @@ layout:
 **What carried over from the original data model/actions, confirmed
 still right:**
 - `calling_status`/`release_status`/`notes`/`date_set_apart`/
-  `selected_person_id`/`release_person_id`: all still exactly
-  `calling_planning`'s shape, admin-editable option lists included.
+  `release_person_id`: all still exactly `calling_planning`'s shape,
+  admin-editable option lists included. (`selected_person_id` itself
+  was later dropped -- see the Candidates multi-select note below.)
 - "Either/both, by status, same meeting" is still exactly
   `pushCallingToSacramentMeeting`'s logic (checks `calling_status` and
   `release_status` independently, can push both into one
@@ -633,6 +638,30 @@ Calling" form (still capturable) -- it currently has **no correct
 usage anywhere in the app** (nothing combines it with a holder's name
 either), so it's real but unused data until/unless a future feature
 actually addresses someone by calling-title + name.
+
+**Candidates reworked into a real multi-select, 2026-09-08, right after
+the display bug fix above shipped** (migration `044`): the user asked
+to drop the free-text Candidates field entirely and instead let
+Selected Person become the candidates field, multi-select, so several
+people can be under consideration at once. New `candidate_person_ids
+uuid[]` column replaces both `candidates_text` (043's free-text field)
+and the single-value `selected_person_id` -- one column now covers
+"who's being considered," a real people reference (unlike the free-text
+version) that can hold zero, one, or many people at once (unlike the
+old single-select). `CallingPlanningGridForm.tsx`'s Candidates cell is
+now a native `<select multiple>` (size 4, Ctrl/Cmd-click to pick more
+than one) with a hidden same-named fallback input before it -- a
+multi-select submits *no* form-data entry at all when nothing is
+selected, so without the fallback, "remove every candidate" would look
+identical to "field not submitted" and the save action would silently
+leave the previous value in place instead of clearing it.
+`pushCallingToSacramentMeeting` now reads `candidate_person_ids`:
+exactly one entry is what "the selected person" means for the
+Sacrament Meeting announcement integration -- zero means nothing to
+announce yet, and more than one now surfaces its own explicit "Narrow
+Candidates down to exactly one person before announcing" message in
+both the server action's own error and the "Ready to Announce" list on
+the page (rather than silently guessing which candidate was meant).
 
 ### Workflow / policy: Adding new people (privacy & data-usage stance)
 

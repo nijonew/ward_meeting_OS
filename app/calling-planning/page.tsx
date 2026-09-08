@@ -49,7 +49,7 @@ export default async function CallingPlanningPage({
   const readyToAnnounce = rows.filter(
     (r) =>
       !r.announced_meeting_id &&
-      ((r.calling_status === "to_announce" && r.selected_person_id) ||
+      ((r.calling_status === "to_announce" && r.candidate_person_ids.length > 0) ||
         (r.release_status === "to_announce" && r.release_person_id))
   );
 
@@ -66,7 +66,9 @@ export default async function CallingPlanningPage({
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Calling Planning</h1>
         <p className="mt-2 text-sm text-slate">
           One row per potential calling change, across every calling &mdash; candidates, status,
-          release, and readiness to announce in Sacrament Meeting.
+          release, and readiness to announce in Sacrament Meeting. Candidates is a multi-select
+          (Ctrl/Cmd-click to pick more than one) &mdash; narrow it down to exactly one person once
+          decided, before announcing.
         </p>
         {filteredCallingName && (
           <p className="mt-2 text-xs text-slate">
@@ -141,18 +143,27 @@ export default async function CallingPlanningPage({
             each to an upcoming meeting&rsquo;s Ward Business.
           </p>
           <ul className="mt-4 flex flex-col gap-4">
-            {readyToAnnounce.map((r) => (
-              <li key={r.id} className="rounded-md border border-rule/60 p-4">
-                <p className="text-sm text-ink">{r.calling_name}</p>
-                <div className="mt-2">
-                  <PushCallingForm
-                    planningId={r.id}
-                    callingId={r.calling_id}
-                    upcomingSacramentMeetings={sacramentMeetings}
-                  />
-                </div>
-              </li>
-            ))}
+            {readyToAnnounce.map((r) => {
+              const needsNarrowing = r.calling_status === "to_announce" && r.candidate_person_ids.length > 1;
+              return (
+                <li key={r.id} className="rounded-md border border-rule/60 p-4">
+                  <p className="text-sm text-ink">{r.calling_name}</p>
+                  {needsNarrowing ? (
+                    <p className="mt-2 text-xs text-brass">
+                      Narrow Candidates down to exactly one person before this can be announced.
+                    </p>
+                  ) : (
+                    <div className="mt-2">
+                      <PushCallingForm
+                        planningId={r.id}
+                        callingId={r.calling_id}
+                        upcomingSacramentMeetings={sacramentMeetings}
+                      />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
