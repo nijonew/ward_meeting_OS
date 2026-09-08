@@ -10,14 +10,6 @@ import { TeachingGridForm } from "@/components/teaching-calendar/TeachingGridFor
 // anyone who can see the calendar can also fill it in.
 const ACCESS_ROLES = ["bishopric", "yw_presidency", "yw_advisor", "yw_specialist", "ym_advisor", "ym_specialist"];
 
-function formatDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function defaultThroughDate(): string {
   const d = new Date();
   d.setMonth(d.getMonth() + 2);
@@ -78,7 +70,7 @@ export default async function TeachingCalendarPage({
         {grid.rows.length === 0 ? (
           <p className="mt-4 text-sm text-slate">No Sundays in this range.</p>
         ) : (
-          <TeachingGridForm classes={grid.classes} rows={grid.rows} formatDate={formatDate} />
+          <TeachingGridForm classes={grid.classes} rows={grid.rows} />
         )}
       </div>
     </main>

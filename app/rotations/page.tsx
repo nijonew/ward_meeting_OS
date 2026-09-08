@@ -42,14 +42,6 @@ const MEETING_TYPE_TABS: { slug: MeetingTypeSlug; label: string }[] = [
   { slug: "youth-council", label: "Youth Council" },
 ];
 
-function formatDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function defaultThroughDate(): string {
   const d = new Date();
   d.setMonth(d.getMonth() + 3);
@@ -266,12 +258,7 @@ export default async function RotationsPage({
             this range yet.
           </p>
         ) : (
-          <AssignmentGridForm
-            meetingTypeSlug={selectedType}
-            columns={grid.columns}
-            rows={grid.rows}
-            formatDate={formatDate}
-          />
+          <AssignmentGridForm meetingTypeSlug={selectedType} columns={grid.columns} rows={grid.rows} />
         )}
       </div>
 

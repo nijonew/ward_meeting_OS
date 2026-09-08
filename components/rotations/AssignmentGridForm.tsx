@@ -9,6 +9,14 @@ import type { MeetingTypeSlug } from "@/lib/types";
 
 const initialState: { error?: string; success?: boolean } = {};
 
+function formatDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function PersonCell({ name, people, value }: { name: string; people: PersonOption[]; value: string | null }) {
   return (
     <select
@@ -32,17 +40,24 @@ function PersonCell({ name, people, value }: { name: string; people: PersonOptio
  * 2026-09-06): show that a save actually happened ("there does not seem
  * to be any response and thus there is no confidence that anything
  * happened"), and disable Save until something's actually been changed.
+ *
+ * formatDate is defined locally rather than passed in as a prop --
+ * root-caused 2026-09-08 against a "page couldn't load" report: this
+ * page's server component used to pass a plain JS function in as a
+ * prop, which Next.js's Server Components model doesn't allow crossing
+ * the server/client boundary (only a Server Action can cross as a
+ * function) -- it throws at render time. This is the most likely
+ * explanation for this exact never-reproduced bug report from
+ * 2026-09-06/08.
  */
 export function AssignmentGridForm({
   meetingTypeSlug,
   columns,
   rows,
-  formatDate,
 }: {
   meetingTypeSlug: MeetingTypeSlug;
   columns: GridColumn[];
   rows: GridRow[];
-  formatDate: (iso: string) => string;
 }) {
   const boundSave = saveAssignmentGrid.bind(null, meetingTypeSlug);
   const [state, formAction, pending] = useActionState(boundSave, initialState);

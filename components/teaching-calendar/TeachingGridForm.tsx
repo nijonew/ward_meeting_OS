@@ -6,20 +6,35 @@ import type { TeachingGridRow } from "@/lib/data/teaching-assignments";
 
 const initialState: { error?: string; success?: boolean } = {};
 
+function formatDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 /**
  * The grid itself, as its own client component -- same reasoning as
  * AssignmentGridForm (components/rotations/AssignmentGridForm.tsx):
  * dirty-tracking and a pending/success indicator both need client
  * state, which a plain server-action <form> can't give on its own.
+ *
+ * formatDate is defined locally rather than passed in as a prop --
+ * Next.js's Server Components model only allows a Server Action to
+ * cross the server/client boundary as a function; a plain function prop
+ * (this page's own server component used to pass one in) throws at
+ * render time. Root-caused 2026-09-08 against a "page couldn't load"
+ * report -- see the identical fix in AssignmentGridForm.tsx, which had
+ * the same bug and is the likely explanation for the older,
+ * never-reproduced /rotations "server error" report too.
  */
 export function TeachingGridForm({
   classes,
   rows,
-  formatDate,
 }: {
   classes: string[];
   rows: TeachingGridRow[];
-  formatDate: (iso: string) => string;
 }) {
   const [state, formAction, pending] = useActionState(saveTeachingGrid, initialState);
   const [dirty, setDirty] = useState(false);

@@ -807,15 +807,26 @@ user grouped those three together as related to a larger, not-yet-detailed
 architecture change to how meetings are displayed generally ("less like
 a form and more like a condensed, easier to view format") -- don't
 start any of the three without that larger discussion happening first.
-**New, not yet triaged:** the user hit "This page couldn't load. A
-server error occurred." on what's believed to be `/rotations` (context:
-they'd gone back to recheck the Conducting-only-one-person
-investigation). Not reproduced yet -- no local Supabase credentials
-exist in this environment to run the dev server against production
-data, and a careful static re-read of `lib/data/rotations.ts`/
-`app/rotations/*` didn't turn up an obvious unguarded crash. Get the
-exact URL and, if possible, the real error from Vercel's function logs
-before guessing further.
+~~**"This page couldn't load. A server error occurred."**~~ **Likely
+root-caused and fixed 2026-09-08**, after the identical symptom showed
+up again on the brand-new `/teaching-calendar` (which shares no backend
+code with `/rotations` at all -- the common thread had to be
+structural, not data-specific). Both pages' grid client components
+(`AssignmentGridForm.tsx`, `TeachingGridForm.tsx`) received a plain
+`formatDate` JavaScript function as a prop from their Server Component
+page -- Next.js's Server Components model only allows a *Server Action*
+to cross the server/client boundary as a function; a plain function
+prop throws at render time. Fixed by defining `formatDate` locally
+inside each client component instead of passing it in. This was never
+reproduced live and no Vercel log was ever obtained, so treat this as
+the most likely explanation rather than a confirmed one -- but it fits
+every known fact (intermittent-looking because it depends on exactly
+which code path Next's flight serializer hits, present on both the
+original `/rotations` report and this session's new
+`/teaching-calendar` report, and consistent with a careful static
+review of the data-fetching code finding nothing wrong on either page).
+Confirm with the user that both pages load cleanly after this ships
+before fully closing it out.
 
 - ~~**Conference Schedule page.**~~ **Built, then generalized, 2026-09-06.**
   First built as a narrow General/Stake Conference-only feature, then
