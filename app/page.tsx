@@ -135,12 +135,21 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 3 -- youth leaders + bishopric (edit access; page itself handles the split) */}
-      {isYouthLeader && !isBishopric && (
+      {/* Tier 3 -- youth leaders + bishopric. Was youth-leader-only
+          (excluding bishopric) back when this was just a "Coming soon"
+          placeholder -- Teaching Calendar itself is meant for "youth
+          leaders and admins" per the user (2026-09-08), so the guard
+          dropped the !isBishopric exclusion once it had a real
+          destination. */}
+      {isYouthLeader && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Youth program</p>
           <TileGrid>
-            <Tile title="Teaching Calendar" comingSoon />
+            <Tile
+              title="Teaching Calendar"
+              description="Sunday teaching assignments for each class"
+              href="/teaching-calendar"
+            />
           </TileGrid>
         </section>
       )}

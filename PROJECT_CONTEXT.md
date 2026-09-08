@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 041
+## Current migration number: 042
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -57,9 +57,11 @@ reconstructed from both:
   confirmed ... because other objects depend on it`). File updated to
   drop those two policies by name and replace them with one gated on
   meeting stage instead (matching this migration's own new rule) --
-  still needs to be re-run with the corrected version.
+  confirmed run (with the corrected version).
+- `042` (new `teaching_assignments` table -- Teaching Calendar, see Known
+  open items below): still needs to be run.
 
-Next migration should be `042_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `043_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -796,8 +798,9 @@ Admin headers~~ (done, see Known open items above for detail) -> ~~drop
 items above -- also surfaced a new, not-yet-scoped "print portal" idea,
 see that same entry) -> ~~Music tile merge~~ (done, see Known open
 items above for detail) -> ~~sign-out bug~~ (not actually a bug, see
-Known open items above for detail) -> Teaching Calendar scope.
-Bishopric-side
+Known open items above for detail) -> ~~Teaching Calendar scope~~
+(done, see Known open items above for detail). The user's own priority
+queue from 2026-09-08 is now fully worked through. Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed
@@ -912,7 +915,34 @@ before guessing further.
     is now the real "send me a reset link" step; `/auth/update-password`
     (reached from that emailed link) is unchanged, still the "type your
     new password" step.
-- Teaching Calendar (youth leader tile) — scope not yet defined, deferred
+- ~~Teaching Calendar (youth leader tile) — scope not yet defined,
+  deferred~~ **Built 2026-09-08** (migration `042`, still needs to be
+  run), per the user's own scoping: a Sunday teaching schedule, one row
+  per (Sunday, class), each cell a short free-text entry -- deliberately
+  **not** tied to any person or calling record (no `people` FK at all,
+  unlike literally everything else assignment-shaped in this app). New
+  `teaching_assignments` table (sparse -- a blank cell just means no row
+  exists yet, same pattern as `meeting_element_notes`), `/teaching-calendar`
+  (a grid: every upcoming Sunday down one side, the 6 real YM/YW classes
+  across the top, one "Save All Changes" button -- reusing the exact
+  grid/dirty-tracking/save-feedback pattern built for the Assignment
+  Rotations grid, `components/rotations/AssignmentGridForm.tsx`, just
+  with plain `<input type="text">` cells instead of person-picker
+  `<select>`s). Classes are derived from `YOUTH_ACTIVITY_GROUPS` minus
+  the "Combined ..." pseudo-values (those describe attendee scope for a
+  combined activity, not an actual class with its own Sunday lesson) --
+  one place to update if the classes are ever renamed again. Access
+  (both viewing and editing, no split) is youth leaders + Bishopric only
+  per the user's own words ("youth leaders and admins... access") -- no
+  public view at all, unlike Youth Activities. The landing-page tile
+  sits in the existing "Youth program" section alongside where Youth
+  Activities' own tile lives in spirit (Youth Activities' actual tile is
+  in the public "This week" tier, since it's publicly viewable and this
+  isn't) -- that section's visibility guard dropped its old
+  `&& !isBishopric` exclusion once there was a real destination admins
+  should reach too. No Table Admin registry entry, matching the
+  `meeting_cancellations` precedent: a bespoke page already covers the
+  only editing this needs.
 - Bishopric-side free-text elements (spiritual thought, handbook training,
   young men coordination, impressions, calling planning, sacrament meeting
   review) can currently be entered in TWO places — new dynamic per-element
