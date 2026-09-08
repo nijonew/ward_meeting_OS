@@ -161,8 +161,8 @@ export default async function HomePage() {
           <TileGrid>
             <Tile
               title="Calling Planning"
-              description="Track calling and release status, suggestions, and readiness to announce"
-              href="/callings"
+              description="One row per calling change: candidates, status, release, and readiness to announce"
+              href="/calling-planning"
             />
             <Tile
               title="Meeting Schedule"

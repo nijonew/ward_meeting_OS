@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 042
+## Current migration number: 043
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -59,9 +59,12 @@ reconstructed from both:
   meeting stage instead (matching this migration's own new rule) --
   confirmed run (with the corrected version).
 - `042` (new `teaching_assignments` table -- Teaching Calendar, see Known
-  open items below): still needs to be run.
+  open items below): confirmed run.
+- `043` (`calling_planning` gains `date_initiated`/`candidates_text` --
+  Calling Planning flat-grid rebuild, see the Calling planning workflow
+  section above): still needs to be run.
 
-Next migration should be `043_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `044_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -495,30 +498,123 @@ account.
    that meeting's ward-business calling/release element.
 5. This is **not** viewable in the public program.
 
-**Status: already matches almost exactly** — unlike the other two
-workflows above, this one confirms rather than conflicts with what's
-built and what was done earlier this session:
-- Calling/candidate/notes/status/release-person/release-status: all
-  exactly `calling_planning`'s existing shape. "Individual(s) being
-  considered" maps to the existing `calling_planning_suggestions`
-  table (multiple candidates + notes, already built) feeding into the
-  single `selected_person_id` once decided.
-- The release-person dropdown "called in from the appropriate table,
-  plus previously vacant" is *exactly* the `scopedBy` (current/backup
-  holder) + "Previously Vacant / New Calling" `specialOptions` work
-  done earlier this session for Table Admin's Calling Planning grid —
-  confirms that design was right. **Note:** `callings.backup_holder_id`
-  was later dropped entirely (migration `034` -- "not actually a real
-  thing" for this ward, per the user) — the release-person dropdown now
-  scopes to current holder only.
-- "Either/both, by status, same meeting" is exactly
-  `pushToSacramentMeeting`'s existing logic (checks calling_status and
-  release_status independently, can push both into one `sacrament_rabnm`
-  write against the chosen meeting).
-- Verified directly: `lib/data/public-view.ts` queries `sacrament_rabnm`
-  filtered to `type = 'baby_blessing'` only — calling/release/
-  presidency_change rows are already excluded from the public program.
+**Status: this section previously claimed "already matches almost
+exactly" -- that was wrong about the actual page, corrected 2026-09-08.**
+The *data model and server actions* did already match reasonably well
+(see "what carried over" below), but the *page* the user actually used
+(`/callings` → click a specific calling → `/callings/[id]`'s nested
+`CallingPlanningCard` list) required picking a calling first and only
+ever showed that one calling's own history -- nothing like the flat,
+every-calling-at-once spreadsheet the user's real workflow is modeled
+on (the user shared a screenshot of that literal spreadsheet, 2026-09-08:
+"the page I am seeing is not close to my vision"). The two had quietly
+diverged over the session without anyone re-checking the built page
+against this file's own description of it.
+
+**Rebuilt 2026-09-08 as `/calling-planning`** (migration `043`), a flat
+grid -- one row per potential calling change, across every calling at
+once, matching the user's spreadsheet directly. Per the user's own
+explicit follow-up while this was being scoped ("It probably needs to
+be our favorite grid format. I like the format for the teaching
+schedule."), it reuses the exact dirty-tracking/Save-All-Changes
+pattern already built for Assignment Rotations and Teaching Calendar
+(`CallingPlanningGridForm.tsx`) rather than the old vertical-card-per-item
+layout:
+- **Columns**: Calling (dropdown, now editable per row -- previously
+  fixed forever at creation), Date Initiated (**new** `date_initiated`
+  column -- the old page had no equivalent at all, silently conflating
+  "when the real discussion started" with "whenever this got typed into
+  the app"), Candidates, Selected Person, Status, Date Set Apart, Notes,
+  Person Being Released, Release Status, Delete.
+- **Candidates simplified to free text** (**new** `candidates_text`
+  column), replacing the `calling_planning_suggestions` relational
+  sub-table's UI (individual add/remove per candidate) -- matches both
+  the user's real spreadsheet (one cell, names stacked as plain text,
+  not a structured pick-list) and the "favorite grid format" simplicity
+  principle Teaching Calendar established. `calling_planning_suggestions`
+  itself is left alone, not dropped -- any real historical data stays,
+  it's just not written to by the new UI. **Selected Person stays a
+  real people FK** (`selected_person_id`, unchanged) since that value
+  feeds the Sacrament Meeting announcement integration below, which
+  needs an actual person record once a candidate is actually decided on,
+  not free text.
+- **"Push to Sacrament Meeting" kept as a separate small form per
+  row**, in a "Ready to Announce" section below the main grid (adapted
+  from the old `pushToSacramentMeeting`, now `pushCallingToSacramentMeeting`
+  in `app/calling-planning/actions.ts`) -- it's a genuinely different
+  *action* (creates real `sacrament_rabnm` rows, advances status,
+  records `announced_meeting_id`) than "assign this cell a value," so it
+  doesn't fit the grid's uniform Save-All pattern, and can't be a
+  `<form>` nested inside the grid's own wrapping `<form>` anyway (HTML
+  forbids nested forms) -- same reasoning `PushRotationForm` already
+  established for the Assignment Rotations grid.
+- **Row delete is a plain client-side button** (`useTransition` calling
+  the server action directly), not a `<form>`, for the same nested-form
+  reason.
+- **Add a new row directly from this page** via a small "+ Start New
+  Calling Change" form at the top (pick the calling, defaults Date
+  Initiated to today) -- the old flow required navigating to that
+  calling's own detail page first and clicking "Start New Planning
+  Process" there; that's gone now, since the whole point is not having
+  to pick a calling before you can even begin.
+- `/callings/[id]` **stripped down to just the roster entry itself**
+  (name, title, current holder) -- the nested planning-history section
+  and `CallingPlanningCard` are deleted outright, not left as a second,
+  now-redundant place to edit the same data (this app's own established
+  principle -- see the unified-sacrament-planning-environment and
+  security-gap fixes earlier in this file for the same reasoning
+  applied elsewhere). It links to `/calling-planning?calling=<id>`
+  instead, which supports that filter for exactly this case.
+- The landing page's "Calling Planning" tile now points to
+  `/calling-planning` (it pointed at `/callings` -- the roster list --
+  before, which is the literal source of the user's "not close to my
+  vision" complaint: the tile never actually led anywhere close to a
+  calling-planning workflow at all). `/callings` (the roster: add a
+  calling, see/set current holders) stays reachable via a small link
+  from the new page rather than its own landing tile -- Table Admin's
+  existing "Callings" table entry already covers the same raw editing
+  if `/callings` itself is ever removed later.
+- **Dead code removed along the way**: `CallingPlanningCard.tsx`,
+  `app/callings/[id]/actions.ts` (folded into the new
+  `app/calling-planning/actions.ts`), `startCallingPlanning`, and
+  `getCallingPlanningHistory` (the single-calling-scoped query,
+  replaced by `getAllCallingPlanningRows` with an optional filter). Also
+  found and removed `lib/data/callings-list.ts` -- a second, entirely
+  unimported `getAllCallings()` (a duplicate of the one in
+  `lib/data/callings.ts` that's actually used, plus a `planning_status`
+  field nothing ever read) -- an abandoned earlier attempt at this same
+  function, dead since before this session started.
+
+**What carried over from the original data model/actions, confirmed
+still right:**
+- `calling_status`/`release_status`/`notes`/`date_set_apart`/
+  `selected_person_id`/`release_person_id`: all still exactly
+  `calling_planning`'s shape, admin-editable option lists included.
+- "Either/both, by status, same meeting" is still exactly
+  `pushCallingToSacramentMeeting`'s logic (checks `calling_status` and
+  `release_status` independently, can push both into one
+  `sacrament_rabnm` write against the chosen meeting) -- unchanged from
+  the original `pushToSacramentMeeting`.
+- Re-verified: `lib/data/public-view.ts` still queries `sacrament_rabnm`
+  filtered to `type = 'baby_blessing'` only -- calling/release/
+  presidency_change rows are still excluded from the public program.
   No conflict, no fix needed here.
+- The release-person dropdown is **not** scoped to the calling's
+  current holder (it lists every active person, same as the old page
+  always did) -- this session's earlier claim that a `scopedBy`
+  current/backup-holder + "Previously Vacant" `specialOptions` version
+  existed for this in Table Admin was checked directly against
+  `lib/admin/registry.ts` while doing this rebuild and turned out to be
+  wrong: `calling_planning` has always been deliberately *excluded*
+  from Table Admin (its own comment there says so, to avoid a
+  duplicate-entry hazard against this bespoke page) -- no such grid
+  ever existed. "Previously Vacant" was never a special value on the
+  person picker to begin with; it's simply what leaving
+  `release_person_id` blank *while* `release_status` is set to its own
+  `previously_vacant` option already means, unchanged before and after
+  this rebuild. Scoping the picker down to just the current holder
+  wasn't added now either, matching the "favorite grid format"
+  simplicity principle -- flag if that turns out to matter in practice.
 
 ### Workflow / policy: Adding new people (privacy & data-usage stance)
 
@@ -800,7 +896,24 @@ see that same entry) -> ~~Music tile merge~~ (done, see Known open
 items above for detail) -> ~~sign-out bug~~ (not actually a bug, see
 Known open items above for detail) -> ~~Teaching Calendar scope~~
 (done, see Known open items above for detail). The user's own priority
-queue from 2026-09-08 is now fully worked through. Bishopric-side
+queue from 2026-09-08 is now fully worked through. Immediately after,
+the user flagged that Calling Planning (`/calling-planning`, formerly
+reached via a misrouted `/callings` tile) "was not close to my vision"
+and it was rebuilt into the flat grid format -- see the Calling planning
+workflow section above for the full writeup. While scoping that
+rebuild the user also said (2026-09-08): "It probably needs to be our
+favorite grid format... It can also be extended to the youth activity
+calendar and calling planning formats" -- calling planning is now done;
+**applying this same grid format to Youth Activities is a real,
+explicitly-named idea from the user, not yet built or scoped in detail**
+-- `/youth-activities` currently uses a different, older list-based
+layout (see the "Adult leaders planning youth activities" workflow
+above), and converting it to the Assignment-Rotations/Teaching-Calendar/
+Calling-Planning grid pattern would need its own scoping pass (what
+counts as a "row" -- one per activity? one per Wednesday regardless of
+whether an activity exists yet, like Teaching Calendar's Sundays? --
+and how the existing Generate/cadence-rule/confirm/cancel controls fit
+around a grid) before starting. Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed

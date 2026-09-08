@@ -1,18 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import {
-  getCallingDetail,
-  getCallingPlanningHistory,
-  DEFAULT_CALLING_STATUSES,
-  DEFAULT_RELEASE_STATUSES,
-} from "@/lib/data/calling-planning";
-import { getActivePeople } from "@/lib/data/people";
-import { getUpcomingMeetings } from "@/lib/data/meetings";
+import { getCallingDetail } from "@/lib/data/calling-planning";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
-import { getSelectOptions } from "@/lib/data/select-options";
-import { startCallingPlanning } from "@/app/callings/actions";
-import { CallingPlanningCard } from "@/components/callings/CallingPlanningCard";
 
 export default async function CallingDetailPage({
   params,
@@ -42,17 +32,6 @@ export default async function CallingDetailPage({
     return <p className="text-slate">Could not find that calling.</p>;
   }
 
-  const [history, people, meetings, callingStatusOptions, releaseStatusOptions] = await Promise.all([
-    getCallingPlanningHistory(callingId),
-    getActivePeople(),
-    getUpcomingMeetings(),
-    getSelectOptions("calling_planning.calling_status", DEFAULT_CALLING_STATUSES),
-    getSelectOptions("calling_planning.release_status", DEFAULT_RELEASE_STATUSES),
-  ]);
-
-  const sacramentMeetings = meetings.filter((m) => m.meetingType === "sacrament-meeting");
-  const start = startCallingPlanning.bind(null, callingId);
-
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Callings" />
@@ -71,31 +50,13 @@ export default async function CallingDetailPage({
         </p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
-        <form action={start} className="mt-4">
-          <button
-            type="submit"
-            className="rounded-md border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
-          >
-            Start New Planning Process
-          </button>
-        </form>
+        <Link
+          href={`/calling-planning?calling=${calling.id}`}
+          className="mt-4 inline-flex w-fit items-center rounded-md border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+        >
+          View calling changes for this calling &rarr;
+        </Link>
       </div>
-
-      {history.length === 0 ? (
-        <p className="text-slate">No planning started yet for this calling.</p>
-      ) : (
-        history.map((planning) => (
-          <CallingPlanningCard
-            key={planning.id}
-            callingId={callingId}
-            planning={planning}
-            people={people}
-            upcomingSacramentMeetings={sacramentMeetings}
-            callingStatusOptions={callingStatusOptions}
-            releaseStatusOptions={releaseStatusOptions}
-          />
-        ))
-      )}
     </main>
   );
 }

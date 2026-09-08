@@ -9,13 +9,6 @@ export interface CallingDetail {
   active: boolean;
 }
 
-export interface SuggestionRow {
-  id: string;
-  person_id: string;
-  person_name: string;
-  note: string | null;
-}
-
 /** Fallback options if admin_select_options has no rows yet for these
  *  fields -- see lib/data/select-options.ts. Also what the migration
  *  022_admin_select_options.sql seeds the table with, so switching over
@@ -40,17 +33,25 @@ export const DEFAULT_RELEASE_STATUSES = [
 
 export interface CallingPlanningRow {
   id: string;
+  calling_id: string;
+  calling_name: string;
+  calling_title_prefix: string | null;
+  date_initiated: string | null;
+  candidates_text: string | null;
   calling_status: string;
   selected_person_id: string | null;
-  selected_person_name: string | null;
   date_set_apart: string | null;
   release_person_id: string | null;
-  release_person_name: string | null;
   release_status: string;
   notes: string | null;
   announced_meeting_id: string | null;
   created_at: string;
-  suggestions: SuggestionRow[];
+}
+
+export interface CallingOption {
+  id: string;
+  name: string;
+  title_prefix: string | null;
 }
 
 export function personName(rel: unknown): string | null {
@@ -78,22 +79,49 @@ export async function getCallingDetail(callingId: string): Promise<CallingDetail
   };
 }
 
-export async function getCallingPlanningHistory(callingId: string): Promise<CallingPlanningRow[]> {
+/** Every active calling, for the grid's "Calling" dropdown -- ordered
+ *  the same way the roster itself is (sort_order), not alphabetically,
+ *  so it matches whatever order the ward already thinks of callings in. */
+export async function getCallingOptions(): Promise<CallingOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("callings")
+    .select("id, name, title_prefix")
+    .eq("active", true)
+    .order("sort_order");
+
+  return error || !data ? [] : data;
+}
+
+/**
+ * Every calling-planning row, across every calling, one row per
+ * potential calling change -- the flat grid the user's own spreadsheet
+ * models this on. Pass callingId to scope to just one calling (used by
+ * the calling detail page's "changes involving this calling" link).
+ */
+export async function getAllCallingPlanningRows(callingId?: string): Promise<CallingPlanningRow[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("calling_planning")
     .select(
-      "id, calling_status, selected_person_id, date_set_apart, release_person_id, release_status, notes, announced_meeting_id, created_at, selected:selected_person_id(name), released:release_person_id(name), calling_planning_suggestions(id, person_id, note, people(name))"
+      "id, calling_id, date_initiated, candidates_text, calling_status, selected_person_id, date_set_apart, release_person_id, release_status, notes, announced_meeting_id, created_at, callings(name, title_prefix)"
     )
-    .eq("calling_id", callingId)
     .order("created_at", { ascending: false });
 
+  if (callingId) {
+    query = query.eq("calling_id", callingId);
+  }
+
+  const { data, error } = await query;
   if (error || !data) return [];
 
   return (data as unknown[]).map((row) => {
     const r = row as {
       id: string;
+      calling_id: string;
+      date_initiated: string | null;
+      candidates_text: string | null;
       calling_status: string;
       selected_person_id: string | null;
       date_set_apart: string | null;
@@ -102,31 +130,25 @@ export async function getCallingPlanningHistory(callingId: string): Promise<Call
       notes: string | null;
       announced_meeting_id: string | null;
       created_at: string;
-      selected: unknown;
-      released: unknown;
-      calling_planning_suggestions:
-        | { id: string; person_id: string; note: string | null; people: { name?: string } | { name?: string }[] | null }[]
-        | null;
+      callings: { name?: string; title_prefix?: string | null } | { name?: string; title_prefix?: string | null }[] | null;
     };
+    const calling = Array.isArray(r.callings) ? r.callings[0] : r.callings;
 
     return {
       id: r.id,
+      calling_id: r.calling_id,
+      calling_name: calling?.name ?? "(unknown calling)",
+      calling_title_prefix: calling?.title_prefix ?? null,
+      date_initiated: r.date_initiated,
+      candidates_text: r.candidates_text,
       calling_status: r.calling_status,
       selected_person_id: r.selected_person_id,
-      selected_person_name: personName(r.selected),
       date_set_apart: r.date_set_apart,
       release_person_id: r.release_person_id,
-      release_person_name: personName(r.released),
       release_status: r.release_status,
       notes: r.notes,
       announced_meeting_id: r.announced_meeting_id,
       created_at: r.created_at,
-      suggestions: (r.calling_planning_suggestions ?? []).map((s) => ({
-        id: s.id,
-        person_id: s.person_id,
-        person_name: personName(s.people) ?? "(unknown)",
-        note: s.note,
-      })),
     };
   });
 }

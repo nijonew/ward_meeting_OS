@@ -1,0 +1,38 @@
+-- 043_calling_planning_grid.sql
+--
+-- Supports the Calling Planning redesign (2026-09-08): the user's real
+-- workflow is a flat spreadsheet -- one row per potential calling
+-- change, covering every calling at once -- not the nested "pick a
+-- calling first, then see its own planning cards" UI this app had
+-- built instead. See PROJECT_CONTEXT.md for the full redesign writeup.
+--
+-- calling_planning predates this repo's migration history (no CREATE
+-- TABLE for it exists in any prior migration file), so this only adds
+-- columns -- same situation as migrations 038/041 found for other
+-- undocumented pre-existing tables.
+--
+-- Two new columns:
+-- - date_initiated: when the discussion really started (the user's own
+--   spreadsheet tracks this explicitly, separate from whenever the row
+--   happened to be entered into this app) -- nullable, no default, so
+--   old/imported rows can be backfilled with a real historical date
+--   rather than defaulting to "today" and being wrong.
+-- - candidates_text: short free-text list of names being considered,
+--   replacing the old calling_planning_suggestions relational sub-table
+--   for new entries -- matches the user's real spreadsheet (a single
+--   cell with names stacked in it, not a structured multi-row pick
+--   list) and the "our favorite grid format" simplicity the user asked
+--   for (2026-09-08), same principle as Teaching Calendar. The
+--   *selected* person (once decided) stays a real people FK
+--   (selected_person_id, already existed) since that value feeds the
+--   Sacrament Meeting announcement integration, which needs a real
+--   person record, not free text.
+--
+-- calling_planning_suggestions itself is left alone, not dropped --
+-- any real historical data already in it is preserved, it's just no
+-- longer written to by the new UI.
+--
+-- Idempotent: safe to re-run.
+
+alter table calling_planning add column if not exists date_initiated date;
+alter table calling_planning add column if not exists candidates_text text;

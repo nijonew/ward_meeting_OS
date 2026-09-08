@@ -78,10 +78,11 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  * up at all; only the columns listed for a table are readable/writable.
  *
  * Deliberately excluded, by decision (not just pending):
- * - calling_planning: has its own purpose-built editor at /callings/[id]
- *   (CallingPlanningCard -- status, person pickers, suggestions, push-to-
- *   -meeting) -- a second, flatter editor for the same data would just be
- *   a duplicate-entry hazard.
+ * - calling_planning: has its own purpose-built flat-grid editor at
+ *   /calling-planning (one row per calling change, across every
+ *   calling -- CallingPlanningGridForm, status/person pickers, push-to-
+ *   -meeting) -- a second, different editor for the same data would just
+ *   be a duplicate-entry hazard.
  * - bishopric_minutes: PROJECT_CONTEXT.md flags this table's free-text
  *   fields as a known duplicate-entry hazard with the dynamic planning
  *   view -- stays out until that's consolidated, so this grid doesn't

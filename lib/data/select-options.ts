@@ -13,7 +13,7 @@ export interface SelectOption {
  * field never ends up with zero choices (before the seed migration has
  * run, or if every row for it was deleted).
  *
- * Shared by the real feature page (e.g. CallingPlanningCard) and the
+ * Shared by the real feature page (e.g. CallingPlanningGridForm) and the
  * generic Table Admin grid (lib/admin/table-data.ts), so both read the
  * same admin-managed list rather than the grid having its own copy.
  */

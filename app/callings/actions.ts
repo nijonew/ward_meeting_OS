@@ -23,20 +23,3 @@ export async function createCalling(formData: FormData) {
   revalidatePath("/callings");
   redirect("/callings");
 }
-
-export async function startCallingPlanning(callingId: string) {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("calling_planning")
-    .insert({ calling_id: callingId })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    redirect(`/callings/${callingId}?error=${encodeURIComponent(error?.message ?? "Could not start.")}`);
-  }
-
-  revalidatePath(`/callings/${callingId}`);
-  redirect(`/callings/${callingId}`);
-}
