@@ -41,10 +41,20 @@ export async function getTeachingAssignmentGrid(throughDateISO: string): Promise
   }
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("teaching_assignments")
     .select("class_date, class_name, entry")
     .in("class_date", sundays);
+
+  if (error) {
+    // Most likely cause: migration 042 (which creates this table) hasn't
+    // been run yet in this environment. Fail soft with an empty grid
+    // rather than letting a raw Postgrest error surface as a Next.js
+    // server error -- every other read in this app follows the same
+    // if (error) convention (see getUpcomingMeetings, getMeetingTypes).
+    console.error("getTeachingAssignmentGrid: query failed:", error.message);
+    return { classes: TEACHING_CLASSES, rows: sundays.map((classDate) => ({ classDate, cells: {} })) };
+  }
 
   const byDate = new Map<string, Record<string, string>>();
   for (const row of (data ?? []) as { class_date: string; class_name: string; entry: string }[]) {
