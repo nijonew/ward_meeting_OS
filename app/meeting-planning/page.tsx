@@ -17,6 +17,11 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * joined the same group right after, per the user's immediate
  * follow-up -- same reasoning, another meeting-planning-adjacent admin
  * tool that doesn't need its own top-level landing-page slot.
+ *
+ * "Meeting Agendas" itself became a further hub (/meeting-agendas,
+ * 2026-09-09, same day) once the user asked for "a tile for each
+ * meeting type under meeting agendas" -- see that page for the
+ * per-type split.
  */
 export default async function MeetingPlanningPage() {
   const { user, profile } = await getSessionUser();
@@ -43,8 +48,8 @@ export default async function MeetingPlanningPage() {
         <TileGrid>
           <Tile
             title="Meeting Agendas"
-            description="Create, cancel, and manage meetings across every type"
-            href="/dashboard"
+            description="Create, cancel, and manage meetings, by type"
+            href="/meeting-agendas"
           />
           <Tile
             title="Meeting Schedule"

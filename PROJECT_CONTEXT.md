@@ -1295,6 +1295,20 @@ before fully closing it out.
   needs attention, and an admin wanting to revisit an old archived
   meeting (e.g. to review its minutes, per the Vision workflow) can
   still reach it via the toggle.
+
+  **"Meeting Agendas" split into its own per-type hub, same day**, per
+  the user's follow-up: "add tile for each meeting type under meeting
+  agendas and separate the lists to those tiles." New `/meeting-agendas`
+  (Bishopric-only, same `Tile`/`TileGrid` pattern as `/meeting-planning`
+  and the landing page's "My meetings") with one tile per meeting type,
+  each landing directly on that type's own `/dashboard?type=<slug>`
+  list -- mirrors the one-tile-per-type pattern "My meetings" already
+  uses for read-only browsing, now applied to the admin side too.
+  `/meeting-planning`'s own "Meeting Agendas" tile now points here
+  instead of straight to `/dashboard`. `/dashboard` itself is
+  unchanged -- still works with or without a `type` filter, "Show all
+  types" still there for anyone who lands on one type and wants the
+  merged view back.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark
