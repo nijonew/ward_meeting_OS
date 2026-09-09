@@ -1200,6 +1200,32 @@ before fully closing it out.
   viewer elsewhere in this file). Showing all four type tiles to every
   logged-in user regardless of role is the simplest option, but may not
   be what's wanted long-term once that viewer exists.
+
+  **"My meetings" made genuinely read-only, and admin control split
+  into its own tile, 2026-09-09** (the user's own request: "make my
+  meetings section for read only views of meetings... make a meeting
+  planning tile in the administration section. It will be the control
+  of meeting planning"). Before this, a Bishopric account clicking a
+  "My meetings" tile landed on `/dashboard`'s full control surface
+  (+ New Meeting, per-row Cancel/Un-cancel, the Unassigned Agenda Items
+  panel) -- fine functionally, but not what "My meetings" is supposed
+  to be for non-admins, and inconsistent for admins browsing their own
+  meetings versus actually administering them. `/dashboard` gained a
+  `?readonly=1` search param: when present, `canCreate` is forced false
+  regardless of role, which -- since `canCreate` was already the single
+  flag gating all three of those admin surfaces *and* `MeetingRow`'s
+  `canManage` prop (which decides both the per-row Cancel controls and
+  whether clicking a meeting goes to the manage hub or the existing
+  read-only view, `/meetings/[id]/public` or `/archived`) -- turned out
+  to need no other changes to get a real read-only mode. The "Show all
+  types" link preserves the flag so filtering by type doesn't
+  accidentally drop out of read-only mode. Every "My meetings" tile now
+  links with `&readonly=1`; a new "Meeting Planning" tile in the
+  Administration section links to plain `/dashboard` (no flags) for the
+  full control surface -- exactly what "My meetings" used to give
+  Bishopric by default. Non-admins were already effectively read-only
+  here (`canCreate` was already false for them), so this only changes
+  behavior for Bishopric.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark

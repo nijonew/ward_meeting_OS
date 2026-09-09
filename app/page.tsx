@@ -108,7 +108,13 @@ export default async function HomePage() {
           calling (attendsMeetings), not to every logged-in account the
           way the rest of this section's tiles are (those always
           include Sacrament Meeting regardless of calling -- see the
-          comment above attendsMeetings). */}
+          comment above attendsMeetings). Per-type tiles link with
+          `readonly=1` (2026-09-09, the user's own request: "make my
+          meetings section for read only views of meetings") -- without
+          it, a Bishopric account would land on /dashboard's full New
+          Meeting/Cancel/Unassigned-Agenda-Items control surface even
+          from here; that surface now lives only behind the
+          Administration section's own Meeting Planning tile below. */}
       {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">My meetings</p>
@@ -117,7 +123,7 @@ export default async function HomePage() {
               <Tile
                 key={slug}
                 title={MEETING_TYPE_LABELS[slug]}
-                href={`/dashboard?type=${slug}`}
+                href={`/dashboard?type=${slug}&readonly=1`}
               />
             ))}
             {attendsMeetings && (
@@ -189,6 +195,11 @@ export default async function HomePage() {
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Administration</p>
           <TileGrid>
+            <Tile
+              title="Meeting Planning"
+              description="Create, cancel, and manage meetings across every type"
+              href="/dashboard"
+            />
             <Tile
               title="Calling Planning"
               description="One row per calling change: candidates, status, release, and readiness to announce"

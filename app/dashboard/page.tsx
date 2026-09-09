@@ -133,10 +133,18 @@ const MEETING_TYPE_SLUGS = new Set<string>(["sacrament-meeting", "bishopric-meet
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; readonly?: string }>;
 }) {
-  const { type: rawType } = await searchParams;
+  const { type: rawType, readonly: rawReadOnly } = await searchParams;
   const typeFilter: MeetingTypeSlug | null = rawType && MEETING_TYPE_SLUGS.has(rawType) ? (rawType as MeetingTypeSlug) : null;
+  // Reached with ?readonly=1 from the landing page's "My meetings"
+  // section (2026-09-09, the user's own request: "make my meetings
+  // section for read only views of meetings") -- forces canCreate off
+  // even for a Bishopric account, which otherwise sees the full New
+  // Meeting/Cancel/Unassigned-Agenda-Items control surface below. The
+  // new "Meeting Planning" Administration tile links to this same page
+  // with no readonly flag, for exactly that full control surface.
+  const isReadOnly = rawReadOnly === "1";
 
   const { user, profile } = await getSessionUser();
 
@@ -159,7 +167,7 @@ export default async function DashboardPage({
   const [allMeetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
   const meetings = typeFilter ? allMeetings.filter((m) => m.meetingType === typeFilter) : allMeetings;
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
-  const canCreate = profile?.role === "bishopric";
+  const canCreate = profile?.role === "bishopric" && !isReadOnly;
   const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
 
   return (
@@ -221,7 +229,10 @@ export default async function DashboardPage({
           <p className="font-mono text-xs uppercase tracking-widest text-slate">
             {typeFilter ? MEETING_TYPE_LABELS[typeFilter] : "Meetings"}
             {typeFilter && (
-              <Link href="/dashboard" className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink">
+              <Link
+                href={isReadOnly ? "/dashboard?readonly=1" : "/dashboard"}
+                className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink"
+              >
                 Show all types
               </Link>
             )}
