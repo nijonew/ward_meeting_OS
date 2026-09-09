@@ -50,11 +50,20 @@ export default async function HomePage() {
   // exactly the existing public program, already visible with no login
   // or calling at all, so gating the tile itself by calling would add
   // no real access control -- just show it to any logged-in account.
+  const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id) : [];
   const visibleMeetingTypes = isBishopric
     ? ALL_MEETING_TYPES
     : user
-      ? Array.from(new Set(["sacrament-meeting" as const, ...(await getVisibleMeetingTypesForUser(user.id))]))
+      ? Array.from(new Set(["sacrament-meeting" as const, ...rawVisibleTypes]))
       : [];
+  // Distinct from the above -- "sacrament-meeting" is always folded into
+  // visibleMeetingTypes for any logged-in account (its tile needs no
+  // calling), so that list alone can't tell "attends a meeting" from
+  // "just logged in." This is the real, narrower signal the Meeting
+  // Agenda Items tile below is gated on (2026-09-09, the user's own
+  // request): a calling that maps to Bishopric Meeting/Ward Council/
+  // Youth Council, or the Bishopric role itself.
+  const attendsMeetings = isBishopric || rawVisibleTypes.length > 0;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -85,11 +94,7 @@ export default async function HomePage() {
             href="/youth-activities"
           />
           <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
-          <Tile
-            title="Meeting Agenda Items"
-            description="Submit an announcement or agenda item"
-            href="/submit"
-          />
+          <Tile title="Submit an Announcement" description="Share something with the ward" href="/submit" />
         </TileGrid>
       </section>
 
@@ -97,7 +102,13 @@ export default async function HomePage() {
           calling actually maps to (meeting_type_members) -- admins see
           all four regardless. Replaces the old single "Meetings" tile,
           which just linked to /dashboard's unfiltered hodgepodge of
-          every meeting type. */}
+          every meeting type. Meeting Agenda Items moved in here
+          2026-09-09 (was a public Tier-0 tile before) per the user's
+          own request -- it's now only shown to accounts that actually
+          attend a meeting by calling (attendsMeetings), not to every
+          logged-in account the way the rest of this section's tiles
+          are (those always include Sacrament Meeting regardless of
+          calling -- see the comment above attendsMeetings). */}
       {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">My meetings</p>
@@ -109,6 +120,13 @@ export default async function HomePage() {
                 href={`/dashboard?type=${slug}`}
               />
             ))}
+            {attendsMeetings && (
+              <Tile
+                title="Meeting Agenda Items"
+                description="Submit an agenda item for a meeting you attend"
+                href="/submit/agenda-item"
+              />
+            )}
           </TileGrid>
         </section>
       )}

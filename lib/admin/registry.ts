@@ -147,7 +147,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "agenda_items",
     label: "Agenda Items",
     description:
-      "Submitted agenda items for bishopric/council meetings. The public /submit form now sets Meeting and Status itself (published by default, straight onto that meeting's agenda) -- this grid is mainly for fixing a mistake or adding one directly.",
+      "Submitted agenda items for bishopric/council meetings. The /submit/agenda-item form (login + calling-gated) sets Meeting and Status itself (published by default, straight onto that meeting's agenda) -- this grid is mainly for fixing a mistake or adding one directly.",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },

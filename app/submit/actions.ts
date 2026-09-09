@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { OTHER_VALUE } from "@/lib/data/announcement-constants";
 
@@ -96,49 +98,71 @@ export async function submitAnnouncement(formData: FormData) {
 
 /**
  * Matches the real public agenda-item form the ward already uses
- * (fetched and confirmed 2026-09-05): email required, name optional,
- * a specific meeting type + date instead of picking "some meeting"
- * later, one description field (no separate title), and how much time
- * is needed. Resolves straight to a real meeting (creating it via
- * getOrCreateMeetingId if that date doesn't have one yet, same as
- * Table Admin's calendar picker) instead of leaving meeting_id null for
- * an admin to sort out afterward. Published immediately -- included by
- * default, per the workflow -- rather than starting pending; an admin
- * can still archive it from the meeting's own Agenda Items section.
+ * (fetched and confirmed 2026-09-05), minus the email/name fields --
+ * **moved behind login and calling-gated 2026-09-09** (the user's own
+ * request: "make it available only to those who attend meetings"), so
+ * the submitter is a known signed-in account now, not a self-reported
+ * name/email. A specific meeting type + date instead of picking "some
+ * meeting" later, one description field (no separate title), and how
+ * much time is needed. Resolves straight to a real meeting (creating
+ * it via getOrCreateMeetingId if that date doesn't have one yet, same
+ * as Table Admin's calendar picker) instead of leaving meeting_id null
+ * for an admin to sort out afterward. Published immediately -- included
+ * by default, per the workflow -- rather than starting pending; an
+ * admin can still archive it from the meeting's own Agenda Items
+ * section.
+ *
+ * Re-checks meeting-type access server-side (not just the page's own
+ * filtered <select>) via the same getVisibleMeetingTypesForUser used
+ * to decide which "My meetings" tiles show up -- this is a real access
+ * boundary now that submission isn't open to anyone with the link, so
+ * it can't rely on the UI alone to keep someone from POSTing a
+ * meeting_type they have no calling-based access to.
  */
 export async function submitAgendaItem(formData: FormData) {
   const supabase = await createClient();
+  const { user, profile } = await getSessionUser();
+  if (!user) redirect("/login");
 
-  const email = String(formData.get("submitted_by_email") ?? "").trim();
-  const name = String(formData.get("submitted_by_name") ?? "").trim() || "(not given)";
   const meetingTypeSlug = String(formData.get("meeting_type") ?? "") as MeetingTypeSlug;
   const dateIso = String(formData.get("meeting_date") ?? "");
   const description = String(formData.get("description") ?? "").trim();
   const timeNeeded = String(formData.get("time_needed") ?? "");
 
-  if (!email || !meetingTypeSlug || !dateIso || !description) {
-    redirect(`/submit?error=${encodeURIComponent("Email, meeting, date, and description are required.")}`);
+  if (!meetingTypeSlug || !dateIso || !description) {
+    redirect(`/submit/agenda-item?error=${encodeURIComponent("Meeting, date, and description are required.")}`);
+  }
+
+  if (profile?.role !== "bishopric") {
+    const allowedTypes = await getVisibleMeetingTypesForUser(user.id);
+    if (!allowedTypes.includes(meetingTypeSlug)) {
+      redirect(
+        `/submit/agenda-item?error=${encodeURIComponent(
+          "You don't have access to submit an agenda item for that meeting."
+        )}`
+      );
+    }
   }
 
   const meetingId = await getOrCreateMeetingId(dateIso, meetingTypeSlug);
   if (!meetingId) {
-    redirect(`/submit?error=${encodeURIComponent("Could not find or create that meeting.")}`);
+    redirect(`/submit/agenda-item?error=${encodeURIComponent("Could not find or create that meeting.")}`);
   }
 
   const { error } = await supabase.from("agenda_items").insert({
     title: deriveTitle(description),
     body: description,
-    submitted_by_name: name,
-    submitted_by_email: email,
+    submitted_by_name: profile?.display_name || user.email || "(not given)",
+    submitted_by_email: profile?.email || user.email || "",
     status: "published",
     meeting_id: meetingId,
     time_needed: TIME_NEEDED_OPTIONS.includes(timeNeeded) ? timeNeeded : null,
   });
 
   if (error) {
-    redirect(`/submit?error=${encodeURIComponent(error.message)}`);
+    redirect(`/submit/agenda-item?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath(`/meetings/${meetingId}/planning`);
-  redirect("/submit?success=1");
+  redirect("/submit/agenda-item?success=1");
 }

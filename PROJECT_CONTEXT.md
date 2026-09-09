@@ -855,6 +855,49 @@ pending. `submitAnnouncement` was deliberately left untouched (still
 pending by default) — see the blocked event-announcement workflow
 below for why.
 
+**Moved behind login and calling-gated, 2026-09-09**, per the user's
+own follow-up: "move the meeting agenda items submittal tile into the
+my meeting section and make it available only to those who attend
+meetings." The original design above (anyone, no login, straight from
+a public Tier-0 tile) matched the real Google Form it was built from,
+but the user's actual intent for *this* app is narrower than the form
+was — an agenda item is for a meeting the submitter actually attends
+by calling, not a fully open public submission the way an announcement
+is. Split the old combined `/submit` page in two rather than gating the
+whole thing:
+- `/submit` **stays exactly as open as before** — announcement
+  submission only now, still no login, still publishes immediately.
+  Its Tier-0 tile is relabeled "Submit an Announcement" (was "Meeting
+  Agenda Items," which had drifted to cover both forms under one
+  misleading name).
+- **New `/submit/agenda-item`**, requires login and reuses
+  `getVisibleMeetingTypesForUser` (the same calling → `meeting_type_members`
+  resolution the "My meetings" tiles already use) to decide which
+  meeting types show in its "Desired Meeting" dropdown — Bishopric
+  gets all three non-Sacrament types regardless of calling, same as
+  everywhere else that role manages everything; everyone else only
+  sees a type their own calling actually maps to. Its landing-page tile
+  moved out of Tier 0 into the "My meetings" section itself, shown only
+  when the signed-in account has at least one such type (or is
+  Bishopric) — a new `attendsMeetings` check on the landing page,
+  distinct from that section's own `visibleMeetingTypes` (which always
+  folds in Sacrament Meeting for any logged-in account regardless of
+  calling, so it alone couldn't tell "attends a meeting" from "just
+  logged in").
+- **`submitAgendaItem` re-checks meeting-type access server-side**, not
+  just via the page's filtered `<select>` — this is a real access
+  boundary now (unlike before, when literally anyone could submit for
+  any type), so a POST naming a type the account has no calling-based
+  access to is rejected the same way, not just hidden from the UI.
+- The email/name fields disappeared from this form entirely — the
+  submitter is a known signed-in account now, so `submitAgendaItem`
+  attributes the item from the session (`profile.display_name`/
+  `profile.email`) instead of self-reported text, matching how other
+  login-gated actions in this app identify who did what.
+- `components/submit/SubmitForm.tsx` (the old combined component) was
+  split into `AnnouncementForm.tsx` and `AgendaItemForm.tsx` and
+  deleted outright, not left alongside the new ones.
+
 ### ~~Terminology question + Workflow: announcing an upcoming event~~ — built 2026-09-05
 
 The Google Form itself (`.../1FAIpQLSfeFKoow2UfLzuwBYHxaS8xRlv9MsfRDXHgItqQbIWOWUXSIQ/viewform`)
