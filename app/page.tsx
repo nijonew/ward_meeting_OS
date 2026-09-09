@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { WARD_NAME } from "@/lib/config";
@@ -13,6 +14,14 @@ const ALL_MEETING_TYPES: MeetingTypeSlug[] = [
   "ward-council",
   "youth-council",
 ];
+
+// Per the user's request (2026-09-09): the landing page's browser tab
+// now reads "Dashboard" and /dashboard's reads "Meeting Dashboard" (see
+// that page's own metadata) -- distinct on purpose, since the user was
+// confused about which page was actually "the dashboard page."
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
 
 /**
  * The single landing page for everyone -- ward members, meeting

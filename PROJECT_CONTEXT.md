@@ -1260,11 +1260,41 @@ before fully closing it out.
   `title.template`, so it had in fact always read the same generic
   string on every route regardless of that h1 fix. Per the user's
   follow-up ("the dashboard page title changed back to ward os"),
-  `app/dashboard/page.tsx` now exports its own `metadata = { title:
+  `app/dashboard/page.tsx` gained its own `metadata = { title:
   "Dashboard" }`, overriding the tab title for just this route rather
   than introducing a site-wide `title.template` that would change every
-  other page's tab title too (no other page has its own `metadata`
-  export as of this writing).
+  other page's tab title too.
+
+  **Both page titles renamed again, and stale past meetings hidden by
+  default, later the same day** -- the user's follow-up: "I still have
+  out of date meetings showing up in the dashboard. And I was confused
+  about which page was the dashboard page. Lets change the landing page
+  title to dashboard, and then the dashboard page title to meeting
+  dashboard." Landing page (`app/page.tsx`) gained its own
+  `metadata.title = "Dashboard"` (its on-page `<h1>` stays `{WARD_NAME}`
+  unchanged -- a different, still-useful piece of branding, not what
+  was being asked about); `/dashboard`'s tab title and on-page `<h1>`
+  both became "Meeting Dashboard" -- the two now read distinctly on
+  purpose, addressing the "which page was actually the dashboard page"
+  confusion directly rather than just being two same-named things at
+  different URLs.
+
+  The stale-meetings report was a real, separate bug:
+  `getUpcomingMeetings()` (`lib/data/meetings.ts`) has never actually
+  filtered by date despite its name -- it returns literally every
+  meeting ever, oldest first, and the existing auto-archive sweep only
+  changes a past meeting's *stage*, it never stopped that meeting from
+  still being listed on `/dashboard`. Fixed by hiding `stage ===
+  "archived"` meetings from the list by default, with a new "Show past
+  meetings" / "Hide past meetings" toggle (`?past=1`, alongside the
+  existing `type`/`readonly` params, all three preserved across each
+  other via a new local `dashboardHref` helper) rather than removing
+  access to old meetings outright -- a past meeting that never got
+  archived (the "No Activity" case) still shows by default regardless,
+  since that badge exists specifically to flag something that still
+  needs attention, and an admin wanting to revisit an old archived
+  meeting (e.g. to review its minutes, per the Vision workflow) can
+  still reach it via the toggle.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark

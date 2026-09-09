@@ -135,20 +135,35 @@ const MEETING_TYPE_SLUGS = new Set<string>(["sacrament-meeting", "bishopric-meet
 // title.template, so every page's browser tab has always shown that
 // same generic string regardless of which page is open -- the on-page
 // h1 fix (2026-09-09) didn't touch this at all, it's a separate piece
-// of chrome. Per the user's follow-up ("the dashboard page title...
-// I would like it to be dashboard"), this overrides the tab title for
-// just this route rather than introducing a site-wide title.template
-// that would change every other page's tab title too.
+// of chrome. Renamed from "Dashboard" to "Meeting Dashboard" the same
+// day, once the landing page itself also became "Dashboard" (see
+// app/page.tsx) -- the user was confused about which page was actually
+// "the dashboard page", so the two needed to read distinctly, not just
+// exist as separate routes.
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Meeting Dashboard",
 };
+
+/** Builds a /dashboard URL preserving whichever of these three
+ *  independent toggles the caller doesn't explicitly override --
+ *  type filter, readonly mode, and (2026-09-09) the past-meetings
+ *  toggle below, so e.g. "Show all types" doesn't accidentally flip
+ *  the user back into showing archived meetings, and vice versa. */
+function dashboardHref(overrides: { type?: MeetingTypeSlug | null; readonly?: boolean; past?: boolean }): string {
+  const params = new URLSearchParams();
+  if (overrides.type) params.set("type", overrides.type);
+  if (overrides.readonly) params.set("readonly", "1");
+  if (overrides.past) params.set("past", "1");
+  const qs = params.toString();
+  return qs ? `/dashboard?${qs}` : "/dashboard";
+}
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; readonly?: string }>;
+  searchParams: Promise<{ type?: string; readonly?: string; past?: string }>;
 }) {
-  const { type: rawType, readonly: rawReadOnly } = await searchParams;
+  const { type: rawType, readonly: rawReadOnly, past: rawPast } = await searchParams;
   const typeFilter: MeetingTypeSlug | null = rawType && MEETING_TYPE_SLUGS.has(rawType) ? (rawType as MeetingTypeSlug) : null;
   // Reached with ?readonly=1 from the landing page's "My meetings"
   // section (2026-09-09, the user's own request: "make my meetings
@@ -158,6 +173,18 @@ export default async function DashboardPage({
   // new "Meeting Planning" Administration tile links to this same page
   // with no readonly flag, for exactly that full control surface.
   const isReadOnly = rawReadOnly === "1";
+  // getUpcomingMeetings() returns literally every meeting ever, despite
+  // its name -- auto-archiving only changes a past meeting's *stage*,
+  // it never stopped that meeting from still being listed here. Per the
+  // user's report (2026-09-09): "I still have out of date meetings
+  // showing up in the dashboard." Archived meetings are hidden by
+  // default now (below); a not-yet-archived past meeting (the "No
+  // Activity" case -- see autoArchivePastMeetings) still shows, since
+  // that badge exists specifically to flag a meeting that still needs
+  // attention. ?past=1 brings archived ones back for anyone who does
+  // need to find one (e.g. to review its minutes) rather than losing
+  // that access outright.
+  const showPast = rawPast === "1";
 
   const { user, profile } = await getSessionUser();
 
@@ -165,7 +192,7 @@ export default async function DashboardPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meetings" />
-        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Dashboard</h1>
+        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Meeting Dashboard</h1>
         <p className="mt-4 text-slate">Sign in to see meetings.</p>
         <Link
           href="/login"
@@ -178,7 +205,9 @@ export default async function DashboardPage({
   }
 
   const [allMeetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
-  const meetings = typeFilter ? allMeetings.filter((m) => m.meetingType === typeFilter) : allMeetings;
+  const meetings = allMeetings
+    .filter((m) => !typeFilter || m.meetingType === typeFilter)
+    .filter((m) => showPast || m.stage !== "archived");
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
   const canCreate = profile?.role === "bishopric" && !isReadOnly;
   const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
@@ -186,7 +215,7 @@ export default async function DashboardPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Meetings" />
-      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Dashboard</h1>
+      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Meeting Dashboard</h1>
 
       {canCreate && unassignedAgendaItems.length > 0 && (
         <section className="mt-10 rounded-lg border border-rule bg-card p-6">
@@ -243,12 +272,18 @@ export default async function DashboardPage({
             {typeFilter ? MEETING_TYPE_LABELS[typeFilter] : "Meetings"}
             {typeFilter && (
               <Link
-                href={isReadOnly ? "/dashboard?readonly=1" : "/dashboard"}
+                href={dashboardHref({ readonly: isReadOnly, past: showPast })}
                 className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink"
               >
                 Show all types
               </Link>
             )}
+            <Link
+              href={dashboardHref({ type: typeFilter, readonly: isReadOnly, past: !showPast })}
+              className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink"
+            >
+              {showPast ? "Hide past meetings" : "Show past meetings"}
+            </Link>
           </p>
           {canCreate && (
             <span className="flex items-center gap-3">
