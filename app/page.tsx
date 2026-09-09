@@ -210,11 +210,6 @@ export default async function HomePage() {
               description="Review and publish submissions"
               href="/announcements"
             />
-            <Tile
-              title="Speaker & Prayer History"
-              description="Who's due for a turn"
-              href="/speaker-prayer-history"
-            />
             <Tile title="Table Admin" description="Direct edit access to raw data tables" href="/admin" />
           </TileGrid>
         </section>

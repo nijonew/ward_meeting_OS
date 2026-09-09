@@ -12,8 +12,11 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * linked straight to /dashboard (the full create/cancel/manage meeting
  * list) and Meeting Schedule/Meeting Cancellations/Assignment
  * Rotations sat as their own top-level Administration tiles -- this
- * folds all four together as one group, with /dashboard itself now
- * reached via the "Meeting Agendas" subtile.
+ * folds them together as one group, with /dashboard itself now
+ * reached via the "Meeting Agendas" subtile. Speaker & Prayer History
+ * joined the same group right after, per the user's immediate
+ * follow-up -- same reasoning, another meeting-planning-adjacent admin
+ * tool that doesn't need its own top-level landing-page slot.
  */
 export default async function MeetingPlanningPage() {
   const { user, profile } = await getSessionUser();
@@ -57,6 +60,11 @@ export default async function MeetingPlanningPage() {
             title="Assignment Rotations"
             description="Who's next for prayers, chorister, etc."
             href="/rotations"
+          />
+          <Tile
+            title="Speaker & Prayer History"
+            description="Who's due for a turn"
+            href="/speaker-prayer-history"
           />
         </TileGrid>
       </div>

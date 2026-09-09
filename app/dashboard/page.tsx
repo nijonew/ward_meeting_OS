@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
@@ -129,6 +130,18 @@ function MeetingRow({
 }
 
 const MEETING_TYPE_SLUGS = new Set<string>(["sacrament-meeting", "bishopric-meeting", "ward-council", "youth-council"]);
+
+// The root layout's metadata.title ("Ward Meeting OS") has no
+// title.template, so every page's browser tab has always shown that
+// same generic string regardless of which page is open -- the on-page
+// h1 fix (2026-09-09) didn't touch this at all, it's a separate piece
+// of chrome. Per the user's follow-up ("the dashboard page title...
+// I would like it to be dashboard"), this overrides the tab title for
+// just this route rather than introducing a site-wide title.template
+// that would change every other page's tab title too.
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
 
 export default async function DashboardPage({
   searchParams,

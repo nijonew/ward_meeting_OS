@@ -1235,17 +1235,36 @@ before fully closing it out.
   `/meeting-planning` (Bishopric-only, plain `Tile`/`TileGrid` --
   matching the landing page's own visual language rather than
   `/admin`'s list-row style, since the user's own word was "subtiles")
-  with four tiles: **Meeting Agendas** (→ `/dashboard`, the
+  with tiles: **Meeting Agendas** (→ `/dashboard`, the
   create/cancel/manage list that "Meeting Planning" used to open
   directly), **Meeting Schedule**, **Meeting Cancellations**, and
   **Assignment Rotations** -- the latter three demoted out of the
   landing page's own Administration section, which previously listed
   them as top-level tiles alongside "Meeting Planning" itself.
   Administration's "Meeting Planning" tile now points to
-  `/meeting-planning` instead of `/dashboard` directly. None of the
-  four destination pages themselves changed -- this is purely a
+  `/meeting-planning` instead of `/dashboard` directly. **Speaker &
+  Prayer History joined the same group minutes later**, same day, per
+  the user's immediate follow-up ("move speaker and prayer history
+  into the meeting planning tile as well") -- demoted out of
+  Administration the same way, for the same reason. None of the five
+  destination pages themselves changed -- this is purely a
   landing-page/navigation reorganization, one more layer of grouping
   under the tile that already existed for meeting-related admin tools.
+
+  **Dashboard's browser tab title fixed, same day.** The on-page `<h1>`
+  fix earlier that day ("I changed the dashboard page so that only the
+  header says ward os. I wanted it to say dashboard") only ever
+  addressed the visible page heading -- the actual browser tab title is
+  a separate piece of chrome, set once for the whole app by
+  `app/layout.tsx`'s `metadata.title` ("Ward Meeting OS"), with no
+  `title.template`, so it had in fact always read the same generic
+  string on every route regardless of that h1 fix. Per the user's
+  follow-up ("the dashboard page title changed back to ward os"),
+  `app/dashboard/page.tsx` now exports its own `metadata = { title:
+  "Dashboard" }`, overriding the tab title for just this route rather
+  than introducing a site-wide `title.template` that would change every
+  other page's tab title too (no other page has its own `metadata`
+  export as of this writing).
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark
