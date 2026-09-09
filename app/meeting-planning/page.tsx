@@ -1,0 +1,65 @@
+import { redirect } from "next/navigation";
+import { AppHeader } from "@/components/AppHeader";
+import { Tile, TileGrid } from "@/components/Tile";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
+
+/**
+ * Hub page for the landing page's "Meeting Planning" Administration
+ * tile (2026-09-09, the user's own request): "make meeting schedule,
+ * meeting cancellations, assignment rotations subtiles after clicking
+ * on meeting planning, plus a meeting agendas tile that handles the
+ * previous meeting planning content." Before this, "Meeting Planning"
+ * linked straight to /dashboard (the full create/cancel/manage meeting
+ * list) and Meeting Schedule/Meeting Cancellations/Assignment
+ * Rotations sat as their own top-level Administration tiles -- this
+ * folds all four together as one group, with /dashboard itself now
+ * reached via the "Meeting Agendas" subtile.
+ */
+export default async function MeetingPlanningPage() {
+  const { user, profile } = await getSessionUser();
+  if (!user) redirect("/login");
+
+  if (profile?.role !== "bishopric") {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+        <AppHeader tag="Meeting Planning" />
+        <p className="mt-10 text-slate">Only the Bishopric can access meeting planning.</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+      <AppHeader tag="Meeting Planning" />
+      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Meeting Planning</h1>
+      <p className="mt-2 text-sm text-slate">
+        Schedule, cancel, and adjust rotations, or jump into a meeting&rsquo;s own agenda.
+      </p>
+
+      <div className="mt-6">
+        <TileGrid>
+          <Tile
+            title="Meeting Agendas"
+            description="Create, cancel, and manage meetings across every type"
+            href="/dashboard"
+          />
+          <Tile
+            title="Meeting Schedule"
+            description="Set cadence and generate meetings"
+            href="/meeting-schedule"
+          />
+          <Tile
+            title="Meeting Cancellations"
+            description="Conferences, holidays, etc. -- auto-cancels affected meetings"
+            href="/meeting-cancellations"
+          />
+          <Tile
+            title="Assignment Rotations"
+            description="Who's next for prayers, chorister, etc."
+            href="/rotations"
+          />
+        </TileGrid>
+      </div>
+    </main>
+  );
+}

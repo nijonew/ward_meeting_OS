@@ -1220,12 +1220,32 @@ before fully closing it out.
   to need no other changes to get a real read-only mode. The "Show all
   types" link preserves the flag so filtering by type doesn't
   accidentally drop out of read-only mode. Every "My meetings" tile now
-  links with `&readonly=1`; a new "Meeting Planning" tile in the
+  links with `&readonly=1`; ~~a new "Meeting Planning" tile in the
   Administration section links to plain `/dashboard` (no flags) for the
-  full control surface -- exactly what "My meetings" used to give
-  Bishopric by default. Non-admins were already effectively read-only
-  here (`canCreate` was already false for them), so this only changes
+  full control surface~~ -- true only until the very next request, see
+  immediately below. Non-admins were already effectively read-only here
+  (`canCreate` was already false for them), so this only changes
   behavior for Bishopric.
+
+  **"Meeting Planning" turned into its own hub page, same day
+  (2026-09-09)**, per the user's immediate follow-up: "make meeting
+  schedule, meeting cancellations, assignment rotations subtiles after
+  clicking on meeting planning, plus a meeting agendas tile that
+  handles the previous meeting planning content." New
+  `/meeting-planning` (Bishopric-only, plain `Tile`/`TileGrid` --
+  matching the landing page's own visual language rather than
+  `/admin`'s list-row style, since the user's own word was "subtiles")
+  with four tiles: **Meeting Agendas** (→ `/dashboard`, the
+  create/cancel/manage list that "Meeting Planning" used to open
+  directly), **Meeting Schedule**, **Meeting Cancellations**, and
+  **Assignment Rotations** -- the latter three demoted out of the
+  landing page's own Administration section, which previously listed
+  them as top-level tiles alongside "Meeting Planning" itself.
+  Administration's "Meeting Planning" tile now points to
+  `/meeting-planning` instead of `/dashboard` directly. None of the
+  four destination pages themselves changed -- this is purely a
+  landing-page/navigation reorganization, one more layer of grouping
+  under the tile that already existed for meeting-related admin tools.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark

@@ -197,23 +197,13 @@ export default async function HomePage() {
           <TileGrid>
             <Tile
               title="Meeting Planning"
-              description="Create, cancel, and manage meetings across every type"
-              href="/dashboard"
+              description="Meeting agendas, schedule, cancellations, and rotations"
+              href="/meeting-planning"
             />
             <Tile
               title="Calling Planning"
               description="One row per calling change: candidates, status, release, and readiness to announce"
               href="/calling-planning"
-            />
-            <Tile
-              title="Meeting Schedule"
-              description="Set cadence and generate meetings"
-              href="/meeting-schedule"
-            />
-            <Tile
-              title="Meeting Cancellations"
-              description="Conferences, holidays, etc. -- auto-cancels affected meetings"
-              href="/meeting-cancellations"
             />
             <Tile
               title="Manage Announcements"
@@ -224,11 +214,6 @@ export default async function HomePage() {
               title="Speaker & Prayer History"
               description="Who's due for a turn"
               href="/speaker-prayer-history"
-            />
-            <Tile
-              title="Assignment Rotations"
-              description="Who's next for prayers, chorister, etc."
-              href="/rotations"
             />
             <Tile title="Table Admin" description="Direct edit access to raw data tables" href="/admin" />
           </TileGrid>
