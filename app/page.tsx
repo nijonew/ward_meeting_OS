@@ -175,6 +175,11 @@ export default async function HomePage() {
               description="Sunday teaching assignments for each class"
               href="/teaching-calendar"
             />
+            <Tile
+              title="Youth Activity Planning"
+              description="Plan and manage upcoming youth activities"
+              comingSoon
+            />
           </TileGrid>
         </section>
       )}

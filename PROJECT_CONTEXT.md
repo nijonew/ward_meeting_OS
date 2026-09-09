@@ -1096,7 +1096,13 @@ Calling-Planning grid pattern would need its own scoping pass (what
 counts as a "row" -- one per activity? one per Wednesday regardless of
 whether an activity exists yet, like Teaching Calendar's Sundays? --
 and how the existing Generate/cadence-rule/confirm/cancel controls fit
-around a grid) before starting. Bishopric-side
+around a grid) before starting. **Placeholder tile added 2026-09-09**
+per the user's request: a "Youth Activity Planning" tile now sits in
+the landing page's "Youth program" section (alongside Teaching
+Calendar, same `isYouthLeader` guard), rendered `comingSoon` -- no
+route or page behind it yet. Purely a landing-page marker that this is
+next up; doesn't itself start or scope the grid-format rebuild above.
+Bishopric-side
 duplicate free-text entry points, real-time notes sync, and the
 "printable" lifecycle stage are deliberately NOT in this queue -- the
 user grouped those three together as related to a larger, not-yet-detailed
