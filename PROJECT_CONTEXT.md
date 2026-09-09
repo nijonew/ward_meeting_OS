@@ -865,11 +865,14 @@ was — an agenda item is for a meeting the submitter actually attends
 by calling, not a fully open public submission the way an announcement
 is. Split the old combined `/submit` page in two rather than gating the
 whole thing:
-- `/submit` **stays exactly as open as before** — announcement
-  submission only now, still no login, still publishes immediately.
-  Its Tier-0 tile is relabeled "Submit an Announcement" (was "Meeting
-  Agenda Items," which had drifted to cover both forms under one
-  misleading name).
+- ~~`/submit` stays exactly as open as before~~ — true only for the
+  rest of this same day; see the follow-up note right after this list,
+  which gates announcement submission too. `/submit` itself is now just
+  a redirect to `/submit/announcement`. At this point in the day it was
+  announcement submission only, still no login, still publishing
+  immediately, with its Tier-0 tile relabeled "Submit an Announcement"
+  (was "Meeting Agenda Items," which had drifted to cover both forms
+  under one misleading name).
 - **New `/submit/agenda-item`**, requires login and reuses
   `getVisibleMeetingTypesForUser` (the same calling → `meeting_type_members`
   resolution the "My meetings" tiles already use) to decide which
@@ -897,6 +900,34 @@ whole thing:
 - `components/submit/SubmitForm.tsx` (the old combined component) was
   split into `AnnouncementForm.tsx` and `AgendaItemForm.tsx` and
   deleted outright, not left alongside the new ones.
+
+**Announcement submission gated the same way, same day (2026-09-09)**,
+per the user's immediate follow-up once Agenda Item shipped above: "the
+same for submitting announcements by moving it to the same location
+with the same gatekeeping." This reverses the "anyone can submit, no
+login" design from 2026-09-05 (see the workflow note right below this
+one, which described that as deliberate at the time) — a real policy
+change the user made twice in one sitting, not a bug fix:
+- **New `/submit/announcement`**, requires login, gated on the same
+  account-level `attendsMeetings` check the landing page now uses
+  (Bishopric, or `getVisibleMeetingTypesForUser` returns at least one
+  type) — unlike Agenda Item, there's no per-meeting-type question for
+  an announcement, so this is a single yes/no page gate rather than a
+  filtered dropdown. `submitAnnouncement` re-checks the same condition
+  server-side too, same defense-in-depth reasoning as
+  `submitAgendaItem`'s meeting-type re-check.
+- `/submit` (the old bare route) is now just a `redirect()` to
+  `/submit/announcement` — kept only so an old bookmark or link lands
+  somewhere real instead of 404ing; the destination page's own
+  login/attendance gate takes over from there.
+- Its landing-page tile moved out of Tier 0 into "My meetings", right
+  alongside Meeting Agenda Items, both gated on the same
+  `attendsMeetings` flag.
+- The "Your email" field disappeared from `AnnouncementForm.tsx` for
+  the same reason it was never on `AgendaItemForm.tsx`: the submitter
+  is a known signed-in account now, so `submitAnnouncement` attributes
+  the submission from the session (`profile.display_name`/
+  `profile.email`) instead of typed-in text.
 
 ### ~~Terminology question + Workflow: announcing an upcoming event~~ — built 2026-09-05
 

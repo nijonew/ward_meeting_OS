@@ -94,7 +94,6 @@ export default async function HomePage() {
             href="/youth-activities"
           />
           <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
-          <Tile title="Submit an Announcement" description="Share something with the ward" href="/submit" />
         </TileGrid>
       </section>
 
@@ -102,13 +101,14 @@ export default async function HomePage() {
           calling actually maps to (meeting_type_members) -- admins see
           all four regardless. Replaces the old single "Meetings" tile,
           which just linked to /dashboard's unfiltered hodgepodge of
-          every meeting type. Meeting Agenda Items moved in here
-          2026-09-09 (was a public Tier-0 tile before) per the user's
-          own request -- it's now only shown to accounts that actually
-          attend a meeting by calling (attendsMeetings), not to every
-          logged-in account the way the rest of this section's tiles
-          are (those always include Sacrament Meeting regardless of
-          calling -- see the comment above attendsMeetings). */}
+          every meeting type. Meeting Agenda Items and Submit an
+          Announcement both moved in here 2026-09-09 (were public
+          Tier-0 tiles before) per the user's own request -- both are
+          now only shown to accounts that actually attend a meeting by
+          calling (attendsMeetings), not to every logged-in account the
+          way the rest of this section's tiles are (those always
+          include Sacrament Meeting regardless of calling -- see the
+          comment above attendsMeetings). */}
       {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">My meetings</p>
@@ -121,11 +121,18 @@ export default async function HomePage() {
               />
             ))}
             {attendsMeetings && (
-              <Tile
-                title="Meeting Agenda Items"
-                description="Submit an agenda item for a meeting you attend"
-                href="/submit/agenda-item"
-              />
+              <>
+                <Tile
+                  title="Meeting Agenda Items"
+                  description="Submit an agenda item for a meeting you attend"
+                  href="/submit/agenda-item"
+                />
+                <Tile
+                  title="Submit an Announcement"
+                  description="Share something with the ward"
+                  href="/submit/announcement"
+                />
+              </>
             )}
           </TileGrid>
         </section>

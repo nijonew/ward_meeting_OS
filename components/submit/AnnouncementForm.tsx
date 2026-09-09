@@ -76,15 +76,16 @@ function RadioSelectWithOther({
 /**
  * Announcement submission -- split out of the old combined SubmitForm
  * (2026-09-09) once Agenda Item submission moved to its own
- * login-gated page (see AgendaItemForm). This half is unchanged in
- * spirit: still open to anyone, no login required, matching the real
- * ward announcement form this was built from.
+ * login-gated page (see AgendaItemForm). Originally still open to
+ * anyone at that point; **also moved behind login 2026-09-09** (same
+ * day, the user's own follow-up) -- the "Your email" field dropped
+ * here for the same reason it never existed on AgendaItemForm: the
+ * submitter is a known signed-in account now, so submitAnnouncement
+ * attributes the submission from the session instead of typed-in text.
  */
 export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) => Promise<void> }) {
   return (
     <form action={onSubmit} className="mt-6 flex flex-col gap-3">
-      <input type="email" name="submitted_by_email" required placeholder="Your email" className={INPUT_CLASS} />
-
       <RadioSelectWithOther
         name="organization"
         label="Which organization is originating this announcement?"

@@ -30,18 +30,42 @@ function deriveTitle(description: string): string {
 /**
  * Matches the real announcement form the ward already uses (pasted by
  * the user 2026-09-05 -- the linked Google Form itself 401'd on every
- * fetch attempt): email required, no name field at all, single-select
- * organization + type (each with a free-text "Other"), multi-select
- * audience + where-announced, title + description, and an optional
- * date/time range/location/link -- file attachment deliberately
- * skipped. Published immediately -- included by default, per the
- * workflow -- rather than starting pending; an admin can still exclude
- * it from Table Admin or the Announcements inbox.
+ * fetch attempt): single-select organization + type (each with a
+ * free-text "Other"), multi-select audience + where-announced, title +
+ * description, and an optional date/time range/location/link -- file
+ * attachment deliberately skipped. Published immediately -- included
+ * by default, per the workflow -- rather than starting pending; an
+ * admin can still exclude it from Table Admin or the Announcements
+ * inbox.
+ *
+ * **Moved behind login and calling-gated 2026-09-09** (the user's own
+ * follow-up right after Agenda Item submission got the same treatment:
+ * "the same for submitting announcements... same location, same
+ * gatekeeping") -- reverses the original "anyone, no login" design.
+ * No more email field at all: the submitter is a known signed-in
+ * account now, so name/email come from the session (profile.display_name/
+ * profile.email) instead of self-reported text, same pattern as
+ * submitAgendaItem. Re-checks "attends a meeting, or is Bishopric"
+ * server-side too, not just via the page's own gate, for the same
+ * defense-in-depth reason submitAgendaItem re-checks meeting-type
+ * access.
  */
 export async function submitAnnouncement(formData: FormData) {
   const supabase = await createClient();
+  const { user, profile } = await getSessionUser();
+  if (!user) redirect("/login");
 
-  const email = String(formData.get("submitted_by_email") ?? "").trim();
+  if (profile?.role !== "bishopric") {
+    const allowedTypes = await getVisibleMeetingTypesForUser(user.id);
+    if (allowedTypes.length === 0) {
+      redirect(
+        `/submit/announcement?error=${encodeURIComponent(
+          "Announcement submission is limited to those who attend a meeting by calling."
+        )}`
+      );
+    }
+  }
+
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const organization = resolveOtherRadio(
@@ -61,10 +85,10 @@ export async function submitAnnouncement(formData: FormData) {
   const location = String(formData.get("location") ?? "").trim() || null;
   const linkUrl = String(formData.get("link_url") ?? "").trim() || null;
 
-  if (!email || !title || !body || !organization || !announcementType || !audience || !whereAnnounced) {
+  if (!title || !body || !organization || !announcementType || !audience || !whereAnnounced) {
     redirect(
-      `/submit?error=${encodeURIComponent(
-        "Email, organization, audience, where to announce, type, title, and description are required."
+      `/submit/announcement?error=${encodeURIComponent(
+        "Organization, audience, where to announce, type, title, and description are required."
       )}`
     );
   }
@@ -72,8 +96,8 @@ export async function submitAnnouncement(formData: FormData) {
   const { error } = await supabase.from("announcements").insert({
     title,
     body,
-    submitted_by_name: "(not given)",
-    submitted_by_email: email,
+    submitted_by_name: profile?.display_name || user.email || "(not given)",
+    submitted_by_email: profile?.email || user.email || "",
     status: "published",
     organization,
     announcement_type: announcementType,
@@ -88,12 +112,12 @@ export async function submitAnnouncement(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/submit?error=${encodeURIComponent(error.message)}`);
+    redirect(`/submit/announcement?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/announcements");
   revalidatePath("/announcements/public");
-  redirect("/submit?success=1");
+  redirect("/submit/announcement?success=1");
 }
 
 /**
