@@ -144,7 +144,8 @@ export default async function DashboardPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meetings" />
-        <p className="mt-10 text-slate">Sign in to see meetings.</p>
+        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Dashboard</h1>
+        <p className="mt-4 text-slate">Sign in to see meetings.</p>
         <Link
           href="/login"
           className="mt-4 inline-flex w-fit items-center rounded-md bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-ink/90"
@@ -164,6 +165,7 @@ export default async function DashboardPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Meetings" />
+      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Dashboard</h1>
 
       {canCreate && unassignedAgendaItems.length > 0 && (
         <section className="mt-10 rounded-lg border border-rule bg-card p-6">
