@@ -7,7 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 export interface PlanningInfo {
   special_format: string;
   ward_business: string | null;
+  /** Repurposed 2026-09-09: now holds who's announcing stake business
+   *  (a short name), not the business content itself -- see
+   *  has_stake_business, the actual yes/no toggle. */
   stake_business: string | null;
+  has_stake_business: boolean;
   recognitions: string | null;
   hidden_notes: string | null;
 }
@@ -34,6 +38,7 @@ export interface MusicRow {
   piece_name: string | null;
   individual_name: string | null;
   group_name: string | null;
+  accompanist_id: string | null;
   accompanist_name: string | null;
   status: string;
 }
@@ -69,7 +74,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
   const [planningRes, assignmentsRes, adultsRes, youthRes, musicRes, rabnmRes] = await Promise.all([
     supabase
       .from("sacrament_planning")
-      .select("special_format, ward_business, stake_business, recognitions, hidden_notes")
+      .select("special_format, ward_business, stake_business, has_stake_business, recognitions, hidden_notes")
       .eq("meeting_id", meetingId)
       .maybeSingle(),
     supabase
@@ -87,7 +92,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
     supabase
       .from("sacrament_music")
       .select(
-        "id, type, slot, hymn_number, piece_name, status, group_name, individual:individual_id(name), accompanist:accompanist_id(name)"
+        "id, type, slot, hymn_number, piece_name, status, group_name, accompanist_id, individual:individual_id(name), accompanist:accompanist_id(name)"
       )
       .eq("meeting_id", meetingId),
     supabase
@@ -110,6 +115,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         piece_name: string | null;
         status: string;
         group_name: string | null;
+        accompanist_id: string | null;
         individual: unknown;
         accompanist: unknown;
       };
@@ -121,6 +127,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         piece_name: r.piece_name,
         individual_name: relationName(r.individual),
         group_name: r.group_name,
+        accompanist_id: r.accompanist_id,
         accompanist_name: relationName(r.accompanist),
         status: r.status,
       };

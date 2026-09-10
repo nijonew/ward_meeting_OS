@@ -27,9 +27,14 @@ async function requireBishopric(): Promise<ActionResult | null> {
 /**
  * Only writes the columns actually submitted. Ward Business, Stake
  * Business, and Recognitions moved to the agenda grid (2026-09-09) and
- * are no longer on the Meeting Info form -- writing them unconditionally
- * from here would blank out whatever the grid just saved, since a form
- * that doesn't render a field submits nothing for it.
+ * the "Meeting Info" section itself was deleted the same day (the
+ * user's own request) -- Special Format is now the only thing this
+ * still saves, from its own small control at the top of the planning
+ * page. Kept accepting the other columns too rather than trimming the
+ * allowlist down to just special_format -- harmless (a form that
+ * doesn't render a field submits nothing for it, so they're never
+ * actually touched from here), and one less place to update if Hidden
+ * Notes or similar ever needs a home again.
  */
 export async function savePlanningInfo(meetingId: string, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();

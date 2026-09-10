@@ -25,6 +25,23 @@ export async function getActiveCallings(): Promise<CallingOption[]> {
   return error || !data ? [] : data;
 }
 
+/** Who currently holds a specific calling, by its exact name -- used
+ *  2026-09-09 to default the Presiding agenda row to the Bishop
+ *  (the user's own request) without needing a whole rotation/eligibility
+ *  round trip just for one person. Null if the calling doesn't exist,
+ *  isn't active, or is vacant. */
+export async function getCurrentHolderIdByCallingName(name: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("callings")
+    .select("current_holder_id")
+    .eq("name", name)
+    .eq("active", true)
+    .maybeSingle();
+
+  return data?.current_holder_id ?? null;
+}
+
 export async function getAllCallings(): Promise<CallingListItem[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

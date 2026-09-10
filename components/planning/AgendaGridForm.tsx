@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
 import type { AgendaRow } from "@/lib/data/agenda-rows";
@@ -29,6 +30,45 @@ function PersonSelect({
   );
 }
 
+/** Stake Business's yes/no toggle + conditional announcer field
+ *  (2026-09-09) -- its own tiny stateful piece since the announcer
+ *  input's visibility has to react to the checkbox client-side; nothing
+ *  else on this grid needs that. The hidden fallback (same name, before
+ *  the checkbox in the DOM) is what lets saveAgendaGrid tell "explicitly
+ *  unchecked" apart from "field never submitted" -- an unchecked
+ *  checkbox submits nothing on its own. */
+function StakeBusinessCell({
+  row,
+}: {
+  row: Extract<AgendaRow, { kind: "stake_business" }>;
+}) {
+  const [hasStakeBusiness, setHasStakeBusiness] = useState(row.hasStakeBusiness);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="flex items-center gap-1.5 text-sm text-ink">
+        <input type="hidden" name={row.toggleField} value="" />
+        <input
+          type="checkbox"
+          name={row.toggleField}
+          defaultChecked={row.hasStakeBusiness}
+          onChange={(e) => setHasStakeBusiness(e.target.checked)}
+        />
+        Stake Business this week
+      </label>
+      {hasStakeBusiness && (
+        <input
+          type="text"
+          name={row.announcerField}
+          defaultValue={row.announcerValue}
+          placeholder="Who's announcing"
+          className={`${INPUT} sm:w-56`}
+        />
+      )}
+    </div>
+  );
+}
+
 /**
  * The agenda itself, as an editable grid -- built 2026-09-09 from the
  * user's own spreadsheet agenda: "I want them to also be more
@@ -42,7 +82,12 @@ function PersonSelect({
  * Every row's field names come from buildAgendaRows
  * (lib/data/agenda-rows.ts) and are parsed back apart by saveAgendaGrid,
  * so this component never needs to know which table anything lives in
- * -- it just renders inputs for whatever rows it's handed.
+ * -- it just renders inputs for whatever rows it's handed. `people` is
+ * the fallback list for kinds with no calling-based restriction of
+ * their own (speaker/text/person_and_text rows); `person` and
+ * `recognize_music` rows carry their own already-restricted
+ * `eligiblePeople` list instead (2026-09-09: "all dropdowns should
+ * follow the rules for the field by calling").
  */
 export function AgendaGridForm({
   meetingId,
@@ -79,6 +124,23 @@ export function AgendaGridForm({
                     <td colSpan={2} className="px-2 py-2 text-center">
                       <span className="font-display text-sm italic text-ink">{row.label}</span>
                       {row.note && <span className="ml-2 text-xs text-slate/60">{row.note}</span>}
+                      {row.href && (
+                        <Link href={row.href} className="ml-2 text-xs text-slate underline hover:text-ink">
+                          Manage &rarr;
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                );
+              }
+
+              if (row.kind === "section") {
+                return (
+                  <tr key={row.id} className="border-t-2 border-rule">
+                    <td colSpan={2} className="px-2 pb-1 pt-4">
+                      <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                        {row.label}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -94,7 +156,7 @@ export function AgendaGridForm({
                   </th>
                   <td className="px-2 py-1.5">
                     {row.kind === "person" && (
-                      <PersonSelect name={row.field} people={people} defaultValue={row.value} />
+                      <PersonSelect name={row.field} people={row.eligiblePeople} defaultValue={row.value} />
                     )}
 
                     {row.kind === "text" && (
@@ -180,6 +242,33 @@ export function AgendaGridForm({
                         />
                       </div>
                     )}
+
+                    {row.kind === "recognize_music" && (
+                      <div className="flex flex-col gap-1.5 sm:flex-row">
+                        <div className="sm:w-1/2">
+                          <label className="block text-[10px] uppercase tracking-widest text-slate/60">
+                            Chorister
+                          </label>
+                          <PersonSelect
+                            name={row.choristerField}
+                            people={row.choristerEligible}
+                            defaultValue={row.choristerValue}
+                          />
+                        </div>
+                        <div className="sm:w-1/2">
+                          <label className="block text-[10px] uppercase tracking-widest text-slate/60">
+                            Organist
+                          </label>
+                          <PersonSelect
+                            name={row.organistField}
+                            people={row.organistEligible}
+                            defaultValue={row.organistValue}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {row.kind === "stake_business" && <StakeBusinessCell row={row} />}
                   </td>
                 </tr>
               );

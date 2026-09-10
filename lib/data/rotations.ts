@@ -80,7 +80,7 @@ export async function getAllRotations(): Promise<RotationRow[]> {
  * 'manual' rotations have no computable source -- callers get an empty
  * list back, same as syncRotationMembership's own early return.
  */
-async function computeEligiblePersonIds(
+export async function computeEligiblePersonIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   eligibilitySource: "standing_attendees" | "calling_names" | "manual",
   eligibilityCallingNames: string[] | null,
@@ -293,6 +293,120 @@ export async function pushRotationToUpcomingMeetings(
  */
 export const CONDUCTING_CALLING_ORDER = ["Bishop", "Bishopric First Counselor", "Bishopric Second Counselor"];
 
+/** Presiding's own eligible list (2026-09-09, the user's own request:
+ *  "default presiding to the bishop, but allow for members of the
+ *  bishopric/stake presidency to be in the dropdown") -- broader than
+ *  Conducting's, since a visiting stake presidency member can preside
+ *  even though they'd never be in the Conducting rotation. */
+export const STAKE_PRESIDENCY_CALLING_NAMES = [
+  "Stake President",
+  "Stake President First Counselor",
+  "Stake President Second Counselor",
+];
+
+/**
+ * The calling-restricted eligible-people list for one person_role agenda
+ * element -- the general-purpose version of what eligiblePeopleByColumn
+ * (below) already does per /rotations column, reused 2026-09-09 for the
+ * meeting planning agenda grid's own dropdowns (the user's own words:
+ * "all dropdowns should follow the rules for the field by calling rather
+ * than have all people in the dropdown"). Presiding/Conducting are
+ * fixed-by-calling rather than rotation-table-driven (see
+ * applyFixedSacramentRoles) so they're resolved directly from the same
+ * calling names that function itself reads, same as
+ * eligiblePeopleByColumn's own Conducting special-case; every other
+ * element key is resolved from its real `rotations` row, if one exists.
+ *
+ * Returns null -- not an empty array -- when no calling-based rule is
+ * configured for this element at all (no matching `rotations` row, or
+ * one explicitly set to "manual"), so callers can fall back to showing
+ * every active person rather than an empty dropdown. An empty ARRAY
+ * (as opposed to null) means a rule IS configured but nobody currently
+ * holds the relevant calling -- surfaced as-is, not silently widened,
+ * matching the applied-assignment grid's own "No one eligible" handling.
+ */
+export async function getEligiblePeopleForElement(
+  meetingTypeSlug: MeetingTypeSlug,
+  meetingTypeId: string,
+  elementKey: string
+): Promise<PersonOption[] | null> {
+  const supabase = await createClient();
+
+  if (meetingTypeSlug === "sacrament-meeting" && (elementKey === "presiding" || elementKey === "conducting")) {
+    const names = elementKey === "presiding" ? [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES] : CONDUCTING_CALLING_ORDER;
+    const ids = await computeEligiblePersonIds(supabase, "calling_names", names, meetingTypeId);
+    return personOptionsByIds(supabase, ids);
+  }
+
+  const { data: rotation } = await supabase
+    .from("rotations")
+    .select("eligibility_source, eligibility_calling_names")
+    .eq("meeting_type_id", meetingTypeId)
+    .eq("element_key", elementKey)
+    .maybeSingle();
+
+  if (!rotation || rotation.eligibility_source === "manual") return null;
+
+  const ids = await computeEligiblePersonIds(
+    supabase,
+    rotation.eligibility_source as "standing_attendees" | "calling_names",
+    rotation.eligibility_calling_names,
+    meetingTypeId
+  );
+  return personOptionsByIds(supabase, ids);
+}
+
+/**
+ * Batched version of getEligiblePeopleForElement for a whole agenda's
+ * worth of person_role elements at once -- one `rotations` query instead
+ * of one per element key.
+ */
+export async function getEligiblePeopleByElementKey(
+  meetingTypeSlug: MeetingTypeSlug,
+  meetingTypeId: string,
+  elementKeys: string[]
+): Promise<Record<string, PersonOption[] | null>> {
+  const supabase = await createClient();
+  const result: Record<string, PersonOption[] | null> = {};
+
+  const fixedKeys = elementKeys.filter((k) => meetingTypeSlug === "sacrament-meeting" && (k === "presiding" || k === "conducting"));
+  for (const key of fixedKeys) {
+    const names = key === "presiding" ? [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES] : CONDUCTING_CALLING_ORDER;
+    const ids = await computeEligiblePersonIds(supabase, "calling_names", names, meetingTypeId);
+    result[key] = await personOptionsByIds(supabase, ids);
+  }
+
+  const remaining = elementKeys.filter((k) => !fixedKeys.includes(k));
+  if (remaining.length > 0) {
+    const { data: rotationRows } = await supabase
+      .from("rotations")
+      .select("element_key, eligibility_source, eligibility_calling_names")
+      .eq("meeting_type_id", meetingTypeId)
+      .in("element_key", remaining);
+    const byKey = new Map(
+      (
+        (rotationRows ?? []) as {
+          element_key: string;
+          eligibility_source: "standing_attendees" | "calling_names" | "manual";
+          eligibility_calling_names: string[] | null;
+        }[]
+      ).map((r) => [r.element_key, r])
+    );
+
+    for (const key of remaining) {
+      const rotation = byKey.get(key);
+      if (!rotation || rotation.eligibility_source === "manual") {
+        result[key] = null;
+        continue;
+      }
+      const ids = await computeEligiblePersonIds(supabase, rotation.eligibility_source, rotation.eligibility_calling_names, meetingTypeId);
+      result[key] = await personOptionsByIds(supabase, ids);
+    }
+  }
+
+  return result;
+}
+
 /**
  * Presiding and Conducting for a new Sacrament Meeting, resolved directly
  * from the Bishop/counselor callings rather than the generic per-meeting
@@ -474,7 +588,7 @@ export function gridColumnsFor(meetingTypeSlug: MeetingTypeSlug): { key: string;
   return GRID_COLUMN_KEYS_BY_TYPE[meetingTypeSlug] ?? [];
 }
 
-async function personOptionsByIds(
+export async function personOptionsByIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ids: string[]
 ): Promise<PersonOption[]> {

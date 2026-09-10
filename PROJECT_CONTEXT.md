@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 045
+## Current migration number: 046
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -69,9 +69,15 @@ reconstructed from both:
   confirmed run.
 - `045` (new `youth_class_teachers` table -- Youth Teaching Planning
   per-person/per-class access control, see Known open items below):
-  still needs to be run.
+  confirmed run.
+- `046` (Sacrament Meeting agenda redesign -- new `sacrament_administered`
+  catalog element, new `sacrament_program_items` table for the Speakers
+  & Music list, `sacrament_planning.has_stake_business`, and retires
+  Chorister/Organist/Pianist/Speaker/Youth Speaker/Intermediate Hymn as
+  fixed template lines, see the Dynamic planning view architecture entry
+  above): still needs to be run.
 
-Next migration should be `046_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `047_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -160,17 +166,13 @@ exclusive access.
       without editing the template first. A repeatable music row's
       `slot` is now assigned positionally from its place in the agenda
       rather than picked from the old per-item "Slot" dropdown.
-    - **Ward Business / Stake Business / Recognitions are real editable
-      rows.** They render as agenda lines writing straight to their
-      `sacrament_planning` columns; previously the agenda showed them as
-      a dead "Edit in Meeting Info above" pointer (`REDIRECT_NOTES`) and
-      the actual fields lived on the Meeting Info form. Those three were
-      *removed* from `PlanningInfoForm` rather than left as a second
-      place to edit the same columns, and `savePlanningInfo` now only
-      writes the columns actually submitted -- otherwise the trimmed
-      form would blank out whatever the grid had just saved. Meeting
-      Info keeps `special_format` + `hidden_notes` and moved below the
-      agenda.
+    - ~~Ward Business / Stake Business / Recognitions are real editable
+      rows.~~ True only for this first pass -- Ward Business and Stake
+      Business both changed shape again the very next day, see below.
+      Recognitions is unaffected, still a plain text row writing to
+      `sacrament_planning.recognitions` (though not actually part of any
+      real template's element list as of this writing -- see that
+      rework's own note on this).
     - **Still their own sections below the grid**, deliberately: the
       collections that add/remove rows rather than filling in a fixed
       line (RABNM, Agenda Items, Action Items) plus Bishopric Minutes and
@@ -188,6 +190,159 @@ exclusive access.
       show (a speaker's `duration`/`confirmed`), is never cleared by a
       save from here. `saveAgendaGrid` re-checks the bishopric role
       server-side, matching the page's own gate.
+  - **Reworked line by line against a real agenda screenshot, 2026-09-10**
+    (the user's own notes, working down the page in order -- "here are
+    my notes going down the page in order of appearance"). This is a
+    genuinely different, more detailed pass than the grid rebuild above
+    -- that one restructured *how* elements render; this one changes
+    *which* elements exist and what each one's fields actually are, for
+    Sacrament Meeting specifically. Applies only to Sacrament Meeting
+    except where noted -- Bishopric Meeting/Ward Council/Youth Council
+    already got the single-agenda-grid treatment from the rebuild above
+    and keep it unchanged here.
+    - **Calling-restricted dropdowns, extended to every person_role row
+      on every meeting type** (the user's own words: "all dropdowns
+      should follow the rules for the field by calling rather than have
+      all people in the dropdown"). New `getEligiblePeopleForElement` /
+      `getEligiblePeopleByElementKey` (`lib/data/rotations.ts`,
+      exporting what used to be `eligiblePeopleByColumn`'s private
+      helpers, `computeEligiblePersonIds` and `personOptionsByIds`) --
+      Presiding and Conducting resolve straight from calling names
+      (fixed-by-calling, same as `applyFixedSacramentRoles`, not
+      rotation-table-driven); every other person_role element resolves
+      from its real `rotations` row, if one exists. Returns `null` (not
+      an empty array) when no calling-based rule is configured at all,
+      so the page falls back to every active person rather than an
+      empty dropdown -- an empty *array* still means "a rule exists but
+      nobody currently holds the calling," surfaced as-is, matching the
+      applied-assignment grid's own established "No one eligible"
+      handling rather than silently widening it. This is called once
+      per planning-page load for every person_role element actually on
+      that meeting's agenda (`app/meetings/[id]/planning/page.tsx`), not
+      hardcoded to Sacrament Meeting.
+    - **Presiding defaults to the Bishop, but the dropdown also offers
+      the rest of the Bishopric and the Stake Presidency** (new
+      `STAKE_PRESIDENCY_CALLING_NAMES` constant) -- the one row with a
+      real default value pre-filled when no `sacrament_assignments` row
+      exists yet (`defaultPresidingId`, resolved via new
+      `getCurrentHolderIdByCallingName` in `lib/data/callings.ts`). In
+      practice this rarely matters since `applyFixedSacramentRoles`
+      already writes a real Presiding row at meeting creation -- it's a
+      defensive fallback for the edge case where the Bishop calling was
+      vacant at creation time.
+    - **Chorister and Organist are no longer their own agenda lines** --
+      both render inline on the Recognize Music line instead (new
+      `recognize_music` `AgendaRow` kind, two `PersonSelect`s side by
+      side), each still calling-scoped via the same eligibility lookup.
+      Storage is completely unchanged (`sacrament_assignments.role =
+      'chorister'/'organist'`, same `role::<key>` field encoding
+      `saveAgendaGrid` already parsed) -- only the *rendering* groups
+      them onto one line; Assignment Rotations still tracks both exactly
+      as before. **Pianist is removed entirely** -- no line, no
+      replacement.
+    - **New "Administration of the Sacrament" section** groups the
+      Sacrament Hymn with a new "Sacrament Administered" cue right after
+      it (migration `046`: new `sacrament_administered` catalog element,
+      `resolution_kind: 'none'`, inserted into every sacrament format
+      that already has a Sacrament Hymn, both in the shared templates
+      and in already-seeded non-archived meetings). The section heading
+      itself isn't a real catalog element -- `buildAgendaRows` just
+      synthesizes a `section`-kind divider row whenever it's about to
+      render the Sacrament Hymn.
+    - **Ward Business moved to its own page**, `/meetings/[id]/ward-business`
+      (the user's own words: "Handle the RABNM in its own separate
+      page"). The agenda grid's own Ward Business line is now "a fixed
+      line without any field" (also the user's own words) -- a banner
+      with a "Manage →" link, nothing else. `RabnmSection` itself is
+      completely unchanged, just relocated from the bottom of the
+      planning view to this new page -- resolves the exact nested-`<form>`
+      problem that made inlining it directly impossible: RabnmSection's
+      own add/remove forms can't be real `<form>`s nested inside the
+      main agenda grid's single big `<form>` (HTML forbids nested
+      forms). The `AgendaRow` `banner` kind gained an optional `href` for
+      this (and for Speakers & Music, below).
+    - **Stake Business is a yes/no toggle**, not free text describing
+      the business itself -- new `sacrament_planning.has_stake_business`
+      boolean (migration `046`); the existing `stake_business` text
+      column is *repurposed* to hold who's announcing it (a short
+      answer), shown only once the box is checked
+      (`StakeBusinessCell` in `AgendaGridForm.tsx`, its own small
+      stateful piece since the announcer field's visibility has to
+      react to the checkbox). The checkbox needs the same hidden-fallback-
+      before-the-real-input trick used elsewhere in this app for
+      checkboxes inside a bigger form (e.g. Calling Planning's
+      multi-select) -- an unchecked box submits nothing on its own, so
+      without the fallback, unchecking it would leave the old `true`
+      value in place forever instead of ever saving `false`.
+    - **Speakers & Music is a freely add/remove/reorderable list, on its
+      own page** (`/meetings/[id]/speakers-music`) -- something the user
+      said they'd been "trying to explain... for some time": "a dropdown
+      which will allow the selection of youth speakers 1-9, speakers
+      1-9, musical numbers 1-9, intermediate hymn, testimonies," added
+      or removed as its own line, in whatever order. This fully replaces
+      the fixed `slot_count`-driven Speaker/Youth Speaker/Intermediate
+      Hymn/Musical Number elements from the grid rebuild above --
+      migration `046` removes all three from every Sacrament Meeting
+      template (and from already-seeded non-archived meetings) entirely,
+      so a week starts with *nothing* in this section and the admin adds
+      exactly what's needed.
+      - New `sacrament_program_items` table (migration `046`) tracks
+        only **order and membership** -- one row per chosen item, keyed
+        by `item_key` (`"speaker_3"`, `"musical_number_5"`, or the bare
+        string `"testimony"`). The actual data still lives in the same
+        `sacrament_speakers_adults/youth` and `sacrament_music` tables
+        everything else already reads, keyed by that same value as
+        their own `slot` -- this table never duplicates that data, and
+        removing an item also deletes its underlying row so nothing
+        orphaned lingers with no visible agenda entry.
+      - `lib/data/sacrament-program.ts` (server-only fetch) and
+        `lib/data/sacrament-program-shared.ts` (pure types/helpers, no
+        `createClient` import) are deliberately two files -- importing
+        the server file's `next/headers` dependency from
+        `SacramentProgramSection.tsx` (a Client Component) broke the
+        build outright the first time this was written as one file;
+        splitting them is the fix.
+      - **Speaker/Youth Speaker rows**: a person picker, or a guest
+        name -- "It will not include a guest name field unless
+        necessary" (the user's own words) is handled by new
+        `SpeakerPersonOrGuestField.tsx`, a small client toggle that
+        keeps the guest-name input out of the DOM entirely until asked
+        for (and vice versa). No topic field, no duration, no
+        confirmed checkbox -- explicitly dropped per the same note;
+        those columns still exist and are simply never touched by this
+        UI, same "don't touch what the grid doesn't show" principle as
+        the main agenda grid.
+      - **Musical Number rows**: Title, Individual-or-Group Name (one
+        plain-text field, not a structured person link), and
+        Accompanist (a real person picker -- `accompanist_id` is an
+        actual FK). **Intermediate Hymn rows**: Hymn Number + Title
+        only, same shape as every other hymn line in this app -- no
+        performer/accompanist, it's congregational. Intermediate Hymn's
+        own dropdown option has no explicit number (unlike the other
+        three, numbered 1-9 by the user's own design) -- picking it
+        auto-assigns the next free `intermediate_hymn_N` slot, the same
+        positional numbering `sacrament_music.slot` already used before
+        this rework.
+      - **Testimony** is a placeholder line with no underlying data row
+        at all -- open testimony-bearing needs nothing filled in.
+      - Each item is its own small `<form>` (Save) plus plain
+        `useTransition` buttons (Remove, reorder) -- these are siblings
+        on their own page, not descendants of any bigger grid form, so
+        nothing here hit the nested-`<form>` restriction the way Ward
+        Business did.
+    - **"Meeting Info" as a section is gone** (the user's own words:
+      "delete the meeting info section") -- `PlanningInfoForm.tsx`
+      deleted outright. Special Format moved to a small inline control
+      at the very top of the planning page (its own tiny `<form>`
+      calling the existing `savePlanningInfo`, trimmed down to just that
+      one field); Hidden Notes wasn't carried anywhere else -- the
+      column still exists, unused, same "harmless but real" treatment
+      already given to `callings.title_prefix` elsewhere in this file.
+    - **Not built today, deliberately deferred**: "Announcements will
+      end up being dynamic and will include the announcements that are
+      marked to be announced in sacrament meeting" -- the user's own
+      words, describing a future direction, not a change to make right
+      now. The Announcements line still renders as a plain banner cue.
 - **Assignment Rotations** (`/rotations`): two genuinely different
   mechanisms, previously documented (and displayed on `/rotations`) as
   if they were one, which turned out to be a real source of confusion

@@ -10,11 +10,17 @@ type SaveGridActionResult = { error?: string; success?: boolean };
 type RoleTable = "sacrament_assignments" | "bishopric_assignments";
 type SpeakerTable = "sacrament_speakers_adults" | "sacrament_speakers_youth";
 
-/** `sacrament_planning` columns this grid is allowed to write. Anything
- *  else on that table (special_format, hidden_notes) stays owned by the
- *  Meeting Info form -- an allowlist rather than trusting whatever field
- *  name arrives, since these go straight into a column name. */
-const PLANNING_COLUMNS = new Set(["ward_business", "stake_business", "recognitions"]);
+/** `sacrament_planning` columns this grid is allowed to write -- an
+ *  allowlist rather than trusting whatever field name arrives, since
+ *  these go straight into a column name. `special_format` is set from
+ *  its own small control at the top of the page (see
+ *  savePlanningInfo in app/meetings/[id]/planning/actions.ts), not
+ *  this grid. */
+const PLANNING_TEXT_COLUMNS = new Set(["stake_business", "recognitions"]);
+/** Checkbox columns need boolean parsing, not the text allowlist's
+ *  trim-or-null handling -- has_stake_business (2026-09-09) is the
+ *  first of these. */
+const PLANNING_BOOLEAN_COLUMNS = new Set(["has_stake_business"]);
 
 interface MusicPatch {
   type: string;
@@ -41,8 +47,11 @@ interface SpeakerPatch {
  * Each field name encodes where its value belongs (see
  * lib/data/agenda-rows.ts, which builds them):
  *   role::<elementKey>                       -> sacrament/bishopric_assignments
+ *     (chorister/organist included -- Recognize Music renders both
+ *     inline, but they still write through this exact same path)
  *   note::<elementKey>::person|text          -> meeting_element_notes
- *   planning::<column>                       -> sacrament_planning
+ *   planning::stake_business|recognitions    -> sacrament_planning (text)
+ *   planning::has_stake_business             -> sacrament_planning (boolean)
  *   music::<type>::<slot|->::number|title|performer -> sacrament_music
  *   speaker::<adults|youth>::<slot>::person|guest|topic -> sacrament_speakers_*
  *
@@ -93,7 +102,10 @@ export async function saveAgendaGrid(
       }
 
       case "planning":
-        if (parts.length === 2 && PLANNING_COLUMNS.has(parts[1])) planning.set(parts[1], value);
+        if (parts.length !== 2) break;
+        if (PLANNING_TEXT_COLUMNS.has(parts[1]) || PLANNING_BOOLEAN_COLUMNS.has(parts[1])) {
+          planning.set(parts[1], value);
+        }
         break;
 
       case "music": {
@@ -175,10 +187,12 @@ export async function saveAgendaGrid(
     if (error) return { error: error.message };
   }
 
-  // --- sacrament_planning text columns ---------------------------------
+  // --- sacrament_planning columns ---------------------------------------
   if (planning.size > 0) {
     const payload: Record<string, unknown> = { meeting_id: meetingId, updated_at: new Date().toISOString() };
-    for (const [column, value] of planning) payload[column] = value || null;
+    for (const [column, value] of planning) {
+      payload[column] = PLANNING_BOOLEAN_COLUMNS.has(column) ? value === "on" : value || null;
+    }
 
     // Only the submitted columns are in the payload, so special_format
     // and hidden_notes keep whatever they already had.
