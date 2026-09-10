@@ -9,9 +9,17 @@ export default async function ConductingViewPage({
 }) {
   const { id: meetingId } = await params;
 
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
   if (!user) {
     redirect("/login");
+  }
+  // Had no role check at all before 2026-09-10 -- any logged-in account
+  // could read any meeting's full conducting script, the same gap
+  // already found and fixed for Planning/Live on 2026-09-08. Whoever
+  // conducts is Bishopric; a non-admin wanting this meeting's program
+  // wants the actual public page instead.
+  if (profile?.role !== "bishopric") {
+    redirect(`/meetings/${meetingId}/public`);
   }
 
   const script = await getConductingScript(meetingId);

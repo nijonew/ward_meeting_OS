@@ -19,15 +19,27 @@
 --   missionary_speaker:  youth_speaker x1, speaker x2, intermediate_hymn x1
 --   stake_speakers:      same as standard (confirmed identical, 033)
 --   baby_blessing:       same as standard (confirmed identical, 033)
---   testimony_meeting/primary_program/christmas_meeting/easter_meeting/
---     stake_conference/general_conference: none of these elements at
---     all (unchanged from before 046 -- no rows needed here).
+--   primary_program/christmas_meeting/easter_meeting/stake_conference/
+--     general_conference: none of these elements at all (unchanged
+--     from before 046 -- no rows needed here).
+--
+-- Amended before this file was ever run (not yet confirmed run as of
+-- this edit, so amended in place rather than adding a 048 for one
+-- missed case): testimony_meeting gets a single `testimony` item.
+-- getConductingScript used to special-case `special_format ===
+-- 'testimony_meeting'` to show one hardcoded testimony-bearing line
+-- regardless of any real per-meeting data; now that Testimony is just
+-- another Speakers & Music item (2026-09-09), that hardcoding is gone
+-- (see lib/data/conducting.ts) -- this is what actually reproduces the
+-- old automatic behavior for a new Testimony Meeting, the same
+-- "seeded once, then freely edited" way every other format default
+-- works here.
 --
 -- This table only ever needs `item_key` values that match
 -- lib/data/sacrament-program-shared.ts's own numbered slots
--- (`<kind>_<n>`) -- "musical_number" and "testimony" are deliberately
--- never template-seeded (never were fixed template defaults, even
--- before migration 046).
+-- (`<kind>_<n>`), or the bare "testimony" -- "musical_number" is the
+-- only kind deliberately never template-seeded (never was a fixed
+-- template default, even before migration 046).
 --
 -- Idempotent: safe to re-run.
 
@@ -78,4 +90,10 @@ from (values
 ) as v(item_key, sort_order)
 where not exists (
   select 1 from sacrament_program_templates existing where existing.format_key = 'missionary_speaker'
+);
+
+insert into sacrament_program_templates (format_key, item_key, sort_order)
+select 'testimony_meeting', 'testimony', 10
+where not exists (
+  select 1 from sacrament_program_templates existing where existing.format_key = 'testimony_meeting'
 );

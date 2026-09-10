@@ -3,6 +3,16 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
 import { getMeetingById } from "@/lib/data/meetings";
+import type { MeetingLifecycleStage } from "@/lib/types";
+
+/** Sacrament Meeting never actually reaches Review/Ready/Live -- nothing
+ *  in this app has ever had a way to move it there (2026-09-10, the
+ *  user's own request: "we can remove the review, ready, live statuses
+ *  for sacrament meeting"; `meetings.stage` is deliberately excluded
+ *  from Table Admin and no dedicated action for those transitions was
+ *  ever built) -- so showing them in the track just implied controls
+ *  that don't exist. */
+const SACRAMENT_LIFECYCLE_STAGES: MeetingLifecycleStage[] = ["template", "planning", "archived"];
 
 function formatMeetingDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -67,7 +77,10 @@ export default async function MeetingLayout({
         <p className="mt-1 text-slate">{formatMeetingDate(meeting.date)}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 overflow-x-auto pb-1">
-          <LifecycleBadge stage={meeting.stage} />
+          <LifecycleBadge
+            stage={meeting.stage}
+            stages={meeting.meetingType === "sacrament-meeting" ? SACRAMENT_LIFECYCLE_STAGES : undefined}
+          />
           {meeting.cancelled && (
             <span className="whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-red-700">
               Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}

@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMeetingById } from "@/lib/data/meetings";
+import { getSacramentProgramItems } from "@/lib/data/sacrament-program";
+import { kindOfItemKey } from "@/lib/data/sacrament-program-shared";
 
 export interface PublicOrderItem {
   heading: string;
@@ -50,6 +52,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     youthRes,
     musicRes,
     rabnmRes,
+    programItems,
   ] = await Promise.all([
     supabase.rpc("get_meeting_special_format", { p_meeting_id: meetingId }),
     supabase
@@ -72,6 +75,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
       .eq("meeting_id", meetingId)
       .eq("status", "published"),
     supabase.from("sacrament_rabnm").select("id, detail").eq("meeting_id", meetingId).eq("type", "baby_blessing"),
+    getSacramentProgramItems(meetingId),
   ]);
 
   const assignments = (assignmentsRes.data ?? []) as RawAssignment[];
@@ -148,35 +152,44 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
 
   const specialFormat = (formatRes.data as string | null) ?? "standard";
 
-  if (specialFormat === "testimony_meeting") {
-    items.push({ heading: "Testimonies", detail: null });
-  } else {
-    const sortedYouth = [...youth].sort((a, b) => a.slot.localeCompare(b.slot));
-    for (const s of sortedYouth) {
-      items.push({ heading: "Youth Speaker", detail: speakerName(s) });
-    }
+  // Speakers & Music, in the meeting's own chosen order (2026-09-10) --
+  // this used to be grouped by type (all youth speakers, then
+  // intermediate hymns, then musical numbers, then adult speakers)
+  // regardless of the order actually saved; now that the planning view
+  // lets these interleave freely (sacrament_program_items), the public
+  // program has to follow the same real order or it stops matching
+  // what's on the agenda. An item not found in its already-filtered
+  // source array (an unconfirmed speaker, an unpublished music item)
+  // is skipped, same as it always silently was.
+  const adultBySlot = new Map(adults.map((s) => [s.slot, s]));
+  const youthBySlot = new Map(youth.map((s) => [s.slot, s]));
+  const musicBySlot = new Map(music.filter((m) => m.slot).map((m) => [m.slot as string, m]));
 
-    const intermediateHymns = music
-      .filter((m) => m.type === "intermediate_hymn")
-      .sort((a, b) => (a.slot ?? "").localeCompare(b.slot ?? ""));
-    for (const h of intermediateHymns) {
-      items.push({ heading: "Intermediate Hymn", detail: `${h.hymn_number ?? ""} ${h.piece_name ?? ""}`.trim() });
+  for (const item of programItems) {
+    const kind = kindOfItemKey(item.itemKey);
+    if (kind === "testimony") {
+      items.push({ heading: "Testimonies", detail: null });
+      continue;
     }
-
-    const musicalNumbers = music
-      .filter((m) => m.type === "musical_number")
-      .sort((a, b) => (a.slot ?? "").localeCompare(b.slot ?? ""));
-    for (const n of musicalNumbers) {
-      const performer = n.group_name || (n.individual_id ? nameById.get(n.individual_id) : null);
+    if (kind === "speaker" || kind === "youth_speaker") {
+      const speaker = (kind === "speaker" ? adultBySlot : youthBySlot).get(item.itemKey);
+      if (!speaker) continue;
+      items.push({ heading: kind === "speaker" ? "Speaker" : "Youth Speaker", detail: speakerName(speaker) });
+      continue;
+    }
+    const musicItem = musicBySlot.get(item.itemKey);
+    if (!musicItem) continue;
+    if (kind === "intermediate_hymn") {
+      items.push({
+        heading: "Intermediate Hymn",
+        detail: `${musicItem.hymn_number ?? ""} ${musicItem.piece_name ?? ""}`.trim(),
+      });
+    } else {
+      const performer = musicItem.group_name || (musicItem.individual_id ? nameById.get(musicItem.individual_id) : null);
       items.push({
         heading: "Musical Number",
-        detail: [n.piece_name, performer].filter(Boolean).join(" — ") || null,
+        detail: [musicItem.piece_name, performer].filter(Boolean).join(" — ") || null,
       });
-    }
-
-    const sortedAdults = [...adults].sort((a, b) => a.slot.localeCompare(b.slot));
-    for (const s of sortedAdults) {
-      items.push({ heading: "Speaker", detail: speakerName(s) });
     }
   }
 

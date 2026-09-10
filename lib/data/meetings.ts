@@ -169,15 +169,24 @@ export async function getUpcomingMeeting(): Promise<Meeting | null> {
 
 /**
  * The sacrament meeting the public landing page should link to today, if
- * any. "Published" (per the lifecycle: ready -> live -> archived) means
- * the print-ready program -- music, speakers, prayers, musicians,
- * conducting, presiding -- is finalized. Ward business and announcements
- * made live during conducting are intentionally not part of this view;
- * they're folded in only once the meeting is archived.
+ * any. Ward business and announcements made live during conducting are
+ * intentionally not part of this view; they're folded in only once the
+ * meeting is archived.
  *
  * Only returns a meeting dated today -- the tile should not appear (or
- * should say "nothing published yet") on any other day, even if a
- * sacrament meeting exists in a ready/live stage for a future Sunday.
+ * should say "nothing published yet") on any other day.
+ *
+ * Gated on date + not-archived, not a `ready`/`live` stage (2026-09-10,
+ * the user's own request: "we can remove the review, ready, live
+ * statuses for sacrament meeting") -- those stages were never actually
+ * reachable in the first place: `meetings.stage` is deliberately kept
+ * out of Table Admin, and no dedicated "mark ready"/"go live" action
+ * was ever built for Sacrament Meeting, so this query could never have
+ * matched anything in real production data. The Vision workflow's own
+ * rule was already date-based ("the public with no login, for that one
+ * day only... editable at all times until archived"), so this is really
+ * a bugfix as much as a simplification: today + not archived is the
+ * actual, working rule.
  */
 export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | null> {
   const supabase = await createClient();
@@ -187,7 +196,7 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
     .from("meetings")
     .select(MEETING_SELECT_COLUMNS)
     .eq("date", today)
-    .in("stage", ["ready", "live"]);
+    .neq("stage", "archived");
 
   if (error || !data) {
     return null;

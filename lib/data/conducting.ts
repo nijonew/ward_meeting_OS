@@ -1,7 +1,7 @@
-import { getSacramentPlanningData, type RabnmRow, type SpeakerRow } from "@/lib/data/sacrament-planning";
+import { getSacramentPlanningData, type RabnmRow } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getMeetingById } from "@/lib/data/meetings";
-import { slotLabel } from "@/lib/data/sacrament-constants";
+import { getSacramentProgramItems, resolveProgramItems, type ResolvedProgramItem } from "@/lib/data/sacrament-program";
 
 export interface ScriptLine {
   heading: string;
@@ -49,17 +49,45 @@ function rabnmPrompt(item: RabnmRow): string {
   }
 }
 
-function speakerLine(row: SpeakerRow, peopleByName: Map<string, string>): string {
-  const name = row.speaker_id ? (peopleByName.get(row.speaker_id) ?? "(speaker not entered)") : row.guest_speaker_name ?? "(speaker not entered)";
-  const topic = row.topic ? ` speaking on: ${row.topic}` : "";
-  return `${name}${topic}`;
+/** One prompt per Speakers & Music item, in the meeting's own chosen
+ *  order (2026-09-10: this used to be grouped by type -- all youth
+ *  speakers, then intermediate hymns, then musical numbers, then adult
+ *  speakers -- regardless of the order actually saved; now that the
+ *  planning view lets these interleave freely, the script has to
+ *  follow the same real order or it stops matching what's on the
+ *  agenda). Mirrors the resolution AgendaGridForm itself renders, just
+ *  as a line of spoken text instead of editable fields. */
+function programItemPrompt(item: ResolvedProgramItem, peopleByName: Map<string, string>): { heading: string; prompt: string } {
+  switch (item.kind) {
+    case "speaker":
+    case "youth_speaker": {
+      const name = item.personId ? (peopleByName.get(item.personId) ?? "(speaker not entered)") : item.guestName || "(speaker not entered)";
+      return { heading: item.label, prompt: name };
+    }
+    case "musical_number": {
+      const performer = item.performer || "(performer not entered)";
+      return {
+        heading: item.label,
+        prompt: `We will now be favored with a musical number, "${item.title || "(title not entered)"}", performed by ${performer}.`,
+      };
+    }
+    case "intermediate_hymn":
+      return {
+        heading: item.label,
+        prompt: `Intermediate hymn number ${item.hymnNumber || "?"}, ${item.title || "(title not entered)"}.`,
+      };
+    case "testimony":
+    default:
+      return { heading: "Testimonies", prompt: "We now invite members of the ward to bear their testimonies." };
+  }
 }
 
 export async function getConductingScript(meetingId: string): Promise<ConductingScript | null> {
-  const [meeting, data, people] = await Promise.all([
+  const [meeting, data, people, programItems] = await Promise.all([
     getMeetingById(meetingId),
     getSacramentPlanningData(meetingId),
     getActivePeople(),
+    getSacramentProgramItems(meetingId),
   ]);
 
   if (!meeting) return null;
@@ -105,22 +133,23 @@ export async function getConductingScript(meetingId: string): Promise<Conducting
     prompt: `We would like to thank ${chorister} for conducting our music today, and ${organist} as our organist.`,
   });
 
-  if (
-    data.planning?.ward_business ||
-    data.rabnm.length > 0 ||
-    (data.planning?.special_format && data.planning.special_format !== "standard")
-  ) {
+  // Ward Business is fully RABNM-driven now (2026-09-09) -- the old
+  // free-text `ward_business` column is no longer written to from
+  // anywhere, so it's dropped from this trigger/output entirely rather
+  // than reading stale data nothing can update anymore.
+  if (data.rabnm.length > 0 || (data.planning?.special_format && data.planning.special_format !== "standard")) {
     lines.push({ heading: "Ward Business", prompt: null });
-    if (data.planning?.ward_business) {
-      lines.push({ heading: "Ward Business Notes", prompt: data.planning.ward_business });
-    }
     for (const item of data.rabnm) {
       lines.push({ heading: item.type.replace(/_/g, " "), prompt: rabnmPrompt(item) });
     }
   }
 
-  if (data.planning?.stake_business) {
-    lines.push({ heading: "Stake Business", prompt: data.planning.stake_business });
+  // Stake Business is a yes/no toggle now (2026-09-09), with the
+  // announcer's name in what used to be free text describing the
+  // business itself.
+  if (data.planning?.has_stake_business) {
+    const announcer = data.planning.stake_business || "(announcer not entered)";
+    lines.push({ heading: "Stake Business", prompt: `${announcer} will present stake business.` });
   }
 
   const sacramentHymn = data.music.find((m) => m.type === "sacrament_hymn");
@@ -139,49 +168,15 @@ export async function getConductingScript(meetingId: string): Promise<Conducting
       "Thank you for your reverence during the administration of the sacrament. Thank you to the priesthood holders who administered the sacrament to us.",
   });
 
-  // Program
+  // Teaching Program -- Speakers & Music, in the meeting's own chosen
+  // order (see programItemPrompt's own comment for why this can no
+  // longer be grouped by type).
   lines.push({ heading: "Program", prompt: null });
 
-  if (data.planning?.special_format === "testimony_meeting") {
-    lines.push({
-      heading: "Testimonies",
-      prompt: "We now invite members of the ward to bear their testimonies.",
-    });
-  } else {
-    const youthSpeakers = data.speakersYouth
-      .filter((s) => s.speaker_id || s.guest_speaker_name)
-      .sort((a, b) => a.slot.localeCompare(b.slot));
-    for (const speaker of youthSpeakers) {
-      lines.push({ heading: slotLabel(speaker.slot), prompt: speakerLine(speaker, peopleById) });
-    }
-
-    const intermediateHymns = data.music
-      .filter((m) => m.type === "intermediate_hymn" && m.slot)
-      .sort((a, b) => (a.slot ?? "").localeCompare(b.slot ?? ""));
-    for (const hymn of intermediateHymns) {
-      lines.push({
-        heading: slotLabel(hymn.slot ?? "Intermediate Hymn"),
-        prompt: `Intermediate hymn number ${hymn.hymn_number ?? "?"}, ${hymn.piece_name ?? "(title not entered)"}.`,
-      });
-    }
-
-    const musicalNumbers = data.music
-      .filter((m) => m.type === "musical_number" && m.slot)
-      .sort((a, b) => (a.slot ?? "").localeCompare(b.slot ?? ""));
-    for (const number of musicalNumbers) {
-      const performer = number.group_name || number.individual_name || "(performer not entered)";
-      lines.push({
-        heading: slotLabel(number.slot ?? "Musical Number"),
-        prompt: `We will now be favored with a musical number, "${number.piece_name ?? "(title not entered)"}", performed by ${performer}.`,
-      });
-    }
-
-    const adultSpeakers = data.speakersAdults
-      .filter((s) => s.speaker_id || s.guest_speaker_name)
-      .sort((a, b) => a.slot.localeCompare(b.slot));
-    for (const speaker of adultSpeakers) {
-      lines.push({ heading: slotLabel(speaker.slot), prompt: speakerLine(speaker, peopleById) });
-    }
+  const resolvedItems = resolveProgramItems(programItems, data.music, data.speakersAdults, data.speakersYouth);
+  for (const item of resolvedItems) {
+    const { heading, prompt } = programItemPrompt(item, peopleById);
+    lines.push({ heading, prompt });
   }
 
   const closingHymn = data.music.find((m) => m.type === "closing_hymn");

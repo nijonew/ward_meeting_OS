@@ -22,8 +22,28 @@ const STAGE_LABELS: Record<MeetingLifecycleStage, string> = {
  * back for the date button instead. The full track stays the default
  * everywhere else (e.g. a meeting's own header), where showing the
  * whole lifecycle at a glance is still the point.
+ *
+ * `stages` (2026-09-10, the user's own request: "we can remove the
+ * review, ready, live statuses for sacrament meeting") lets a caller
+ * show a shorter track than the full 6-stage one -- Sacrament Meeting's
+ * own header passes `["template", "planning", "archived"]`, since
+ * nothing in this app has ever had a way to move a meeting into
+ * review/ready/live (no Table Admin column, no dedicated action --
+ * `meetings.stage` is deliberately excluded from Table Admin precisely
+ * because "the lifecycle... controls what the public program page
+ * shows -- edit it through the meeting's own pages, not here", and no
+ * such page-level control for those three stages was ever built).
+ * Defaults to the full list for every other meeting type, unchanged.
  */
-export function LifecycleBadge({ stage, compact }: { stage: MeetingLifecycleStage; compact?: boolean }) {
+export function LifecycleBadge({
+  stage,
+  compact,
+  stages = MEETING_LIFECYCLE_STAGES,
+}: {
+  stage: MeetingLifecycleStage;
+  compact?: boolean;
+  stages?: MeetingLifecycleStage[];
+}) {
   if (compact) {
     return (
       <span
@@ -36,7 +56,7 @@ export function LifecycleBadge({ stage, compact }: { stage: MeetingLifecycleStag
     );
   }
 
-  const currentIndex = MEETING_LIFECYCLE_STAGES.indexOf(stage);
+  const currentIndex = stages.indexOf(stage);
 
   return (
     <div
@@ -44,7 +64,7 @@ export function LifecycleBadge({ stage, compact }: { stage: MeetingLifecycleStag
       role="img"
       aria-label={`Meeting stage: ${STAGE_LABELS[stage]}`}
     >
-      {MEETING_LIFECYCLE_STAGES.map((s, i) => {
+      {stages.map((s, i) => {
         const isCurrent = i === currentIndex;
         const isPast = i < currentIndex;
 
@@ -62,7 +82,7 @@ export function LifecycleBadge({ stage, compact }: { stage: MeetingLifecycleStag
             >
               {STAGE_LABELS[s]}
             </span>
-            {i < MEETING_LIFECYCLE_STAGES.length - 1 && (
+            {i < stages.length - 1 && (
               <span
                 className={["h-px w-4 shrink-0", isPast ? "bg-ink/20" : "bg-ink/10"].join(" ")}
               />

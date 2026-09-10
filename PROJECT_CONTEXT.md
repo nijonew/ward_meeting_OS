@@ -753,10 +753,80 @@ account.
   `/dashboard` already cover "start planning a future date with no
   meeting yet" without needing Table Admin's calendar-picker trick, so
   there was no real capability gap to fill first.
-- No "printable" lifecycle stage or terminology exists today — current
-  stages are `template → planning → review → ready → live → archived`.
-  Where "printable" maps onto that chain (or whether it replaces part of
-  it) needs deciding, not assumed.
+- ~~No "printable" lifecycle stage or terminology exists today — current
+  stages are `template → planning → review → ready → live → archived`.~~
+  **Simplified 2026-09-10** (the user's own words: "we can remove the
+  review, ready, live statuses for sacrament meeting") -- this turned
+  out to be a bugfix as much as a simplification. Investigating it
+  surfaced that Review/Ready/Live were **never actually reachable for
+  Sacrament Meeting in the first place**: `meetings.stage` is
+  deliberately excluded from Table Admin ("edit it through the
+  meeting's own pages, not here" -- `lib/admin/registry.ts`'s own
+  comment), and no dedicated "mark ready"/"go live" action was ever
+  built for Sacrament Meeting -- meaning `getTodaysPublishedSacramentMeeting`
+  and `/meetings/[id]/public`'s own `.in("stage", ["ready", "live"])`
+  checks could never have matched a real row, so **the public program
+  page has likely never actually shown anything in production**. Both
+  now gate on `date === today && stage !== "archived"` instead --
+  exactly the Vision workflow's own already-stated rule ("public with
+  no login, for that one day only... editable at all times until
+  archived"), just finally implemented correctly. `LifecycleBadge`
+  gained an optional `stages` override so a Sacrament Meeting's own
+  header shows a 3-stage track (Template/Planning/Archived) instead of
+  the full 6, which had been implying manual controls that never
+  existed; every other meeting type is unaffected, still the full
+  track (they use a genuinely different workflow -- Bishopric Meeting/
+  Ward Council/Youth Council have a real Live tab of their own).
+  "Printable" as a named stage is still undecided -- this only removed
+  the three that were already dead ends, it doesn't answer where
+  "printable" itself belongs in the (now shorter) chain.
+
+  **Public and Conducting views updated to match everything else
+  changed 2026-09-09/10** (the user's own follow-up, right after
+  noticing this: "we need to see updates to the public and conducting
+  views"). Investigating found two more real staleness bugs from the
+  agenda redesign, both fixed:
+  - `lib/data/conducting.ts` still read `sacrament_planning.ward_business`
+    as free text (dead since Ward Business became fully RABNM-driven,
+    2026-09-09) and `stake_business` as the business description itself
+    (repurposed the same day to hold who's *announcing* it, gated by
+    the new `has_stake_business` toggle) -- both fixed to match.
+  - **Both `conducting.ts` and `lib/data/public-view.ts` built the
+    Speakers & Music/Program section grouped by type** (every youth
+    speaker, then every intermediate hymn, then every musical number,
+    then every adult speaker), regardless of the order actually saved
+    -- correct before `sacrament_program_items` existed (there was no
+    other order to follow), silently wrong the moment that list started
+    letting these interleave freely. Both now fetch
+    `getSacramentProgramItems` and walk that real order instead,
+    resolving each entry against the same already-filtered
+    speaker/music data (`confirmed = true` for speakers, `status =
+    'published'` for music -- unchanged) and skipping any item not yet
+    confirmed/published, same as before. `conducting.ts` reuses
+    `resolveProgramItems` directly (its data is already shaped
+    compatibly); `public-view.ts` has its own raw query shapes, so it
+    re-implements the same per-kind resolution inline rather than
+    reshaping its queries to fit.
+  - Testimony Meeting's conducting script used to hardcode "show one
+    testimony line, skip all speakers/music" whenever `special_format
+    === 'testimony_meeting'`, independent of any real per-meeting data.
+    That hardcoding is gone now that Testimony is just another Speakers
+    & Music item -- migration `047` was amended (not yet confirmed run
+    at the time, so amended in place rather than adding a `048`) to
+    seed a single `testimony` item for that format by default,
+    reproducing the old automatic behavior through the new mechanism
+    instead of a special case.
+  - **Incidental security gap found and fixed while in here**: Conducting
+    (`/meetings/[id]/conducting`) had no role check at all -- any
+    logged-in account could read any meeting's full conducting script,
+    the same gap already found and fixed for Planning/Live on
+    2026-09-08. Now Bishopric-only, redirecting a non-admin to the
+    actual public page instead.
+  - A bigger Conducting redesign -- "similar to the planning view but
+    with suggested wording interspersed as appropriate" (the user's own
+    words) -- is a distinct, larger idea flagged here but **not started**;
+    what's described above is the correctness fix for the current
+    conducting script, not that redesign.
 
 ### Workflow: Calling planning and calling-specific ward business in Sacrament Meeting
 
