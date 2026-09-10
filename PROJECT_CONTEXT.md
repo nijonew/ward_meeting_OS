@@ -822,11 +822,67 @@ account.
     the same gap already found and fixed for Planning/Live on
     2026-09-08. Now Bishopric-only, redirecting a non-admin to the
     actual public page instead.
-  - A bigger Conducting redesign -- "similar to the planning view but
-    with suggested wording interspersed as appropriate" (the user's own
-    words) -- is a distinct, larger idea flagged here but **not started**;
-    what's described above is the correctness fix for the current
-    conducting script, not that redesign.
+  - **Conducting redesign, built same day (2026-09-10)**, scoped via a
+    formal plan (`/plan`) before starting: "similar to the planning view
+    but with suggested wording interspersed as appropriate" (the user's
+    own words). Clarifying questions settled: read-only during the
+    meeting, but reflects Planning edits without a manual refresh;
+    label + resolved value + suggested wording per row (closer to
+    Planning's own shape, not just a flat prompt list); wording only
+    where something is naturally spoken (hymns, prayers, RABNM,
+    Recognize Music, Stake Business, Sacrament Administered, Musical
+    Numbers/Intermediate Hymn/Testimony) -- Presiding/Conducting/
+    Visiting Authorities/Speaker names show the value only, nothing
+    synthesized; wording computed fresh every time, no per-meeting
+    override/customization UI.
+
+    The real fix underneath the visual change: **Conducting is now
+    template-driven, the same way Planning already is.** The old
+    `getConductingScript` was a single hand-written function that
+    hardcoded the entire meeting flow as a fixed sequence -- it never
+    read the meeting's own `meeting_planned_elements`/`meeting_templates`
+    at all, so it silently ignored any per-meeting agenda customization
+    and only had one `special_format` special-case
+    (`testimony_meeting`, itself already stale after the Speakers &
+    Music rework). New `getConductingRows` (`lib/data/conducting.ts`)
+    fetches the same `getPlannedElements`/`getTemplateElements` (with
+    the same zero-seeded-elements fallback) Planning uses, splits at
+    Closing Hymn/Prayer the same way, and calls new
+    `buildConductingRows` (`lib/data/conducting-rows.ts`) -- a direct
+    read-only counterpart to `buildAgendaRows`, same per-element-key
+    dispatch, same four sections (Opening/Administration of the
+    Sacrament/Teaching Program/Closing), producing
+    `{ value, wording }` per row instead of an editable field. Teaching
+    Program reuses `resolveProgramItems` in the meeting's real saved
+    order (same fix already applied to `public-view.ts` above); Ward
+    Business reuses the exact same `rabnmPrompt` sentences, now moved
+    into `conducting-rows.ts` since the old `conducting.ts` no longer
+    owns the fixed sequence.
+
+    One deliberate simplification: the old hand-written script had a
+    couple of sentences spanning two elements ("...after which the
+    prayer will be offered by X"). A generic per-element dispatch can't
+    know what the *next* row will be, so every row's wording is now
+    self-contained -- a small, called-out trade-off for a system that's
+    actually maintainable and won't drift from Planning again.
+
+    **"Updates in real time" is a plain 8-second poll, not Supabase
+    Realtime** -- `components/planning/ConductingScriptView.tsx`
+    (Client Component) calls a new Server Action,
+    `refreshConductingScript` (`app/meetings/[id]/conducting-actions.ts`,
+    re-checks the Bishopric gate itself), on an interval and replaces
+    its rows. This app has never used Supabase Realtime or a
+    client-side Supabase client anywhere before this (`lib/supabase/client.ts`
+    existed already but was unimported anywhere) -- wiring up real
+    Postgres Changes would mean enabling Realtime on ~8 tables and
+    verifying RLS/Realtime interaction live against the real project,
+    neither of which could be checked without a deploy-and-test cycle.
+    A short poll gets "no manual refresh needed" with far less new
+    surface area; swapping it for a real subscription later, if truly
+    instant push ever matters, is a contained, separate upgrade.
+    `app/meetings/[id]/conducting/page.tsx` is now a thin wrapper --
+    the Bishopric-only gate and initial fetch, then
+    `ConductingScriptView` for the row list + polling.
 
 ### Workflow: Calling planning and calling-specific ward business in Sacrament Meeting
 
@@ -1722,6 +1778,22 @@ before fully closing it out.
     a prop -- an inline server action is allowed across the
     server/client boundary as a function, unlike a plain one (see the
     formatDate-prop bug elsewhere in this file).
+
+  **Sacrament Meeting removed from "My meetings" entirely, 2026-09-10**
+  (the user's own words: "remove sacrament meeting from 'my
+  meetings'"). `ALL_MEETING_TYPES` (`app/page.tsx`) no longer includes
+  it, and the non-admin branch stopped unconditionally folding
+  `"sacrament-meeting"` into `visibleMeetingTypes` -- that list is now
+  just `rawVisibleTypes` (the real calling-based result) for a
+  non-admin, and the three collaborative types for Bishopric. Its own
+  "This week" tile (public program, no login/calling needed) already
+  covered what a non-admin would want; admins reach it through
+  Administration → Meeting Planning → Meeting Agendas instead -- this
+  tile was a third, redundant entry point. `attendsMeetings` (gating
+  the Meeting Agenda Items/Submit an Announcement tiles) is unaffected
+  in behavior -- it already used the un-folded `rawVisibleTypes`, not
+  `visibleMeetingTypes` -- but the two lists are now identical for a
+  non-admin instead of one being a superset of the other.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark

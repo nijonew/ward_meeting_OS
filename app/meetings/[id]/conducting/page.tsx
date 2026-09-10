@@ -1,7 +1,17 @@
 import { redirect } from "next/navigation";
-import { getConductingScript } from "@/lib/data/conducting";
+import { getConductingRows } from "@/lib/data/conducting";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { ConductingScriptView } from "@/components/planning/ConductingScriptView";
 
+/**
+ * Rebuilt 2026-09-10 around `getConductingRows` (lib/data/conducting.ts)
+ * -- template-driven the same way Planning is, instead of a hand-written
+ * fixed sequence. This page itself is now a thin wrapper: the initial
+ * render + the Bishopric-only gate happen here (Server Component,
+ * unchanged from the fix added earlier the same day); the actual
+ * row list + the "updates without a manual refresh" polling live in
+ * ConductingScriptView (Client Component).
+ */
 export default async function ConductingViewPage({
   params,
 }: {
@@ -22,7 +32,7 @@ export default async function ConductingViewPage({
     redirect(`/meetings/${meetingId}/public`);
   }
 
-  const script = await getConductingScript(meetingId);
+  const script = await getConductingRows(meetingId);
 
   if (!script) {
     return <p className="text-slate">Could not load this meeting.</p>;
@@ -37,16 +47,7 @@ export default async function ConductingViewPage({
           needed.
         </div>
       )}
-      {script.lines.map((line, i) => (
-        <div key={i}>
-          <p className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
-            {line.heading}
-          </p>
-          {line.prompt && (
-            <p className="mt-1 text-lg leading-relaxed text-ink sm:text-xl">{line.prompt}</p>
-          )}
-        </div>
-      ))}
+      <ConductingScriptView meetingId={meetingId} initialRows={script.rows} />
     </div>
   );
 }

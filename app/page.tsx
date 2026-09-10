@@ -8,12 +8,13 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
 import type { AppRole } from "@/lib/supabase/get-session-user";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 
-const ALL_MEETING_TYPES: MeetingTypeSlug[] = [
-  "sacrament-meeting",
-  "bishopric-meeting",
-  "ward-council",
-  "youth-council",
-];
+// Sacrament Meeting deliberately excluded (2026-09-10, the user's own
+// request: "remove sacrament meeting from 'my meetings'") -- its own
+// tile in the "This week" tier above already covers the one thing a
+// non-admin would want (today's public program), and admins reach it
+// through Administration -> Meeting Planning -> Meeting Agendas
+// instead, so a third entry point here was redundant.
+const ALL_MEETING_TYPES: MeetingTypeSlug[] = ["bishopric-meeting", "ward-council", "youth-council"];
 
 // Per the user's request (2026-09-09): the landing page's browser tab
 // now reads "Dashboard" and /dashboard's reads "Meeting Dashboard" (see
@@ -55,23 +56,16 @@ export default async function HomePage() {
   // tile for a type their calling actually maps to (meeting_type_members)
   // -- per the user's own request (2026-09-06): "only show the meetings
   // that apply to the person by nature of their calling." Sacrament
-  // Meeting is a deliberate exception (2026-09-08): its live view is
-  // exactly the existing public program, already visible with no login
-  // or calling at all, so gating the tile itself by calling would add
-  // no real access control -- just show it to any logged-in account.
+  // Meeting no longer gets a tile here at all (2026-09-10) -- see
+  // ALL_MEETING_TYPES's own comment above.
   const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id) : [];
-  const visibleMeetingTypes = isBishopric
-    ? ALL_MEETING_TYPES
-    : user
-      ? Array.from(new Set(["sacrament-meeting" as const, ...rawVisibleTypes]))
-      : [];
-  // Distinct from the above -- "sacrament-meeting" is always folded into
-  // visibleMeetingTypes for any logged-in account (its tile needs no
-  // calling), so that list alone can't tell "attends a meeting" from
-  // "just logged in." This is the real, narrower signal the Meeting
-  // Agenda Items tile below is gated on (2026-09-09, the user's own
-  // request): a calling that maps to Bishopric Meeting/Ward Council/
-  // Youth Council, or the Bishopric role itself.
+  const visibleMeetingTypes = isBishopric ? ALL_MEETING_TYPES : rawVisibleTypes;
+  // This is the same list as visibleMeetingTypes for a non-admin now
+  // that Sacrament Meeting isn't unconditionally folded in -- kept as
+  // its own named check anyway, since it's a real, distinct concept
+  // (attends *some* meeting by calling, or is Bishopric) that the
+  // Meeting Agenda Items/Submit an Announcement tiles below are gated
+  // on (2026-09-09, the user's own request).
   const attendsMeetings = isBishopric || rawVisibleTypes.length > 0;
 
   return (
