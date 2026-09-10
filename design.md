@@ -11,9 +11,11 @@ rebuild, a light Calm load-in on each page's own heading, and an app-wide em-das
 UI copy. The ledger-index chip (`components/LedgerIndex.tsx`) has since been added to every
 grid where row order is real, fixed information -- Assignment Rotations, the Teaching
 Calendar, and the Dashboard meeting list -- and deliberately left off Calling Planning, whose
-rows are sortable/filterable and have no fixed sequence to number. **Still not yet done:**
-destructive-button copy still uses ad hoc red-600/700 rather than the `danger` token. Real,
-scoped follow-up work, not an oversight to re-litigate this file over.
+rows are sortable/filterable and have no fixed sequence to number. Destructive actions and
+validation errors sitewide (real record deletion, `CancelMeetingButton`, "Cancelled" labels,
+form error text) have since moved off ad hoc red-600/700 onto the `danger` token itself,
+leaving every other use of the app's shared neutral button style (Save, Add, Publish,
+back-links, dismiss-this-form "Cancel") untouched.
 
 ---
 
