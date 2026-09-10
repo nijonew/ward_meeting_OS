@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { FIELD_SEPARATOR } from "@/lib/data/agenda-rows";
+import { lookupHymn1985Titles } from "@/lib/data/hymnal";
 
 type SaveGridActionResult = { error?: string; success?: boolean };
 
@@ -201,9 +202,19 @@ export async function saveAgendaGrid(
   }
 
   // --- music -----------------------------------------------------------
+  // Auto-fill missing titles from Music Reference (2026-09-10, the
+  // user's own report: "hymn numbers... weren't submitted with
+  // titles") -- batched into one lookup rather than one query per row.
+  const numbersNeedingTitles: number[] = [];
+  for (const patch of music.values()) {
+    const n = patch.number ? Number.parseInt(patch.number, 10) : null;
+    if (n != null && !Number.isNaN(n) && !patch.title) numbersNeedingTitles.push(n);
+  }
+  const titleByNumber = await lookupHymn1985Titles(numbersNeedingTitles);
+
   for (const patch of music.values()) {
     const hymnNumber = patch.number ? Number.parseInt(patch.number, 10) : null;
-    const pieceName = patch.title || null;
+    const pieceName = patch.title || (hymnNumber != null ? titleByNumber.get(hymnNumber) ?? null : null);
     const performer = patch.performer || null;
     const isEmpty = hymnNumber == null && !pieceName && !performer;
 

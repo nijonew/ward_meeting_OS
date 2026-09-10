@@ -79,8 +79,14 @@ reconstructed from both:
 - `047` (new `sacrament_program_templates` table -- Speakers & Music
   pre-fill by format, see the Dynamic planning view architecture entry
   above): still needs to be run.
+- `048` (one-time backfill: fills `sacrament_music.piece_name` from
+  Music Reference wherever a hymn number was saved with no title --
+  see the hymn-title auto-fill entry below): still needs to be run.
+- `049` (one-time bulk import: 412 names into `people`, skipping any
+  that already exist -- see the bulk people import entry below): still
+  needs to be run.
 
-Next migration should be `048_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `050_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2178,6 +2184,48 @@ before fully closing it out.
   feature, which sidesteps the "Table Admin only ever renders real DB
   rows" limitation entirely: the grid always shows one row per upcoming
   meeting whether or not an assignment row exists yet for it.
+- **Bug report: hymn numbers saved with no title, 2026-09-10** (the
+  user's own words: "I have hymn numbers that were submitted by date
+  but they weren't submitted with titles. These should automatically
+  fill based on the data imported with hymn number and title"). Root
+  cause: `/music`'s bulk paste tool (`parseBulkMusicText`,
+  `lib/data/music-parsing.ts`) has always treated its title column as
+  optional per row -- a pasted row with just a date/type/hymn-number
+  left `sacrament_music.piece_name` null with nothing to ever fill it
+  in later. New `lib/data/hymnal.ts` (`lookupHymn1985Title(s)`) queries
+  Music Reference (`hymnal_songs`, `songbook = 'hymns_1985'`
+  specifically -- the hymnal every congregational hymn type this app
+  tracks is actually sung from) and now backs every write path that
+  accepts a bare hymn number: `submitBulkMusicRows`/`addSingleMusicItem`
+  (`app/music/actions.ts`), the agenda grid's own music rows
+  (`saveAgendaGrid` in `app/meetings/[id]/agenda-actions.ts`), and
+  Intermediate Hymn in the Speakers & Music list (`saveProgramMusic` in
+  `app/meetings/[id]/speakers-music-actions.ts`) -- a number entered
+  with no title now fills the title in automatically instead of saving
+  blank, going forward. Never overwrites a title someone actually
+  typed -- only fills in when the title field arrives empty. Migration
+  `048` is the matching one-time catch-up for rows already saved blank
+  before this shipped -- same match rule (1985 Hymnal, blank/whitespace-only
+  `piece_name`), idempotent, still needs to be run.
+- **One-time bulk name import, 2026-09-10** (the user's own request:
+  "I also need to do a one-time name input. Some of the names are
+  already in the form. I need a way to not duplicate the names as
+  well") -- a deliberate, named exception to this app's own "no bulk
+  import, add people one at a time" policy (see the Adding new people
+  workflow/policy above), not a reversal of it: still name-only, no
+  other PII, just applied as one batch instead of one row at a time, at
+  the user's own explicit request. Migration `049` inserts 412 names
+  the user pasted directly (checked against each other first --
+  case-insensitively, no internal duplicates) via
+  `insert ... select ... where not exists (...)`, skipping any name
+  already present in `people` (case-insensitive, trimmed) rather than
+  assuming no overlap -- idempotent, so re-running it later only adds
+  whichever names are still missing. New rows default to
+  `attendance_status = 'attending'`/`active = true` (so they show up in
+  assignment pickers immediately); `age_group` is left blank, since it
+  can't be reliably guessed from a name alone -- an admin can set it
+  per person afterward via Table Admin's People grid if wanted. Still
+  needs to be run.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

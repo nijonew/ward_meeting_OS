@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { kindOfItemKey } from "@/lib/data/sacrament-program";
+import { lookupHymn1985Title } from "@/lib/data/hymnal";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -196,9 +197,17 @@ export async function saveProgramMusic(
   const supabase = await createClient();
 
   const hymnNumberRaw = String(formData.get("hymn_number") ?? "").trim();
+  const hymnNumber = hymnNumberRaw ? Number.parseInt(hymnNumberRaw, 10) : null;
+  // Auto-fill from Music Reference when a number was entered with no
+  // title (2026-09-10, the user's own report) -- Intermediate Hymn is
+  // the only kind this action ever gets a real hymn_number for.
+  let pieceName = String(formData.get("piece_name") ?? "").trim() || null;
+  if (hymnNumber != null && !pieceName) {
+    pieceName = await lookupHymn1985Title(hymnNumber);
+  }
   const payload: Record<string, unknown> = {
-    hymn_number: hymnNumberRaw ? Number.parseInt(hymnNumberRaw, 10) : null,
-    piece_name: String(formData.get("piece_name") ?? "").trim() || null,
+    hymn_number: hymnNumber,
+    piece_name: pieceName,
   };
   if (type === "musical_number") {
     payload.group_name = String(formData.get("performer") ?? "").trim() || null;
