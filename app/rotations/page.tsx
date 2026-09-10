@@ -207,6 +207,10 @@ export default async function RotationsPage({
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Assignment Rotations" />
 
+      <Link href="/meeting-planning" className="text-xs text-slate hover:text-ink">
+        &larr; Meeting Planning
+      </Link>
+
       <section className="mt-4">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
         <p className="mt-2 text-sm text-slate">

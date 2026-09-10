@@ -1877,6 +1877,36 @@ before fully closing it out.
     gained `&larr; Meeting Planning`. `/youth-teaching-planning`'s
     single-class view already had its own `&larr; Youth Teaching
     Planning` link back to that hub, added when it was first built.
+  - **Re-audited 2026-09-10** (the user's own request: "I still need
+    back arrow links on several pages... an assessment of all pages
+    that are a drill-down from the main page"), specifically to catch
+    drift from this session's own restructuring -- moving Meeting
+    Schedule/Meeting Cancellations/Assignment Rotations/Speaker & Prayer
+    History from their own top-level Administration tiles into
+    `/meeting-planning`'s subtiles demoted each from "one click from
+    Home" to "two clicks, behind a hub," but nobody had added a
+    breadcrumb back to that hub when it happened -- they still only had
+    the wordmark, which now skipped past the hub entirely. Same gap
+    found for `/callings`, once Calling Planning's rebuild made it
+    reachable only via a link from `/calling-planning` rather than its
+    own landing-page tile. Fixed by adding one `&larr; <Parent>` link
+    each, exact same pattern as everywhere else in this section:
+    `/meeting-schedule`, `/meeting-cancellations`, `/rotations`, and
+    `/speaker-prayer-history` all gained `&larr; Meeting Planning`;
+    `/callings` gained `&larr; Calling Planning`. `/dashboard` needed a
+    **conditional** link instead of a fixed one, since it's genuinely
+    reached two different ways at two different depths -- the landing
+    page's "My meetings" tiles (`?readonly=1`, one click from Home,
+    left alone) and Meeting Agendas' per-type tiles (no `readonly` flag,
+    three clicks deep) -- the existing `isReadOnly` check already
+    distinguishes the two contexts exactly, so `&larr; Meeting Agendas`
+    now shows only when `!isReadOnly`. Everything else nested under
+    `/meetings/[id]/*` was already covered by the shared layout's
+    `&larr; Meetings` link (including the newer Ward Business page,
+    which additionally has its own `&larr; Planning` on top of that);
+    every other page checked either already had one from an earlier
+    pass or is a genuine one-click-from-Home tile where the wordmark
+    baseline still applies, matching this section's own original rule.
 - ~~Teaching Calendar (youth leader tile) — scope not yet defined,
   deferred~~ **Built 2026-09-08** (migration `042`, still needs to be
   run), per the user's own scoping: a Sunday teaching schedule, one row

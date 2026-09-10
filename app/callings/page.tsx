@@ -31,6 +31,10 @@ export default async function CallingsListPage({
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Callings" />
 
+      <Link href="/calling-planning" className="text-xs text-slate hover:text-ink">
+        &larr; Calling Planning
+      </Link>
+
       <div className="rounded-lg border border-rule bg-card p-6 sm:p-8">
         <h1 className="font-display text-3xl leading-tight">Callings</h1>
         <p className="mt-1 text-slate">Manage callings and holders.</p>

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getMeetingCancellations } from "@/lib/data/meeting-cancellations";
@@ -44,6 +45,10 @@ export default async function MeetingCancellationsPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Meeting Cancellations" />
+
+      <Link href="/meeting-planning" className="text-xs text-slate hover:text-ink">
+        &larr; Meeting Planning
+      </Link>
 
       <section className="mt-4">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Meeting Cancellations</h1>

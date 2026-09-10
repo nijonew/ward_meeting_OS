@@ -234,6 +234,20 @@ export default async function DashboardPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Meetings" />
+
+      {/* Reached two different ways -- the landing page's "My meetings"
+          tiles (readonly=1, one click from Home, wordmark-only "back" is
+          fine there, same as every other top-level tile) and Meeting
+          Agendas' per-type tiles (no readonly flag, three clicks deep:
+          Home -> Meeting Planning -> Meeting Agendas -> here). Only the
+          second path needs a real breadcrumb back out -- `isReadOnly`
+          already distinguishes the two contexts exactly. */}
+      {!isReadOnly && (
+        <Link href="/meeting-agendas" className="mt-6 text-xs text-slate hover:text-ink">
+          &larr; Meeting Agendas
+        </Link>
+      )}
+
       <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
 
       {canCreate && unassignedAgendaItems.length > 0 && (
