@@ -3,6 +3,17 @@
 **Direction:** The Ledger (Direction 3 of 3, chosen 2026-09-10)
 **Status:** Source of truth for every visual decision from Phase 2 onward. If code and this file disagree, fix the code.
 
+**Implementation status (2026-09-10):** The home page went through the full five-phase
+process (direction, structure/motion, copy, assets, polish) and matches this file in every
+respect. Every other page in the app then received a second, sitewide pass: the palette and
+type tokens (Phase 1), 4px radius, the primary-button accent color, the `LifecycleBadge`
+rebuild, a light Calm load-in on each page's own heading, and an app-wide em-dash cleanup in
+UI copy. **Not yet done outside the home page:** the ledger-index chip has not been added to
+any grid's leading column (Assignment Rotations, Calling Planning, Teaching Calendar,
+Dashboard list all still use a plain rule divider with no chip), and destructive-button copy
+still uses ad hoc red-600/700 rather than the `danger` token. Both are real, scoped, follow-up
+work, not oversights to re-litigate this file over.
+
 ---
 
 ## Brand & thesis
@@ -144,8 +155,10 @@ real information becomes legible.
   *current* stage, `ink-muted`-on-`rule` for past/future stages. No brass-style filled pill for
   every stage — accent is reserved for "this is happening now," not decoration.
 - **Grids** (Assignment Rotations, Calling Planning, Teaching Calendar, Dashboard list) —
-  unchanged dirty-tracking/Save-All-Changes interaction; reskinned with `rule-strong` row
-  dividers and the ledger-index chip in the leading column wherever the row has a real order.
+  unchanged dirty-tracking/Save-All-Changes interaction; reskin with `rule-strong` row dividers
+  and the ledger-index chip in the leading column wherever the row has a real order. *Not yet
+  built* — these still use their original plain row dividers as of the 2026-09-10 sitewide pass;
+  see the Implementation status note above.
 - **Forms/inputs** — 4px radius, 1px `rule` border, `surface` background, `accent` focus ring.
 
 ## Copy rules
