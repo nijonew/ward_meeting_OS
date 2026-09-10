@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
@@ -22,6 +23,10 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * 2026-09-09, same day) once the user asked for "a tile for each
  * meeting type under meeting agendas" -- see that page for the
  * per-type split.
+ *
+ * Gained an explicit "&larr; Home" back link (2026-09-09) per the
+ * user's own request -- the AppHeader wordmark already links home, but
+ * evidently wasn't read as a "back" affordance on its own.
  */
 export default async function MeetingPlanningPage() {
   const { user, profile } = await getSessionUser();
@@ -39,7 +44,12 @@ export default async function MeetingPlanningPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Meeting Planning" />
-      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Meeting Planning</h1>
+
+      <Link href="/" className="mt-6 text-xs text-slate hover:text-ink">
+        &larr; Home
+      </Link>
+
+      <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Planning</h1>
       <p className="mt-2 text-sm text-slate">
         Schedule, cancel, and adjust rotations, or jump into a meeting&rsquo;s own agenda.
       </p>

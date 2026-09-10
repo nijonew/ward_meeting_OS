@@ -1347,6 +1347,18 @@ before fully closing it out.
     is now the real "send me a reset link" step; `/auth/update-password`
     (reached from that emailed link) is unchanged, still the "type your
     new password" step.
+  - **Extended to the three new hub pages, 2026-09-09** (the user's own
+    request, after building `/meeting-planning`, `/meeting-agendas`, and
+    the reworked `/youth-teaching-planning`): the "AppHeader wordmark is
+    enough for a top-level page" baseline turned out not to read as an
+    actual back affordance in practice, at least for hub pages the user
+    navigates into and back out of repeatedly. `/meeting-planning` and
+    the `/youth-teaching-planning` hub view (both reachable straight
+    from the landing page) gained an explicit `&larr; Home` link;
+    `/meeting-agendas` (nested one level under `/meeting-planning`)
+    gained `&larr; Meeting Planning`. `/youth-teaching-planning`'s
+    single-class view already had its own `&larr; Youth Teaching
+    Planning` link back to that hub, added when it was first built.
 - ~~Teaching Calendar (youth leader tile) — scope not yet defined,
   deferred~~ **Built 2026-09-08** (migration `042`, still needs to be
   run), per the user's own scoping: a Sunday teaching schedule, one row

@@ -31,6 +31,10 @@ function defaultThroughDate(): string {
  * one-tile-per-type pattern already used by the landing page's "My
  * meetings" and /meeting-agendas. Old /teaching-calendar now just
  * redirects here (see that route's own page.tsx).
+ *
+ * The hub view gained an explicit "&larr; Home" back link (2026-09-09)
+ * per the user's own request; the single-class view already had its
+ * own "&larr; Youth Teaching Planning" link back to this hub.
  */
 export default async function YouthTeachingPlanningPage({
   searchParams,
@@ -58,7 +62,12 @@ export default async function YouthTeachingPlanningPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Youth Teaching Planning" />
-        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
+
+        <Link href="/" className="mt-6 text-xs text-slate hover:text-ink">
+          &larr; Home
+        </Link>
+
+        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
         <p className="mt-2 text-sm text-slate">
           Sunday teaching assignments for each class. Short free-text entries only &mdash; not linked
           to any person or calling record.
