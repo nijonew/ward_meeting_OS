@@ -89,7 +89,7 @@ export default async function YouthActivitiesPage() {
                   key={item.id}
                   className={[
                     "rounded border px-3 py-2 text-sm",
-                    item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
+                    item.cancelled ? "border-danger/30 bg-danger/5" : "border-rule/60",
                   ].join(" ")}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -100,7 +100,7 @@ export default async function YouthActivitiesPage() {
                       </span>{" "}
                       {item.title}
                       {item.cancelled && (
-                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-red-700">
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">
                           Cancelled
                         </span>
                       )}
@@ -151,13 +151,13 @@ export default async function YouthActivitiesPage() {
                               placeholder="Reason (optional)"
                               className="w-32 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
                             />
-                            <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                            <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                               Cancel
                             </button>
                           </form>
                         )}
                         <form action={remove}>
-                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                          <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                             Delete
                           </button>
                         </form>
@@ -165,7 +165,7 @@ export default async function YouthActivitiesPage() {
                     )}
                   </div>
                   {item.cancelled ? (
-                    <p className="mt-1 text-red-700">
+                    <p className="mt-1 text-danger">
                       This activity has been cancelled{item.cancellation_note ? `: ${item.cancellation_note}` : "."}
                     </p>
                   ) : (

@@ -33,7 +33,7 @@ export function PushRotationForm({ rotationId }: { rotationId: string }) {
           {pending ? "Pushing..." : "Push"}
         </button>
       </form>
-      {state.error && <p className="mt-1 text-[11px] text-red-600">{state.error}</p>}
+      {state.error && <p className="mt-1 text-[11px] text-danger">{state.error}</p>}
       {state.filled !== undefined && (
         <p className="mt-1 text-[11px] text-ink-muted">
           Filled {state.filled} meeting{state.filled === 1 ? "" : "s"}

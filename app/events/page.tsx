@@ -106,7 +106,7 @@ export default async function ScheduledEventsPage({
                 key={item.key}
                 className={[
                   "rounded border px-3 py-2 text-sm",
-                  item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
+                  item.cancelled ? "border-danger/30 bg-danger/5" : "border-rule/60",
                 ].join(" ")}
               >
                 <span className="text-ink">
@@ -116,13 +116,13 @@ export default async function ScheduledEventsPage({
                   </span>{" "}
                   {item.title}
                   {item.cancelled && (
-                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-red-700">
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">
                       Cancelled
                     </span>
                   )}
                 </span>
                 {item.cancelled ? (
-                  <p className="mt-1 text-red-700">
+                  <p className="mt-1 text-danger">
                     This activity has been cancelled{item.cancellationNote ? `: ${item.cancellationNote}` : "."}
                   </p>
                 ) : (

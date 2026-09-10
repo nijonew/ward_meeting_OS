@@ -38,7 +38,7 @@ export default async function CallingsListPage({
       <div className="rounded border border-rule bg-surface p-6 sm:p-8">
         <h1 className="rise-in font-display text-3xl leading-tight">Callings</h1>
         <p className="mt-1 text-ink-muted">Manage callings and holders.</p>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
         <form action={createCalling} className="mt-4 flex flex-wrap gap-2">
           <input

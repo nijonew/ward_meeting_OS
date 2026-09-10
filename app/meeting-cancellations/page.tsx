@@ -90,7 +90,7 @@ export default async function MeetingCancellationsPage() {
                     {affected.length > 0 && <span className="text-ink-muted"> &middot; {affected.join(", ")}</span>}
                   </span>
                   <form action={remove}>
-                    <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                    <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                       Delete
                     </button>
                   </form>

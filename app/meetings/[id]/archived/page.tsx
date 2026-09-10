@@ -287,7 +287,7 @@ export default async function ArchivedMeetingPage({
       </div>
 
       {meeting.cancelled && (
-        <div className="rounded border border-red-900/30 bg-red-950/5 p-4 text-sm text-red-700">
+        <div className="rounded border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
           This meeting was cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
         </div>
       )}

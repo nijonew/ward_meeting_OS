@@ -47,7 +47,7 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
           <button type="button" onClick={() => move("down")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
             &darr;
           </button>
-          <button type="button" onClick={remove} disabled={removing} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
+          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger disabled:opacity-30">
             Remove
           </button>
         </span>

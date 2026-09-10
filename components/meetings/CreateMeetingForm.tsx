@@ -95,7 +95,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
         {pending ? "Creating..." : "Create Meeting"}
       </button>
 
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {state.error && <p className="text-sm text-danger">{state.error}</p>}
     </form>
   );
 }

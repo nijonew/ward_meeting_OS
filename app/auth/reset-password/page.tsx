@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
         >
           {pending ? "Sending..." : "Send reset link"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
         {state.success && (
           <p className="text-sm text-ink">Check your email for a link to set your password.</p>
         )}

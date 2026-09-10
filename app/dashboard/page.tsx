@@ -86,7 +86,7 @@ function MeetingRow({
   };
 
   return (
-    <tr className={["border-t border-rule-strong/40", meeting.cancelled ? "bg-red-950/5" : ""].join(" ")}>
+    <tr className={["border-t border-rule-strong/40", meeting.cancelled ? "bg-danger/5" : ""].join(" ")}>
       <td className="px-2 py-2 align-top">
         <LedgerIndex position={position} current={position === 1} />
       </td>
@@ -101,7 +101,7 @@ function MeetingRow({
             </span>
           )}
           {meeting.cancelled && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-red-700">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-danger">
               Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
             </span>
           )}

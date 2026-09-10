@@ -90,7 +90,7 @@ export function AssignmentGridForm({
                 <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   {c.label}
                   {c.eligiblePeople.length === 0 && (
-                    <span className="mt-0.5 block normal-case tracking-normal text-red-700">
+                    <span className="mt-0.5 block normal-case tracking-normal text-danger">
                       No one eligible, check callings
                     </span>
                   )}
@@ -136,7 +136,7 @@ export function AssignmentGridForm({
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
         {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
       </div>
     </form>

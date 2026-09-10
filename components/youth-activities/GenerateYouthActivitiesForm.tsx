@@ -38,7 +38,7 @@ export function GenerateYouthActivitiesForm() {
         </button>
       </form>
 
-      {state.error && <p className="mt-3 text-sm text-red-600">{state.error}</p>}
+      {state.error && <p className="mt-3 text-sm text-danger">{state.error}</p>}
       {state.created !== undefined && (
         <p className="mt-3 text-sm text-ink">
           Created {state.created} activit{state.created === 1 ? "y" : "ies"}

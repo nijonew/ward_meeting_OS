@@ -60,7 +60,7 @@ export default async function SubmitAgendaItemPage({
                 Thanks. Your agenda item has been added.
               </p>
             )}
-            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+            {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
             <AgendaItemForm meetingTypes={meetingTypes} onSubmit={submitAgendaItem} />
           </>

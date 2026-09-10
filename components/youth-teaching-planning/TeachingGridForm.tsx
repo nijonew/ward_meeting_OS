@@ -99,7 +99,7 @@ export function TeachingGridForm({
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
         {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
       </div>
     </form>

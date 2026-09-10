@@ -95,7 +95,7 @@ export function RulesManager({
                     >
                       Copy
                     </button>
-                    <button type="button" onClick={() => onDelete(r.id)} className="text-xs text-ink-muted hover:text-ink">
+                    <button type="button" onClick={() => onDelete(r.id)} className="text-xs text-danger/70 hover:text-danger">
                       Delete
                     </button>
                   </span>

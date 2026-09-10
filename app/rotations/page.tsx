@@ -137,7 +137,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
                       </button>
                     </form>
                     <form action={remove}>
-                      <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                      <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                         Remove
                       </button>
                     </form>

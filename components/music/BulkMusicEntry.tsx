@@ -117,7 +117,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
                     </td>
                     <td className="py-1.5">
                       {row.errors.length > 0 ? (
-                        <span className="text-red-600">{row.errors.join("; ")}</span>
+                        <span className="text-danger">{row.errors.join("; ")}</span>
                       ) : (
                         <span className="text-success">OK</span>
                       )}
@@ -139,7 +139,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
         </div>
       )}
 
-      {result?.error && <p className="mt-3 text-sm text-red-600">{result.error}</p>}
+      {result?.error && <p className="mt-3 text-sm text-danger">{result.error}</p>}
       {result?.count !== undefined && (
         <p className="mt-3 text-sm text-ink">
           Submitted {result.count} item{result.count === 1 ? "" : "s"} for Bishopric approval.

@@ -51,7 +51,7 @@ export function GenerateForm({
         </button>
       </form>
 
-      {state.error && <p className="mt-3 text-sm text-red-600">{state.error}</p>}
+      {state.error && <p className="mt-3 text-sm text-danger">{state.error}</p>}
       {state.created !== undefined && (
         <p className="mt-3 text-sm text-ink">
           Created {state.created} {state.created === 1 ? itemLabelSingular : itemLabelPlural}

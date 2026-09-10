@@ -103,7 +103,7 @@ export function CombinedAgendaGrids({
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         {!pending && !dirty && bothSaved && <p className="text-sm text-success">Saved.</p>}
       </div>
     </div>

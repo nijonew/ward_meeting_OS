@@ -45,7 +45,7 @@ export default async function CallingDetailPage({
         <p className="mt-1 text-ink-muted">
           Current holder: {calling.current_holder_name ?? "Vacant"}
         </p>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
         <Link
           href={`/calling-planning?calling=${calling.id}`}

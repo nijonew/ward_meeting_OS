@@ -50,7 +50,7 @@ export function PushCallingForm({
           {pending ? "Adding..." : "Add to Sacrament Meeting"}
         </button>
       </form>
-      {state.error && <p className="mt-1 text-xs text-red-600">{state.error}</p>}
+      {state.error && <p className="mt-1 text-xs text-danger">{state.error}</p>}
       {!pending && state.success && !state.error && <p className="mt-1 text-xs text-success">Added.</p>}
     </div>
   );

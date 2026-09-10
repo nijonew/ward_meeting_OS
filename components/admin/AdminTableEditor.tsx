@@ -176,7 +176,7 @@ export function AdminTableEditor({
 
   return (
     <div className="overflow-x-auto rounded border border-rule bg-surface p-6">
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
       <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
@@ -225,7 +225,7 @@ export function AdminTableEditor({
                     type="button"
                     disabled={pending}
                     onClick={() => removeRow(row)}
-                    className="text-xs text-ink-muted hover:text-ink"
+                    className="text-xs text-danger/70 hover:text-danger"
                   >
                     Delete
                   </button>

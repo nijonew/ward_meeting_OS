@@ -28,7 +28,8 @@ export function CancelMeetingButton({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const BUTTON_CLASS = "whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5";
+  const BUTTON_CLASS =
+    "whitespace-nowrap rounded border border-danger/40 px-3 py-1.5 text-xs text-danger hover:bg-danger/5";
 
   if (!expanded) {
     return (

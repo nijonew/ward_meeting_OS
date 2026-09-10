@@ -82,7 +82,7 @@ export default async function MeetingLayout({
             stages={meeting.meetingType === "sacrament-meeting" ? SACRAMENT_LIFECYCLE_STAGES : undefined}
           />
           {meeting.cancelled && (
-            <span className="whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-red-700">
+            <span className="whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-danger">
               Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
             </span>
           )}

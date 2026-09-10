@@ -39,7 +39,7 @@ export default function LoginPage() {
         >
           {pending ? "Signing in..." : "Sign in"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
       </form>
 
       <Link href="/auth/reset-password" className="mt-4 text-xs text-ink-muted underline">
