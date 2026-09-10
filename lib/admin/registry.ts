@@ -10,6 +10,7 @@ import {
   slotLabel,
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
+import { TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
 
 /** Fields whose choices can be edited via the "Dropdown Option Lists"
  *  admin table below (admin_select_options) instead of code. Kept as an
@@ -413,6 +414,18 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "confirmed", label: "Confirmed", type: "boolean" },
       { column: "cancelled", label: "Cancelled", type: "boolean" },
       { column: "cancellation_note", label: "Cancellation Note", type: "text" },
+    ],
+  },
+
+  youth_class_teachers: {
+    table: "youth_class_teachers",
+    label: "Youth Class Teachers",
+    description:
+      "Who may view/edit which class's schedule on Youth Teaching Planning. Bishopric and Young Women Presidency already see every (or every YW) class regardless of rows here -- this only matters for narrowing everyone else down to specific class(es) they're assigned to teach.",
+    orderBy: { column: "created_at", ascending: false },
+    columns: [
+      { column: "person_id", label: "Person", type: "foreign_key", required: true, foreignKey: PERSON_FK },
+      { column: "class_name", label: "Class", type: "select", required: true, options: TEACHING_CLASS_OPTIONS },
     ],
   },
 };

@@ -180,15 +180,19 @@ export default async function HomePage() {
           placeholder -- Teaching Calendar itself is meant for "youth
           leaders and admins" per the user (2026-09-08), so the guard
           dropped the !isBishopric exclusion once it had a real
-          destination. */}
+          destination. Renamed to "Youth Teaching Planning" (2026-09-09,
+          the user's own request) once it became a per-class hub --
+          which class(es) a given account actually sees inside it is a
+          separate, narrower question than this role-based tile gate;
+          see getAccessibleClasses in lib/data/teaching-assignments.ts. */}
       {isYouthLeader && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">Youth program</p>
           <TileGrid>
             <Tile
-              title="Teaching Calendar"
-              description="Sunday teaching assignments for each class"
-              href="/teaching-calendar"
+              title="Youth Teaching Planning"
+              description="Sunday teaching assignments for your class"
+              href="/youth-teaching-planning"
             />
             <Tile
               title="Youth Activity Planning"

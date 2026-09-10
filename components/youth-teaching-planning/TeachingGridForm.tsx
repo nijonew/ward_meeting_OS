@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { saveTeachingGrid } from "@/app/teaching-calendar/actions";
+import { saveTeachingGrid } from "@/app/youth-teaching-planning/actions";
 import type { TeachingGridRow } from "@/lib/data/teaching-assignments";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -25,9 +25,12 @@ function formatDate(iso: string) {
  * cross the server/client boundary as a function; a plain function prop
  * (this page's own server component used to pass one in) throws at
  * render time. Root-caused 2026-09-08 against a "page couldn't load"
- * report -- see the identical fix in AssignmentGridForm.tsx, which had
- * the same bug and is the likely explanation for the older,
- * never-reproduced /rotations "server error" report too.
+ * report -- see the identical fix in AssignmentGridForm.tsx.
+ *
+ * `classes` is usually a single-item array now (2026-09-09, moved from
+ * /teaching-calendar to /youth-teaching-planning's per-class pages) --
+ * left as an array rather than a single `class` prop since nothing else
+ * about this component needs to change to support that narrowing.
  */
 export function TeachingGridForm({
   classes,

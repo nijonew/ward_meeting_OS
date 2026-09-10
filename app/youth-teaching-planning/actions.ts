@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getAccessibleClasses } from "@/lib/data/teaching-assignments";
 
 type SaveGridActionResult = { error?: string; success?: boolean };
 
@@ -22,13 +24,28 @@ function parseFieldName(name: string): { classDate: string; className: string } 
  * and the same delete-then-insert-if-set approach as every other
  * per-cell save in this app -- a blank cell just means no row for that
  * (date, class) exists.
+ *
+ * Re-checks class-level access server-side (2026-09-09, added alongside
+ * the youth_class_teachers access-control rework) -- the grid this
+ * submits from only ever renders fields for the one class the viewer
+ * was already confirmed to have access to on the page itself, so a
+ * mismatch here can only happen against a forged/direct request, not a
+ * legitimate user; skipped silently rather than erroring the whole
+ * save, same way a mismatched meeting type is a non-issue for a
+ * legitimate caller of submitAgendaItem.
  */
 export async function saveTeachingGrid(_prevState: unknown, formData: FormData): Promise<SaveGridActionResult> {
+  const { user, profile } = await getSessionUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const accessibleClasses = await getAccessibleClasses(user.id, profile?.role ?? null);
+
   const supabase = await createClient();
 
   for (const [name, value] of formData.entries()) {
     const parsed = parseFieldName(name);
     if (!parsed) continue;
+    if (!accessibleClasses.includes(parsed.className)) continue;
     const entry = String(value).trim();
 
     const { error: deleteError } = await supabase
@@ -46,6 +63,6 @@ export async function saveTeachingGrid(_prevState: unknown, formData: FormData):
     }
   }
 
-  revalidatePath("/teaching-calendar");
+  revalidatePath("/youth-teaching-planning");
   return { success: true };
 }

@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 044
+## Current migration number: 045
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -65,10 +65,13 @@ reconstructed from both:
   section above): confirmed run.
 - `044` (`calling_planning` gains `candidate_person_ids uuid[]`, drops
   `candidates_text` and `selected_person_id` -- Candidates
-  multi-select, see the Calling planning workflow section above): still
-  needs to be run.
+  multi-select, see the Calling planning workflow section above):
+  confirmed run.
+- `045` (new `youth_class_teachers` table -- Youth Teaching Planning
+  per-person/per-class access control, see Known open items below):
+  still needs to be run.
 
-Next migration should be `045_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `046_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1372,6 +1375,55 @@ before fully closing it out.
   should reach too. No Table Admin registry entry, matching the
   `meeting_cancellations` precedent: a bespoke page already covers the
   only editing this needs.
+
+  **Renamed to "Youth Teaching Planning" and reworked into a per-class
+  hub with real per-person access control, 2026-09-09**, per the user's
+  own request: "change the name of the teaching calendar to youth
+  teaching planning. then add a tile for each youth group under the
+  youth teaching planning hub. then authenticate the specific people
+  assigned to the youth group to see only their group unless it is the
+  bishopric or young women presidency. Bishopric can see all groups.
+  young women presidency can see all young women groups." Two separate
+  changes bundled together:
+  - **Navigation**: `/youth-teaching-planning` (renamed from
+    `/teaching-calendar`, which now just `redirect()`s here) is a hub
+    -- one tile per class the viewer has access to (see below), each
+    landing on `?class=<name>`'s own single-column grid instead of the
+    old page's one shared grid with every class as a column at once.
+    Same one-tile-per-type pattern already used by the landing page's
+    "My meetings" and `/meeting-agendas`. `getTeachingAssignmentGrid`
+    (`lib/data/teaching-assignments.ts`) gained an optional `classes`
+    param (defaults to every class) to scope both the query and the
+    returned grid to just the one requested column.
+  - **Real access control** (migration `045`, new `youth_class_teachers`
+    table -- `person_id` FK + `class_name` text, added to Table Admin
+    as "Youth Class Teachers" since it's a plain two-column mapping the
+    generic engine already handles): before this, viewing/editing the
+    whole calendar was all-or-nothing by role (any of the 5 youth-leader
+    roles, or Bishopric) -- now Bishopric still sees every class and
+    Young Women Presidency still sees every YW class (both stay
+    role-based, per the user's own words), but the other 4 roles
+    (yw_advisor/yw_specialist/ym_advisor/ym_specialist) are narrowed
+    down to exactly the class(es) a `youth_class_teachers` row assigns
+    them to -- new `getAccessibleClasses`/`getTaughtClassesForUser`
+    (mirroring `getVisibleMeetingTypesForUser`'s exact
+    auth-user-\>people-row-\>mapping-table shape). An account in one of
+    those 4 roles with no assignment row yet sees an empty hub ("You
+    haven't been assigned to teach a class yet") rather than the old
+    blanket access. The page itself re-verifies a requested `?class=`
+    against the resolved list before rendering anything from it (not
+    just hiding its tile), and `saveTeachingGrid`
+    (`app/youth-teaching-planning/actions.ts`) re-checks the same list
+    server-side per field before writing -- this had **no server-side
+    authorization at all** before (page-level role gate only), which
+    was fine when viewing and editing were the same all-or-nothing
+    permission, but became a real gap once specific classes needed to
+    be off-limits to specific accounts.
+  - `components/teaching-calendar/TeachingGridForm.tsx` moved to
+    `components/youth-teaching-planning/TeachingGridForm.tsx` (same
+    component, now typically rendered with a single-item `classes`
+    array); `app/teaching-calendar/actions.ts` moved to
+    `app/youth-teaching-planning/actions.ts`.
 - Bishopric-side free-text elements (spiritual thought, handbook training,
   young men coordination, impressions, calling planning, sacrament meeting
   review) can currently be entered in TWO places — new dynamic per-element
