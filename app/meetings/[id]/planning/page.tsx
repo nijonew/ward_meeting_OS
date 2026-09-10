@@ -15,10 +15,12 @@ import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bi
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getEligiblePeopleByElementKey } from "@/lib/data/rotations";
-import { buildAgendaRows } from "@/lib/data/agenda-rows";
+import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
+import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
+import { SacramentProgramSection } from "@/components/planning/SacramentProgramSection";
 import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
 import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
 import { AgendaItemsSection } from "@/components/bishopric/AgendaItemsSection";
@@ -33,16 +35,35 @@ import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
  * against a real agenda screenshot -- see lib/data/agenda-rows.ts for
  * the full per-row writeup of what changed and why.
  *
+ * Sacrament Meeting's agenda is split into four named sections
+ * (2026-09-10, the user's own request): Opening, Administration of the
+ * Sacrament, Teaching Program, Closing. Opening/Administration/Closing
+ * are synthesized section-divider rows inside buildAgendaRows itself
+ * (Opening prepended here since it's tied to *being the first segment*,
+ * not to a specific element key the way the other two are); Teaching
+ * Program is the heading right above `SacramentProgramSection`, since
+ * that section's content lives outside any AgendaGridForm entirely.
+ *
+ * The grid is genuinely two separate `<form>`s for Sacrament Meeting --
+ * everything through Administration of the Sacrament, then (after
+ * Teaching Program's own add/remove list) Closing Hymn/Prayer -- rather
+ * than one, because Teaching Program's own add/remove/save controls
+ * can't be real `<form>`s nested inside a bigger one (HTML forbids
+ * nested forms); splitting the grid around it, instead of moving it to
+ * its own page, keeps everything in one continuous flow on this page
+ * (2026-09-10, the user's own follow-up: "move the speaker/music
+ * management items directly into the agenda rather than by link").
+ *
  * What deliberately stays its own section below the grid: the
  * collections that add and remove rows rather than filling in a fixed
  * line -- Agenda Items, Action Items -- plus Bishopric Minutes and
- * Council Notes. Ward Business and Speakers & Music also add/remove
- * rows, but they moved to their own pages entirely rather than a
- * section here (see agenda-rows.ts's file comment) -- the main grid
- * just links out to them. "Meeting Info" as its own section is gone
- * (2026-09-09, the user's own request: "delete the meeting info
- * section") -- Special Format moved to a small control at the very top
- * of the page (below); Hidden Notes wasn't carried anywhere else.
+ * Council Notes. Ward Business still moves to its own page
+ * (/meetings/[id]/ward-business) -- only Speakers & Music came back
+ * inline, per the user's specific request. "Meeting Info" as its own
+ * section is gone (2026-09-09, the user's own request: "delete the
+ * meeting info section") -- Special Format moved to a small control at
+ * the very top of the page (below); Hidden Notes wasn't carried
+ * anywhere else.
  */
 export default async function PlanningViewPage({
   params,
@@ -85,12 +106,13 @@ export default async function PlanningViewPage({
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  const [plannedElements, people, roleAssignments, elementNotes, sacramentData] = await Promise.all([
+  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, programItems] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
     getRoleAssignments(meetingId, roleTable),
     getElementNotes(meetingId),
     isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
+    isSacrament ? getSacramentProgramItems(meetingId) : Promise.resolve([]),
   ]);
 
   // Meetings created before the per-meeting agenda existed have zero
@@ -109,33 +131,20 @@ export default async function PlanningViewPage({
   // everywhere, not just Bishopric Meeting.
   const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
-  // Agenda Items is the one element with a real add/review section of its
-  // own below -- a grid row for it would just be a label with nothing to
-  // type into. Ward Business is excluded the same way -- its own page
-  // now (see below) -- but Speakers & Music has no element left to
-  // filter, since it never had one before this rework.
+  // Agenda Items and Ward Business are the two elements with a real
+  // add/review section of their own (this page and /meetings/[id]/ward-
+  // business, respectively) -- a grid row for either would just be a
+  // label with nothing to type into.
   const hasAgendaItemsElement = templateElements.some((el) => el.key === "agenda_items");
   const elementsForGrid: TemplateElementRow[] = templateElements.filter((el) => el.key !== "agenda_items");
 
-  // Splice a synthetic "Speakers & Music" marker right before Closing
-  // Hymn/Prayer -- no real catalog element survives for it to key off
-  // (migration 046 removed Speaker/Youth Speaker/Intermediate Hymn from
-  // the templates entirely), so buildAgendaRows's own key-matching
-  // needs something to match here. See agenda-rows.ts's file comment.
-  if (isSacrament) {
-    const closingIndex = elementsForGrid.findIndex((el) => el.key === "closing_hymn" || el.key === "closing_prayer");
-    elementsForGrid.splice(closingIndex === -1 ? elementsForGrid.length : closingIndex, 0, {
-      id: "speakers-music-link",
-      element_id: "speakers-music-link",
-      key: "speakers_music_link",
-      label: "Speakers & Music",
-      resolution_kind: "none",
-      repeatable: false,
-      max_slots: null,
-      sort_order: 0,
-      slot_count: null,
-    });
-  }
+  // Split the agenda in two around Teaching Program (Sacrament Meeting
+  // only) -- everything before Closing Hymn/Prayer, then Closing
+  // Hymn/Prayer itself. See this file's own top comment for why this
+  // needs to be two <form>s instead of one.
+  const closingIndex = elementsForGrid.findIndex((el) => el.key === "closing_hymn" || el.key === "closing_prayer");
+  const openingElements = isSacrament && closingIndex !== -1 ? elementsForGrid.slice(0, closingIndex) : elementsForGrid;
+  const closingElements = isSacrament && closingIndex !== -1 ? elementsForGrid.slice(closingIndex) : [];
 
   // Calling-restricted dropdowns (2026-09-09: "all dropdowns should
   // follow the rules for the field by calling") -- one batched lookup
@@ -150,8 +159,7 @@ export default async function PlanningViewPage({
     isSacrament ? getCurrentHolderIdByCallingName("Bishop") : Promise.resolve(null),
   ]);
 
-  const agendaRows = buildAgendaRows({
-    elements: elementsForGrid,
+  const rowInputs = {
     roleAssignments,
     elementNotes,
     isSacrament,
@@ -163,7 +171,16 @@ export default async function PlanningViewPage({
     allPeople: people,
     defaultPresidingId,
     meetingId,
-  });
+  };
+
+  const openingRows: AgendaRow[] = isSacrament
+    ? [{ kind: "section", id: "opening-section", label: "Opening" }, ...buildAgendaRows({ elements: openingElements, ...rowInputs })]
+    : buildAgendaRows({ elements: openingElements, ...rowInputs });
+  const closingRows = buildAgendaRows({ elements: closingElements, ...rowInputs });
+
+  const resolvedProgramItems = isSacrament
+    ? resolveProgramItems(programItems, sacramentData?.music ?? [], sacramentData?.speakersAdults ?? [], sacramentData?.speakersYouth ?? [])
+    : [];
 
   const saveFormat = async (formData: FormData) => {
     "use server";
@@ -214,13 +231,23 @@ export default async function PlanningViewPage({
             .
           </p>
           <div className="mt-4">
-            <AgendaGridForm
-              meetingId={meetingId}
-              roleTable={roleTable}
-              rows={agendaRows}
-              people={people}
-            />
+            <AgendaGridForm meetingId={meetingId} roleTable={roleTable} rows={openingRows} people={people} />
           </div>
+
+          {isSacrament && (
+            <div className="mt-6 border-t-2 border-rule pt-4">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                Teaching Program
+              </span>
+              <SacramentProgramSection meetingId={meetingId} items={resolvedProgramItems} people={people} />
+            </div>
+          )}
+
+          {closingRows.length > 0 && (
+            <div className="mt-6">
+              <AgendaGridForm meetingId={meetingId} roleTable={roleTable} rows={closingRows} people={people} />
+            </div>
+          )}
         </div>
       )}
 

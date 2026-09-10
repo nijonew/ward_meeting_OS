@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 046
+## Current migration number: 047
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -75,9 +75,12 @@ reconstructed from both:
   & Music list, `sacrament_planning.has_stake_business`, and retires
   Chorister/Organist/Pianist/Speaker/Youth Speaker/Intermediate Hymn as
   fixed template lines, see the Dynamic planning view architecture entry
+  above): confirmed run.
+- `047` (new `sacrament_program_templates` table -- Speakers & Music
+  pre-fill by format, see the Dynamic planning view architecture entry
   above): still needs to be run.
 
-Next migration should be `047_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `048_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -274,18 +277,55 @@ exclusive access.
       multi-select) -- an unchecked box submits nothing on its own, so
       without the fallback, unchecking it would leave the old `true`
       value in place forever instead of ever saving `false`.
-    - **Speakers & Music is a freely add/remove/reorderable list, on its
-      own page** (`/meetings/[id]/speakers-music`) -- something the user
-      said they'd been "trying to explain... for some time": "a dropdown
-      which will allow the selection of youth speakers 1-9, speakers
-      1-9, musical numbers 1-9, intermediate hymn, testimonies," added
-      or removed as its own line, in whatever order. This fully replaces
-      the fixed `slot_count`-driven Speaker/Youth Speaker/Intermediate
-      Hymn/Musical Number elements from the grid rebuild above --
-      migration `046` removes all three from every Sacrament Meeting
-      template (and from already-seeded non-archived meetings) entirely,
-      so a week starts with *nothing* in this section and the admin adds
-      exactly what's needed.
+    - **Speakers & Music is a freely add/remove/reorderable list** --
+      something the user said they'd been "trying to explain... for
+      some time": "a dropdown which will allow the selection of youth
+      speakers 1-9, speakers 1-9, musical numbers 1-9, intermediate
+      hymn, testimonies," added or removed as its own line, in whatever
+      order. This fully replaces the fixed `slot_count`-driven Speaker/
+      Youth Speaker/Intermediate Hymn/Musical Number elements from the
+      grid rebuild above -- migration `046` removes all three from
+      every Sacrament Meeting template (and from already-seeded
+      non-archived meetings) entirely.
+      - ~~On its own page (`/meetings/[id]/speakers-music`)~~ -- true for
+        about a day. **Moved back inline, 2026-09-10**, per the user's
+        own follow-up: "I would like to move the speaker/music
+        management items directly into the agenda rather than by link."
+        `SacramentProgramSection` now renders directly on the planning
+        page, between two separate `AgendaGridForm` instances --
+        `app/meetings/[id]/planning/page.tsx` splits the agenda's
+        elements in two right at Closing Hymn/Prayer, so this section's
+        own add/remove/save `<form>`s stay valid HTML as *siblings* of
+        the two grid forms rather than needing to nest inside either of
+        them. Ward Business/RABNM is unaffected -- still its own
+        separate page, only Speakers & Music came back inline. The
+        now-deleted standalone page's route folder was removed outright
+        (not redirected -- it existed too briefly to have been
+        bookmarked).
+      - **Pre-filled from the meeting's own format, 2026-09-10** (the
+        user's own words: "the intent is that the templates will
+        pre-fill the speaker/music management... with the speaker/music
+        elements for that meeting type") -- new `sacrament_program_templates`
+        table (migration `047`: `format_key`, `item_key`, `sort_order`)
+        and `seedSacramentProgramItemsForMeeting`, called at both
+        meeting-creation sites (`app/meetings/new/actions.ts`,
+        `lib/data/meeting-schedule.ts`'s Generate Meetings) alongside
+        the existing `seedPlannedElementsForMeeting` call, same "seeded
+        once at creation, then freely edited from there" pattern as
+        every other per-meeting template in this app -- changing
+        `special_format` later never re-seeds it, matching that same
+        established precedent. Default lists were reconstructed from
+        this repo's own migration history (033's original seed data, as
+        corrected by 036), since migration 046 deleted the real
+        `slot_count` values without recording them anywhere else:
+        `standard`/`stake_speakers`/`baby_blessing` all get Youth
+        Speaker ×2, Speaker ×2, Intermediate Hymn ×1 (confirmed
+        identical to each other back in migration 033); `missionary_speaker`
+        gets Youth Speaker ×1, Speaker ×2, Intermediate Hymn ×1; every
+        other format (Testimony Meeting, Primary Program, Christmas/
+        Easter, Stake/General Conference) gets nothing, matching that
+        none of them ever had these as fixed defaults, before or after
+        migration 046.
       - New `sacrament_program_items` table (migration `046`) tracks
         only **order and membership** -- one row per chosen item, keyed
         by `item_key` (`"speaker_3"`, `"musical_number_5"`, or the bare
@@ -327,9 +367,23 @@ exclusive access.
         at all -- open testimony-bearing needs nothing filled in.
       - Each item is its own small `<form>` (Save) plus plain
         `useTransition` buttons (Remove, reorder) -- these are siblings
-        on their own page, not descendants of any bigger grid form, so
-        nothing here hit the nested-`<form>` restriction the way Ward
-        Business did.
+        of the two surrounding grid `<form>`s, not descendants of
+        either, so nothing here hits the nested-`<form>` restriction.
+    - **Four named sections, 2026-09-10** (the user's own request,
+      given in these exact words): "Opening, administration of the
+      sacrament, teaching program, closing." Opening covers everything
+      up through Recognize Music/Ward Business/Stake Business;
+      Administration of the Sacrament (already built, see above) covers
+      Sacrament Hymn + Sacrament Administered; Teaching Program is the
+      heading directly above `SacramentProgramSection`; Closing covers
+      Closing Hymn/Prayer. Opening and Closing are synthesized
+      `section`-kind divider rows the same way Administration of the
+      Sacrament already was -- Closing anchored to Closing Hymn the same
+      way Administration is anchored to Sacrament Hymn, and Opening
+      prepended directly by the page (rather than inside
+      `buildAgendaRows` itself) since it's tied to *being the first of
+      the two grid halves*, not to a specific element key the other two
+      can key off reliably.
     - **"Meeting Info" as a section is gone** (the user's own words:
       "delete the meeting info section") -- `PlanningInfoForm.tsx`
       deleted outright. Special Format moved to a small inline control

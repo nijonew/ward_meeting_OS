@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
+import { seedSacramentProgramItemsForMeeting } from "@/lib/data/sacrament-program";
 import { candidateDatesForCadence, readCadenceFields } from "@/lib/data/cadence";
 
 export interface ScheduleRule {
@@ -214,6 +215,12 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
       }
       await applyRotationsToNewMeeting(row.id, rule.meeting_type_id, slug);
       await seedPlannedElementsForMeeting(row.id, rule.meeting_type_id, isSacrament ? "standard" : null);
+      // Speakers & Music pre-fill by template (2026-09-10) -- same
+      // "standard" default every bulk-generated meeting already gets
+      // for special_format above.
+      if (isSacrament) {
+        await seedSacramentProgramItemsForMeeting(row.id, "standard");
+      }
       created += 1;
     }
   }

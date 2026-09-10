@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
+import { seedSacramentProgramItemsForMeeting } from "@/lib/data/sacrament-program";
 
 export type CreateMeetingState = { error?: string };
 
@@ -46,6 +47,12 @@ export async function createMeeting(
 
   await applyRotationsToNewMeeting(data.id, meeting_type_id, meetingTypeSlug);
   await seedPlannedElementsForMeeting(data.id, meeting_type_id, isSacrament ? specialFormat : null);
+  // Speakers & Music pre-fill by template (2026-09-10) -- see
+  // seedSacramentProgramItemsForMeeting's own comment. Sacrament-only,
+  // same as the special_format-driven seed just above.
+  if (isSacrament) {
+    await seedSacramentProgramItemsForMeeting(data.id, specialFormat);
+  }
 
   redirect(`/meetings/${data.id}`);
 }

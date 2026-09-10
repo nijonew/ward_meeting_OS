@@ -17,19 +17,20 @@ import { slotLabel } from "@/lib/data/sacrament-constants";
  *
  * Reworked the same day, line by line, from the user's own notes
  * against a real agenda screenshot -- see each row kind's own comment
- * below for what changed and why. Ward Business and Speakers & Music
- * moved to their own pages entirely (/meetings/[id]/ward-business,
- * /meetings/[id]/speakers-music), since their own add/remove controls
+ * below for what changed and why. Ward Business moved to its own page
+ * (/meetings/[id]/ward-business) since its own add/remove controls
  * can't be real <form>s nested inside this grid's single big <form>
- * (HTML forbids nested forms) -- both render as a banner-with-link row
- * right here instead of a real field. Ward Business is a real
- * (untouched) catalog element still in the meeting's own element list;
- * Speakers & Music has no catalog element to key off anymore (its old
- * fixed elements -- Speaker/Youth Speaker/Intermediate Hymn -- were
- * removed from the templates entirely, migration 046), so the page
- * splices a synthetic "speakers_music_link" marker into `elements`
- * wherever it belongs (right before Closing Hymn) before calling this
- * function.
+ * (HTML forbids nested forms) -- it renders as a banner-with-link row
+ * right here instead of a real field; the underlying catalog element
+ * is untouched, just rendered differently. Speakers & Music briefly
+ * got the same treatment the next day, then moved back inline
+ * (2026-09-10, the user's own follow-up: "move the speaker/music
+ * management items directly into the agenda rather than by link") --
+ * the page renders it as its own component sitting *between* two
+ * separate `AgendaGridForm` instances instead, sidestepping the
+ * nested-form problem a different way (siblings, not descendants) --
+ * see app/meetings/[id]/planning/page.tsx and
+ * SacramentProgramSection.tsx for that split.
  *
  * These row shapes are deliberately plain serializable data: the page
  * (a Server Component) resolves every element against its real storage
@@ -218,18 +219,6 @@ export function buildAgendaRows({
       continue;
     }
 
-    // Speakers & Music (2026-09-09: a freely add/remove/reorderable
-    // list on its own page, /meetings/[id]/speakers-music -- see
-    // lib/data/sacrament-program.ts). No real catalog element to key
-    // off anymore (its old fixed elements were removed from the
-    // templates entirely, migration 046) -- the page splices this
-    // synthetic "speakers_music_link" marker into `elements` wherever
-    // it belongs before calling this function.
-    if (isSacrament && key === "speakers_music_link") {
-      rows.push({ kind: "banner", id: el.id, label: el.label, href: `/meetings/${meetingId}/speakers-music` });
-      continue;
-    }
-
     // Stake Business (2026-09-09: yes/no toggle + optional announcer,
     // replacing free text) -- checked before the generic switch since
     // it's still catalogued as resolution_kind 'free_text' but no
@@ -273,6 +262,15 @@ export function buildAgendaRows({
     // Sacrament Hymn is about to render.
     if (isSacrament && key === "sacrament_hymn") {
       rows.push({ kind: "section", id: `${el.id}-section`, label: "Administration of the Sacrament" });
+    }
+
+    // Closing (2026-09-10: the meeting split into four named sections
+    // -- Opening, Administration of the Sacrament, Teaching Program,
+    // Closing -- per the user's own request). Same synthesized-divider
+    // approach as Administration of the Sacrament above, just anchored
+    // to Closing Hymn instead of Sacrament Hymn.
+    if (isSacrament && key === "closing_hymn") {
+      rows.push({ kind: "section", id: `${el.id}-section`, label: "Closing" });
     }
 
     switch (el.resolution_kind) {

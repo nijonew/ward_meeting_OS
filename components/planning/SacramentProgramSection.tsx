@@ -103,15 +103,26 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
 }
 
 /**
- * The Speakers & Music portion of Sacrament Meeting, rebuilt 2026-09-09
- * as its own freely add/remove/reorderable list -- the user's own
- * words: "the speakers and music portion of the meeting should have a
- * dynamic number of elements where elements can be added or removed."
- * Lives on its own page (/meetings/[id]/speakers-music) rather than
- * inline in the main agenda grid -- each item needs its own add/
- * remove/save controls, which can't be real <form>s nested inside the
- * main agenda grid's single big <form> (HTML forbids nested forms),
- * same reasoning Ward Business/RABNM moved to its own page for.
+ * The Speakers & Music portion of Sacrament Meeting -- built 2026-09-09
+ * as its own freely add/remove/reorderable list ("the speakers and
+ * music portion of the meeting should have a dynamic number of
+ * elements where elements can be added or removed"), then moved
+ * inline into the main planning page 2026-09-10 per the user's
+ * follow-up ("I would like to move the speaker/music management items
+ * directly into the agenda rather than by link"). Rendered directly in
+ * the flow of the agenda, between the two `AgendaGridForm` halves
+ * (app/meetings/[id]/planning/page.tsx splits the agenda in two right
+ * where this belongs) -- each item's own add/remove/save controls are
+ * real `<form>`s, siblings of (not descendants of) the surrounding
+ * grid forms, so nothing here hits HTML's "no nested forms" rule the
+ * way embedding this *inside* one of those grids' own `<form>` would.
+ * Ward Business/RABNM still lives on its own separate page -- only
+ * Speakers & Music moved back inline, per this specific request. The
+ * "Teaching Program" section heading itself is rendered by the page,
+ * immediately above this component -- one of the meeting's four named
+ * sections (Opening, Administration of the Sacrament, Teaching
+ * Program, Closing; 2026-09-10, also the user's own request), not
+ * something specific to this component.
  */
 export function SacramentProgramSection({
   meetingId,
@@ -138,11 +149,10 @@ export function SacramentProgramSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
-      <h2 className="font-display text-xl">Speakers &amp; Music</h2>
-      <p className="mt-1 text-xs text-slate">
-        Add exactly the speakers, musical numbers, and testimonies this meeting needs, in whatever
-        order -- nothing here is pre-filled from a template.
+    <div className="mt-2">
+      <p className="text-xs text-slate">
+        Pre-filled from this meeting&rsquo;s format -- add or remove speakers, musical numbers, and
+        testimonies here, in whatever order.
       </p>
 
       {items.length === 0 ? (

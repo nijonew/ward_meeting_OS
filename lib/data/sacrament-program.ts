@@ -42,3 +42,47 @@ export async function getSacramentProgramItems(meetingId: string): Promise<Progr
   if (error || !data) return [];
   return data.map((row) => ({ id: row.id, itemKey: row.item_key, sortOrder: row.sort_order }));
 }
+
+/**
+ * Called once, right after a new Sacrament Meeting is created (alongside
+ * seedPlannedElementsForMeeting) -- copies that format's default
+ * Speakers & Music list (migration 047, `sacrament_program_templates`)
+ * into the meeting's own `sacrament_program_items`, same "seeded once,
+ * then freely add/remove/reorder from there" pattern as every other
+ * per-meeting template in this app. A format with no template rows
+ * (Testimony Meeting, Primary Program, Christmas/Easter, Stake/General
+ * Conference -- none of these ever had Speaker/Youth Speaker/
+ * Intermediate Hymn as fixed defaults, before or after migration 046)
+ * simply seeds nothing, same as leaving the list empty by hand.
+ *
+ * Best-effort, matching seedPlannedElementsForMeeting: only runs when
+ * the meeting doesn't already have any program items (so calling this
+ * twice, or against a meeting an admin already started filling in by
+ * hand, can't clobber real data), and never throws -- a failed seed
+ * just leaves the meeting with an empty list, same as the
+ * pre-this-feature default.
+ */
+export async function seedSacramentProgramItemsForMeeting(meetingId: string, formatKey: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("sacrament_program_items")
+    .select("id")
+    .eq("meeting_id", meetingId)
+    .limit(1);
+  if (existing && existing.length > 0) return;
+
+  const { data: template } = await supabase
+    .from("sacrament_program_templates")
+    .select("item_key, sort_order")
+    .eq("format_key", formatKey)
+    .order("sort_order", { ascending: true });
+  if (!template || template.length === 0) return;
+
+  const { error } = await supabase.from("sacrament_program_items").insert(
+    template.map((row) => ({ meeting_id: meetingId, item_key: row.item_key, sort_order: row.sort_order }))
+  );
+  if (error) {
+    console.error(`seedSacramentProgramItemsForMeeting: meeting ${meetingId} failed:`, error.message);
+  }
+}
