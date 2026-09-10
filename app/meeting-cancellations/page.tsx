@@ -84,7 +84,7 @@ export default async function MeetingCancellationsPage() {
                   className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">{c.reason}</span>{" "}
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">{c.reason}</span>{" "}
                     {formatDate(c.start_date)}
                     {c.end_date !== c.start_date ? ` – ${formatDate(c.end_date)}` : ""}
                     {affected.length > 0 && <span className="text-ink-muted"> &mdash; {affected.join(", ")}</span>}

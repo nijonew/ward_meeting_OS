@@ -4,7 +4,7 @@ export function BishopricLiveView({ data }: { data: BishopricMeetingData }) {
   const field = (label: string, value: string | null | undefined) =>
     value ? (
       <div className="mt-4">
-        <p className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">{label}</p>
+        <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{label}</p>
         <p className="mt-1 text-lg text-ink">{value}</p>
       </div>
     ) : null;
@@ -25,7 +25,7 @@ export function BishopricLiveView({ data }: { data: BishopricMeetingData }) {
 
       {data.actionItems.length > 0 && (
         <div className="rounded-lg border border-rule bg-surface p-6">
-          <p className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">Action Items</p>
+          <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">Action Items</p>
           <ul className="mt-2 flex flex-col gap-1">
             {data.actionItems.map((item) => (
               <li key={item.id} className={item.completed ? "text-ink-muted/50 line-through" : "text-lg text-ink"}>
@@ -39,7 +39,7 @@ export function BishopricLiveView({ data }: { data: BishopricMeetingData }) {
 
       {data.agendaItems.filter((i) => i.status === "published").length > 0 && (
         <div className="rounded-lg border border-rule bg-surface p-6">
-          <p className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">Agenda Items</p>
+          <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">Agenda Items</p>
           <ul className="mt-2 flex flex-col gap-1">
             {data.agendaItems
               .filter((i) => i.status === "published")

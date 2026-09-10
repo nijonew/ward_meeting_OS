@@ -58,3 +58,38 @@
     cursor: pointer;
   }
 }
+
+/*
+ * Structural motion (Phase 2, "Calm"): content rises into place on load
+ * -- 8-12px translate plus a fade, ~250ms, ease-out, no pinning or
+ * scroll-scrubbing (design.md's Motion section). This is a deliberate
+ * CSS stand-in; Phase 5 replaces it with real Lenis/GSAP wiring per the
+ * redesign process, so keep this block easy to delete wholesale later.
+ *
+ * Reduced-motion is respected by construction: .rise-in only gets an
+ * animation inside the no-preference media query, so a
+ * prefers-reduced-motion user simply sees the element at its resting
+ * opacity/position with no animation ever running.
+ */
+@layer utilities {
+  .rise-in {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rise-in {
+      animation: rise-in 260ms ease-out both;
+    }
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

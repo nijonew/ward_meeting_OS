@@ -1,37 +1,41 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { WARD_NAME } from "@/lib/config";
 import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import type { AppRole } from "@/lib/supabase/get-session-user";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 
-// Sacrament Meeting deliberately excluded (2026-09-10, the user's own
-// request: "remove sacrament meeting from 'my meetings'") -- its own
-// tile in the "This week" tier above already covers the one thing a
-// non-admin would want (today's public program), and admins reach it
-// through Administration -> Meeting Planning -> Meeting Agendas
-// instead, so a third entry point here was redundant.
+// Visual redesign (design.md, direction "The Ledger"). The spine
+// (church-meeting-management shape, adapted to this app): current
+// meeting/week context -> thesis moment -> meetings you plan ->
+// announcements & events -> your area of responsibility -> broader
+// admin tools -> one primary action -> footer.
+//
+// Motion is "Calm" (see .rise-in in globals.css), applied only to the
+// hero -- the one region guaranteed to be in view on load. Phase 2
+// originally staggered a rise-in across every section below it too,
+// but on a page this tall that motion finishes before anyone scrolls
+// far enough to see it: pure wasted code, invisible in practice. Phase
+// 5's restraint pass cut it rather than build scroll-triggered reveals
+// to make it "work" -- a static section that appears the instant it's
+// scrolled to communicates just as well and is simpler.
+//
+// Copy note: existing functional labels (tile titles, descriptions,
+// section eyebrows) were already real app content before this
+// redesign, so they're untouched -- the words this redesign actually
+// introduced (the hero's supporting sentences, the primary-action
+// line) were written in Phase 3. The hero visual is a hand-built inline
+// SVG per design.md's Assets plan (Phase 4) -- no photography, no
+// stock imagery, no generated illustration.
+
 const ALL_MEETING_TYPES: MeetingTypeSlug[] = ["bishopric-meeting", "ward-council", "youth-council"];
 
-// Per the user's request (2026-09-09): the landing page's browser tab
-// now reads "Dashboard" and /dashboard's reads "Meeting Dashboard" (see
-// that page's own metadata) -- distinct on purpose, since the user was
-// confused about which page was actually "the dashboard page."
 export const metadata: Metadata = {
   title: "Dashboard",
 };
-
-/**
- * The single landing page for everyone -- ward members, meeting
- * participants, youth leaders, music coordinators, and the bishopric all
- * land here. Tiles are filtered in or out below based on login state and
- * role; tapping a tile navigates to that feature's own existing page.
- * See /areas/ward-meeting-os.md for the full tile/role matrix this
- * implements.
- */
 
 const YOUTH_LEADER_ROLES: AppRole[] = [
   "yw_presidency",
@@ -51,76 +55,109 @@ export default async function HomePage() {
 
   const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
 
-  // Admins manage every meeting type regardless of which calling happens
-  // to be recorded against their own account; everyone else only sees a
-  // tile for a type their calling actually maps to (meeting_type_members)
-  // -- per the user's own request (2026-09-06): "only show the meetings
-  // that apply to the person by nature of their calling." Sacrament
-  // Meeting no longer gets a tile here at all (2026-09-10) -- see
-  // ALL_MEETING_TYPES's own comment above.
   const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id) : [];
   const visibleMeetingTypes = isBishopric ? ALL_MEETING_TYPES : rawVisibleTypes;
-  // This is the same list as visibleMeetingTypes for a non-admin now
-  // that Sacrament Meeting isn't unconditionally folded in -- kept as
-  // its own named check anyway, since it's a real, distinct concept
-  // (attends *some* meeting by calling, or is Bishopric) that the
-  // Meeting Agenda Items/Submit an Announcement tiles below are gated
-  // on (2026-09-09, the user's own request).
   const attendsMeetings = isBishopric || rawVisibleTypes.length > 0;
 
+  // Single most relevant next step for the primary-action band -- kept
+  // to one honest option rather than forcing something for every
+  // session state. See the file comment above.
+  const primaryAction = !user
+    ? {
+        label: "Sign in",
+        href: "/login",
+        note: "Sign in for your meeting and planning tools.",
+      }
+    : isBishopric
+      ? {
+          label: "Open Meeting Planning",
+          href: "/meeting-planning",
+          note: "Agendas, the schedule, and rotations are one click away.",
+        }
+      : isMusicPlanner
+        ? {
+            label: "Open Music Planning",
+            href: "/music",
+            note: "Keep hymns and music filled in for what's coming up.",
+          }
+        : isYouthLeader
+          ? {
+              label: "Open Youth Teaching Planning",
+              href: "/youth-teaching-planning",
+              note: "Sunday teaching assignments for your class are waiting.",
+            }
+          : null;
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col px-6 py-12 sm:px-8">
       <AppHeader />
 
-      <section className="mt-10">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">{WARD_NAME}</h1>
-        {!user && <p className="mt-2 text-ink-muted">Sign in for meeting and planning tools.</p>}
+      {/* 1 & 2 -- current meeting/week context, then the thesis moment */}
+      <section className="rise-in mt-10">
+        <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Today</p>
+
+        {todaysSacramentMeeting ? (
+          <Link
+            href={`/meetings/${todaysSacramentMeeting.id}/public`}
+            className="mt-3 flex flex-col rounded border border-rule bg-surface px-6 py-5 transition-colors hover:border-rule-strong"
+          >
+            <span className="font-display text-xl font-semibold text-ink sm:text-2xl">
+              Sacrament Meeting Program
+            </span>
+            <span className="mt-1 text-sm text-ink-muted">Today&rsquo;s program</span>
+          </Link>
+        ) : (
+          <div className="mt-3 flex flex-col rounded border border-rule/60 px-6 py-5">
+            <span className="font-display text-xl font-semibold text-ink/40 sm:text-2xl">
+              Sacrament Meeting Program
+            </span>
+            <span className="mt-1 text-sm text-ink-muted/60">Published on meeting day</span>
+          </div>
+        )}
+
+        <h1 className="mt-6 font-display text-xl font-bold leading-snug text-ink sm:text-2xl">
+          Efficient enough for a volunteer&rsquo;s spare hour, quiet enough for Sunday morning.
+        </h1>
+        <p className="mt-2 max-w-prose text-sm text-ink-muted">
+          Rotations, templates, and prior planning are already filled in. A leader&rsquo;s own
+          time goes to what only a person can add, not to rebuilding what&rsquo;s already
+          settled. Everyone else sees the same information back, plainly, when they need it.
+        </p>
+
+        {/* Assets plan (design.md): a quiet ledger-line motif -- an
+            abstraction of "an ordered list," which is what the app
+            actually is. Hand-built inline SVG, no photography, no
+            illustration of a person or building. The first row is
+            drawn emphasized (filled index chip, heavier rule) the same
+            way the signature element marks a current/next item
+            elsewhere in the app; the rest sit quiet. */}
+        <svg
+          viewBox="0 0 720 200"
+          className="mt-6 h-24 w-full sm:h-32"
+          role="img"
+          aria-hidden="true"
+        >
+          <rect x="0" y="18" width="14" height="14" rx="2" fill="var(--color-accent)" />
+          <rect x="28" y="21" width="420" height="8" rx="4" fill="var(--color-rule-strong)" />
+
+          <rect x="0" y="54" width="14" height="14" rx="2" fill="none" stroke="var(--color-rule-strong)" strokeWidth="1.5" />
+          <rect x="28" y="57" width="560" height="8" rx="4" fill="var(--color-rule)" />
+
+          <rect x="0" y="90" width="14" height="14" rx="2" fill="none" stroke="var(--color-rule-strong)" strokeWidth="1.5" />
+          <rect x="28" y="93" width="300" height="8" rx="4" fill="var(--color-rule)" />
+
+          <rect x="0" y="126" width="14" height="14" rx="2" fill="none" stroke="var(--color-rule-strong)" strokeWidth="1.5" />
+          <rect x="28" y="129" width="480" height="8" rx="4" fill="var(--color-rule)" />
+
+          <rect x="0" y="162" width="14" height="14" rx="2" fill="none" stroke="var(--color-rule-strong)" strokeWidth="1.5" />
+          <rect x="28" y="165" width="380" height="8" rx="4" fill="var(--color-rule)" />
+        </svg>
       </section>
 
-      {/* Tier 0 -- everyone, no login required */}
-      <section className="mt-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">This week</p>
-        <TileGrid>
-            {todaysSacramentMeeting ? (
-              <Tile
-                title="Sacrament Meeting Program"
-                description="Today's program"
-                href={`/meetings/${todaysSacramentMeeting.id}/public`}
-              />
-            ) : (
-              <Tile title="Sacrament Meeting Program" description="Published on meeting day" comingSoon />
-            )}
-          <Tile title="Announcements" description="Ward-wide announcements" href="/announcements/public" />
-          <Tile
-            title="Youth Activities"
-            description="Planned activities for YW and YM"
-            href="/youth-activities"
-          />
-          <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
-        </TileGrid>
-      </section>
-
-      {/* Tier 1 -- any logged-in user, but only meeting types their own
-          calling actually maps to (meeting_type_members) -- admins see
-          all four regardless. Replaces the old single "Meetings" tile,
-          which just linked to /dashboard's unfiltered hodgepodge of
-          every meeting type. Meeting Agenda Items and Submit an
-          Announcement both moved in here 2026-09-09 (were public
-          Tier-0 tiles before) per the user's own request -- both are
-          now only shown to accounts that actually attend a meeting by
-          calling (attendsMeetings), not to every logged-in account the
-          way the rest of this section's tiles are (those always
-          include Sacrament Meeting regardless of calling -- see the
-          comment above attendsMeetings). Per-type tiles link with
-          `readonly=1` (2026-09-09, the user's own request: "make my
-          meetings section for read only views of meetings") -- without
-          it, a Bishopric account would land on /dashboard's full New
-          Meeting/Cancel/Unassigned-Agenda-Items control surface even
-          from here; that surface now lives only behind the
-          Administration section's own Meeting Planning tile below. */}
+      {/* 3 -- meeting planning / assignments */}
       {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">My meetings</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">My meetings</p>
           <TileGrid>
             {visibleMeetingTypes.map((slug) => (
               <Tile
@@ -147,18 +184,24 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 3 -- music coordinator + bishopric. Was two tiles
-          (Sacrament Music Planning + a separate Music Coordination
-          status overview) -- merged into one 2026-09-08 per the user's
-          own call: the per-meeting Planning view (unified 2026-09-08,
-          priority queue item 1 above) already covers everyday status
-          for one meeting at a time, so a separate weeks-at-a-glance
-          overview page added an entry point without adding a real
-          capability. /music-coordination and its data module were
-          removed outright, not just unlinked. */}
+      {/* 4 -- announcements / important information */}
+      <section className="mt-10">
+        <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Announcements &amp; events</p>
+        <TileGrid>
+          <Tile title="Announcements" description="Ward-wide announcements" href="/announcements/public" />
+          <Tile
+            title="Youth Activities"
+            description="Planned activities for YW and YM"
+            href="/youth-activities"
+          />
+          <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
+        </TileGrid>
+      </section>
+
+      {/* 5 -- people / responsibilities */}
       {isMusicPlanner && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">Music</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Music</p>
           <TileGrid>
             <Tile
               title="Sacrament Meeting Music Planning"
@@ -169,19 +212,9 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 3 -- youth leaders + bishopric. Was youth-leader-only
-          (excluding bishopric) back when this was just a "Coming soon"
-          placeholder -- Teaching Calendar itself is meant for "youth
-          leaders and admins" per the user (2026-09-08), so the guard
-          dropped the !isBishopric exclusion once it had a real
-          destination. Renamed to "Youth Teaching Planning" (2026-09-09,
-          the user's own request) once it became a per-class hub --
-          which class(es) a given account actually sees inside it is a
-          separate, narrower question than this role-based tile gate;
-          see getAccessibleClasses in lib/data/teaching-assignments.ts. */}
       {isYouthLeader && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">Youth program</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Youth program</p>
           <TileGrid>
             <Tile
               title="Youth Teaching Planning"
@@ -197,10 +230,10 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 4 -- bishopric only */}
+      {/* 6 -- supporting meeting tools */}
       {isBishopric && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">Administration</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Administration</p>
           <TileGrid>
             <Tile
               title="Meeting Planning"
@@ -222,8 +255,22 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* 7 -- one primary action */}
+      {primaryAction && (
+        <section className="mt-10 flex flex-col items-start gap-2 border-t border-rule pt-8">
+          <p className="max-w-prose text-sm text-ink-muted">{primaryAction.note}</p>
+          <Link
+            href={primaryAction.href}
+            className="inline-flex items-center rounded bg-accent px-5 py-2.5 font-body text-sm font-medium text-surface transition-colors hover:bg-accent-deep"
+          >
+            {primaryAction.label}
+          </Link>
+        </section>
+      )}
+
+      {/* 8 -- footer / navigation */}
       <footer className="mt-auto pt-16 text-xs text-ink-muted">
-        Ward OS &mdash; Heritage Ward &mdash; Syracuse Utah Stake
+        Ward OS &middot; Heritage Ward &middot; Syracuse Utah Stake
       </footer>
     </main>
   );

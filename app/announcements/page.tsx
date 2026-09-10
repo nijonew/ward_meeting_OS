@@ -53,7 +53,7 @@ export default async function AnnouncementsInboxPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                         {item.kind === "announcement" ? "Announcement" : "Agenda Item"}
                       </span>{" "}
                       {item.title}
@@ -61,7 +61,7 @@ export default async function AnnouncementsInboxPage() {
                     <span className="flex items-center gap-2">
                       <span
                         className={[
-                          "font-mono text-[10px] uppercase tracking-widest",
+                          "font-mono text-[10px] uppercase tracking-wider",
                           item.status === "published"
                             ? "text-success"
                             : item.status === "archived"

@@ -81,12 +81,12 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
             <table className="w-full min-w-[640px] text-left text-xs">
               <thead>
                 <tr className="border-b border-rule text-ink-muted">
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Date</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Type</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Piece</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Performer</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Accompanist</th>
-                  <th className="py-1.5 font-mono uppercase tracking-widest">Status</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Date</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Type</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Piece</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Performer</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Accompanist</th>
+                  <th className="py-1.5 font-mono uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>

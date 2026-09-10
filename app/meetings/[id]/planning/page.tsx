@@ -241,7 +241,7 @@ export default async function PlanningViewPage({
                 people={people}
               >
                 <div className="border-t-2 border-rule pt-4">
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                     Teaching Program
                   </span>
                   <SacramentProgramSection meetingId={meetingId} items={resolvedProgramItems} people={people} />

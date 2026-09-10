@@ -61,7 +61,7 @@ export default async function WardEventsPage() {
                 <li key={item.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                         {formatDate(item.event_date)}
                         {item.event_time ? ` \u00b7 ${item.event_time}` : ""}
                       </span>{" "}
@@ -71,7 +71,7 @@ export default async function WardEventsPage() {
                       <span className="flex items-center gap-2">
                         <span
                           className={[
-                            "font-mono text-[10px] uppercase tracking-widest",
+                            "font-mono text-[10px] uppercase tracking-wider",
                             item.status === "published" ? "text-success" : "text-accent",
                           ].join(" ")}
                         >

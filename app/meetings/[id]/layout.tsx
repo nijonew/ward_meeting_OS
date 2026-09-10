@@ -94,7 +94,7 @@ export default async function MeetingLayout({
           <Link
             key={tab.slug}
             href={`/meetings/${meeting.id}/${tab.slug}`}
-            className="border-b-2 border-transparent px-4 py-2 font-mono text-xs uppercase tracking-widest text-ink-muted transition-colors hover:text-ink"
+            className="border-b-2 border-transparent px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
           >
             {tab.label}
           </Link>

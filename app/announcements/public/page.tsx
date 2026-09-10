@@ -64,12 +64,12 @@ export default async function PublicAnnouncementsPage() {
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <span className="font-display text-base text-ink">{a.title}</span>
                     {dateRange && (
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                         {dateRange}
                       </span>
                     )}
                   </div>
-                  {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-ink-muted/60">{meta}</p>}
+                  {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
                   {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
                   {a.location && <p className="mt-1 text-[11px] text-ink-muted/70">Location: {a.location}</p>}
                   {a.link_url && (

@@ -45,7 +45,7 @@ export function RulesManager({
       {rules.length > 0 && (
         <table className="mt-4 w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+            <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
               <th className="pb-2 pr-3">Meeting Type</th>
               <th className="pb-2 pr-3">Schedule</th>
               <th className="pb-2 pr-3">Time</th>
@@ -66,7 +66,7 @@ export function RulesManager({
                     type="button"
                     onClick={() => onToggle(r.id, r.active)}
                     className={[
-                      "font-mono text-[10px] uppercase tracking-widest",
+                      "font-mono text-[10px] uppercase tracking-wider",
                       r.active ? "text-success" : "text-ink-muted/50",
                     ].join(" ")}
                   >

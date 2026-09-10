@@ -44,7 +44,7 @@ export function RabnmSection({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
               >
                 <span>
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                     {typeLabel(item.type)}
                   </span>{" "}
                   {item.people.length > 0 && <span>{item.people.join(", ")}</span>}

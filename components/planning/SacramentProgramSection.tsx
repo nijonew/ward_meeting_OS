@@ -39,7 +39,7 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
   return (
     <li className="rounded-md border border-rule/60 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">{item.label}</span>
+        <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{item.label}</span>
         <span className="flex items-center gap-3">
           <button type="button" onClick={() => move("up")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
             &uarr;

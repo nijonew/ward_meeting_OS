@@ -93,7 +93,7 @@ export default async function SpeakerPrayerHistoryPage() {
               {entries.map((e, i) => (
                 <li key={i} className="flex items-baseline justify-between gap-3 border-b border-rule/40 py-1.5 text-sm last:border-0">
                   <span>
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">{e.role}</span>{" "}
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">{e.role}</span>{" "}
                     <span className="text-ink">{e.person_name}</span>
                     {e.topic && <span className="text-ink-muted"> &mdash; {e.topic}</span>}
                   </span>

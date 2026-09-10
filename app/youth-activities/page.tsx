@@ -94,18 +94,18 @@ export default async function YouthActivitiesPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                         {formatDate(item.activity_date)}
                         {item.activity_time ? ` · ${item.activity_time}` : ""}
                       </span>{" "}
                       {item.title}
                       {item.cancelled && (
-                        <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-red-700">
                           Cancelled
                         </span>
                       )}
                       {!item.confirmed && !item.cancelled && (
-                        <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-accent">
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">
                           Tentative
                         </span>
                       )}
@@ -114,7 +114,7 @@ export default async function YouthActivitiesPage() {
                       <span className="flex flex-wrap items-center gap-2">
                         <span
                           className={[
-                            "font-mono text-[10px] uppercase tracking-widest",
+                            "font-mono text-[10px] uppercase tracking-wider",
                             item.status === "published" ? "text-success" : "text-accent",
                           ].join(" ")}
                         >

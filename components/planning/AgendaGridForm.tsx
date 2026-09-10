@@ -165,7 +165,7 @@ export function AgendaGridForm({
                 return (
                   <tr key={row.id} className="border-t-2 border-rule">
                     <td colSpan={2} className="px-2 pb-1 pt-4">
-                      <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                         {row.label}
                       </span>
                     </td>
@@ -273,7 +273,7 @@ export function AgendaGridForm({
                     {row.kind === "recognize_music" && (
                       <div className="flex flex-col gap-1.5 sm:flex-row">
                         <div className="sm:w-1/2">
-                          <label className="block text-[10px] uppercase tracking-widest text-ink-muted/60">
+                          <label className="block text-[10px] uppercase tracking-wider text-ink-muted/60">
                             Chorister
                           </label>
                           <PersonSelect
@@ -283,7 +283,7 @@ export function AgendaGridForm({
                           />
                         </div>
                         <div className="sm:w-1/2">
-                          <label className="block text-[10px] uppercase tracking-widest text-ink-muted/60">
+                          <label className="block text-[10px] uppercase tracking-wider text-ink-muted/60">
                             Organist
                           </label>
                           <PersonSelect

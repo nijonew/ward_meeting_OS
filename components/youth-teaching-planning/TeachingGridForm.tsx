@@ -56,11 +56,11 @@ export function TeachingGridForm({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Sunday
               </th>
               {classes.map((c) => (
-                <th key={c} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                <th key={c} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   {c}
                 </th>
               ))}

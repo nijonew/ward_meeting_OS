@@ -34,7 +34,7 @@ function TabLink({ view, current, label }: { view: ViewFilter; current: ViewFilt
     <Link
       href={`/events?view=${view}`}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
+        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
         active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >
@@ -110,13 +110,13 @@ export default async function ScheduledEventsPage({
                 ].join(" ")}
               >
                 <span className="text-ink">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                     {formatDate(item.date)}
                     {item.time ? ` \u00b7 ${item.time}` : ""} \u00b7 {item.kind}
                   </span>{" "}
                   {item.title}
                   {item.cancelled && (
-                    <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-red-700">
                       Cancelled
                     </span>
                   )}

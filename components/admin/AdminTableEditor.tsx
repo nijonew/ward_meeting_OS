@@ -179,7 +179,7 @@ export function AdminTableEditor({
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
       <table className="w-full min-w-[720px] text-sm">
         <thead>
-          <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+          <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
             {columns.map((c) => (
               <th key={c.column} className="pb-2 pr-3">
                 <button

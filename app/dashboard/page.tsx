@@ -90,17 +90,17 @@ function MeetingRow({
         <div className="flex flex-wrap items-center gap-2">
           <LifecycleBadge stage={meeting.stage} compact />
           {!isBuilt && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
               Coming soon
             </span>
           )}
           {meeting.cancelled && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-red-700">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-red-700">
               Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
             </span>
           )}
           {meeting.noActivity && !meeting.cancelled && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-ink-muted/50">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-ink-muted/50">
               No Activity
             </span>
           )}
@@ -301,7 +301,7 @@ export default async function DashboardPage({
 
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">
             {typeFilter ? (
               // The type name is already in the h1 above ("<Type>
               // Planning Dashboard") once filtered -- repeating it here
@@ -347,15 +347,15 @@ export default async function DashboardPage({
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                     Date
                   </th>
                   {!typeFilter && (
-                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                       Type
                     </th>
                   )}
-                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                     Stage
                   </th>
                   <th className="px-2 py-2" />

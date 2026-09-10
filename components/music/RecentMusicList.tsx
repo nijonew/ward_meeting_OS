@@ -26,7 +26,7 @@ export function RecentMusicList({ items }: { items: RecentMusicItem[] }) {
               key={item.id}
               className="flex flex-wrap items-center gap-2 border-b border-rule/40 py-1.5 text-sm last:border-0"
             >
-              <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                 {formatDate(item.date)}
               </span>
               <span>

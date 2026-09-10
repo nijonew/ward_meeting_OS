@@ -53,7 +53,7 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
     <Link
       href={`/rotations?type=${slug}`}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
+        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
         active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >

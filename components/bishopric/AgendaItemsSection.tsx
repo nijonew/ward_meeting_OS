@@ -39,7 +39,7 @@ export function AgendaItemsSection({
                   <span className="flex items-center gap-2">
                     <span
                       className={[
-                        "font-mono text-[10px] uppercase tracking-widest",
+                        "font-mono text-[10px] uppercase tracking-wider",
                         item.status === "published"
                           ? "text-success"
                           : item.status === "archived"

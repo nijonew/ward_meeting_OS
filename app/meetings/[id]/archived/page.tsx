@@ -59,7 +59,7 @@ import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 
 const NOTE_BOX = "rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-ink";
 const ROW = "rounded-md border border-rule/60 p-3";
-const LABEL = "font-mono text-[11px] uppercase tracking-widest text-ink-muted/70";
+const LABEL = "font-mono text-[11px] uppercase tracking-wider text-ink-muted/70";
 
 function personName(people: PersonOption[], id: string | null | undefined): string | null {
   if (!id) return null;

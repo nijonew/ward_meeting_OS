@@ -144,7 +144,7 @@ export function CallingPlanningGridForm({
           <thead>
             <tr>
               {COLUMNS.map((c) => (
-                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
+                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   <button
                     type="button"
                     onClick={() => toggleSort(c.key)}
