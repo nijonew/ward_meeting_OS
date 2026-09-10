@@ -1315,10 +1315,44 @@ before fully closing it out.
   list -- mirrors the one-tile-per-type pattern "My meetings" already
   uses for read-only browsing, now applied to the admin side too.
   `/meeting-planning`'s own "Meeting Agendas" tile now points here
-  instead of straight to `/dashboard`. `/dashboard` itself is
-  unchanged -- still works with or without a `type` filter, "Show all
-  types" still there for anyone who lands on one type and wants the
-  merged view back.
+  instead of straight to `/dashboard`. ~~`/dashboard` itself is
+  unchanged~~ -- true only until the next request, see immediately
+  below.
+
+  **`/dashboard` reworked into a single-line-per-meeting grid, with a
+  type-specific page title, shortly after (2026-09-09)** -- the user's
+  own words, reacting to a screenshot of the old stacked-card layout:
+  "each meeting-specific page... can be titled by the meeting type
+  followed by 'planning dashboard'... the words 'sacrament meeting'
+  appear too often... look more like the grids we have been using...
+  single line items per scheduled event." Two changes:
+  - **Title**: `/dashboard`'s browser tab and `<h1>` now read
+    "`<Type>` Planning Dashboard" (e.g. "Sacrament Meeting Planning
+    Dashboard") whenever `?type=` is set, or the generic "Meeting
+    Dashboard" when it isn't (the merged "Show all types" view) -- a
+    shared `dashboardPageTitle()` helper feeds both the `<h1>` and a
+    new `generateMetadata` (a static `metadata` export can't read
+    `searchParams`, so this replaced it) so the two can't drift apart.
+  - **Layout**: `MeetingRow` went from a stacked card (title shown
+    twice -- a small label plus a big heading -- with cancel controls
+    in a separate block below it) to one `<table>` `<tr>` per meeting,
+    matching the mono-uppercase-header/tight-border look of the other
+    per-item grids in this app (Assignment Rotations, Calling Planning,
+    Teaching Calendar) even though this list isn't a Save-All-Changes
+    editable grid -- it's borrowing the *look*, not the
+    dirty-tracking/single-form mechanics, since each row's Cancel/
+    Un-cancel is already its own independent little form (no nesting
+    issue, since the list was never wrapped in one big outer form to
+    begin with). Columns: Date (links to the meeting when built),
+    Type (hidden entirely when `?type=` narrows the list to one type
+    already -- the actual fix for "sacrament meeting" appearing on
+    every single row on top of the header and title), Stage (lifecycle
+    badge plus Cancelled/No Activity/Coming-soon flags inline), and an
+    actions cell with the same inline Cancel/Un-cancel form as before,
+    just condensed to fit one row. The section header's own type-name
+    label is dropped too when filtered (redundant with the new `<h1>`)
+    -- that slot becomes the "Show all types" link instead of a second
+    copy of the name.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark

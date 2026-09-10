@@ -17,60 +17,31 @@ function formatMeetingDate(iso: string) {
   });
 }
 
+/**
+ * One `<tr>` per meeting -- reworked 2026-09-09 from a stacked card (with
+ * a separate cancel-controls block below it) into a single grid row, per
+ * the user's own request: "the overall look can look more like the
+ * grids we have been using... single line items per scheduled event."
+ * `showType` is false whenever the list is already filtered to one
+ * meeting type (the common case now that navigation goes through
+ * /meeting-agendas' and "My meetings"' per-type tiles) -- the type name
+ * was showing up twice per row (a small label plus the big heading) on
+ * top of already being named in the section header and (2026-09-09) the
+ * page's own "<Type> Planning Dashboard" heading, which the same
+ * feedback flagged directly ("the words 'sacrament meeting' appear too
+ * often").
+ */
 function MeetingRow({
   meeting,
   isBuilt,
   canManage,
+  showType,
 }: {
   meeting: Meeting;
   isBuilt: boolean;
   canManage: boolean;
+  showType: boolean;
 }) {
-  const card = (
-    <div
-      className={[
-        "flex flex-col gap-3 rounded-md border px-5 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between",
-        meeting.cancelled ? "border-red-900/30 bg-red-950/5" : isBuilt ? "border-rule bg-card hover:border-ink/30" : "border-rule/60",
-      ].join(" ")}
-    >
-      <div>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
-          {meeting.title}
-        </p>
-        <p className={["font-display text-lg", isBuilt ? "text-ink" : "text-ink/40"].join(" ")}>
-          {meeting.title}
-          {meeting.cancelled && (
-            <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
-              Cancelled
-            </span>
-          )}
-          {meeting.noActivity && !meeting.cancelled && (
-            <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-slate/50">
-              No Activity
-            </span>
-          )}
-        </p>
-        <p className={isBuilt ? "text-sm text-slate" : "text-sm text-slate/60"}>
-          {formatMeetingDate(meeting.date)}
-        </p>
-        {meeting.cancelled && (
-          <p className="mt-1 text-xs text-red-700">
-            Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
-          </p>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <LifecycleBadge stage={meeting.stage} />
-        {!isBuilt && (
-          <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/70">
-            Coming soon
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
   // Admins land on the meeting's own hub (tabs for Planning/Conducting/
   // Public, or Template/Planning/Live) same as always; everyone else
   // goes straight to whichever read-only view actually applies to them
@@ -79,17 +50,13 @@ function MeetingRow({
   const nonAdminHref = meeting.meetingType === "sacrament-meeting" ? "public" : "archived";
   const href = canManage ? `/meetings/${meeting.id}` : `/meetings/${meeting.id}/${nonAdminHref}`;
 
-  const linked = isBuilt ? (
-    <Link href={href} className="block">
-      {card}
+  const dateCell = isBuilt ? (
+    <Link href={href} className="text-ink hover:underline">
+      {formatMeetingDate(meeting.date)}
     </Link>
   ) : (
-    card
+    <span className="text-ink/40">{formatMeetingDate(meeting.date)}</span>
   );
-
-  if (!canManage || meeting.stage === "archived") {
-    return <li>{linked}</li>;
-  }
 
   const uncancel = async () => {
     "use server";
@@ -101,31 +68,54 @@ function MeetingRow({
   };
 
   return (
-    <li className="flex flex-col gap-1.5">
-      {linked}
-      <div className="flex items-center gap-2 px-1">
-        {meeting.cancelled ? (
-          <form action={uncancel}>
-            <button type="submit" className="text-xs text-slate hover:text-ink">
-              Un-cancel
-            </button>
-          </form>
-        ) : (
-          <form action={cancel} className="flex items-center gap-1">
-            <input type="hidden" name="id" value={meeting.id} />
-            <input
-              type="text"
-              name="cancellation_note"
-              placeholder="Reason (optional)"
-              className="w-40 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
-            />
-            <button type="submit" className="text-xs text-slate hover:text-ink">
-              Cancel Meeting
-            </button>
-          </form>
-        )}
-      </div>
-    </li>
+    <tr className={["border-t border-rule/60", meeting.cancelled ? "bg-red-950/5" : ""].join(" ")}>
+      <td className="px-2 py-2 align-top text-sm">{dateCell}</td>
+      {showType && <td className="px-2 py-2 align-top text-sm text-slate">{meeting.title}</td>}
+      <td className="px-2 py-2 align-top">
+        <div className="flex flex-wrap items-center gap-2">
+          <LifecycleBadge stage={meeting.stage} />
+          {!isBuilt && (
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/70">
+              Coming soon
+            </span>
+          )}
+          {meeting.cancelled && (
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-red-700">
+              Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
+            </span>
+          )}
+          {meeting.noActivity && !meeting.cancelled && (
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/50">
+              No Activity
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-2 py-2 align-top">
+        {canManage &&
+          meeting.stage !== "archived" &&
+          (meeting.cancelled ? (
+            <form action={uncancel}>
+              <button type="submit" className="whitespace-nowrap text-xs text-slate hover:text-ink">
+                Un-cancel
+              </button>
+            </form>
+          ) : (
+            <form action={cancel} className="flex items-center gap-1">
+              <input type="hidden" name="id" value={meeting.id} />
+              <input
+                type="text"
+                name="cancellation_note"
+                placeholder="Reason"
+                className="w-24 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
+              />
+              <button type="submit" className="whitespace-nowrap text-xs text-slate hover:text-ink">
+                Cancel
+              </button>
+            </form>
+          ))}
+      </td>
+    </tr>
   );
 }
 
@@ -140,9 +130,26 @@ const MEETING_TYPE_SLUGS = new Set<string>(["sacrament-meeting", "bishopric-meet
 // app/page.tsx) -- the user was confused about which page was actually
 // "the dashboard page", so the two needed to read distinctly, not just
 // exist as separate routes.
-export const metadata: Metadata = {
-  title: "Meeting Dashboard",
-};
+//
+// A static `metadata` export can't read searchParams, so this became a
+// `generateMetadata` function once the title needed to vary by
+// `?type=` (2026-09-09, the user's own request: "each meeting-specific
+// page... can be titled by the meeting type followed by 'planning
+// dashboard'") -- shares dashboardPageTitle with the on-page <h1> below
+// so the two can never drift apart.
+function dashboardPageTitle(typeFilter: MeetingTypeSlug | null): string {
+  return typeFilter ? `${MEETING_TYPE_LABELS[typeFilter]} Planning Dashboard` : "Meeting Dashboard";
+}
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}): Promise<Metadata> {
+  const { type: rawType } = await searchParams;
+  const typeFilter: MeetingTypeSlug | null = rawType && MEETING_TYPE_SLUGS.has(rawType) ? (rawType as MeetingTypeSlug) : null;
+  return { title: dashboardPageTitle(typeFilter) };
+}
 
 /** Builds a /dashboard URL preserving whichever of these three
  *  independent toggles the caller doesn't explicitly override --
@@ -197,7 +204,7 @@ export default async function DashboardPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meetings" />
-        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Meeting Dashboard</h1>
+        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
         <p className="mt-4 text-slate">Sign in to see meetings.</p>
         <Link
           href="/login"
@@ -220,7 +227,7 @@ export default async function DashboardPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Meetings" />
-      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">Meeting Dashboard</h1>
+      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
 
       {canCreate && unassignedAgendaItems.length > 0 && (
         <section className="mt-10 rounded-lg border border-rule bg-card p-6">
@@ -274,14 +281,21 @@ export default async function DashboardPage({
       <section className="mt-10">
         <div className="flex items-center justify-between">
           <p className="font-mono text-xs uppercase tracking-widest text-slate">
-            {typeFilter ? MEETING_TYPE_LABELS[typeFilter] : "Meetings"}
-            {typeFilter && (
+            {typeFilter ? (
+              // The type name is already in the h1 above ("<Type>
+              // Planning Dashboard") once filtered -- repeating it here
+              // too was exactly the kind of over-repetition flagged
+              // 2026-09-09 ("the words 'sacrament meeting' appear too
+              // often"), so this slot becomes the "Show all types" link
+              // instead of a second copy of the name.
               <Link
                 href={dashboardHref({ readonly: isReadOnly, past: showPast })}
-                className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink"
+                className="normal-case tracking-normal text-slate/70 hover:text-ink"
               >
                 Show all types
               </Link>
+            ) : (
+              "Meetings"
             )}
             <Link
               href={dashboardHref({ type: typeFilter, readonly: isReadOnly, past: !showPast })}
@@ -305,18 +319,41 @@ export default async function DashboardPage({
           )}
         </div>
 
-        <ul className="mt-4 flex flex-col gap-3">
-          {meetings.map((meeting) => (
-            <MeetingRow
-              key={meeting.id}
-              meeting={meeting}
-              isBuilt={builtSlugs.has(meeting.meetingType)}
-              canManage={canCreate}
-            />
-          ))}
-        </ul>
-
-        {meetings.length === 0 && <p className="mt-4 text-slate">No meetings scheduled yet.</p>}
+        {meetings.length === 0 ? (
+          <p className="mt-4 text-slate">No meetings scheduled yet.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                    Date
+                  </th>
+                  {!typeFilter && (
+                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                      Type
+                    </th>
+                  )}
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                    Stage
+                  </th>
+                  <th className="px-2 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {meetings.map((meeting) => (
+                  <MeetingRow
+                    key={meeting.id}
+                    meeting={meeting}
+                    isBuilt={builtSlugs.has(meeting.meetingType)}
+                    canManage={canCreate}
+                    showType={!typeFilter}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <footer className="mt-auto pt-16 text-xs text-slate">
