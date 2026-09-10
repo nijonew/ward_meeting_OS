@@ -11,11 +11,11 @@ export default function UpdatePasswordPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <Link href="/login" className="text-xs text-slate hover:text-ink">
+      <Link href="/login" className="text-xs text-ink-muted hover:text-ink">
         &larr; Sign in
       </Link>
       <h1 className="mt-2 font-display text-2xl">Set your password</h1>
-      <p className="mt-2 text-sm text-slate">Choose a password you&rsquo;ll use to sign in from now on.</p>
+      <p className="mt-2 text-sm text-ink-muted">Choose a password you&rsquo;ll use to sign in from now on.</p>
 
       <form action={formAction} className="mt-6 flex flex-col gap-3">
         <input
@@ -24,7 +24,7 @@ export default function UpdatePasswordPage() {
           required
           minLength={8}
           placeholder="New password (8+ characters)"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
+          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
         />
         <input
           type="password"
@@ -32,7 +32,7 @@ export default function UpdatePasswordPage() {
           required
           minLength={8}
           placeholder="Confirm password"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
+          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
         />
         <button
           type="submit"

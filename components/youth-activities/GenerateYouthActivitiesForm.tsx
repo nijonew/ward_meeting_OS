@@ -9,9 +9,9 @@ export function GenerateYouthActivitiesForm() {
   const [state, formAction, pending] = useActionState(generateYouthActivities, initialState);
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Generate Combined Activities</h2>
-      <p className="mt-1 text-sm text-slate">
+      <p className="mt-1 text-sm text-ink-muted">
         Creates placeholder Combined YM (1st Wednesday), Combined YW (2nd &amp; 4th), and Combined
         YM/YW (3rd) activities through the chosen date, rotating the planning group automatically.
         Each is created tentative (unconfirmed, draft) with a &ldquo;(TBD)&rdquo; title &mdash; edit
@@ -20,7 +20,7 @@ export function GenerateYouthActivitiesForm() {
       </p>
 
       <form action={formAction} className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="text-xs text-slate">
+        <label className="text-xs text-ink-muted">
           Through
           <input
             type="date"

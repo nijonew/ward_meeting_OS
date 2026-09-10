@@ -17,7 +17,7 @@ export function ActionItemsSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Action Items</h2>
 
       {items.length > 0 && (
@@ -39,15 +39,15 @@ export function ActionItemsSection({
                   aria-hidden="true"
                   className="mt-1"
                 />
-                <span className={["flex-1", item.completed ? "text-slate/50 line-through" : "text-ink"].join(" ")}>
+                <span className={["flex-1", item.completed ? "text-ink-muted/50 line-through" : "text-ink"].join(" ")}>
                   {item.description}
                   {item.assigned_to_name && (
-                    <span className="text-slate"> &mdash; {item.assigned_to_name}</span>
+                    <span className="text-ink-muted"> &mdash; {item.assigned_to_name}</span>
                   )}
-                  {item.due_date && <span className="text-slate"> (due {item.due_date})</span>}
+                  {item.due_date && <span className="text-ink-muted"> (due {item.due_date})</span>}
                 </span>
                 <form action={toggle}>
-                  <button type="submit" className="text-xs text-slate hover:text-ink">
+                  <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                     {item.completed ? "Undo" : "Mark done"}
                   </button>
                 </form>

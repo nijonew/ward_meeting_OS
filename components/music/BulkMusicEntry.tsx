@@ -42,9 +42,9 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Bulk Add Music</h2>
-      <p className="mt-1 text-xs text-slate">
+      <p className="mt-1 text-xs text-ink-muted">
         Paste rows copied from a spreadsheet: Date, Type, Hymn Number, Piece Name, Performer,
         Group Name, Accompanist. A header row is fine if included. Meetings that don&rsquo;t
         exist yet are created automatically.
@@ -73,14 +73,14 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
 
       {parsed && (
         <div className="mt-4">
-          <p className="text-xs text-slate">
+          <p className="text-xs text-ink-muted">
             {validCount} of {parsed.length} row{parsed.length === 1 ? "" : "s"} ready to submit.
           </p>
 
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-xs">
               <thead>
-                <tr className="border-b border-rule text-slate">
+                <tr className="border-b border-rule text-ink-muted">
                   <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Date</th>
                   <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Type</th>
                   <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Piece</th>
@@ -102,7 +102,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
                       {row.matchedIndividualName ? (
                         row.matchedIndividualName
                       ) : row.performerText ? (
-                        <span className="text-brass">{row.performerText} (unmatched)</span>
+                        <span className="text-accent">{row.performerText} (unmatched)</span>
                       ) : (
                         "—"
                       )}
@@ -110,7 +110,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
                     <td className="py-1.5 pr-3">
                       {row.matchedAccompanistName ??
                         (row.accompanistText ? (
-                          <span className="text-brass">{row.accompanistText} (unmatched)</span>
+                          <span className="text-accent">{row.accompanistText} (unmatched)</span>
                         ) : (
                           "—"
                         ))}
@@ -119,7 +119,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
                       {row.errors.length > 0 ? (
                         <span className="text-red-600">{row.errors.join("; ")}</span>
                       ) : (
-                        <span className="text-sage">OK</span>
+                        <span className="text-success">OK</span>
                       )}
                     </td>
                   </tr>

@@ -144,7 +144,7 @@ export function CallingPlanningGridForm({
           <thead>
             <tr>
               {COLUMNS.map((c) => (
-                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
                   <button
                     type="button"
                     onClick={() => toggleSort(c.key)}
@@ -240,7 +240,7 @@ export function CallingPlanningGridForm({
                     type="button"
                     disabled={deleting}
                     onClick={() => removeRow(row.id)}
-                    className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                    className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                   >
                     Delete
                   </button>
@@ -249,7 +249,7 @@ export function CallingPlanningGridForm({
             ))}
           </tbody>
         </table>
-        {visibleCount === 0 && <p className="mt-3 text-sm text-slate">No rows match the current filters.</p>}
+        {visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No rows match the current filters.</p>}
       </div>
 
       <div className="mt-4 flex items-center gap-3">
@@ -261,7 +261,7 @@ export function CallingPlanningGridForm({
           {pending ? "Saving..." : "Save All Changes"}
         </button>
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-sage">Saved.</p>}
+        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
       </div>
     </form>
   );

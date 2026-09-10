@@ -35,7 +35,7 @@ export function AgendaItemForm({
           </option>
         ))}
       </select>
-      <label className="text-xs text-slate">
+      <label className="text-xs text-ink-muted">
         Date of meeting
         <input type="date" name="meeting_date" required className={`mt-1 block w-full ${INPUT_CLASS}`} />
       </label>

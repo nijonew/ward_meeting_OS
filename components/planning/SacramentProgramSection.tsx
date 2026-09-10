@@ -39,15 +39,15 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
   return (
     <li className="rounded-md border border-rule/60 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">{item.label}</span>
+        <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">{item.label}</span>
         <span className="flex items-center gap-3">
-          <button type="button" onClick={() => move("up")} disabled={moving} className="text-xs text-slate hover:text-ink disabled:opacity-30">
+          <button type="button" onClick={() => move("up")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
             &uarr;
           </button>
-          <button type="button" onClick={() => move("down")} disabled={moving} className="text-xs text-slate hover:text-ink disabled:opacity-30">
+          <button type="button" onClick={() => move("down")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
             &darr;
           </button>
-          <button type="button" onClick={remove} disabled={removing} className="text-xs text-slate hover:text-ink disabled:opacity-30">
+          <button type="button" onClick={remove} disabled={removing} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
             Remove
           </button>
         </span>
@@ -97,7 +97,7 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
         </form>
       )}
 
-      {item.kind === "testimony" && <p className="mt-2 text-sm text-slate">Open testimony &mdash; nothing to fill in.</p>}
+      {item.kind === "testimony" && <p className="mt-2 text-sm text-ink-muted">Open testimony &mdash; nothing to fill in.</p>}
     </li>
   );
 }
@@ -151,7 +151,7 @@ export function SacramentProgramSection({
   return (
     <div className="mt-2">
       {items.length === 0 ? (
-        <p className="mt-4 text-sm text-slate">Nothing added yet.</p>
+        <p className="mt-4 text-sm text-ink-muted">Nothing added yet.</p>
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {items.map((item) => (

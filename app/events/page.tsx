@@ -35,7 +35,7 @@ function TabLink({ view, current, label }: { view: ViewFilter; current: ViewFilt
       href={`/events?view=${view}`}
       className={[
         "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
-        active ? "bg-ink text-paper" : "text-slate hover:text-ink",
+        active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >
       {label}
@@ -96,9 +96,9 @@ export default async function ScheduledEventsPage({
         </div>
       </section>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         {merged.length === 0 ? (
-          <p className="text-sm text-slate">Nothing scheduled yet.</p>
+          <p className="text-sm text-ink-muted">Nothing scheduled yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {merged.map((item) => (
@@ -110,7 +110,7 @@ export default async function ScheduledEventsPage({
                 ].join(" ")}
               >
                 <span className="text-ink">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
                     {formatDate(item.date)}
                     {item.time ? ` \u00b7 ${item.time}` : ""} \u00b7 {item.kind}
                   </span>{" "}
@@ -126,7 +126,7 @@ export default async function ScheduledEventsPage({
                     This activity has been cancelled{item.cancellationNote ? `: ${item.cancellationNote}` : "."}
                   </p>
                 ) : (
-                  item.subtitle && <p className="mt-1 text-slate">{item.subtitle}</p>
+                  item.subtitle && <p className="mt-1 text-ink-muted">{item.subtitle}</p>
                 )}
               </li>
             ))}

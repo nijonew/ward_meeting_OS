@@ -16,7 +16,7 @@ export function ConductingRowList({ rows }: { rows: ConductingRow[] }) {
           return (
             <p
               key={row.id}
-              className="mt-2 border-t-2 border-rule pt-4 font-mono text-[11px] uppercase tracking-widest text-slate/70 first:mt-0 first:border-t-0 first:pt-0"
+              className="mt-2 border-t-2 border-rule pt-4 font-mono text-[11px] uppercase tracking-widest text-ink-muted/70 first:mt-0 first:border-t-0 first:pt-0"
             >
               {row.label}
             </p>
@@ -25,9 +25,9 @@ export function ConductingRowList({ rows }: { rows: ConductingRow[] }) {
 
         return (
           <div key={row.id}>
-            <p className="font-mono text-[11px] uppercase tracking-widest text-slate/70">{row.label}</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-ink-muted/70">{row.label}</p>
             {row.value && <p className="mt-0.5 text-base text-ink">{row.value}</p>}
-            {row.wording && <p className="mt-1 text-sm italic leading-relaxed text-slate">{row.wording}</p>}
+            {row.wording && <p className="mt-1 text-sm italic leading-relaxed text-ink-muted">{row.wording}</p>}
           </div>
         );
       })}

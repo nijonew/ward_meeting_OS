@@ -11,11 +11,11 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <Link href="/" className="text-xs text-slate hover:text-ink">
+      <Link href="/" className="text-xs text-ink-muted hover:text-ink">
         &larr; Home
       </Link>
       <h1 className="mt-2 font-display text-2xl">Ward OS</h1>
-      <p className="mt-2 text-sm text-slate">Sign in with your email and password.</p>
+      <p className="mt-2 text-sm text-ink-muted">Sign in with your email and password.</p>
 
       <form action={formAction} className="mt-6 flex flex-col gap-3">
         <input
@@ -23,14 +23,14 @@ export default function LoginPage() {
           name="email"
           required
           placeholder="you@example.com"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
+          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
         />
         <input
           type="password"
           name="password"
           required
           placeholder="Password"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
+          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
         />
         <button
           type="submit"
@@ -42,7 +42,7 @@ export default function LoginPage() {
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
       </form>
 
-      <Link href="/auth/reset-password" className="mt-4 text-xs text-slate underline">
+      <Link href="/auth/reset-password" className="mt-4 text-xs text-ink-muted underline">
         Forgot your password, or signing in for the first time?
       </Link>
     </main>

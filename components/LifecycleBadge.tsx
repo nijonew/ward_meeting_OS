@@ -49,7 +49,7 @@ export function LifecycleBadge({
       <span
         role="img"
         aria-label={`Meeting stage: ${STAGE_LABELS[stage]}`}
-        className="flex h-7 w-max items-center whitespace-nowrap rounded-full bg-brass px-3 font-mono text-[11px] uppercase tracking-wider text-paper"
+        className="flex h-7 w-max items-center whitespace-nowrap rounded-full bg-accent px-3 font-mono text-[11px] uppercase tracking-wider text-paper"
       >
         {STAGE_LABELS[stage]}
       </span>
@@ -74,7 +74,7 @@ export function LifecycleBadge({
               className={[
                 "flex h-7 items-center whitespace-nowrap rounded-full px-3 font-mono text-[11px] uppercase tracking-wider transition-colors",
                 isCurrent
-                  ? "bg-brass text-paper"
+                  ? "bg-accent text-paper"
                   : isPast
                     ? "bg-ink/10 text-ink/50"
                     : "bg-transparent text-ink/30",

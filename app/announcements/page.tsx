@@ -15,7 +15,7 @@ export default async function AnnouncementsInboxPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Announcements" />
-        <p className="mt-10 text-slate">Only the Bishopric can review submissions.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can review submissions.</p>
       </main>
     );
   }
@@ -26,15 +26,15 @@ export default async function AnnouncementsInboxPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Announcements" />
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Submissions</h2>
-        <p className="mt-1 text-xs text-slate">
+        <p className="mt-1 text-xs text-ink-muted">
           General submissions not tied to a specific meeting. Agenda items added directly on a
           Bishopric Meeting&rsquo;s Planning tab live there instead, not here.
         </p>
 
         {items.length === 0 ? (
-          <p className="mt-4 text-sm text-slate">Nothing submitted yet.</p>
+          <p className="mt-4 text-sm text-ink-muted">Nothing submitted yet.</p>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
             {items.map((item) => {
@@ -53,7 +53,7 @@ export default async function AnnouncementsInboxPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
                         {item.kind === "announcement" ? "Announcement" : "Agenda Item"}
                       </span>{" "}
                       {item.title}
@@ -63,32 +63,32 @@ export default async function AnnouncementsInboxPage() {
                         className={[
                           "font-mono text-[10px] uppercase tracking-widest",
                           item.status === "published"
-                            ? "text-sage"
+                            ? "text-success"
                             : item.status === "archived"
-                              ? "text-slate/50"
-                              : "text-brass",
+                              ? "text-ink-muted/50"
+                              : "text-accent",
                         ].join(" ")}
                       >
                         {item.status}
                       </span>
                       {item.status !== "published" && (
                         <form action={publish}>
-                          <button type="submit" className="text-xs text-slate hover:text-ink">
+                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                             Publish
                           </button>
                         </form>
                       )}
                       {item.status !== "archived" && (
                         <form action={archive}>
-                          <button type="submit" className="text-xs text-slate hover:text-ink">
+                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                             Archive
                           </button>
                         </form>
                       )}
                     </span>
                   </div>
-                  {item.body && <p className="mt-1 text-slate">{item.body}</p>}
-                  <p className="mt-1 text-[11px] text-slate/60">
+                  {item.body && <p className="mt-1 text-ink-muted">{item.body}</p>}
+                  <p className="mt-1 text-[11px] text-ink-muted/60">
                     {item.submitted_by_name} &lt;{item.submitted_by_email}&gt;
                   </p>
                 </li>

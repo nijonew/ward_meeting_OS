@@ -9,12 +9,12 @@ export function QuickAddMusic({ people }: { people: PersonOption[] }) {
   };
 
   return (
-    <details className="rounded-lg border border-rule bg-card p-6">
+    <details className="rounded-lg border border-rule bg-surface p-6">
       <summary className="cursor-pointer font-display text-xl">Add One Item</summary>
 
       <form action={add} className="mt-4 flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="text-sm text-slate">
+          <label className="text-sm text-ink-muted">
             Date
             <input
               type="date"
@@ -23,7 +23,7 @@ export function QuickAddMusic({ people }: { people: PersonOption[] }) {
               className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
             />
           </label>
-          <label className="text-sm text-slate">
+          <label className="text-sm text-ink-muted">
             Type
             <select
               name="type"
@@ -59,7 +59,7 @@ export function QuickAddMusic({ people }: { people: PersonOption[] }) {
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="text-sm text-slate">
+          <label className="text-sm text-ink-muted">
             Performer
             <select
               name="individual_id"
@@ -82,7 +82,7 @@ export function QuickAddMusic({ people }: { people: PersonOption[] }) {
           />
         </div>
 
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Accompanist
           <select
             name="accompanist_id"

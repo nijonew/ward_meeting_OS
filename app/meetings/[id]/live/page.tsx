@@ -23,7 +23,7 @@ export default async function LiveViewPage({
   const meeting = await getMeetingById(meetingId);
 
   if (!meeting) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
   // Archived meetings are read-only from here on -- see
   // app/meetings/[id]/archived (the "agenda as it was finalized" view).
@@ -48,15 +48,15 @@ export default async function LiveViewPage({
   if (meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council") {
     const notes = await getCouncilNotes(meetingId);
     return (
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         {notes?.notes ? (
           <p className="text-lg leading-relaxed text-ink">{notes.notes}</p>
         ) : (
-          <p className="text-slate">No notes entered yet.</p>
+          <p className="text-ink-muted">No notes entered yet.</p>
         )}
       </div>
     );
   }
 
-  return <p className="text-slate">Nothing to show here for this meeting type.</p>;
+  return <p className="text-ink-muted">Nothing to show here for this meeting type.</p>;
 }

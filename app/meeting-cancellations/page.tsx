@@ -30,7 +30,7 @@ export default async function MeetingCancellationsPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Cancellations" />
-        <p className="mt-10 text-slate">Only the Bishopric can manage meeting cancellations.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can manage meeting cancellations.</p>
       </main>
     );
   }
@@ -46,13 +46,13 @@ export default async function MeetingCancellationsPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Meeting Cancellations" />
 
-      <Link href="/meeting-planning" className="text-xs text-slate hover:text-ink">
+      <Link href="/meeting-planning" className="text-xs text-ink-muted hover:text-ink">
         &larr; Meeting Planning
       </Link>
 
       <section className="mt-4">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Meeting Cancellations</h1>
-        <p className="mt-2 text-sm text-slate">
+        <p className="mt-2 text-sm text-ink-muted">
           A date range, a reason, and which meeting types (and optionally youth activities) get
           cancelled for it &mdash; shown with the reason as a note, not hidden. Use this for General
           Conference, Stake Conference, holidays, or anything else where some meetings still happen
@@ -62,11 +62,11 @@ export default async function MeetingCancellationsPage() {
         </p>
       </section>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Scheduled Cancellations</h2>
 
         {cancellations.length === 0 ? (
-          <p className="mt-4 text-sm text-slate">None scheduled yet.</p>
+          <p className="mt-4 text-sm text-ink-muted">None scheduled yet.</p>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
             {cancellations.map((c) => {
@@ -84,13 +84,13 @@ export default async function MeetingCancellationsPage() {
                   className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">{c.reason}</span>{" "}
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">{c.reason}</span>{" "}
                     {formatDate(c.start_date)}
                     {c.end_date !== c.start_date ? ` – ${formatDate(c.end_date)}` : ""}
-                    {affected.length > 0 && <span className="text-slate"> &mdash; {affected.join(", ")}</span>}
+                    {affected.length > 0 && <span className="text-ink-muted"> &mdash; {affected.join(", ")}</span>}
                   </span>
                   <form action={remove}>
-                    <button type="submit" className="text-xs text-slate hover:text-ink">
+                    <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                       Delete
                     </button>
                   </form>
@@ -101,10 +101,10 @@ export default async function MeetingCancellationsPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Add Cancellation</h2>
         <form action={add} className="mt-4 flex flex-col gap-3">
-          <label className="text-sm text-slate">
+          <label className="text-sm text-ink-muted">
             Reason
             <input
               type="text"
@@ -116,7 +116,7 @@ export default async function MeetingCancellationsPage() {
           </label>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="text-sm text-slate">
+            <label className="text-sm text-ink-muted">
               Start Date
               <input
                 type="date"
@@ -125,7 +125,7 @@ export default async function MeetingCancellationsPage() {
                 className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
-            <label className="text-sm text-slate">
+            <label className="text-sm text-ink-muted">
               End Date
               <input
                 type="date"
@@ -137,7 +137,7 @@ export default async function MeetingCancellationsPage() {
           </div>
 
           <fieldset className="rounded-md border border-rule px-3 py-2">
-            <p className="text-xs text-slate">Cancel these meeting types for the date range above</p>
+            <p className="text-xs text-ink-muted">Cancel these meeting types for the date range above</p>
             <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {ALL_MEETING_TYPES.map((slug) => (
                 <label key={slug} className="flex items-center gap-2 text-sm text-ink">

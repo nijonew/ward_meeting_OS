@@ -24,16 +24,16 @@ export function GenerateForm({
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">{heading}</h2>
-      <p className="mt-1 text-sm text-slate">
+      <p className="mt-1 text-sm text-ink-muted">
         Creates real {itemLabelPlural} from the active cadence rules above, for any dates that
         don&rsquo;t already have one. Safe to run again later &mdash; existing ones are never
         duplicated.
       </p>
 
       <form action={formAction} className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="text-xs text-slate">
+        <label className="text-xs text-ink-muted">
           Through
           <input
             type="date"

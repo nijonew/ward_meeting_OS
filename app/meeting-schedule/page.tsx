@@ -16,7 +16,7 @@ export default async function MeetingSchedulePage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Schedule" />
-        <p className="mt-10 text-slate">Only the Bishopric can manage the meeting schedule.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can manage the meeting schedule.</p>
       </main>
     );
   }
@@ -27,13 +27,13 @@ export default async function MeetingSchedulePage() {
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Meeting Schedule" />
 
-      <Link href="/meeting-planning" className="text-xs text-slate hover:text-ink">
+      <Link href="/meeting-planning" className="text-xs text-ink-muted hover:text-ink">
         &larr; Meeting Planning
       </Link>
 
       <section className="mt-4">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Meeting Schedule</h1>
-        <p className="mt-2 text-sm text-slate">
+        <p className="mt-2 text-sm text-ink-muted">
           Set the typical cadence for each meeting type, then generate real meetings from it.
         </p>
       </section>
@@ -46,7 +46,7 @@ export default async function MeetingSchedulePage() {
         onDelete={deleteScheduleRule}
         onToggle={toggleScheduleRuleActive}
       />
-      <p className="-mt-3 text-[11px] text-slate/60">
+      <p className="-mt-3 text-[11px] text-ink-muted/60">
         For &ldquo;1st and 3rd Tuesday,&rdquo; add two Nth-of-month rules. For something like &ldquo;the
         Tuesday after the 3rd Sunday,&rdquo; use Relative &mdash; it&rsquo;s computed from the anchor
         day each month rather than a fixed numbered weekday, so it lands correctly no matter how the

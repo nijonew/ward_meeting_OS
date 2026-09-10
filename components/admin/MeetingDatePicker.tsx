@@ -127,29 +127,29 @@ export function MeetingDatePicker({
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-xs rounded-lg border border-rule bg-card p-4 shadow-lg"
+            className="w-full max-w-xs rounded-lg border border-rule bg-surface p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <button type="button" onClick={() => shiftMonth(-1)} className="px-2 text-slate hover:text-ink">
+              <button type="button" onClick={() => shiftMonth(-1)} className="px-2 text-ink-muted hover:text-ink">
                 &larr;
               </button>
               <p className="font-display text-sm">
                 {new Date(view.year, view.month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
               </p>
-              <button type="button" onClick={() => shiftMonth(1)} className="px-2 text-slate hover:text-ink">
+              <button type="button" onClick={() => shiftMonth(1)} className="px-2 text-ink-muted hover:text-ink">
                 &rarr;
               </button>
             </div>
 
             {allowCreate && (
-              <p className="mt-2 text-[11px] text-slate/70">
+              <p className="mt-2 text-[11px] text-ink-muted/70">
                 Bold dates already have a meeting. Any other date can still be picked -- it&rsquo;ll be created
                 when you save.
               </p>
             )}
 
-            <div className="mt-3 grid grid-cols-7 gap-1 text-center font-mono text-[10px] uppercase text-slate/60">
+            <div className="mt-3 grid grid-cols-7 gap-1 text-center font-mono text-[10px] uppercase text-ink-muted/60">
               {WEEKDAY_HEADERS.map((d, i) => (
                 <div key={i}>{d}</div>
               ))}
@@ -172,8 +172,8 @@ export function MeetingDatePicker({
                       matches
                         ? "cursor-pointer bg-ink/5 font-medium text-ink hover:bg-ink/10"
                         : clickable
-                          ? "cursor-pointer text-slate hover:bg-ink/5"
-                          : "cursor-default text-slate/30",
+                          ? "cursor-pointer text-ink-muted hover:bg-ink/5"
+                          : "cursor-default text-ink-muted/30",
                       isSelected ? "ring-2 ring-ink" : "",
                     ].join(" ")}
                   >
@@ -185,7 +185,7 @@ export function MeetingDatePicker({
 
             {dayPicking && (
               <div className="mt-3 flex flex-col gap-1 border-t border-rule/60 pt-3">
-                <p className="text-[11px] text-slate">More than one meeting that day:</p>
+                <p className="text-[11px] text-ink-muted">More than one meeting that day:</p>
                 {(byDate.get(dayPicking) ?? []).map((o) => (
                   <button
                     key={o.value}
@@ -210,12 +210,12 @@ export function MeetingDatePicker({
                     onChange(null);
                     setOpen(false);
                   }}
-                  className="text-xs text-slate hover:text-ink"
+                  className="text-xs text-ink-muted hover:text-ink"
                 >
                   Clear
                 </button>
               )}
-              <button type="button" onClick={() => setOpen(false)} className="ml-auto text-xs text-slate hover:text-ink">
+              <button type="button" onClick={() => setOpen(false)} className="ml-auto text-xs text-ink-muted hover:text-ink">
                 Cancel
               </button>
             </div>

@@ -17,7 +17,7 @@ export function BishopricMinutesForm({
   };
 
   const textarea = (name: string, label: string, defaultValue: string | null, rows = 2) => (
-    <label className="mt-4 block text-sm text-slate">
+    <label className="mt-4 block text-sm text-ink-muted">
       {label}
       <textarea
         name={name}
@@ -29,10 +29,10 @@ export function BishopricMinutesForm({
   );
 
   return (
-    <form action={save} className="rounded-lg border border-rule bg-card p-6">
+    <form action={save} className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Minutes</h2>
 
-      <label className="mt-4 block text-sm text-slate">
+      <label className="mt-4 block text-sm text-ink-muted">
         Spiritual Thought Presenter
         <select
           name="spiritual_thought_presenter_id"
@@ -50,7 +50,7 @@ export function BishopricMinutesForm({
       {textarea("spiritual_thought_notes", "Spiritual Thought Notes", minutes?.spiritual_thought_notes ?? null)}
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Handbook Training Topic
           <input
             type="text"
@@ -59,7 +59,7 @@ export function BishopricMinutesForm({
             className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Handbook Training Presenter
           <select
             name="handbook_training_presenter_id"
@@ -91,7 +91,7 @@ export function BishopricMinutesForm({
       {textarea("impressions", "Impressions", minutes?.impressions ?? null)}
       {textarea("minutes_body", "Minutes", minutes?.minutes_body ?? null, 5)}
 
-      <label className="mt-4 block text-sm text-slate">
+      <label className="mt-4 block text-sm text-ink-muted">
         Next Meeting Date
         <input
           type="date"

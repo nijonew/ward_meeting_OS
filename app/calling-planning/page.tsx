@@ -27,7 +27,7 @@ export default async function CallingPlanningPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Calling Planning" />
-        <p className="mt-10 text-slate">Only the Bishopric can manage calling planning.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can manage calling planning.</p>
       </main>
     );
   }
@@ -64,7 +64,7 @@ export default async function CallingPlanningPage({
 
       <section className="mt-4">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">Calling Planning</h1>
-        <p className="mt-2 text-sm text-slate">
+        <p className="mt-2 text-sm text-ink-muted">
           One row per potential calling change, across every calling &mdash; candidates, status,
           release, and readiness to announce in Sacrament Meeting. Pick from the Candidates
           dropdown to add someone under consideration, click &times; on a name to remove them, and
@@ -72,23 +72,23 @@ export default async function CallingPlanningPage({
           heading to sort by it; type in the box under a heading to filter.
         </p>
         {filteredCallingName && (
-          <p className="mt-2 text-xs text-slate">
+          <p className="mt-2 text-xs text-ink-muted">
             Filtered to <span className="text-ink">{filteredCallingName}</span> &mdash;{" "}
             <Link href="/calling-planning" className="hover:text-ink">
               show all callings
             </Link>
           </p>
         )}
-        <p className="mt-2 text-xs text-slate">
+        <p className="mt-2 text-xs text-ink-muted">
           <Link href="/callings" className="hover:text-ink">
             Manage the calling roster (add a calling, set the current holder) &rarr;
           </Link>
         </p>
       </section>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         <form action={addEntry} className="flex flex-wrap items-end gap-2">
-          <label className="text-xs text-slate">
+          <label className="text-xs text-ink-muted">
             Calling
             <select
               name="calling_id"
@@ -106,7 +106,7 @@ export default async function CallingPlanningPage({
               ))}
             </select>
           </label>
-          <label className="text-xs text-slate">
+          <label className="text-xs text-ink-muted">
             Date Initiated
             <input
               type="date"
@@ -124,7 +124,7 @@ export default async function CallingPlanningPage({
         </form>
 
         {rows.length === 0 ? (
-          <p className="mt-4 text-sm text-slate">No calling changes yet.</p>
+          <p className="mt-4 text-sm text-ink-muted">No calling changes yet.</p>
         ) : (
           <CallingPlanningGridForm
             rows={rows}
@@ -137,9 +137,9 @@ export default async function CallingPlanningPage({
       </div>
 
       {readyToAnnounce.length > 0 && (
-        <section className="rounded-lg border border-rule bg-card p-6">
+        <section className="rounded-lg border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Ready to Announce</h2>
-          <p className="mt-1 text-xs text-slate">
+          <p className="mt-1 text-xs text-ink-muted">
             Calling Status or Release Status is &ldquo;To Announce in Sacrament&rdquo; &mdash; add
             each to an upcoming meeting&rsquo;s Ward Business.
           </p>
@@ -150,7 +150,7 @@ export default async function CallingPlanningPage({
                 <li key={r.id} className="rounded-md border border-rule/60 p-4">
                   <p className="text-sm text-ink">{r.calling_name}</p>
                   {needsNarrowing ? (
-                    <p className="mt-2 text-xs text-brass">
+                    <p className="mt-2 text-xs text-accent">
                       Narrow Candidates down to exactly one person before this can be announced.
                     </p>
                   ) : (

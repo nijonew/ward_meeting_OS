@@ -22,27 +22,27 @@ export default async function CallingDetailPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Callings" />
-        <p className="mt-10 text-slate">Only the Bishopric can manage callings.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can manage callings.</p>
       </main>
     );
   }
 
   const calling = await getCallingDetail(callingId);
   if (!calling) {
-    return <p className="text-slate">Could not find that calling.</p>;
+    return <p className="text-ink-muted">Could not find that calling.</p>;
   }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Callings" />
 
-      <Link href="/callings" className="text-xs text-slate hover:text-ink">
+      <Link href="/callings" className="text-xs text-ink-muted hover:text-ink">
         &larr; Callings
       </Link>
 
-      <div className="rounded-lg border border-rule bg-card p-6 sm:p-8">
+      <div className="rounded-lg border border-rule bg-surface p-6 sm:p-8">
         <h1 className="font-display text-3xl leading-tight">{calling.name}</h1>
-        <p className="mt-1 text-slate">
+        <p className="mt-1 text-ink-muted">
           Current holder: {calling.current_holder_name ?? "Vacant"}
         </p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

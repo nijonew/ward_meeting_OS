@@ -10,7 +10,7 @@ import {
 } from "@/lib/data/announcement-constants";
 
 const INPUT_CLASS = "rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink";
-const LABEL_CLASS = "text-xs text-slate";
+const LABEL_CLASS = "text-xs text-ink-muted";
 
 /** Renders a fieldset of checkboxes sharing one `name` -- FormData's
  *  getAll(name) on submit collects every box the visitor checked. */

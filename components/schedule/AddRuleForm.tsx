@@ -83,7 +83,7 @@ export function RuleForm({
           {pending ? "Saving..." : submitLabel}
         </button>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="text-xs text-slate hover:text-ink">
+          <button type="button" onClick={onCancel} className="text-xs text-ink-muted hover:text-ink">
             Cancel
           </button>
         )}

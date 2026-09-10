@@ -69,7 +69,7 @@ function RuleForm({
           {pending ? "Saving..." : submitLabel}
         </button>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="text-xs text-slate hover:text-ink">
+          <button type="button" onClick={onCancel} className="text-xs text-ink-muted hover:text-ink">
             Cancel
           </button>
         )}
@@ -102,13 +102,13 @@ export function WardEventScheduleManager({
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-rule bg-card p-6">
+    <div className="overflow-x-auto rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Cadence</h2>
 
       {rules.length > 0 && (
         <table className="mt-4 w-full min-w-[520px] text-sm">
           <thead>
-            <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+            <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted/70">
               <th className="pb-2 pr-3">Title</th>
               <th className="pb-2 pr-3">Schedule</th>
               <th className="pb-2 pr-3">Active</th>
@@ -119,14 +119,14 @@ export function WardEventScheduleManager({
             {rules.map((r) => (
               <tr key={r.id} className="border-b border-rule/40 last:border-0">
                 <td className="py-2 pr-3 text-ink">{r.title}</td>
-                <td className="py-2 pr-3 text-slate">{describeCadence(r)}</td>
+                <td className="py-2 pr-3 text-ink-muted">{describeCadence(r)}</td>
                 <td className="py-2 pr-3">
                   <button
                     type="button"
                     onClick={() => onToggle(r.id, r.active)}
                     className={[
                       "font-mono text-[10px] uppercase tracking-widest",
-                      r.active ? "text-sage" : "text-slate/50",
+                      r.active ? "text-success" : "text-ink-muted/50",
                     ].join(" ")}
                   >
                     {r.active ? "Active" : "Paused"}
@@ -140,7 +140,7 @@ export function WardEventScheduleManager({
                         setMode({ kind: "edit", rule: r });
                         setFormKey((k) => k + 1);
                       }}
-                      className="text-xs text-slate hover:text-ink"
+                      className="text-xs text-ink-muted hover:text-ink"
                     >
                       Edit
                     </button>
@@ -150,11 +150,11 @@ export function WardEventScheduleManager({
                         setMode({ kind: "copy", rule: r });
                         setFormKey((k) => k + 1);
                       }}
-                      className="text-xs text-slate hover:text-ink"
+                      className="text-xs text-ink-muted hover:text-ink"
                     >
                       Copy
                     </button>
-                    <button type="button" onClick={() => onDelete(r.id)} className="text-xs text-slate hover:text-ink">
+                    <button type="button" onClick={() => onDelete(r.id)} className="text-xs text-ink-muted hover:text-ink">
                       Delete
                     </button>
                   </span>
@@ -174,7 +174,7 @@ export function WardEventScheduleManager({
         onCancel={mode.kind === "blank" ? undefined : resetForm}
       />
       {mode.kind !== "blank" && (
-        <p className="mt-2 text-[11px] text-slate/60">
+        <p className="mt-2 text-[11px] text-ink-muted/60">
           {mode.kind === "edit" ? "Editing the rule above." : "Copying the rule above as a starting point for a new one."}
         </p>
       )}

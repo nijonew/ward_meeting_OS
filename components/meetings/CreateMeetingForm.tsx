@@ -15,7 +15,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
 
   return (
     <form action={formAction} className="mt-4 flex flex-col gap-3">
-      <label className="text-sm text-slate">
+      <label className="text-sm text-ink-muted">
         Meeting Type
         <select
           name="meeting_type_id"
@@ -36,7 +36,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
       </label>
 
       {isSacrament && (
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Special Format
           <select
             name="special_format"
@@ -49,14 +49,14 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-slate/70">
+          <span className="mt-1 block text-xs text-ink-muted/70">
             Picks this meeting&rsquo;s starting agenda elements. Changing it later (in Meeting Info)
             won&rsquo;t re-populate the agenda &mdash; add/remove elements yourself if you change your mind.
           </span>
         </label>
       )}
 
-      <label className="text-sm text-slate">
+      <label className="text-sm text-ink-muted">
         Date
         <input
           type="date"
@@ -67,7 +67,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Time (optional)
           <input
             type="time"
@@ -75,7 +75,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
             className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Duration, minutes (optional)
           <input
             type="number"

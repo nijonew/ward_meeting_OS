@@ -14,7 +14,7 @@ export default async function MusicPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Music" />
-        <p className="mt-10 text-slate">Sign in to add music.</p>
+        <p className="mt-10 text-ink-muted">Sign in to add music.</p>
         <Link
           href="/login"
           className="mt-4 inline-flex w-fit items-center rounded-md bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-ink/90"
@@ -31,7 +31,7 @@ export default async function MusicPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Music" />
-        <p className="mt-10 text-slate">
+        <p className="mt-10 text-ink-muted">
           Your account doesn&rsquo;t have access to music entry yet. Ask the Bishopric to assign
           you the Music planner role.
         </p>
@@ -49,7 +49,7 @@ export default async function MusicPage() {
       <QuickAddMusic people={people} />
       <RecentMusicList items={recent} />
 
-      <footer className="mt-auto pt-16 text-xs text-slate">
+      <footer className="mt-auto pt-16 text-xs text-ink-muted">
         Ward Meeting OS &mdash; planning, conducting, and publishing meetings from one source of
         truth.
       </footer>

@@ -16,7 +16,7 @@ export default async function NewMeetingPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="New Meeting" />
-        <p className="mt-10 text-slate">Only the Bishopric can create meetings.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can create meetings.</p>
       </main>
     );
   }
@@ -27,13 +27,13 @@ export default async function NewMeetingPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="New Meeting" />
 
-      <Link href="/dashboard" className="text-xs text-slate hover:text-ink">
+      <Link href="/dashboard" className="text-xs text-ink-muted hover:text-ink">
         &larr; Meetings
       </Link>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded-lg border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Create Meeting</h2>
-        <p className="mt-1 text-xs text-slate">
+        <p className="mt-1 text-xs text-ink-muted">
           Pick a type and date. You&rsquo;ll land on that meeting&rsquo;s page once it&rsquo;s created.
         </p>
         <CreateMeetingForm meetingTypes={meetingTypes} />

@@ -95,7 +95,7 @@ export function RabnmAddForm({
           </option>
         ))}
       </select>
-      <p className="text-xs text-slate/60">Ctrl/Cmd-click to select more than one person.</p>
+      <p className="text-xs text-ink-muted/60">Ctrl/Cmd-click to select more than one person.</p>
 
       <input
         type="text"
@@ -105,7 +105,7 @@ export function RabnmAddForm({
       />
 
       {showEventDate && (
-        <label className="text-xs text-slate">
+        <label className="text-xs text-ink-muted">
           {EVENT_DATE_LABELS[type] ?? "Date"}
           <input
             type="date"

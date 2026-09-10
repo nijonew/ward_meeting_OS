@@ -74,12 +74,12 @@ export default async function HomePage() {
 
       <section className="mt-10">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">{WARD_NAME}</h1>
-        {!user && <p className="mt-2 text-slate">Sign in for meeting and planning tools.</p>}
+        {!user && <p className="mt-2 text-ink-muted">Sign in for meeting and planning tools.</p>}
       </section>
 
       {/* Tier 0 -- everyone, no login required */}
       <section className="mt-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-slate">This week</p>
+        <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">This week</p>
         <TileGrid>
             {todaysSacramentMeeting ? (
               <Tile
@@ -120,7 +120,7 @@ export default async function HomePage() {
           Administration section's own Meeting Planning tile below. */}
       {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">My meetings</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">My meetings</p>
           <TileGrid>
             {visibleMeetingTypes.map((slug) => (
               <Tile
@@ -158,7 +158,7 @@ export default async function HomePage() {
           removed outright, not just unlinked. */}
       {isMusicPlanner && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Music</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">Music</p>
           <TileGrid>
             <Tile
               title="Sacrament Meeting Music Planning"
@@ -181,7 +181,7 @@ export default async function HomePage() {
           see getAccessibleClasses in lib/data/teaching-assignments.ts. */}
       {isYouthLeader && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Youth program</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">Youth program</p>
           <TileGrid>
             <Tile
               title="Youth Teaching Planning"
@@ -200,7 +200,7 @@ export default async function HomePage() {
       {/* Tier 4 -- bishopric only */}
       {isBishopric && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">Administration</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">Administration</p>
           <TileGrid>
             <Tile
               title="Meeting Planning"
@@ -222,7 +222,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      <footer className="mt-auto pt-16 text-xs text-slate">
+      <footer className="mt-auto pt-16 text-xs text-ink-muted">
         Ward OS &mdash; Heritage Ward &mdash; Syracuse Utah Stake
       </footer>
     </main>

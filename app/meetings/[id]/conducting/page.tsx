@@ -35,13 +35,13 @@ export default async function ConductingViewPage({
   const script = await getConductingRows(meetingId);
 
   if (!script) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
   return (
     <div className="flex flex-col gap-5">
       {script.specialFormat !== "standard" && (
-        <div className="rounded-md border border-brass/40 bg-card px-4 py-3 text-sm text-ink">
+        <div className="rounded-md border border-accent/40 bg-surface px-4 py-3 text-sm text-ink">
           This meeting is flagged as <strong>{script.specialFormat.replace(/_/g, " ")}</strong> —
           the standard script below may not fit. Read through it before the meeting and adjust as
           needed.

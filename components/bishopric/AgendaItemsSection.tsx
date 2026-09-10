@@ -14,9 +14,9 @@ export function AgendaItemsSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Agenda Items</h2>
-      <p className="mt-1 text-xs text-slate">
+      <p className="mt-1 text-xs text-ink-muted">
         Items added here publish immediately. Anything submitted through the (separate) public
         submission form shows up here as pending, for you to review.
       </p>
@@ -41,32 +41,32 @@ export function AgendaItemsSection({
                       className={[
                         "font-mono text-[10px] uppercase tracking-widest",
                         item.status === "published"
-                          ? "text-sage"
+                          ? "text-success"
                           : item.status === "archived"
-                            ? "text-slate/50"
-                            : "text-brass",
+                            ? "text-ink-muted/50"
+                            : "text-accent",
                       ].join(" ")}
                     >
                       {item.status}
                     </span>
                     {item.status !== "published" && (
                       <form action={publish}>
-                        <button type="submit" className="text-xs text-slate hover:text-ink">
+                        <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                           Publish
                         </button>
                       </form>
                     )}
                     {item.status !== "archived" && (
                       <form action={archive}>
-                        <button type="submit" className="text-xs text-slate hover:text-ink">
+                        <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                           Archive
                         </button>
                       </form>
                     )}
                   </span>
                 </div>
-                {item.body && <p className="mt-1 text-slate">{item.body}</p>}
-                <p className="mt-1 text-[11px] text-slate/60">Submitted by {item.submitted_by_name}</p>
+                {item.body && <p className="mt-1 text-ink-muted">{item.body}</p>}
+                <p className="mt-1 text-[11px] text-ink-muted/60">Submitted by {item.submitted_by_name}</p>
               </li>
             );
           })}

@@ -7,10 +7,10 @@ export function CouncilNotesForm({ meetingId, notes }: { meetingId: string; note
   };
 
   return (
-    <form action={save} className="rounded-lg border border-rule bg-card p-6">
+    <form action={save} className="rounded-lg border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Notes</h2>
 
-      <label className="mt-4 block text-sm text-slate">
+      <label className="mt-4 block text-sm text-ink-muted">
         Meeting Notes
         <textarea
           name="notes"
@@ -20,7 +20,7 @@ export function CouncilNotesForm({ meetingId, notes }: { meetingId: string; note
         />
       </label>
 
-      <label className="mt-4 block text-sm text-slate">
+      <label className="mt-4 block text-sm text-ink-muted">
         Next Meeting Date
         <input
           type="date"

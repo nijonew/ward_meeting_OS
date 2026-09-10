@@ -77,7 +77,7 @@ export function MultiPersonSelect({
                 type="button"
                 onClick={() => removePerson(p.id)}
                 aria-label={`Remove ${p.name}`}
-                className="text-slate hover:text-ink"
+                className="text-ink-muted hover:text-ink"
               >
                 &times;
               </button>
