@@ -11,7 +11,7 @@ export function BishopricLiveView({ data }: { data: BishopricMeetingData }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         {field("Spiritual Thought", data.minutes?.spiritual_thought_notes)}
         {field("Handbook Training", data.minutes?.handbook_training_topic)}
         {field("Calendar Review", data.minutes?.calendar_review_notes)}
@@ -24,13 +24,13 @@ export function BishopricLiveView({ data }: { data: BishopricMeetingData }) {
       </div>
 
       {data.actionItems.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">Action Items</p>
           <ul className="mt-2 flex flex-col gap-1">
             {data.actionItems.map((item) => (
               <li key={item.id} className={item.completed ? "text-ink-muted/50 line-through" : "text-lg text-ink"}>
                 {item.description}
-                {item.assigned_to_name && <span className="text-ink-muted"> &mdash; {item.assigned_to_name}</span>}
+                {item.assigned_to_name && <span className="text-ink-muted"> &middot; {item.assigned_to_name}</span>}
               </li>
             ))}
           </ul>
@@ -38,7 +38,7 @@ export function BishopricLiveView({ data }: { data: BishopricMeetingData }) {
       )}
 
       {data.agendaItems.filter((i) => i.status === "published").length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">Agenda Items</p>
           <ul className="mt-2 flex flex-col gap-1">
             {data.agendaItems

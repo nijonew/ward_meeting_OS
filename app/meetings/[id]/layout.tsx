@@ -69,11 +69,11 @@ export default async function MeetingLayout({
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag={meeting.title} />
 
-      <section className="mt-10 rounded-lg border border-rule bg-surface p-6 sm:p-8">
+      <section className="mt-10 rounded border border-rule bg-surface p-6 sm:p-8">
         <Link href="/dashboard" className="text-xs text-ink-muted hover:text-ink">
           &larr; Meetings
         </Link>
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{meeting.title}</h1>
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{meeting.title}</h1>
         <p className="mt-1 text-ink-muted">{formatMeetingDate(meeting.date)}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 overflow-x-auto pb-1">
@@ -104,7 +104,7 @@ export default async function MeetingLayout({
       <div className="mt-8 flex-1">{children}</div>
 
       <footer className="mt-auto pt-16 text-xs text-ink-muted">
-        Ward Meeting OS &mdash; planning, conducting, and publishing meetings from one source of
+        Ward Meeting OS &middot; planning, conducting, and publishing meetings from one source of
         truth.
       </footer>
     </main>

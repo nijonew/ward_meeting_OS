@@ -26,7 +26,7 @@ export default async function AnnouncementsInboxPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Announcements" />
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Submissions</h2>
         <p className="mt-1 text-xs text-ink-muted">
           General submissions not tied to a specific meeting. Agenda items added directly on a
@@ -49,7 +49,7 @@ export default async function AnnouncementsInboxPage() {
               return (
                 <li
                   key={`${item.kind}-${item.id}`}
-                  className="rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">

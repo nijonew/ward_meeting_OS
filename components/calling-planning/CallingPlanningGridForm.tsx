@@ -8,7 +8,7 @@ import type { PersonOption } from "@/lib/data/people";
 import type { SelectOption } from "@/lib/data/select-options";
 
 const initialState: { error?: string; success?: boolean } = {};
-const INPUT_CLASS = "w-full min-w-[9rem] rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
+const INPUT_CLASS = "w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 type SortDirection = "asc" | "desc";
 
 const COLUMNS = [
@@ -218,7 +218,7 @@ export function CallingPlanningGridForm({
                 </td>
                 <td className="px-2 py-1.5">
                   <select name={`${row.id}::release_person_id`} defaultValue={row.release_person_id ?? ""} className={INPUT_CLASS}>
-                    <option value="">&mdash; None / Previously Vacant &mdash;</option>
+                    <option value="">None / Previously Vacant</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -256,7 +256,7 @@ export function CallingPlanningGridForm({
         <button
           type="submit"
           disabled={!dirty || pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>

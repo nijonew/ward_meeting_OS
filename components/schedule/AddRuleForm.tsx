@@ -78,7 +78,7 @@ export function RuleForm({
         <button
           type="submit"
           disabled={pending}
-          className="w-fit rounded-md bg-ink px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+          className="w-fit rounded bg-accent px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
         >
           {pending ? "Saving..." : submitLabel}
         </button>

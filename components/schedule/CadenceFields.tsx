@@ -6,7 +6,7 @@ import type { CadenceShape } from "@/lib/data/cadence";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const NTH_NAMES = ["1st", "2nd", "3rd", "4th", "5th"];
 
-export const CADENCE_SELECT_CLASS = "rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink";
+export const CADENCE_SELECT_CLASS = "rounded border border-rule bg-paper px-2 py-2 text-xs text-ink";
 
 /**
  * The weekly / nth-of-month / relative cadence picker, shared by every

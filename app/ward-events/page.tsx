@@ -41,7 +41,7 @@ export default async function WardEventsPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Ward Events" />
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Upcoming Events</h2>
 
         {events.length === 0 ? (
@@ -58,7 +58,7 @@ export default async function WardEventsPage() {
                 await deleteWardEvent(item.id);
               };
               return (
-                <li key={item.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+                <li key={item.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
                       <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
@@ -100,7 +100,7 @@ export default async function WardEventsPage() {
       </div>
 
       {canManage && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Add Event</h2>
           <form action={add} className="mt-4 flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -110,7 +110,7 @@ export default async function WardEventsPage() {
                   type="date"
                   name="event_date"
                   required
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
               <label className="text-sm text-ink-muted">
@@ -118,7 +118,7 @@ export default async function WardEventsPage() {
                 <input
                   type="time"
                   name="event_time"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
             </div>
@@ -129,7 +129,7 @@ export default async function WardEventsPage() {
                 type="text"
                 name="title"
                 required
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
@@ -138,7 +138,7 @@ export default async function WardEventsPage() {
               <input
                 type="text"
                 name="location"
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
@@ -147,13 +147,13 @@ export default async function WardEventsPage() {
               <textarea
                 name="notes"
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
             <button
               type="submit"
-              className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+              className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
             >
               Add &amp; Publish
             </button>

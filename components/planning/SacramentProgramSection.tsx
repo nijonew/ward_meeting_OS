@@ -12,7 +12,7 @@ import { allProgramItemOptions, type ResolvedProgramItem } from "@/lib/data/sacr
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
 import type { PersonOption } from "@/lib/data/people";
 
-const INPUT = "rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink";
+const INPUT = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
 
 function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meetingId: string; people: PersonOption[] }) {
   const [removing, startRemove] = useTransition();
@@ -37,7 +37,7 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
   };
 
   return (
-    <li className="rounded-md border border-rule/60 p-3">
+    <li className="rounded border border-rule/60 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{item.label}</span>
         <span className="flex items-center gap-3">
@@ -56,7 +56,7 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
       {(item.kind === "speaker" || item.kind === "youth_speaker") && (
         <form action={saveSpeaker} className="mt-2 flex flex-wrap items-center gap-2">
           <SpeakerPersonOrGuestField people={people} defaultPersonId={item.personId} defaultGuestName={item.guestName} />
-          <button type="submit" className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90">
+          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep">
             Save
           </button>
         </form>
@@ -67,14 +67,14 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
           <input type="text" name="piece_name" defaultValue={item.title} placeholder="Title" className={INPUT} />
           <input type="text" name="performer" defaultValue={item.performer} placeholder="Individual or group name" className={INPUT} />
           <select name="accompanist_id" defaultValue={item.accompanistId} className={INPUT}>
-            <option value="">&mdash; Accompanist &mdash;</option>
+            <option value="">Accompanist</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90">
+          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep">
             Save
           </button>
         </form>
@@ -91,13 +91,13 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
             className={`${INPUT} w-16`}
           />
           <input type="text" name="piece_name" defaultValue={item.title} placeholder="Hymn title" className={INPUT} />
-          <button type="submit" className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90">
+          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep">
             Save
           </button>
         </form>
       )}
 
-      {item.kind === "testimony" && <p className="mt-2 text-sm text-ink-muted">Open testimony &mdash; nothing to fill in.</p>}
+      {item.kind === "testimony" && <p className="mt-2 text-sm text-ink-muted">Open testimony. Nothing to fill in.</p>}
     </li>
   );
 }
@@ -175,7 +175,7 @@ export function SacramentProgramSection({
           <button
             type="submit"
             disabled={adding}
-            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+            className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
           >
             {adding ? "Adding..." : "Add"}
           </button>

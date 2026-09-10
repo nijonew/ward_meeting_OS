@@ -32,7 +32,7 @@ export default async function MeetingSchedulePage() {
       </Link>
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Meeting Schedule</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Meeting Schedule</h1>
         <p className="mt-2 text-sm text-ink-muted">
           Set the typical cadence for each meeting type, then generate real meetings from it.
         </p>
@@ -48,7 +48,7 @@ export default async function MeetingSchedulePage() {
       />
       <p className="-mt-3 text-[11px] text-ink-muted/60">
         For &ldquo;1st and 3rd Tuesday,&rdquo; add two Nth-of-month rules. For something like &ldquo;the
-        Tuesday after the 3rd Sunday,&rdquo; use Relative &mdash; it&rsquo;s computed from the anchor
+        Tuesday after the 3rd Sunday,&rdquo; use Relative. It&rsquo;s computed from the anchor
         day each month rather than a fixed numbered weekday, so it lands correctly no matter how the
         month falls. Use Edit to change a rule in place, or Copy to start a new one from its values.
       </p>

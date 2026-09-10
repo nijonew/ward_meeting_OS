@@ -31,7 +31,7 @@ export default async function NewMeetingPage() {
         &larr; Meetings
       </Link>
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Create Meeting</h2>
         <p className="mt-1 text-xs text-ink-muted">
           Pick a type and date. You&rsquo;ll land on that meeting&rsquo;s page once it&rsquo;s created.

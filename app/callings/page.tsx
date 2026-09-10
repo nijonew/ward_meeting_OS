@@ -35,8 +35,8 @@ export default async function CallingsListPage({
         &larr; Calling Planning
       </Link>
 
-      <div className="rounded-lg border border-rule bg-surface p-6 sm:p-8">
-        <h1 className="font-display text-3xl leading-tight">Callings</h1>
+      <div className="rounded border border-rule bg-surface p-6 sm:p-8">
+        <h1 className="rise-in font-display text-3xl leading-tight">Callings</h1>
         <p className="mt-1 text-ink-muted">Manage callings and holders.</p>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
@@ -46,17 +46,17 @@ export default async function CallingsListPage({
             name="name"
             placeholder="Calling name"
             required
-            className="flex-1 rounded-md border border-rule bg-transparent px-3 py-2 text-sm"
+            className="flex-1 rounded border border-rule bg-transparent px-3 py-2 text-sm"
           />
           <input
             type="text"
             name="title_prefix"
             placeholder="Title prefix (optional)"
-            className="flex-1 rounded-md border border-rule bg-transparent px-3 py-2 text-sm"
+            className="flex-1 rounded border border-rule bg-transparent px-3 py-2 text-sm"
           />
           <button
             type="submit"
-            className="rounded-md border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+            className="rounded border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
           >
             Add Calling
           </button>
@@ -71,7 +71,7 @@ export default async function CallingsListPage({
             <li key={calling.id}>
               <Link
                 href={`/callings/${calling.id}`}
-                className="flex items-center justify-between gap-4 rounded-lg border border-rule bg-surface p-4 transition-colors hover:bg-ink/5"
+                className="flex items-center justify-between gap-4 rounded border border-rule bg-surface p-4 transition-colors hover:bg-ink/5"
               >
                 <span>
                   <span className="font-medium text-ink">{calling.name}</span>

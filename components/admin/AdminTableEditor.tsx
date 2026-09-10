@@ -175,7 +175,7 @@ export function AdminTableEditor({
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-rule bg-surface p-6">
+    <div className="overflow-x-auto rounded border border-rule bg-surface p-6">
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
       <table className="w-full min-w-[720px] text-sm">
         <thead>
@@ -250,7 +250,7 @@ export function AdminTableEditor({
                 type="button"
                 disabled={pending}
                 onClick={addRow}
-                className="w-fit rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+                className="w-fit rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
               >
                 Add
               </button>
@@ -292,7 +292,7 @@ function AdminCellInput({
   if (column.type === "select" || column.type === "foreign_key") {
     return (
       <select value={value == null ? "" : String(value)} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>
-        <option value="">{column.required ? "— choose —" : "— none —"}</option>
+        <option value="">{column.required ? "Choose" : "None"}</option>
         {(options ?? []).map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

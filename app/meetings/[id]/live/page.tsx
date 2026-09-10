@@ -48,7 +48,7 @@ export default async function LiveViewPage({
   if (meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council") {
     const notes = await getCouncilNotes(meetingId);
     return (
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         {notes?.notes ? (
           <p className="text-lg leading-relaxed text-ink">{notes.notes}</p>
         ) : (

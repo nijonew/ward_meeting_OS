@@ -46,7 +46,7 @@ export function ConductingScriptView({
   return (
     <div className="flex flex-col gap-4">
       <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/50">
-        Live{updatedAt ? ` — updated ${updatedAt}` : ""}
+        Live{updatedAt ? ` · updated ${updatedAt}` : ""}
       </p>
       <ConductingRowList rows={rows} />
     </div>

@@ -69,7 +69,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
         <Link href="/admin" className="text-xs text-ink-muted hover:text-ink">
           &larr; All tables
         </Link>
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{config.label}</h1>
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{config.label}</h1>
         {config.description && <p className="mt-2 text-sm text-ink-muted">{config.description}</p>}
       </section>
 

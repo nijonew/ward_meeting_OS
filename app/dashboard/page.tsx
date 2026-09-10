@@ -65,7 +65,7 @@ function MeetingRow({
   const dateCell = isBuilt ? (
     <Link
       href={href}
-      className="inline-flex items-center whitespace-nowrap rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+      className="inline-flex items-center whitespace-nowrap rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
     >
       {formatMeetingDate(meeting.date)}
     </Link>
@@ -113,7 +113,7 @@ function MeetingRow({
             <form action={uncancel}>
               <button
                 type="submit"
-                className="whitespace-nowrap rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
+                className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
               >
                 Un-cancel
               </button>
@@ -211,11 +211,11 @@ export default async function DashboardPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meetings" />
-        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
+        <h1 className="rise-in mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
         <p className="mt-4 text-ink-muted">Sign in to see meetings.</p>
         <Link
           href="/login"
-          className="mt-4 inline-flex w-fit items-center rounded-md bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+          className="mt-4 inline-flex w-fit items-center rounded bg-accent px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
         >
           Sign in
         </Link>
@@ -248,10 +248,10 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
+      <h1 className="rise-in mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
 
       {canCreate && unassignedAgendaItems.length > 0 && (
-        <section className="mt-10 rounded-lg border border-rule bg-surface p-6">
+        <section className="mt-10 rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Unassigned Agenda Items</h2>
           <p className="mt-1 text-xs text-ink-muted">
             Submitted through the public form without a specific meeting. Assign each one to a
@@ -265,7 +265,7 @@ export default async function DashboardPage({
                 if (meetingId) await assignAgendaItemToMeeting(item.id, meetingId);
               };
               return (
-                <li key={item.id} className="rounded-md border border-rule/60 p-3 text-sm">
+                <li key={item.id} className="rounded border border-rule/60 p-3 text-sm">
                   <p className="text-ink">{item.title}</p>
                   {item.body && <p className="mt-1 text-ink-muted">{item.body}</p>}
                   <p className="mt-1 text-[11px] text-ink-muted/60">Submitted by {item.submitted_by_name}</p>
@@ -274,20 +274,20 @@ export default async function DashboardPage({
                       name="meeting_id"
                       required
                       defaultValue=""
-                      className="flex-1 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+                      className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     >
                       <option value="" disabled>
                         Choose a meeting&hellip;
                       </option>
                       {allMeetings.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.title} &mdash; {formatMeetingDate(m.date)}
+                          {m.title} &middot; {formatMeetingDate(m.date)}
                         </option>
                       ))}
                     </select>
                     <button
                       type="submit"
-                      className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90"
+                      className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper hover:bg-accent-deep"
                     >
                       Assign
                     </button>
@@ -332,7 +332,7 @@ export default async function DashboardPage({
               </Link>
               <Link
                 href="/meetings/new"
-                className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90"
+                className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep"
               >
                 + New Meeting
               </Link>
@@ -378,7 +378,7 @@ export default async function DashboardPage({
       </section>
 
       <footer className="mt-auto pt-16 text-xs text-ink-muted">
-        Ward OS &mdash; planning, conducting, and publishing meetings from one source of truth.
+        Ward OS &middot; planning, conducting, and publishing meetings from one source of truth.
       </footer>
     </main>
   );

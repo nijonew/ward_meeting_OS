@@ -41,9 +41,9 @@ export default async function ConductingViewPage({
   return (
     <div className="flex flex-col gap-5">
       {script.specialFormat !== "standard" && (
-        <div className="rounded-md border border-accent/40 bg-surface px-4 py-3 text-sm text-ink">
-          This meeting is flagged as <strong>{script.specialFormat.replace(/_/g, " ")}</strong> —
-          the standard script below may not fit. Read through it before the meeting and adjust as
+        <div className="rounded border border-accent/40 bg-surface px-4 py-3 text-sm text-ink">
+          This meeting is flagged as <strong>{script.specialFormat.replace(/_/g, " ")}</strong>.
+          The standard script below may not fit. Read through it before the meeting and adjust as
           needed.
         </div>
       )}

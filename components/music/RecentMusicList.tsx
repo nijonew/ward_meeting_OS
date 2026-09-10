@@ -14,7 +14,7 @@ function formatDate(iso: string) {
 
 export function RecentMusicList({ items }: { items: RecentMusicItem[] }) {
   return (
-    <div className="rounded-lg border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Upcoming Submissions</h2>
 
       {items.length === 0 ? (
@@ -31,7 +31,7 @@ export function RecentMusicList({ items }: { items: RecentMusicItem[] }) {
               </span>
               <span>
                 &middot; {typeLabel(item.type)}
-                {item.piece_name && <> &mdash; {item.piece_name}</>}
+                {item.piece_name && <> &middot; {item.piece_name}</>}
                 {item.hymn_number && <> (Hymn {item.hymn_number})</>}
                 {item.performer && <span className="text-ink-muted"> &middot; {item.performer}</span>}
               </span>

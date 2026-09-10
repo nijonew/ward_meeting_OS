@@ -57,8 +57,8 @@ import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
  * etc.) and resolves each element to plain text instead.
  */
 
-const NOTE_BOX = "rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-ink";
-const ROW = "rounded-md border border-rule/60 p-3";
+const NOTE_BOX = "rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-ink";
+const ROW = "rounded border border-rule/60 p-3";
 const LABEL = "font-mono text-[11px] uppercase tracking-wider text-ink-muted/70";
 
 function personName(people: PersonOption[], id: string | null | undefined): string | null {
@@ -84,7 +84,7 @@ function Plain({ children }: { children: React.ReactNode }) {
 }
 
 function Empty() {
-  return <p className="text-sm text-ink-muted/50">&mdash; none &mdash;</p>;
+  return <p className="text-sm text-ink-muted/50">None</p>;
 }
 
 export default async function ArchivedMeetingPage({
@@ -111,7 +111,7 @@ export default async function ArchivedMeetingPage({
     // public program, and archived stays admin-only.
     if (!isAdmin) {
       return (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">
             This meeting&rsquo;s program is available at its{" "}
             <Link href={`/meetings/${meetingId}/public`} className="underline">
@@ -124,9 +124,9 @@ export default async function ArchivedMeetingPage({
     }
     if (meeting.stage !== "archived") {
       return (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">
-            This meeting hasn&rsquo;t been archived yet &mdash; it&rsquo;s still editable from{" "}
+            This meeting hasn&rsquo;t been archived yet. It&rsquo;s still editable from{" "}
             <Link href={`/meetings/${meetingId}/planning`} className="underline">
               Planning
             </Link>
@@ -139,7 +139,7 @@ export default async function ArchivedMeetingPage({
     const hasAccess = isAdmin || (await getVisibleMeetingTypesForUser(user.id)).includes(meeting.meetingType);
     if (!hasAccess) {
       return (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">You don&rsquo;t have access to view this meeting.</p>
         </div>
       );
@@ -147,9 +147,9 @@ export default async function ArchivedMeetingPage({
     if (meeting.stage !== "live" && meeting.stage !== "archived") {
       if (isAdmin) {
         return (
-          <div className="rounded-lg border border-rule bg-surface p-6">
+          <div className="rounded border border-rule bg-surface p-6">
             <p className="text-sm text-ink-muted">
-              This meeting isn&rsquo;t live yet &mdash; it&rsquo;s still editable from{" "}
+              This meeting isn&rsquo;t live yet. It&rsquo;s still editable from{" "}
               <Link href={`/meetings/${meetingId}/live`} className="underline">
                 Live
               </Link>
@@ -159,7 +159,7 @@ export default async function ArchivedMeetingPage({
         );
       }
       return (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">This meeting isn&rsquo;t available to view yet.</p>
         </div>
       );
@@ -278,33 +278,33 @@ export default async function ArchivedMeetingPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-xs text-ink-muted">
+      <div className="rounded border border-accent/40 bg-accent/5 p-4 text-xs text-ink-muted">
         {meeting.stage === "archived"
-          ? "Archived — this is the finalized agenda as it was when the meeting ended."
-          : "This meeting is live — the agenda below can still change."}{" "}
+          ? "Archived. This is the finalized agenda as it was when the meeting ended."
+          : "This meeting is live. The agenda below can still change."}{" "}
         Highlighted boxes are notes/content admins entered; everything else is the agenda itself.
         {!showRealTimeNotes && " Meeting notes and minutes become visible here once this meeting is archived."}
       </div>
 
       {meeting.cancelled && (
-        <div className="rounded-lg border border-red-900/30 bg-red-950/5 p-4 text-sm text-red-700">
+        <div className="rounded border border-red-900/30 bg-red-950/5 p-4 text-sm text-red-700">
           This meeting was cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
         </div>
       )}
 
       {templateElements.length === 0 ? (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">No agenda elements were recorded for this meeting.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Agenda</h2>
           <div className="mt-4 flex flex-col gap-2">{elementFields}</div>
         </div>
       )}
 
       {isSacrament && musicRows.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Music</h2>
           <div className="mt-4 flex flex-col gap-2">
             {musicRows.map((m) => (
@@ -312,8 +312,8 @@ export default async function ArchivedMeetingPage({
                 <p className={LABEL}>{m.type.replace(/_/g, " ")}</p>
                 <Plain>
                   {m.hymn_number ? `#${m.hymn_number}` : ""} {m.piece_name ?? ""}
-                  {m.individual_name ? ` — ${m.individual_name}` : ""}
-                  {m.group_name ? ` — ${m.group_name}` : ""}
+                  {m.individual_name ? ` · ${m.individual_name}` : ""}
+                  {m.group_name ? ` · ${m.group_name}` : ""}
                   {m.accompanist_name ? ` (accompanied by ${m.accompanist_name})` : ""}
                 </Plain>
               </div>
@@ -323,12 +323,12 @@ export default async function ArchivedMeetingPage({
       )}
 
       {isSacrament && speakerRows.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Speakers</h2>
           <div className="mt-4 flex flex-col gap-2">
             {speakerRows.map((s, i) => (
               <div key={`${s.slot}-${i}`} className={ROW}>
-                <Plain>{s.guest_speaker_name || personName(people, s.speaker_id) || "— unnamed —"}</Plain>
+                <Plain>{s.guest_speaker_name || personName(people, s.speaker_id) || "Unnamed"}</Plain>
                 {s.topic && <Note>{s.topic}</Note>}
               </div>
             ))}
@@ -337,13 +337,13 @@ export default async function ArchivedMeetingPage({
       )}
 
       {isSacrament && sacramentData && sacramentData.rabnm.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Recognitions / Advancements / Baptisms / New Members</h2>
           <div className="mt-4 flex flex-col gap-2">
             {sacramentData.rabnm.map((r) => (
               <div key={r.id} className={ROW}>
                 <p className={LABEL}>{r.type.replace(/_/g, " ")}</p>
-                <Plain>{[r.calling_name, ...r.people].filter(Boolean).join(" — ") || "—"}</Plain>
+                <Plain>{[r.calling_name, ...r.people].filter(Boolean).join(" · ") || "None"}</Plain>
                 {r.detail && <Note>{r.detail}</Note>}
               </div>
             ))}
@@ -352,7 +352,7 @@ export default async function ArchivedMeetingPage({
       )}
 
       {showRealTimeNotes && isBishopric && bishopricData?.minutes && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Minutes</h2>
           <div className="mt-4 flex flex-col gap-2">
             {[
@@ -384,7 +384,7 @@ export default async function ArchivedMeetingPage({
       )}
 
       {showRealTimeNotes && isBishopric && bishopricData && bishopricData.actionItems.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Action Items</h2>
           <div className="mt-4 flex flex-col gap-2">
             {bishopricData.actionItems.map((item) => (
@@ -402,7 +402,7 @@ export default async function ArchivedMeetingPage({
       )}
 
       {showRealTimeNotes && isCouncil && (councilNotes?.notes || councilNotes?.next_meeting_date) && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Council Notes</h2>
           <div className="mt-4 flex flex-col gap-2">
             {councilNotes?.notes && (
@@ -420,7 +420,7 @@ export default async function ArchivedMeetingPage({
       )}
 
       {renderedNoneKinds.has("agenda_items") && agendaItems.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Agenda Items</h2>
           <div className="mt-4 flex flex-col gap-2">
             {agendaItems.map((item) => (

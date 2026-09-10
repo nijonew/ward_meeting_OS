@@ -196,7 +196,7 @@ export default async function PlanningViewPage({
           <select
             name="special_format"
             defaultValue={sacramentData.planning?.special_format ?? "standard"}
-            className="rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+            className="rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
           >
             {SPECIAL_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -204,14 +204,14 @@ export default async function PlanningViewPage({
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Save
           </button>
         </form>
       )}
 
       {templateElements.length === 0 ? (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">
             No agenda elements yet. Add some in the{" "}
             <a href={`/meetings/${meetingId}/template`} className="underline">
@@ -221,7 +221,7 @@ export default async function PlanningViewPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Agenda</h2>
           <p className="mt-1 text-xs text-ink-muted">
             Every element on this meeting&rsquo;s agenda, in order. Edit any line, then save once.

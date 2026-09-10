@@ -14,7 +14,7 @@ export function AgendaItemsSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Agenda Items</h2>
       <p className="mt-1 text-xs text-ink-muted">
         Items added here publish immediately. Anything submitted through the (separate) public
@@ -33,7 +33,7 @@ export function AgendaItemsSection({
               await setAgendaItemStatus(item.id, meetingId, "archived");
             };
             return (
-              <li key={item.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+              <li key={item.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-ink">{item.title}</span>
                   <span className="flex items-center gap-2">
@@ -79,17 +79,17 @@ export function AgendaItemsSection({
           name="title"
           required
           placeholder="Title"
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <textarea
           name="body"
           rows={2}
           placeholder="Details"
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <button
           type="submit"
-          className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+          className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
         >
           Add &amp; Publish
         </button>

@@ -70,7 +70,7 @@ export function MultiPersonSelect({
           {selectedPeople.map((p) => (
             <li
               key={p.id}
-              className="flex items-center gap-1 rounded-full bg-ink/10 px-2 py-0.5 text-[11px] text-ink"
+              className="flex items-center gap-1 rounded border border-rule bg-surface px-2 py-0.5 text-[11px] text-ink"
             >
               {p.name}
               <button
@@ -90,7 +90,7 @@ export function MultiPersonSelect({
         <select
           value=""
           onChange={(e) => addPerson(e.target.value)}
-          className="rounded-md border border-rule bg-paper px-2 py-1 text-xs text-ink"
+          className="rounded border border-rule bg-paper px-2 py-1 text-xs text-ink"
         >
           <option value="">+ Add candidate&hellip;</option>
           {available.map((p) => (

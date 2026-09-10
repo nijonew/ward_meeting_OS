@@ -29,7 +29,7 @@ export function RabnmSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Recognitions / Advancements / Baptisms / New Members</h2>
 
       {items.length > 0 && (
@@ -41,14 +41,14 @@ export function RabnmSection({
             return (
               <li
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
               >
                 <span>
                   <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                     {typeLabel(item.type)}
                   </span>{" "}
                   {item.people.length > 0 && <span>{item.people.join(", ")}</span>}
-                  {item.calling_name && <span> &mdash; {item.calling_name}</span>}
+                  {item.calling_name && <span> &middot; {item.calling_name}</span>}
                   {item.detail && <span className="text-ink-muted"> ({item.detail})</span>}
                 </span>
                 {canEdit && (

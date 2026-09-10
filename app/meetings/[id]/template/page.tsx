@@ -68,12 +68,12 @@ export default async function TemplatePage({
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Agenda Elements" />
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">
-          {meeting.meetingTypeName} &mdash; {formatDate(meeting.date)}
+          {meeting.meetingTypeName} &middot; {formatDate(meeting.date)}
         </h2>
         <p className="mt-1 text-xs text-ink-muted">
-          Only affects this meeting &mdash; add, remove, or reorder elements here without changing
+          Only affects this meeting. Add, remove, or reorder elements here without changing
           any other {meeting.meetingTypeName}. New meetings start from the default list managed at{" "}
           <Link href="/admin/meeting-templates" className="underline">
             Admin &rsaquo; Meeting Templates
@@ -107,7 +107,7 @@ export default async function TemplatePage({
               return (
                 <div
                   key={el.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">{el.label}</span>
 
@@ -120,7 +120,7 @@ export default async function TemplatePage({
                           min={1}
                           max={el.max_slots ?? undefined}
                           defaultValue={el.slot_count ?? 1}
-                          className="w-14 rounded-md border border-rule bg-paper px-2 py-1 text-xs text-ink"
+                          className="w-14 rounded border border-rule bg-paper px-2 py-1 text-xs text-ink"
                         />
                         <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                           Set
@@ -159,7 +159,7 @@ export default async function TemplatePage({
       </div>
 
       {available.length > 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Add Element</h2>
           <div className="mt-4 flex flex-col gap-2">
             {available.map((el) => {
@@ -170,7 +170,7 @@ export default async function TemplatePage({
               return (
                 <div
                   key={el.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">{el.label}</span>
                   <form action={add}>

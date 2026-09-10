@@ -22,13 +22,13 @@ export function PushRotationForm({ rotationId }: { rotationId: string }) {
             type="date"
             name="from_date"
             required
-            className="ml-2 rounded-md border border-rule bg-paper px-2 py-1 text-[11px] text-ink"
+            className="ml-2 rounded border border-rule bg-paper px-2 py-1 text-[11px] text-ink"
           />
         </label>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md border border-rule px-2.5 py-1 text-[11px] text-ink hover:bg-ink/5 disabled:opacity-50"
+          className="rounded border border-rule px-2.5 py-1 text-[11px] text-ink hover:bg-ink/5 disabled:opacity-50"
         >
           {pending ? "Pushing..." : "Push"}
         </button>

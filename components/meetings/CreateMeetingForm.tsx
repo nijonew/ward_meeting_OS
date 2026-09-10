@@ -22,7 +22,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
           required
           value={meetingTypeId}
           onChange={(e) => setMeetingTypeId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         >
           <option value="" disabled>
             Choose a meeting type
@@ -41,7 +41,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
           <select
             name="special_format"
             defaultValue="standard"
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           >
             {SPECIAL_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -51,7 +51,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
           </select>
           <span className="mt-1 block text-xs text-ink-muted/70">
             Picks this meeting&rsquo;s starting agenda elements. Changing it later (in Meeting Info)
-            won&rsquo;t re-populate the agenda &mdash; add/remove elements yourself if you change your mind.
+            won&rsquo;t re-populate the agenda. Add or remove elements yourself if you change your mind.
           </span>
         </label>
       )}
@@ -62,7 +62,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
           type="date"
           name="date"
           required
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
       </label>
 
@@ -72,7 +72,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
           <input
             type="time"
             name="time_of_day"
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
         <label className="text-sm text-ink-muted">
@@ -82,7 +82,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
             name="duration_minutes"
             min={5}
             step={5}
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
       </div>
@@ -90,7 +90,7 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
       <button
         type="submit"
         disabled={pending}
-        className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+        className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
       >
         {pending ? "Creating..." : "Create Meeting"}
       </button>

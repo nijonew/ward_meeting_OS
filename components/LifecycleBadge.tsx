@@ -34,6 +34,13 @@ const STAGE_LABELS: Record<MeetingLifecycleStage, string> = {
  * shows -- edit it through the meeting's own pages, not here", and no
  * such page-level control for those three stages was ever built).
  * Defaults to the full list for every other meeting type, unchanged.
+ *
+ * Restyled per design.md's Components section (sitewide redesign pass):
+ * a bordered chip, not a filled pill, for every stage except the
+ * current one -- accent fill is reserved for "this is happening now,"
+ * not decoration repeated down the whole track. 4px radius (`rounded`),
+ * matching every other chip/card in the app rather than this
+ * component's own one-off `rounded-full`.
  */
 export function LifecycleBadge({
   stage,
@@ -49,7 +56,7 @@ export function LifecycleBadge({
       <span
         role="img"
         aria-label={`Meeting stage: ${STAGE_LABELS[stage]}`}
-        className="flex h-7 w-max items-center whitespace-nowrap rounded-full bg-accent px-3 font-mono text-[11px] uppercase tracking-wider text-paper"
+        className="flex h-7 w-max items-center whitespace-nowrap rounded border border-accent bg-accent px-3 font-mono text-[11px] uppercase tracking-wider text-surface"
       >
         {STAGE_LABELS[stage]}
       </span>
@@ -72,19 +79,19 @@ export function LifecycleBadge({
           <div key={s} className="flex items-center">
             <span
               className={[
-                "flex h-7 items-center whitespace-nowrap rounded-full px-3 font-mono text-[11px] uppercase tracking-wider transition-colors",
+                "flex h-7 items-center whitespace-nowrap rounded border px-3 font-mono text-[11px] uppercase tracking-wider transition-colors",
                 isCurrent
-                  ? "bg-accent text-paper"
+                  ? "border-accent bg-accent text-surface"
                   : isPast
-                    ? "bg-ink/10 text-ink/50"
-                    : "bg-transparent text-ink/30",
+                    ? "border-rule text-ink-muted"
+                    : "border-rule/50 text-ink-muted/50",
               ].join(" ")}
             >
               {STAGE_LABELS[s]}
             </span>
             {i < stages.length - 1 && (
               <span
-                className={["h-px w-4 shrink-0", isPast ? "bg-ink/20" : "bg-ink/10"].join(" ")}
+                className={["h-px w-4 shrink-0", isPast ? "bg-rule-strong" : "bg-rule"].join(" ")}
               />
             )}
           </div>

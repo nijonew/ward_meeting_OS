@@ -44,7 +44,7 @@ export default async function SpeakerPrayerHistoryPage() {
       </Link>
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Speaker &amp; Prayer History</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Speaker &amp; Prayer History</h1>
         <p className="mt-2 text-sm text-ink-muted">
           Sourced from archived sacrament meetings only. Speakers and sacrament-meeting prayers don&rsquo;t
           rotate automatically, so this is here to help spot who&rsquo;s due for a turn.
@@ -52,7 +52,7 @@ export default async function SpeakerPrayerHistoryPage() {
       </section>
 
       {entries.length === 0 && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">
             No archived sacrament meetings yet. History fills in as meetings move to the archived stage.
           </p>
@@ -62,7 +62,7 @@ export default async function SpeakerPrayerHistoryPage() {
       {entries.length > 0 && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border border-rule bg-surface p-6">
+            <div className="rounded border border-rule bg-surface p-6">
               <h2 className="font-display text-xl">Due to Speak</h2>
               <ul className="mt-3 flex flex-col gap-1.5">
                 {dueToSpeak.slice(0, 15).map((d) => (
@@ -74,7 +74,7 @@ export default async function SpeakerPrayerHistoryPage() {
               </ul>
             </div>
 
-            <div className="rounded-lg border border-rule bg-surface p-6">
+            <div className="rounded border border-rule bg-surface p-6">
               <h2 className="font-display text-xl">Due for a Prayer</h2>
               <ul className="mt-3 flex flex-col gap-1.5">
                 {dueToPray.slice(0, 15).map((d) => (
@@ -87,7 +87,7 @@ export default async function SpeakerPrayerHistoryPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-rule bg-surface p-6">
+          <div className="rounded border border-rule bg-surface p-6">
             <h2 className="font-display text-xl">Full History</h2>
             <ul className="mt-3 flex flex-col gap-1.5">
               {entries.map((e, i) => (
@@ -95,7 +95,7 @@ export default async function SpeakerPrayerHistoryPage() {
                   <span>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">{e.role}</span>{" "}
                     <span className="text-ink">{e.person_name}</span>
-                    {e.topic && <span className="text-ink-muted"> &mdash; {e.topic}</span>}
+                    {e.topic && <span className="text-ink-muted"> &middot; {e.topic}</span>}
                   </span>
                   <span className="shrink-0 text-xs text-ink-muted">{formatDate(e.date)}</span>
                 </li>

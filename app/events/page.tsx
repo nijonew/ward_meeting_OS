@@ -34,7 +34,7 @@ function TabLink({ view, current, label }: { view: ViewFilter; current: ViewFilt
     <Link
       href={`/events?view=${view}`}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
+        "rounded px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
         active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >
@@ -66,7 +66,7 @@ export default async function ScheduledEventsPage({
       date: a.activity_date,
       time: a.activity_time,
       title: a.title,
-      subtitle: a.planning_group ? `${a.group_name} — planned by ${a.planning_group}` : a.group_name,
+      subtitle: a.planning_group ? `${a.group_name} · planned by ${a.planning_group}` : a.group_name,
       kind: "Youth" as const,
       cancelled: a.cancelled,
       cancellationNote: a.cancellation_note,
@@ -88,15 +88,15 @@ export default async function ScheduledEventsPage({
       <AppHeader tag="Scheduled Events" />
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Scheduled Events</h1>
-        <div className="mt-4 flex w-fit gap-1 rounded-md border border-rule p-1">
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Scheduled Events</h1>
+        <div className="mt-4 flex w-fit gap-1 rounded border border-rule p-1">
           <TabLink view="both" current={view} label="Both" />
           <TabLink view="youth" current={view} label="Youth" />
           <TabLink view="ward" current={view} label="Ward" />
         </div>
       </section>
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         {merged.length === 0 ? (
           <p className="text-sm text-ink-muted">Nothing scheduled yet.</p>
         ) : (
@@ -105,7 +105,7 @@ export default async function ScheduledEventsPage({
               <li
                 key={item.key}
                 className={[
-                  "rounded-md border px-3 py-2 text-sm",
+                  "rounded border px-3 py-2 text-sm",
                   item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
                 ].join(" ")}
               >

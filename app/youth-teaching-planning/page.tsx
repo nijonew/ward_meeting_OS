@@ -67,9 +67,9 @@ export default async function YouthTeachingPlanningPage({
           &larr; Home
         </Link>
 
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          Sunday teaching assignments for each class. Short free-text entries only &mdash; not linked
+          Sunday teaching assignments for each class. Short free-text entries only, not linked
           to any person or calling record.
         </p>
 
@@ -118,14 +118,14 @@ export default async function YouthTeachingPlanningPage({
         <Link href="/youth-teaching-planning" className="text-xs text-ink-muted hover:text-ink">
           &larr; Youth Teaching Planning
         </Link>
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{rawClass}</h1>
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{rawClass}</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          Sunday teaching assignments. Short free-text entries only &mdash; not linked to any person
+          Sunday teaching assignments. Short free-text entries only, not linked to any person
           or calling record, so type whatever&rsquo;s useful (a name, a lesson topic, or both).
         </p>
       </section>
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <form method="get" className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="class" value={rawClass} />
           <label className="text-xs text-ink-muted">
@@ -134,10 +134,10 @@ export default async function YouthTeachingPlanningPage({
               type="date"
               name="through"
               defaultValue={throughDate}
-              className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+              className="ml-2 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
             />
           </label>
-          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Update range
           </button>
         </form>

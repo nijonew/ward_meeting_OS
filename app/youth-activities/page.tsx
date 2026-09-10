@@ -57,7 +57,7 @@ export default async function YouthActivitiesPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Youth Activities" />
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Upcoming Activities</h2>
 
         {activities.length === 0 ? (
@@ -88,7 +88,7 @@ export default async function YouthActivitiesPage() {
                 <li
                   key={item.id}
                   className={[
-                    "rounded-md border px-3 py-2 text-sm",
+                    "rounded border px-3 py-2 text-sm",
                     item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
                   ].join(" ")}
                 >
@@ -171,9 +171,9 @@ export default async function YouthActivitiesPage() {
                   ) : (
                     <p className="mt-1 text-ink-muted">
                       {item.group_name}
-                      {item.planning_group ? ` — planned by ${item.planning_group}` : ""}
-                      {item.development_category ? ` — ${item.development_category}` : ""}
-                      {item.location ? ` — ${item.location}` : ""}
+                      {item.planning_group ? ` · planned by ${item.planning_group}` : ""}
+                      {item.development_category ? ` · ${item.development_category}` : ""}
+                      {item.location ? ` · ${item.location}` : ""}
                     </p>
                   )}
                   {(item.youth_lead || item.advisor_lead) && (
@@ -194,7 +194,7 @@ export default async function YouthActivitiesPage() {
       {canManage && <GenerateYouthActivitiesForm />}
 
       {canManage && (
-        <div className="rounded-lg border border-rule bg-surface p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Add Activity</h2>
           <form action={add} className="mt-4 flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -204,7 +204,7 @@ export default async function YouthActivitiesPage() {
                   type="date"
                   name="activity_date"
                   required
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
               <label className="text-sm text-ink-muted">
@@ -212,7 +212,7 @@ export default async function YouthActivitiesPage() {
                 <input
                   type="time"
                   name="activity_time"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
             </div>
@@ -223,7 +223,7 @@ export default async function YouthActivitiesPage() {
                 type="text"
                 name="title"
                 required
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
@@ -234,7 +234,7 @@ export default async function YouthActivitiesPage() {
                   name="group_name"
                   required
                   defaultValue=""
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 >
                   <option value="" disabled>
                     Choose group
@@ -251,9 +251,9 @@ export default async function YouthActivitiesPage() {
                 <select
                   name="development_category"
                   defaultValue=""
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 >
-                  <option value="">&mdash; None &mdash;</option>
+                  <option value="">None</option>
                   {YOUTH_DEVELOPMENT_CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>
                       {c.label}
@@ -268,7 +268,7 @@ export default async function YouthActivitiesPage() {
               <input
                 type="text"
                 name="location"
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
@@ -278,7 +278,7 @@ export default async function YouthActivitiesPage() {
                 <input
                   type="text"
                   name="youth_lead"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
               <label className="text-sm text-ink-muted">
@@ -286,7 +286,7 @@ export default async function YouthActivitiesPage() {
                 <input
                   type="text"
                   name="advisor_lead"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
             </div>
@@ -296,13 +296,13 @@ export default async function YouthActivitiesPage() {
               <textarea
                 name="notes"
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
             <button
               type="submit"
-              className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+              className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
             >
               Add &amp; Publish
             </button>

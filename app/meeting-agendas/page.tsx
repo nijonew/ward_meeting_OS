@@ -49,7 +49,7 @@ export default async function MeetingAgendasPage() {
         &larr; Meeting Planning
       </Link>
 
-      <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Agendas</h1>
+      <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Agendas</h1>
       <p className="mt-2 text-sm text-ink-muted">Create, cancel, and manage meetings, by type.</p>
 
       <div className="mt-6">

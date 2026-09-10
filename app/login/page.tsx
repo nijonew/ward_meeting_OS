@@ -23,19 +23,19 @@ export default function LoginPage() {
           name="email"
           required
           placeholder="you@example.com"
-          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
         <input
           type="password"
           name="password"
           required
           placeholder="Password"
-          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
         >
           {pending ? "Signing in..." : "Sign in"}
         </button>

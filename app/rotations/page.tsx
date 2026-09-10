@@ -53,7 +53,7 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
     <Link
       href={`/rotations?type=${slug}`}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
+        "rounded px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
         active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >
@@ -77,7 +77,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
   const nextUpName = rotation.members[rotation.next_index % Math.max(rotation.members.length, 1)]?.person_name;
 
   return (
-    <div className="rounded-lg border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-display text-xl">{ELEMENT_LABELS[rotation.element_key] ?? rotation.element_key}</h2>
@@ -116,7 +116,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
               return (
                 <li
                   key={m.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-1.5 text-sm"
+                  className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-1.5 text-sm"
                 >
                   <span className={idx === rotation.next_index % rotation.members.length ? "text-ink" : "text-ink-muted"}>
                     {m.person_name}
@@ -151,7 +151,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
 
       {availablePeople.length > 0 && (
         <form action={addMember} className="mt-4 flex items-center gap-2">
-          <select name="person_id" defaultValue="" className="flex-1 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
+          <select name="person_id" defaultValue="" className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
             <option value="" disabled>
               Add someone&hellip;
             </option>
@@ -161,7 +161,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90">
+          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper hover:bg-accent-deep">
             Add
           </button>
         </form>
@@ -212,23 +212,23 @@ export default async function RotationsPage({
       </Link>
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          Every upcoming meeting down one side, every role across the top &mdash; fill in who&rsquo;s
+          Every upcoming meeting down one side, every role across the top. Fill in who&rsquo;s
           actually assigned. This is the real, applied assignment for that meeting, however it got
-          there (a fixed calling order, a rotation, or a manual pick) &mdash; editing a cell here
+          there (a fixed calling order, a rotation, or a manual pick). Editing a cell here
           never changes whose turn is next for the rotations below, it only overrides this one
           meeting.
         </p>
       </section>
 
-      <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+      <div className="flex w-fit flex-wrap gap-1 rounded border border-rule p-1">
         {MEETING_TYPE_TABS.map((t) => (
           <TypeTab key={t.slug} slug={t.slug} active={t.slug === selectedType} label={t.label} />
         ))}
       </div>
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <form method="get" className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="type" value={selectedType} />
           <label className="text-xs text-ink-muted">
@@ -237,19 +237,19 @@ export default async function RotationsPage({
               type="date"
               name="through"
               defaultValue={throughDate}
-              className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+              className="ml-2 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
             />
           </label>
-          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Update range
           </button>
         </form>
 
         {selectedType === "sacrament-meeting" && (
           <p className="mt-3 text-[11px] text-ink-muted/60">
-            No Presiding column &mdash; it always defaults to whoever holds the Bishop calling.
+            No Presiding column. It always defaults to whoever holds the Bishop calling.
             Conducting cycles automatically by calendar month (Bishop &rarr; 1st Counselor &rarr; 2nd
-            Counselor) based on who currently holds each calling &mdash; if it shows the same person
+            Counselor) based on who currently holds each calling. If it shows the same person
             every month, check that both counselor callings actually have a current holder set
             (Table Admin &rarr; Callings). The dropdown itself already only offers whichever of the
             three currently has a holder.

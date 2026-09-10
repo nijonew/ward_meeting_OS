@@ -48,10 +48,10 @@ export default async function PublicAnnouncementsPage() {
       <AppHeader tag="Announcements" />
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Announcements</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Announcements</h1>
       </section>
 
-      <div className="rounded-lg border border-rule bg-surface p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         {announcements.length === 0 ? (
           <p className="text-sm text-ink-muted">Nothing posted yet.</p>
         ) : (
@@ -60,7 +60,7 @@ export default async function PublicAnnouncementsPage() {
               const dateRange = formatDateRange(a);
               const meta = [a.organization, a.announcement_type].filter(Boolean).join(" · ");
               return (
-                <li key={a.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+                <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <span className="font-display text-base text-ink">{a.title}</span>
                     {dateRange && (

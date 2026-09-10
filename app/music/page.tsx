@@ -17,7 +17,7 @@ export default async function MusicPage() {
         <p className="mt-10 text-ink-muted">Sign in to add music.</p>
         <Link
           href="/login"
-          className="mt-4 inline-flex w-fit items-center rounded-md bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+          className="mt-4 inline-flex w-fit items-center rounded bg-accent px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
         >
           Sign in
         </Link>
@@ -50,7 +50,7 @@ export default async function MusicPage() {
       <RecentMusicList items={recent} />
 
       <footer className="mt-auto pt-16 text-xs text-ink-muted">
-        Ward Meeting OS &mdash; planning, conducting, and publishing meetings from one source of
+        Ward Meeting OS &middot; planning, conducting, and publishing meetings from one source of
         truth.
       </footer>
     </main>

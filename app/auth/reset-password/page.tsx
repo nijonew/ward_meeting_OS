@@ -27,7 +27,7 @@ export default function ResetPasswordPage() {
       </Link>
       <h1 className="mt-2 font-display text-2xl">Reset your password</h1>
       <p className="mt-2 text-sm text-ink-muted">
-        Enter your email and we&rsquo;ll send a link to set a password &mdash; use this the first
+        Enter your email and we&rsquo;ll send a link to set a password. Use this the first
         time you sign in too.
       </p>
 
@@ -37,12 +37,12 @@ export default function ResetPasswordPage() {
           name="email"
           required
           placeholder="you@example.com"
-          className="rounded-md border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
         >
           {pending ? "Sending..." : "Send reset link"}
         </button>

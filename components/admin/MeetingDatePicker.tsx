@@ -108,8 +108,8 @@ export function MeetingDatePicker({
     : pendingCreateDate
       ? `New: ${formatDate(pendingCreateDate)}`
       : required
-        ? "— choose a date —"
-        : "— none —";
+        ? "Choose a date"
+        : "None";
 
   return (
     <div className="relative">
@@ -127,7 +127,7 @@ export function MeetingDatePicker({
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-xs rounded-lg border border-rule bg-surface p-4 shadow-lg"
+            className="w-full max-w-xs rounded border border-rule bg-surface p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">

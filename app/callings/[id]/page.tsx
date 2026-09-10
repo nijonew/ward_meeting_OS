@@ -40,8 +40,8 @@ export default async function CallingDetailPage({
         &larr; Callings
       </Link>
 
-      <div className="rounded-lg border border-rule bg-surface p-6 sm:p-8">
-        <h1 className="font-display text-3xl leading-tight">{calling.name}</h1>
+      <div className="rounded border border-rule bg-surface p-6 sm:p-8">
+        <h1 className="rise-in font-display text-3xl leading-tight">{calling.name}</h1>
         <p className="mt-1 text-ink-muted">
           Current holder: {calling.current_holder_name ?? "Vacant"}
         </p>
@@ -49,7 +49,7 @@ export default async function CallingDetailPage({
 
         <Link
           href={`/calling-planning?calling=${calling.id}`}
-          className="mt-4 inline-flex w-fit items-center rounded-md border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+          className="mt-4 inline-flex w-fit items-center rounded border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
         >
           View calling changes for this calling &rarr;
         </Link>

@@ -39,7 +39,7 @@ export function RulesManager({
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-rule bg-surface p-6">
+    <div className="overflow-x-auto rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Cadence</h2>
 
       {rules.length > 0 && (

@@ -7,7 +7,7 @@ import type { PersonOption } from "@/lib/data/people";
 import { submitBulkMusicRows } from "@/app/music/actions";
 
 function typeLabel(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "–";
   return MUSIC_TYPES.find((t) => t.value === value)?.label ?? value;
 }
 
@@ -42,7 +42,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Bulk Add Music</h2>
       <p className="mt-1 text-xs text-ink-muted">
         Paste rows copied from a spreadsheet: Date, Type, Hymn Number, Piece Name, Performer,
@@ -59,14 +59,14 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
         }}
         rows={8}
         placeholder={"8/9/2026\tOpening Hymn\t19\tCome, Come, Ye Saints\n8/9/2026\tMusical Number\t\tHow Great Thou Art\tJane Doe"}
-        className="mt-3 block w-full rounded-md border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink"
+        className="mt-3 block w-full rounded border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink"
       />
 
       <button
         type="button"
         onClick={handlePreview}
         disabled={!text.trim()}
-        className="mt-3 rounded-md border border-rule px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:opacity-50"
+        className="mt-3 rounded border border-rule px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:opacity-50"
       >
         Preview
       </button>
@@ -92,10 +92,10 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
               <tbody>
                 {parsed.map((row, i) => (
                   <tr key={i} className="border-b border-rule/40">
-                    <td className="py-1.5 pr-3">{row.dateIso ?? (row.dateText || "—")}</td>
+                    <td className="py-1.5 pr-3">{row.dateIso ?? (row.dateText || "–")}</td>
                     <td className="py-1.5 pr-3">{typeLabel(row.type) || row.typeText}</td>
                     <td className="py-1.5 pr-3">
-                      {row.pieceName ?? "—"}
+                      {row.pieceName ?? "–"}
                       {row.hymnNumber ? ` (Hymn ${row.hymnNumber})` : ""}
                     </td>
                     <td className="py-1.5 pr-3">
@@ -104,7 +104,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
                       ) : row.performerText ? (
                         <span className="text-accent">{row.performerText} (unmatched)</span>
                       ) : (
-                        "—"
+                        "–"
                       )}
                     </td>
                     <td className="py-1.5 pr-3">
@@ -112,7 +112,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
                         (row.accompanistText ? (
                           <span className="text-accent">{row.accompanistText} (unmatched)</span>
                         ) : (
-                          "—"
+                          "–"
                         ))}
                     </td>
                     <td className="py-1.5">
@@ -132,7 +132,7 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
             type="button"
             onClick={handleSubmit}
             disabled={validCount === 0 || pending}
-            className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+            className="mt-4 rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
           >
             {pending ? "Submitting..." : `Submit ${validCount} row${validCount === 1 ? "" : "s"}`}
           </button>

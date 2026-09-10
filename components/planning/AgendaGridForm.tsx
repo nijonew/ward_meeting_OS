@@ -7,7 +7,7 @@ import type { AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
 
 const initialState: { error?: string; success?: boolean } = {};
-const INPUT = "w-full rounded-md border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
+const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
 
 function PersonSelect({
   name,
@@ -20,7 +20,7 @@ function PersonSelect({
 }) {
   return (
     <select name={name} defaultValue={defaultValue} className={INPUT}>
-      <option value="">&mdash; Unassigned &mdash;</option>
+      <option value="">Unassigned</option>
       {people.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -309,7 +309,7 @@ export function AgendaGridForm({
           <button
             type="submit"
             disabled={!dirty || pending}
-            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending ? "Saving..." : "Save All Changes"}
           </button>

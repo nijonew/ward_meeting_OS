@@ -17,7 +17,7 @@ export function ActionItemsSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Action Items</h2>
 
       {items.length > 0 && (
@@ -30,7 +30,7 @@ export function ActionItemsSection({
             return (
               <li
                 key={item.id}
-                className="flex items-start gap-3 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                className="flex items-start gap-3 rounded border border-rule/60 px-3 py-2 text-sm"
               >
                 <input
                   type="checkbox"
@@ -42,7 +42,7 @@ export function ActionItemsSection({
                 <span className={["flex-1", item.completed ? "text-ink-muted/50 line-through" : "text-ink"].join(" ")}>
                   {item.description}
                   {item.assigned_to_name && (
-                    <span className="text-ink-muted"> &mdash; {item.assigned_to_name}</span>
+                    <span className="text-ink-muted"> &middot; {item.assigned_to_name}</span>
                   )}
                   {item.due_date && <span className="text-ink-muted"> (due {item.due_date})</span>}
                 </span>
@@ -63,14 +63,14 @@ export function ActionItemsSection({
           name="description"
           required
           placeholder="Description"
-          className="flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="flex-1 rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <select
           name="assigned_to_id"
           defaultValue=""
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         >
-          <option value="">&mdash; Assign to &mdash;</option>
+          <option value="">Assign to</option>
           {people.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -80,11 +80,11 @@ export function ActionItemsSection({
         <input
           type="date"
           name="due_date"
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <button
           type="submit"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
         >
           Add
         </button>

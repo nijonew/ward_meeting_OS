@@ -23,7 +23,7 @@ const SACRAMENT_CONTENT_TABLES = new Set([
 
 function TableList({ tables }: { tables: AdminTableConfig[] }) {
   return (
-    <ul className="divide-y divide-rule rounded-lg border border-rule bg-surface">
+    <ul className="divide-y divide-rule rounded border border-rule bg-surface">
       {tables.map((t) => (
         <li key={t.table}>
           <Link href={`/admin/${t.table}`} className="flex items-baseline justify-between px-6 py-4 hover:bg-paper">
@@ -58,10 +58,10 @@ export default async function AdminIndexPage() {
       <AppHeader tag="Admin" />
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Table Admin</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Table Admin</h1>
         <p className="mt-2 text-sm text-ink-muted">
           Direct edit access to the underlying data tables. Fields tied to app logic (rotation order,
-          meeting stage, and the like) are intentionally left out here &mdash; use their dedicated pages
+          meeting stage, and the like) are intentionally left out here. Use their dedicated pages
           for those.
         </p>
       </section>
@@ -76,7 +76,7 @@ export default async function AdminIndexPage() {
         <section>
           <h2 className="font-display text-xl">Sacrament Meeting Content</h2>
           <p className="mt-1 text-xs text-ink-muted">
-            Raw-data fallback for troubleshooting or a bulk fix &mdash; for everyday planning, open that
+            Raw-data fallback for troubleshooting or a bulk fix. For everyday planning, open that
             meeting&rsquo;s own Planning view instead. It already brings Music, Speakers, RABNM, and
             Rotations together in one screen for that meeting.
           </p>
@@ -91,7 +91,7 @@ export default async function AdminIndexPage() {
         <p className="mt-1 text-xs text-ink-muted">
           Not generic-grid editors -- these have dedicated add/remove/reorder UIs of their own.
         </p>
-        <ul className="mt-3 divide-y divide-rule rounded-lg border border-rule bg-surface">
+        <ul className="mt-3 divide-y divide-rule rounded border border-rule bg-surface">
           <li>
             <Link
               href="/admin/meeting-templates"

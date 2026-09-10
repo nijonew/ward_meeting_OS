@@ -44,8 +44,8 @@ export default async function SubmitAgendaItemPage({
       <section className="mt-10">
         <h1 className="font-display text-2xl">Submit an Agenda Item</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          For a meeting you attend by calling. It goes straight onto that meeting&rsquo;s agenda
-          &mdash; the Bishopric can remove it afterward if needed.
+          For a meeting you attend by calling. It goes straight onto that meeting&rsquo;s agenda,
+          and the Bishopric can remove it afterward if needed.
         </p>
 
         {meetingTypes.length === 0 ? (
@@ -56,8 +56,8 @@ export default async function SubmitAgendaItemPage({
         ) : (
           <>
             {success && (
-              <p className="mt-4 rounded-md border border-rule bg-surface p-4 text-sm text-ink">
-                Thanks &mdash; your agenda item has been added.
+              <p className="mt-4 rounded border border-rule bg-surface p-4 text-sm text-ink">
+                Thanks. Your agenda item has been added.
               </p>
             )}
             {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
