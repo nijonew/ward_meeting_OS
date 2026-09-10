@@ -5,7 +5,6 @@ import {
   getTemplateElements,
   getPlannedElements,
   getRoleAssignments,
-  type TemplateElementRow,
 } from "@/lib/data/meeting-elements";
 import { getElementNotes } from "@/lib/data/meeting-element-notes";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
@@ -14,31 +13,36 @@ import { getActiveCallings } from "@/lib/data/callings";
 import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
-import { SPEAKER_SLOTS_ADULT, SPEAKER_SLOTS_YOUTH } from "@/lib/data/sacrament-constants";
-import {
-  PersonRoleField,
-  FreeTextField,
-  PersonAndTextField,
-  LabelOnlyField,
-} from "@/components/planning/DynamicElementField";
+import { buildAgendaRows } from "@/lib/data/agenda-rows";
+import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
 import { PlanningInfoForm } from "@/components/planning/PlanningInfoForm";
-import { SpeakersForm } from "@/components/planning/SpeakersForm";
 import { RabnmSection } from "@/components/planning/RabnmSection";
-import { MusicArrangeSection } from "@/components/planning/MusicArrangeSection";
 import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
 import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
 import { AgendaItemsSection } from "@/components/bishopric/AgendaItemsSection";
 import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
 
-// Free-text elements that already have a dedicated, unambiguous home
-// elsewhere -- rendering them again here would create two disconnected
-// copies of the same field. Shown as a pointer instead of a duplicate
-// editor.
-const REDIRECT_NOTES: Record<string, string> = {
-  ward_business: "Edit in Meeting Info above",
-  stake_business: "Edit in Meeting Info above",
-};
-
+/**
+ * The planning view, rebuilt 2026-09-09 around a single agenda grid --
+ * the user's own request, with their real spreadsheet agenda as the
+ * reference: "I want them to also be more agenda-like. single line for
+ * each element with a field that can be edited after being pre-filled."
+ *
+ * What changed: every agenda element is now one line in one grid, in
+ * the meeting's own element order, with one "Save All Changes" button.
+ * Music and Speakers used to be pulled *out* of the agenda and rendered
+ * as their own big sections underneath (so hymns and speakers appeared
+ * out of order, away from the agenda they belong to); they're inline
+ * rows now, resolved against the same sacrament_music /
+ * sacrament_speakers_* tables as before. Ward/Stake Business, which
+ * used to render here as a dead "Edit in Meeting Info above" pointer,
+ * are real editable rows too.
+ *
+ * What deliberately stays its own section below the grid: the
+ * collections that add and remove rows rather than filling in a fixed
+ * line -- RABNM, Agenda Items, Action Items -- plus Bishopric Minutes,
+ * Council Notes, and Meeting Info (special format + hidden notes).
+ */
 export default async function PlanningViewPage({
   params,
 }: {
@@ -106,84 +110,23 @@ export default async function PlanningViewPage({
   // everywhere, not just Bishopric Meeting.
   const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
-  const renderedMusicKinds = new Set<string>();
-  const renderedSlotKinds = new Set<string>();
-  const renderedNoneKinds = new Set<string>();
-
-  function renderElement(el: TemplateElementRow) {
-    switch (el.resolution_kind) {
-      case "person_role":
-        return (
-          <PersonRoleField
-            key={el.id}
-            meetingId={meetingId}
-            elementKey={el.key}
-            label={el.label}
-            table={roleTable}
-            people={people}
-            value={roleAssignments[el.key]}
-          />
-        );
-
-      case "free_text":
-        if (REDIRECT_NOTES[el.key]) {
-          return <LabelOnlyField key={el.id} label={el.label} note={REDIRECT_NOTES[el.key]} />;
-        }
-        return (
-          <FreeTextField
-            key={el.id}
-            meetingId={meetingId}
-            elementKey={el.key}
-            label={el.label}
-            value={elementNotes[el.key]}
-          />
-        );
-
-      case "person_and_text":
-        return (
-          <PersonAndTextField
-            key={el.id}
-            meetingId={meetingId}
-            elementKey={el.key}
-            label={el.label}
-            people={people}
-            value={elementNotes[el.key]}
-          />
-        );
-
-      case "music":
-        // Rendered once, below, via the existing MusicArrangeSection --
-        // avoid an empty placeholder per hymn-type element.
-        renderedMusicKinds.add(el.key);
-        return null;
-
-      case "person_slot":
-        // Rendered once per slot type, below, via the existing
-        // SpeakersForm -- avoid duplicating the 9-slot form per element.
-        renderedSlotKinds.add(el.key);
-        return null;
-
-      case "none":
-      default: {
-        if (el.key === "agenda_items") {
-          // Rendered once, below, via AgendaItemsSection -- no
-          // placeholder needed since a real section follows.
-          renderedNoneKinds.add(el.key);
-          return null;
-        }
-        return <LabelOnlyField key={el.id} label={el.label} />;
-      }
-    }
-  }
-
-  const elementFields = templateElements.map(renderElement).filter(Boolean);
+  // Agenda Items is the one element with a real add/review section of its
+  // own below -- a grid row for it would just be a label with nothing to
+  // type into.
+  const hasAgendaItemsElement = templateElements.some((el) => el.key === "agenda_items");
+  const agendaRows = buildAgendaRows({
+    elements: templateElements.filter((el) => el.key !== "agenda_items"),
+    roleAssignments,
+    elementNotes,
+    isSacrament,
+    planning: sacramentData?.planning ?? null,
+    music: sacramentData?.music ?? [],
+    speakersAdults: sacramentData?.speakersAdults ?? [],
+    speakersYouth: sacramentData?.speakersYouth ?? [],
+  });
 
   return (
     <div className="flex flex-col gap-6">
-      {isSacrament && sacramentData && (
-        <PlanningInfoForm meetingId={meetingId} planning={sacramentData.planning} />
-      )}
-
       {templateElements.length === 0 ? (
         <div className="rounded-lg border border-rule bg-card p-6">
           <p className="text-sm text-slate">
@@ -197,34 +140,23 @@ export default async function PlanningViewPage({
       ) : (
         <div className="rounded-lg border border-rule bg-card p-6">
           <h2 className="font-display text-xl">Agenda</h2>
-          <div className="mt-4 flex flex-col gap-2">{elementFields}</div>
+          <p className="mt-1 text-xs text-slate">
+            Every element on this meeting&rsquo;s agenda, in order. Edit any line, then save once.
+            Add, remove, or reorder the lines themselves in the{" "}
+            <a href={`/meetings/${meetingId}/template`} className="underline">
+              agenda editor
+            </a>
+            .
+          </p>
+          <div className="mt-4">
+            <AgendaGridForm
+              meetingId={meetingId}
+              roleTable={roleTable}
+              rows={agendaRows}
+              people={people}
+            />
+          </div>
         </div>
-      )}
-
-      {isSacrament && sacramentData && renderedMusicKinds.size > 0 && (
-        <MusicArrangeSection meetingId={meetingId} music={sacramentData.music} />
-      )}
-
-      {isSacrament && sacramentData && renderedSlotKinds.has("speaker") && (
-        <SpeakersForm
-          meetingId={meetingId}
-          title="Speakers - Adults"
-          variant="adults"
-          slots={SPEAKER_SLOTS_ADULT}
-          speakers={sacramentData.speakersAdults}
-          people={people}
-        />
-      )}
-
-      {isSacrament && sacramentData && renderedSlotKinds.has("youth_speaker") && (
-        <SpeakersForm
-          meetingId={meetingId}
-          title="Speakers - Youth"
-          variant="youth"
-          slots={SPEAKER_SLOTS_YOUTH}
-          speakers={sacramentData.speakersYouth}
-          people={people}
-        />
       )}
 
       {isSacrament && sacramentData && (
@@ -244,11 +176,13 @@ export default async function PlanningViewPage({
         </>
       )}
 
-      {renderedNoneKinds.has("agenda_items") && (
-        <AgendaItemsSection meetingId={meetingId} items={agendaItems} />
-      )}
+      {hasAgendaItemsElement && <AgendaItemsSection meetingId={meetingId} items={agendaItems} />}
 
       {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
+
+      {isSacrament && sacramentData && (
+        <PlanningInfoForm meetingId={meetingId} planning={sacramentData.planning} />
+      )}
     </div>
   );
 }

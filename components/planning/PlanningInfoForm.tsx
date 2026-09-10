@@ -2,6 +2,18 @@ import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import type { PlanningInfo } from "@/lib/data/sacrament-planning";
 
+/**
+ * The bits of `sacrament_planning` that aren't agenda lines: which
+ * template format this meeting follows, and notes that never leave the
+ * planning view.
+ *
+ * Ward Business, Stake Business, and Recognitions used to live here too
+ * -- they're editable agenda rows in the grid above as of 2026-09-09
+ * (see lib/data/agenda-rows.ts), so they were removed from this form
+ * rather than left as a second place to edit the same three columns:
+ * exactly the duplicate-free-text-entry-point hazard PROJECT_CONTEXT.md
+ * already flags for the Bishopric-side fields.
+ */
 export function PlanningInfoForm({
   meetingId,
   planning,
@@ -31,36 +43,6 @@ export function PlanningInfoForm({
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="mt-4 block text-sm text-slate">
-        Ward Business
-        <textarea
-          name="ward_business"
-          defaultValue={planning?.ward_business ?? ""}
-          rows={3}
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        />
-      </label>
-
-      <label className="mt-4 block text-sm text-slate">
-        Stake Business
-        <textarea
-          name="stake_business"
-          defaultValue={planning?.stake_business ?? ""}
-          rows={3}
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        />
-      </label>
-
-      <label className="mt-4 block text-sm text-slate">
-        Recognitions
-        <textarea
-          name="recognitions"
-          defaultValue={planning?.recognitions ?? ""}
-          rows={2}
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        />
       </label>
 
       <label className="mt-4 block text-sm text-slate">

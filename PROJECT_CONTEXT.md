@@ -128,6 +128,66 @@ exclusive access.
   Sunday with no `meetings` row yet creates one automatically on save
   (with rotations applied), so planning can start against any date
   without running Generate Meetings first.
+  - **Rebuilt as a single agenda grid, 2026-09-09** (the user's own
+    request, with a screenshot of their real spreadsheet agenda as the
+    reference: "I want them to also be more agenda-like. single line for
+    each element with a field that can be edited after being
+    pre-filled"). Every element is now one line in one grid -- label
+    left, its pre-filled editable value right, in the meeting's own
+    element order -- with a single "Save All Changes" button, the same
+    dirty-tracking/save-feedback pattern as Assignment Rotations,
+    Teaching Calendar, and Calling Planning. This replaced a stack of
+    one-bordered-box-per-element, each with its own Save button.
+    Applies to every meeting type, not just Sacrament Meeting.
+    - **Music and Speakers are inline agenda rows now.** They used to be
+      pulled *out* of the agenda (`renderedMusicKinds`/`renderedSlotKinds`)
+      and rendered as their own big sections underneath, so hymns and
+      speakers appeared out of order, detached from the agenda they
+      belong to. Same storage as before (`sacrament_music`,
+      `sacrament_speakers_adults/youth`) -- only the UI moved.
+      `MusicArrangeSection.tsx`, `SpeakersForm.tsx`, and
+      `DynamicElementField.tsx` were deleted outright rather than left
+      unlinked, along with `dynamic-planning-actions.ts` and
+      `saveAdultSpeakers`/`saveYouthSpeakers`/`arrangeMusicItem` (plus
+      `saveAssignments`, which had already been dead before this).
+    - **A repeatable element expands to `slot_count` rows** (`speaker`,
+      `youth_speaker`, `intermediate_hymn`, `musical_number`) -- so the
+      standard Sacrament template's "speaker: 2" renders Speaker 1 and
+      Speaker 2 as their own agenda lines, matching the user's
+      spreadsheet, instead of one 9-slot form. Never fewer rows than are
+      already filled in (lowering `slot_count` later must not orphan or
+      hide an existing speaker), plus one spare so another can be added
+      without editing the template first. A repeatable music row's
+      `slot` is now assigned positionally from its place in the agenda
+      rather than picked from the old per-item "Slot" dropdown.
+    - **Ward Business / Stake Business / Recognitions are real editable
+      rows.** They render as agenda lines writing straight to their
+      `sacrament_planning` columns; previously the agenda showed them as
+      a dead "Edit in Meeting Info above" pointer (`REDIRECT_NOTES`) and
+      the actual fields lived on the Meeting Info form. Those three were
+      *removed* from `PlanningInfoForm` rather than left as a second
+      place to edit the same columns, and `savePlanningInfo` now only
+      writes the columns actually submitted -- otherwise the trimmed
+      form would blank out whatever the grid had just saved. Meeting
+      Info keeps `special_format` + `hidden_notes` and moved below the
+      agenda.
+    - **Still their own sections below the grid**, deliberately: the
+      collections that add/remove rows rather than filling in a fixed
+      line (RABNM, Agenda Items, Action Items) plus Bishopric Minutes and
+      Council Notes.
+    - Field names encode their own destination
+      (`role::<key>`, `note::<key>::person|text`, `planning::<column>`,
+      `music::<type>::<slot|->::number|title|performer`,
+      `speaker::<adults|youth>::<slot>::person|guest|topic`), built in
+      one place (`lib/data/agenda-rows.ts`) and parsed back apart in
+      another (`app/meetings/[id]/agenda-actions.ts`'s `saveAgendaGrid`),
+      so the renderer never needs to know which table anything lives in.
+      Every write is scoped to exactly the submitted fields -- no
+      blanket "delete every row for this meeting first" -- so an element
+      that isn't on this meeting's agenda, or a column the grid doesn't
+      show (a speaker's `duration`/`confirmed`), is never cleared by a
+      save from here. `saveAgendaGrid` re-checks the bishopric role
+      server-side, matching the page's own gate.
 - **Assignment Rotations** (`/rotations`): two genuinely different
   mechanisms, previously documented (and displayed on `/rotations`) as
   if they were one, which turned out to be a real source of confusion

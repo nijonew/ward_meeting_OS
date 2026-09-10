@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
-import { ASSIGNMENT_ROLES, SPEAKER_SLOTS_ADULT, SPEAKER_SLOTS_YOUTH } from "@/lib/data/sacrament-constants";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -25,21 +24,27 @@ async function requireBishopric(): Promise<ActionResult | null> {
   return null;
 }
 
+/**
+ * Only writes the columns actually submitted. Ward Business, Stake
+ * Business, and Recognitions moved to the agenda grid (2026-09-09) and
+ * are no longer on the Meeting Info form -- writing them unconditionally
+ * from here would blank out whatever the grid just saved, since a form
+ * that doesn't render a field submits nothing for it.
+ */
 export async function savePlanningInfo(meetingId: string, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("sacrament_planning").upsert(
-    {
-      meeting_id: meetingId,
-      special_format: String(formData.get("special_format") ?? "standard"),
-      ward_business: String(formData.get("ward_business") ?? "").trim() || null,
-      stake_business: String(formData.get("stake_business") ?? "").trim() || null,
-      recognitions: String(formData.get("recognitions") ?? "").trim() || null,
-      hidden_notes: String(formData.get("hidden_notes") ?? "").trim() || null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "meeting_id" }
-  );
+  const payload: Record<string, unknown> = {
+    meeting_id: meetingId,
+    updated_at: new Date().toISOString(),
+  };
+  for (const column of ["special_format", "ward_business", "stake_business", "recognitions", "hidden_notes"]) {
+    if (!formData.has(column)) continue;
+    const value = String(formData.get(column) ?? "").trim();
+    payload[column] = column === "special_format" ? value || "standard" : value || null;
+  }
+
+  const { error } = await supabase.from("sacrament_planning").upsert(payload, { onConflict: "meeting_id" });
 
   if (error) {
     return { error: error.message };
@@ -47,104 +52,6 @@ export async function savePlanningInfo(meetingId: string, formData: FormData): P
 
   revalidatePath(`/meetings/${meetingId}/planning`);
   return { success: true };
-}
-
-export async function saveAssignments(meetingId: string, formData: FormData): Promise<ActionResult> {
-  const supabase = await createClient();
-
-  const rows = ASSIGNMENT_ROLES.map(({ value }) => ({
-    meeting_id: meetingId,
-    role: value,
-    assigned_to_id: String(formData.get(`assigned_${value}`) ?? "") || null,
-    confirmed: formData.get(`confirmed_${value}`) === "on",
-  })).filter((row) => row.assigned_to_id !== null);
-
-  const { error: deleteError } = await supabase
-    .from("sacrament_assignments")
-    .delete()
-    .eq("meeting_id", meetingId);
-  if (deleteError) {
-    return { error: deleteError.message };
-  }
-
-  if (rows.length > 0) {
-    const { error: insertError } = await supabase.from("sacrament_assignments").insert(rows);
-    if (insertError) {
-      return { error: insertError.message };
-    }
-  }
-
-  revalidatePath(`/meetings/${meetingId}/planning`);
-  return { success: true };
-}
-
-async function saveSpeakers(
-  table: "sacrament_speakers_adults" | "sacrament_speakers_youth",
-  slots: readonly string[],
-  meetingId: string,
-  formData: FormData
-): Promise<ActionResult> {
-  const supabase = await createClient();
-
-  const rows = slots
-    .map((slot) => {
-      const speakerId = String(formData.get(`${slot}_speaker_id`) ?? "");
-      const guestName = String(formData.get(`${slot}_guest_name`) ?? "").trim();
-      const topic = String(formData.get(`${slot}_topic`) ?? "").trim();
-      const duration = String(formData.get(`${slot}_duration`) ?? "").trim();
-      const confirmed = formData.get(`${slot}_confirmed`) === "on";
-
-      if (!speakerId && !guestName && !topic) {
-        return null; // nothing entered for this slot -- skip it
-      }
-
-      return {
-        meeting_id: meetingId,
-        slot,
-        speaker_id: speakerId || null,
-        guest_speaker_name: guestName || null,
-        topic: topic || null,
-        duration: duration || null,
-        confirmed,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
-
-  const { error: deleteError } = await supabase.from(table).delete().eq("meeting_id", meetingId);
-  if (deleteError) {
-    return { error: deleteError.message };
-  }
-
-  if (rows.length > 0) {
-    const { error: insertError } = await supabase.from(table).insert(rows);
-    if (insertError) {
-      return { error: insertError.message };
-    }
-  }
-
-  return { success: true };
-}
-
-export async function saveAdultSpeakers(meetingId: string, formData: FormData): Promise<ActionResult> {
-  const result = await saveSpeakers(
-    "sacrament_speakers_adults",
-    SPEAKER_SLOTS_ADULT,
-    meetingId,
-    formData
-  );
-  revalidatePath(`/meetings/${meetingId}/planning`);
-  return result;
-}
-
-export async function saveYouthSpeakers(meetingId: string, formData: FormData): Promise<ActionResult> {
-  const result = await saveSpeakers(
-    "sacrament_speakers_youth",
-    SPEAKER_SLOTS_YOUTH,
-    meetingId,
-    formData
-  );
-  revalidatePath(`/meetings/${meetingId}/planning`);
-  return result;
 }
 
 export async function addRabnmItem(meetingId: string, formData: FormData): Promise<ActionResult> {
@@ -211,24 +118,3 @@ export async function deleteRabnmItem(rabnmId: string, meetingId: string): Promi
   return { success: true };
 }
 
-export async function arrangeMusicItem(
-  musicId: string,
-  meetingId: string,
-  formData: FormData
-): Promise<ActionResult> {
-  const supabase = await createClient();
-
-  const slot = String(formData.get("slot") ?? "");
-
-  // No approval step anymore -- every music item is treated as ready the
-  // moment it's entered (status defaults to 'published' at insert time).
-  // This action now only ever places an item into a slot.
-  const { error } = await supabase.from("sacrament_music").update({ slot: slot || null }).eq("id", musicId);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath(`/meetings/${meetingId}/planning`);
-  return { success: true };
-}
