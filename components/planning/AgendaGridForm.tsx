@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
 import type { AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
@@ -88,17 +88,41 @@ function StakeBusinessCell({
  * `recognize_music` rows carry their own already-restricted
  * `eligiblePeople` list instead (2026-09-09: "all dropdowns should
  * follow the rules for the field by calling").
+ *
+ * `formId`/`hideActions`/`onDirtyChange`/`onStateChange` (2026-09-10)
+ * exist for exactly one caller: Sacrament Meeting's planning page
+ * renders two of these (split around Teaching Program, which can't
+ * share a `<form>` with either -- see agenda-rows.ts's file comment)
+ * but the user wants one combined "Save All Changes" button for both
+ * rather than two separate ones. When `hideActions` is set, this
+ * component still owns a real `<form>` and its own `useActionState`
+ * submission (native `form.requestSubmit()`, called externally via
+ * `formId`, still triggers it exactly like a real click would) -- it
+ * just doesn't render its own button/feedback, reporting dirty/pending/
+ * result up through the two callbacks instead so a parent wrapping
+ * *two* of these can combine them into one button and one status line.
+ * Every other caller (non-Sacrament meeting types, which only ever
+ * render one of these) is unaffected -- these props are all optional
+ * and default to the original all-in-one-component behavior.
  */
 export function AgendaGridForm({
   meetingId,
   roleTable,
   rows,
   people,
+  formId,
+  hideActions,
+  onDirtyChange,
+  onStateChange,
 }: {
   meetingId: string;
   roleTable: "sacrament_assignments" | "bishopric_assignments";
   rows: AgendaRow[];
   people: PersonOption[];
+  formId?: string;
+  hideActions?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+  onStateChange?: (state: { error?: string; success?: boolean }, pending: boolean) => void;
 }) {
   const boundSave = saveAgendaGrid.bind(null, meetingId, roleTable);
   const [state, formAction, pending] = useActionState(boundSave, initialState);
@@ -112,8 +136,11 @@ export function AgendaGridForm({
     if (state.success && dirty) setDirty(false);
   }
 
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+  useEffect(() => onStateChange?.(state, pending), [state, pending, onStateChange]);
+
   return (
-    <form action={formAction} onChange={() => setDirty(true)}>
+    <form id={formId} action={formAction} onChange={() => setDirty(true)}>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <tbody>
@@ -277,17 +304,19 @@ export function AgendaGridForm({
         </table>
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={!dirty || pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {pending ? "Saving..." : "Save All Changes"}
-        </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-sage">Saved.</p>}
-      </div>
+      {!hideActions && (
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={!dirty || pending}
+            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {pending ? "Saving..." : "Save All Changes"}
+          </button>
+          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+          {!pending && !dirty && state.success && !state.error && <p className="text-sm text-sage">Saved.</p>}
+        </div>
+      )}
     </form>
   );
 }

@@ -20,6 +20,7 @@ import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacram
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
+import { CombinedAgendaGrids } from "@/components/planning/CombinedAgendaGrids";
 import { SacramentProgramSection } from "@/components/planning/SacramentProgramSection";
 import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
 import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
@@ -231,23 +232,25 @@ export default async function PlanningViewPage({
             .
           </p>
           <div className="mt-4">
-            <AgendaGridForm meetingId={meetingId} roleTable={roleTable} rows={openingRows} people={people} />
+            {isSacrament ? (
+              <CombinedAgendaGrids
+                meetingId={meetingId}
+                roleTable={roleTable}
+                openingRows={openingRows}
+                closingRows={closingRows}
+                people={people}
+              >
+                <div className="border-t-2 border-rule pt-4">
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                    Teaching Program
+                  </span>
+                  <SacramentProgramSection meetingId={meetingId} items={resolvedProgramItems} people={people} />
+                </div>
+              </CombinedAgendaGrids>
+            ) : (
+              <AgendaGridForm meetingId={meetingId} roleTable={roleTable} rows={openingRows} people={people} />
+            )}
           </div>
-
-          {isSacrament && (
-            <div className="mt-6 border-t-2 border-rule pt-4">
-              <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
-                Teaching Program
-              </span>
-              <SacramentProgramSection meetingId={meetingId} items={resolvedProgramItems} people={people} />
-            </div>
-          )}
-
-          {closingRows.length > 0 && (
-            <div className="mt-6">
-              <AgendaGridForm meetingId={meetingId} roleTable={roleTable} rows={closingRows} people={people} />
-            </div>
-          )}
         </div>
       )}
 

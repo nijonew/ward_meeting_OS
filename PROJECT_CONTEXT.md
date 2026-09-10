@@ -411,6 +411,35 @@ exclusive access.
       marked to be announced in sacrament meeting" -- the user's own
       words, describing a future direction, not a change to make right
       now. The Announcements line still renders as a plain banner cue.
+    - **One combined "Save All Changes" button for both grid halves,
+      2026-09-10** (the user's own request: "we can remove the save all
+      changes button from the sacrament administration section," then,
+      when asked whether that meant losing the ability to save the
+      Presiding-through-Sacrament-Hymn half outright, confirmed "one
+      combined button for both halves"). New
+      `components/planning/CombinedAgendaGrids.tsx` (Client Component)
+      renders both `AgendaGridForm` instances -- unchanged in every
+      other respect, still two real `<form>`s for the reason given
+      above -- with new optional `formId`/`hideActions`/`onDirtyChange`/
+      `onStateChange` props on `AgendaGridForm` itself: `hideActions`
+      suppresses each form's own button/feedback while it still owns a
+      real `<form id="...">` and its own `useActionState` submission
+      underneath, and the two callbacks report that form's dirty/
+      pending/result state up to the wrapper. One visible button in the
+      wrapper calls the browser's native `form.requestSubmit()` on both
+      underlying `<form id="...">` elements by id when clicked --
+      exactly as if each form's own (now-hidden) button had been clicked
+      -- and shows combined Saving/disabled/Saved state across both.
+      Teaching Program (`SacramentProgramSection`, unaffected otherwise)
+      renders via a `children` slot between the two forms, same position
+      as before. Every other meeting type still renders a single
+      `AgendaGridForm` directly with its own default button --
+      `CombinedAgendaGrids` is Sacrament-Meeting-only, used from
+      `app/meetings/[id]/planning/page.tsx`'s existing `isSacrament`
+      branch. Also removed, same request: the description paragraph
+      under Teaching Program ("Pre-filled from this meeting's format --
+      add or remove speakers...") -- purely cosmetic, no behavior
+      change.
 - **Assignment Rotations** (`/rotations`): two genuinely different
   mechanisms, previously documented (and displayed on `/rotations`) as
   if they were one, which turned out to be a real source of confusion

@@ -150,11 +150,6 @@ export function SacramentProgramSection({
 
   return (
     <div className="mt-2">
-      <p className="text-xs text-slate">
-        Pre-filled from this meeting&rsquo;s format -- add or remove speakers, musical numbers, and
-        testimonies here, in whatever order.
-      </p>
-
       {items.length === 0 ? (
         <p className="mt-4 text-sm text-slate">Nothing added yet.</p>
       ) : (
