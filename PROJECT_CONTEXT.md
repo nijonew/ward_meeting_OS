@@ -233,6 +233,20 @@ exclusive access.
       already writes a real Presiding row at meeting creation -- it's a
       defensive fallback for the edge case where the Bishop calling was
       vacant at creation time.
+
+      **Bug found and fixed 2026-09-10**: the two Stake Presidency
+      counselor names were guessed as "Stake President First/Second
+      Counselor" -- didn't match this ward's actual roster naming.
+      `computeEligiblePersonIds`'s `calling_names` source does an exact
+      match against `callings.name`, so a wrong guess here means the
+      counselors silently never appear, not an error. Confirmed
+      directly with the user: the roster's real names are "Stake
+      Presidency First Counselor"/"Stake Presidency Second Counselor"
+      ("Presidency," not "President") -- `STAKE_PRESIDENCY_CALLING_NAMES`
+      corrected to match. If a calling like this ever seems to have no
+      eligible people despite someone clearly holding it, suspect a
+      name mismatch (or the calling not existing in `/callings` at all)
+      before assuming the eligibility logic itself is wrong.
     - **Chorister and Organist are no longer their own agenda lines** --
       both render inline on the Recognize Music line instead (new
       `recognize_music` `AgendaRow` kind, two `PersonSelect`s side by

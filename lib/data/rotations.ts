@@ -297,11 +297,18 @@ export const CONDUCTING_CALLING_ORDER = ["Bishop", "Bishopric First Counselor", 
  *  "default presiding to the bishop, but allow for members of the
  *  bishopric/stake presidency to be in the dropdown") -- broader than
  *  Conducting's, since a visiting stake presidency member can preside
- *  even though they'd never be in the Conducting rotation. */
+ *  even though they'd never be in the Conducting rotation. Matched
+ *  against `callings.name` exactly (see computeEligiblePersonIds's
+ *  "calling_names" source below) -- corrected 2026-09-10 after the
+ *  first guess ("Stake President First/Second Counselor") didn't match
+ *  this ward's actual roster naming ("Stake Presidency First/Second
+ *  Counselor," confirmed directly with the user). If these callings
+ *  aren't in the roster at all yet, they still won't appear here
+ *  regardless of the name matching -- add them via /callings first. */
 export const STAKE_PRESIDENCY_CALLING_NAMES = [
   "Stake President",
-  "Stake President First Counselor",
-  "Stake President Second Counselor",
+  "Stake Presidency First Counselor",
+  "Stake Presidency Second Counselor",
 ];
 
 /**
