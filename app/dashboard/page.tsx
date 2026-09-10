@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
+import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
@@ -30,6 +31,17 @@ function formatMeetingDate(iso: string) {
  * page's own "<Type> Planning Dashboard" heading, which the same
  * feedback flagged directly ("the words 'sacrament meeting' appear too
  * often").
+ *
+ * Reworked again the same day, per the user's follow-up: the date is
+ * now a real button (not just a hover-underline link) -- "so it is
+ * obvious that by clicking the date is how you enter meeting planning"
+ * -- and the Stage column shows only the current stage
+ * (`LifecycleBadge`'s `compact` mode) instead of the full
+ * Template-through-Archived track, freeing up the row's width for that
+ * bigger date button. Cancel became its own client component
+ * (CancelMeetingButton) since revealing the reason field only after
+ * the button is clicked needs client state a plain server-action
+ * `<form>` can't provide on its own.
  */
 function MeetingRow({
   meeting,
@@ -51,11 +63,14 @@ function MeetingRow({
   const href = canManage ? `/meetings/${meeting.id}` : `/meetings/${meeting.id}/${nonAdminHref}`;
 
   const dateCell = isBuilt ? (
-    <Link href={href} className="text-ink hover:underline">
+    <Link
+      href={href}
+      className="inline-flex items-center whitespace-nowrap rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+    >
       {formatMeetingDate(meeting.date)}
     </Link>
   ) : (
-    <span className="text-ink/40">{formatMeetingDate(meeting.date)}</span>
+    <span className="text-sm text-ink/40">{formatMeetingDate(meeting.date)}</span>
   );
 
   const uncancel = async () => {
@@ -69,11 +84,11 @@ function MeetingRow({
 
   return (
     <tr className={["border-t border-rule/60", meeting.cancelled ? "bg-red-950/5" : ""].join(" ")}>
-      <td className="px-2 py-2 align-top text-sm">{dateCell}</td>
+      <td className="px-2 py-2 align-top">{dateCell}</td>
       {showType && <td className="px-2 py-2 align-top text-sm text-slate">{meeting.title}</td>}
       <td className="px-2 py-2 align-top">
         <div className="flex flex-wrap items-center gap-2">
-          <LifecycleBadge stage={meeting.stage} />
+          <LifecycleBadge stage={meeting.stage} compact />
           {!isBuilt && (
             <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/70">
               Coming soon
@@ -96,23 +111,15 @@ function MeetingRow({
           meeting.stage !== "archived" &&
           (meeting.cancelled ? (
             <form action={uncancel}>
-              <button type="submit" className="whitespace-nowrap text-xs text-slate hover:text-ink">
+              <button
+                type="submit"
+                className="whitespace-nowrap rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
+              >
                 Un-cancel
               </button>
             </form>
           ) : (
-            <form action={cancel} className="flex items-center gap-1">
-              <input type="hidden" name="id" value={meeting.id} />
-              <input
-                type="text"
-                name="cancellation_note"
-                placeholder="Reason"
-                className="w-24 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
-              />
-              <button type="submit" className="whitespace-nowrap text-xs text-slate hover:text-ink">
-                Cancel
-              </button>
-            </form>
+            <CancelMeetingButton meetingId={meeting.id} cancelAction={cancel} />
           ))}
       </td>
     </tr>

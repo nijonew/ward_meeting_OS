@@ -1353,6 +1353,36 @@ before fully closing it out.
     label is dropped too when filtered (redundant with the new `<h1>`)
     -- that slot becomes the "Show all types" link instead of a second
     copy of the name.
+
+  **Refined again minutes later, same day** -- the user's own
+  follow-up: "make a button out of the date field... the status fields
+  can be eliminated except for the status that is current... turn the
+  'cancel' option into a button and have the reason field appear after
+  the cancel button is pressed and at the end of the meeting line
+  instead of in front of the cancel button." Applied to every meeting
+  type's rows, not just Sacrament -- they all share the same
+  `MeetingRow`, and nothing about the request was Sacrament-specific.
+  - **Date is now a real button** (`bg-ink` pill, same visual weight as
+    "+ New Meeting"), not just a hover-underline text link -- makes it
+    obvious that clicking the date is how you open the meeting, per the
+    user's own words.
+  - **`LifecycleBadge` gained a `compact` prop**: renders just the
+    current stage's own pill, no Template-through-Archived track --
+    used only here, so the row has the width back for the bigger date
+    button. The full track stays the default everywhere else (a
+    meeting's own header) unaffected, since a re-derived one-off badge
+    would have violated the component's own "views instead of duplicate
+    data" reuse principle.
+  - **New `components/dashboard/CancelMeetingButton.tsx`**: Cancel is a
+    real bordered button now (matching Un-cancel, restyled to match);
+    clicking it reveals the reason input *after* the button (not before
+    it, which is where it sat previously) -- needs client state to
+    toggle that reveal, which a plain server-action `<form>` can't do
+    on its own, so this is its own small client component rather than
+    inline JSX. Takes the row's inline "use server" `cancel` closure as
+    a prop -- an inline server action is allowed across the
+    server/client boundary as a function, unlike a plain one (see the
+    formatDate-prop bug elsewhere in this file).
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark

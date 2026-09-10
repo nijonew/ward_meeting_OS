@@ -14,8 +14,28 @@ const STAGE_LABELS: Record<MeetingLifecycleStage, string> = {
  * status track, with the current stage highlighted. Intentionally reused
  * as-is on the dashboard and meeting detail views rather than re-derived,
  * per the project's own "views instead of duplicate data" principle.
+ *
+ * `compact` (2026-09-09, the user's own request: "the status fields can
+ * be eliminated except for the status that is current") renders just
+ * the current stage's own pill, no track/connectors -- used by
+ * /dashboard's single-line grid rows, which needed the horizontal room
+ * back for the date button instead. The full track stays the default
+ * everywhere else (e.g. a meeting's own header), where showing the
+ * whole lifecycle at a glance is still the point.
  */
-export function LifecycleBadge({ stage }: { stage: MeetingLifecycleStage }) {
+export function LifecycleBadge({ stage, compact }: { stage: MeetingLifecycleStage; compact?: boolean }) {
+  if (compact) {
+    return (
+      <span
+        role="img"
+        aria-label={`Meeting stage: ${STAGE_LABELS[stage]}`}
+        className="flex h-7 w-max items-center whitespace-nowrap rounded-full bg-brass px-3 font-mono text-[11px] uppercase tracking-wider text-paper"
+      >
+        {STAGE_LABELS[stage]}
+      </span>
+    );
+  }
+
   const currentIndex = MEETING_LIFECYCLE_STAGES.indexOf(stage);
 
   return (
