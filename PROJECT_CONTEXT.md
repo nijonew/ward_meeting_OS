@@ -1284,17 +1284,24 @@ before fully closing it out.
   filtered by date despite its name -- it returns literally every
   meeting ever, oldest first, and the existing auto-archive sweep only
   changes a past meeting's *stage*, it never stopped that meeting from
-  still being listed on `/dashboard`. Fixed by hiding `stage ===
+  still being listed on `/dashboard`. First pass hid `stage ===
   "archived"` meetings from the list by default, with a new "Show past
   meetings" / "Hide past meetings" toggle (`?past=1`, alongside the
   existing `type`/`readonly` params, all three preserved across each
-  other via a new local `dashboardHref` helper) rather than removing
-  access to old meetings outright -- a past meeting that never got
-  archived (the "No Activity" case) still shows by default regardless,
-  since that badge exists specifically to flag something that still
-  needs attention, and an admin wanting to revisit an old archived
-  meeting (e.g. to review its minutes, per the Vision workflow) can
-  still reach it via the toggle.
+  other via a new local `dashboardHref` helper).
+
+  **Corrected minutes later, same day** -- the user's immediate
+  follow-up: "today is 9/9/2026 and I am still seeing meetings to plan
+  for back in august." Filtering by `stage` alone was too narrow: a
+  past meeting that never got any real activity recorded stays
+  un-archived forever by design (the "No Activity" case -- see
+  `autoArchivePastMeetings`), so every old, never-touched meeting was
+  still sitting in the default view no matter how old. The filter is
+  now purely date-based -- hidden by default is simply "date is before
+  today," archived or not -- which is what actually matches "out of
+  date." `?past=1` still brings every past meeting back (date, stage,
+  and "No Activity" badge all intact) for anyone who needs to find one,
+  e.g. to review an archived meeting's minutes per the Vision workflow.
 
   **"Meeting Agendas" split into its own per-type hub, same day**, per
   the user's follow-up: "add tile for each meeting type under meeting

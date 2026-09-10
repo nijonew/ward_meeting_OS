@@ -175,16 +175,21 @@ export default async function DashboardPage({
   const isReadOnly = rawReadOnly === "1";
   // getUpcomingMeetings() returns literally every meeting ever, despite
   // its name -- auto-archiving only changes a past meeting's *stage*,
-  // it never stopped that meeting from still being listed here. Per the
-  // user's report (2026-09-09): "I still have out of date meetings
-  // showing up in the dashboard." Archived meetings are hidden by
-  // default now (below); a not-yet-archived past meeting (the "No
-  // Activity" case -- see autoArchivePastMeetings) still shows, since
-  // that badge exists specifically to flag a meeting that still needs
-  // attention. ?past=1 brings archived ones back for anyone who does
-  // need to find one (e.g. to review its minutes) rather than losing
-  // that access outright.
+  // it never stopped that meeting from still being listed here. First
+  // pass (2026-09-09) filtered out only `stage === "archived"`, but the
+  // user's immediate follow-up ("today is 9/9/2026 and I am still
+  // seeing meetings to plan for back in august") showed that was too
+  // narrow -- a past meeting that never got any real activity recorded
+  // stays un-archived forever (see autoArchivePastMeetings/noActivity),
+  // so filtering by stage alone still left every old, untouched test/
+  // stale meeting sitting in the default view indefinitely. Filtering
+  // by date instead: hidden by default is simply "date is before
+  // today," archived or not. ?past=1 still brings every past meeting
+  // back (its own date, stage, and "No Activity" badge intact) for
+  // anyone who needs to find one, e.g. to review an archived meeting's
+  // minutes.
   const showPast = rawPast === "1";
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   const { user, profile } = await getSessionUser();
 
@@ -207,7 +212,7 @@ export default async function DashboardPage({
   const [allMeetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
   const meetings = allMeetings
     .filter((m) => !typeFilter || m.meetingType === typeFilter)
-    .filter((m) => showPast || m.stage !== "archived");
+    .filter((m) => showPast || m.date >= todayIso);
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
   const canCreate = profile?.role === "bishopric" && !isReadOnly;
   const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
