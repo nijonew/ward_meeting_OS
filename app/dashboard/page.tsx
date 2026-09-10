@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
+import { LedgerIndex } from "@/components/LedgerIndex";
 import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
@@ -48,11 +49,13 @@ function MeetingRow({
   isBuilt,
   canManage,
   showType,
+  position,
 }: {
   meeting: Meeting;
   isBuilt: boolean;
   canManage: boolean;
   showType: boolean;
+  position: number;
 }) {
   // Admins land on the meeting's own hub (tabs for Planning/Conducting/
   // Public, or Template/Planning/Live) same as always; everyone else
@@ -83,7 +86,10 @@ function MeetingRow({
   };
 
   return (
-    <tr className={["border-t border-rule/60", meeting.cancelled ? "bg-red-950/5" : ""].join(" ")}>
+    <tr className={["border-t border-rule-strong/40", meeting.cancelled ? "bg-red-950/5" : ""].join(" ")}>
+      <td className="px-2 py-2 align-top">
+        <LedgerIndex position={position} current={position === 1} />
+      </td>
       <td className="px-2 py-2 align-top">{dateCell}</td>
       {showType && <td className="px-2 py-2 align-top text-sm text-ink-muted">{meeting.title}</td>}
       <td className="px-2 py-2 align-top">
@@ -347,6 +353,7 @@ export default async function DashboardPage({
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
+                  <th className="w-8 px-2 py-2" aria-hidden="true" />
                   <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                     Date
                   </th>
@@ -362,13 +369,14 @@ export default async function DashboardPage({
                 </tr>
               </thead>
               <tbody>
-                {meetings.map((meeting) => (
+                {meetings.map((meeting, i) => (
                   <MeetingRow
                     key={meeting.id}
                     meeting={meeting}
                     isBuilt={builtSlugs.has(meeting.meetingType)}
                     canManage={canCreate}
                     showType={!typeFilter}
+                    position={i + 1}
                   />
                 ))}
               </tbody>
