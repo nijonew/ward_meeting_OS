@@ -29,7 +29,7 @@ export function RabnmSection({
   };
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Recognitions / Advancements / Baptisms / New Members</h2>
 
       {items.length > 0 && (
@@ -41,19 +41,19 @@ export function RabnmSection({
             return (
               <li
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
               >
                 <span>
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                     {typeLabel(item.type)}
                   </span>{" "}
                   {item.people.length > 0 && <span>{item.people.join(", ")}</span>}
-                  {item.calling_name && <span> &mdash; {item.calling_name}</span>}
-                  {item.detail && <span className="text-slate"> ({item.detail})</span>}
+                  {item.calling_name && <span> &middot; {item.calling_name}</span>}
+                  {item.detail && <span className="text-ink-muted"> ({item.detail})</span>}
                 </span>
                 {canEdit && (
                   <form action={remove}>
-                    <button type="submit" className="text-xs text-slate hover:text-ink">
+                    <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                       Remove
                     </button>
                   </form>
@@ -69,7 +69,7 @@ export function RabnmSection({
         // visibility) resets cleanly after a successful add.
         <RabnmAddForm key={items.length} onAdd={add} people={people} callings={callings} />
       ) : (
-        items.length === 0 && <p className="mt-4 text-sm text-slate">Nothing recorded yet.</p>
+        items.length === 0 && <p className="mt-4 text-sm text-ink-muted">Nothing recorded yet.</p>
       )}
     </div>
   );

@@ -78,18 +78,18 @@ export function RuleForm({
         <button
           type="submit"
           disabled={pending}
-          className="w-fit rounded-md bg-ink px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+          className="w-fit rounded bg-accent px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
         >
           {pending ? "Saving..." : submitLabel}
         </button>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="text-xs text-slate hover:text-ink">
+          <button type="button" onClick={onCancel} className="text-xs text-ink-muted hover:text-ink">
             Cancel
           </button>
         )}
       </div>
 
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {state.error && <p className="text-sm text-danger">{state.error}</p>}
     </form>
   );
 }

@@ -32,10 +32,10 @@ export function SpeakerPersonOrGuestField({
           name="guest_name"
           defaultValue={defaultGuestName}
           placeholder="Guest name"
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <input type="hidden" name="person_id" value="" />
-        <button type="button" onClick={() => setShowGuest(false)} className="text-xs text-slate hover:text-ink">
+        <button type="button" onClick={() => setShowGuest(false)} className="text-xs text-ink-muted hover:text-ink">
           Choose from People instead
         </button>
       </div>
@@ -47,9 +47,9 @@ export function SpeakerPersonOrGuestField({
       <select
         name="person_id"
         defaultValue={defaultPersonId}
-        className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+        className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
       >
-        <option value="">&mdash; Choose speaker &mdash;</option>
+        <option value="">Choose speaker</option>
         {people.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -57,7 +57,7 @@ export function SpeakerPersonOrGuestField({
         ))}
       </select>
       <input type="hidden" name="guest_name" value="" />
-      <button type="button" onClick={() => setShowGuest(true)} className="text-xs text-slate hover:text-ink">
+      <button type="button" onClick={() => setShowGuest(true)} className="text-xs text-ink-muted hover:text-ink">
         Guest speaker instead
       </button>
     </div>

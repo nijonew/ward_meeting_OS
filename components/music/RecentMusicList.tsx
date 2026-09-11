@@ -14,11 +14,11 @@ function formatDate(iso: string) {
 
 export function RecentMusicList({ items }: { items: RecentMusicItem[] }) {
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Upcoming Submissions</h2>
 
       {items.length === 0 ? (
-        <p className="mt-3 text-sm text-slate">Nothing submitted yet.</p>
+        <p className="mt-3 text-sm text-ink-muted">Nothing submitted yet.</p>
       ) : (
         <ul className="mt-3 flex flex-col gap-1.5">
           {items.map((item) => (
@@ -26,14 +26,14 @@ export function RecentMusicList({ items }: { items: RecentMusicItem[] }) {
               key={item.id}
               className="flex flex-wrap items-center gap-2 border-b border-rule/40 py-1.5 text-sm last:border-0"
             >
-              <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                 {formatDate(item.date)}
               </span>
               <span>
                 &middot; {typeLabel(item.type)}
-                {item.piece_name && <> &mdash; {item.piece_name}</>}
+                {item.piece_name && <> &middot; {item.piece_name}</>}
                 {item.hymn_number && <> (Hymn {item.hymn_number})</>}
-                {item.performer && <span className="text-slate"> &middot; {item.performer}</span>}
+                {item.performer && <span className="text-ink-muted"> &middot; {item.performer}</span>}
               </span>
             </li>
           ))}

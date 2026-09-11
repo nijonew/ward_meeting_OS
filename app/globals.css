@@ -1,17 +1,31 @@
 @import "tailwindcss";
 
+/*
+ * Palette and type from design.md ("The Ledger", chosen 2026-09-10).
+ * Token names are semantic on purpose (ink / accent / rule, not brass /
+ * slate / sage) -- every component across the app already references
+ * these Tailwind utility names (bg-accent, text-ink-muted, bg-surface,
+ * border-rule, etc.), so changing a value here reskins the whole app at
+ * once without touching component markup. See design.md for the full
+ * rationale, the OKLCH table, and which components still owe a shape
+ * pass (radius/fill) beyond this color-and-type migration.
+ */
 @theme {
-  --color-ink: #232a3b;
-  --color-paper: #faf8f3;
-  --color-card: #fdfcf8;
-  --color-brass: #9c7a3c;
-  --color-slate: #5b6472;
-  --color-sage: #6b7f6e;
-  --color-rule: #d8d2c4;
+  --color-paper: oklch(96% 0.004 250);
+  --color-surface: oklch(99% 0.002 250);
+  --color-ink: oklch(21% 0.02 260);
+  --color-ink-muted: oklch(46% 0.015 255);
+  --color-rule: oklch(87% 0.008 250);
+  --color-rule-strong: oklch(65% 0.02 255);
+  --color-accent: oklch(38% 0.11 20);
+  --color-accent-deep: oklch(29% 0.1 20);
+  --color-accent-soft: oklch(93% 0.025 20);
+  --color-success: oklch(44% 0.08 150);
+  --color-danger: oklch(47% 0.14 38);
 
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
 @layer base {
@@ -22,12 +36,12 @@
   }
 
   ::selection {
-    background-color: var(--color-brass);
-    color: var(--color-paper);
+    background-color: var(--color-accent);
+    color: var(--color-surface);
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-brass);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 
@@ -42,5 +56,40 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+}
+
+/*
+ * Structural motion (Phase 2, "Calm"): content rises into place on load
+ * -- 8-12px translate plus a fade, ~250ms, ease-out, no pinning or
+ * scroll-scrubbing (design.md's Motion section). This is a deliberate
+ * CSS stand-in; Phase 5 replaces it with real Lenis/GSAP wiring per the
+ * redesign process, so keep this block easy to delete wholesale later.
+ *
+ * Reduced-motion is respected by construction: .rise-in only gets an
+ * animation inside the no-preference media query, so a
+ * prefers-reduced-motion user simply sees the element at its resting
+ * opacity/position with no animation ever running.
+ */
+@layer utilities {
+  .rise-in {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rise-in {
+      animation: rise-in 260ms ease-out both;
+    }
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

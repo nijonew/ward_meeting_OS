@@ -6,7 +6,7 @@ import type { CadenceShape } from "@/lib/data/cadence";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const NTH_NAMES = ["1st", "2nd", "3rd", "4th", "5th"];
 
-export const CADENCE_SELECT_CLASS = "rounded-md border border-rule bg-paper px-2 py-2 text-xs text-ink";
+export const CADENCE_SELECT_CLASS = "rounded border border-rule bg-paper px-2 py-2 text-xs text-ink";
 
 /**
  * The weekly / nth-of-month / relative cadence picker, shared by every
@@ -44,7 +44,7 @@ export function CadenceFields({
       </select>
 
       {cadence === "weekly" && (
-        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-slate sm:col-span-4">
+        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted sm:col-span-4">
           Every
           <select name="day_of_week" required defaultValue={initialValues?.day_of_week ?? ""} className={CADENCE_SELECT_CLASS}>
             <option value="" disabled>
@@ -60,7 +60,7 @@ export function CadenceFields({
       )}
 
       {cadence === "nth_weekday" && (
-        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-slate sm:col-span-4">
+        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted sm:col-span-4">
           The
           <select
             name="nth_occurrence"
@@ -92,7 +92,7 @@ export function CadenceFields({
       )}
 
       {cadence === "relative" && (
-        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-slate sm:col-span-4">
+        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted sm:col-span-4">
           The
           <select
             name="anchor_nth_occurrence"

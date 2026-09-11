@@ -15,16 +15,19 @@ export async function AppHeader({ tag }: { tag?: string }) {
 
   return (
     <header className="flex items-baseline justify-between border-b border-rule pb-6">
-      <Link href="/" className="font-display text-xl tracking-tight">
+      <Link
+        href="/"
+        className="font-display text-xl tracking-tight text-ink transition-colors hover:text-ink-muted"
+      >
         Ward OS
       </Link>
       <div className="flex items-center gap-4">
-        {tag && <span className="font-mono text-xs uppercase tracking-widest text-slate">{tag}</span>}
+        {tag && <span className="font-mono text-xs uppercase tracking-wider text-ink-muted">{tag}</span>}
         {user ? (
           <form action={signOut}>
             <button
               type="submit"
-              className="font-mono text-xs uppercase tracking-widest text-slate transition-colors hover:text-ink"
+              className="font-mono text-xs uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
             >
               Sign out
             </button>
@@ -32,7 +35,7 @@ export async function AppHeader({ tag }: { tag?: string }) {
         ) : (
           <Link
             href="/login"
-            className="font-mono text-xs uppercase tracking-widest text-slate transition-colors hover:text-ink"
+            className="font-mono text-xs uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
           >
             Sign in
           </Link>

@@ -7,7 +7,7 @@ import type { AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
 
 const initialState: { error?: string; success?: boolean } = {};
-const INPUT = "w-full rounded-md border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
+const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
 
 function PersonSelect({
   name,
@@ -20,7 +20,7 @@ function PersonSelect({
 }) {
   return (
     <select name={name} defaultValue={defaultValue} className={INPUT}>
-      <option value="">&mdash; Unassigned &mdash;</option>
+      <option value="">Unassigned</option>
       {people.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -150,9 +150,9 @@ export function AgendaGridForm({
                   <tr key={row.id} className="border-t border-rule/60">
                     <td colSpan={2} className="px-2 py-2 text-center">
                       <span className="font-display text-sm italic text-ink">{row.label}</span>
-                      {row.note && <span className="ml-2 text-xs text-slate/60">{row.note}</span>}
+                      {row.note && <span className="ml-2 text-xs text-ink-muted/60">{row.note}</span>}
                       {row.href && (
-                        <Link href={row.href} className="ml-2 text-xs text-slate underline hover:text-ink">
+                        <Link href={row.href} className="ml-2 text-xs text-ink-muted underline hover:text-ink">
                           Manage &rarr;
                         </Link>
                       )}
@@ -165,7 +165,7 @@ export function AgendaGridForm({
                 return (
                   <tr key={row.id} className="border-t-2 border-rule">
                     <td colSpan={2} className="px-2 pb-1 pt-4">
-                      <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                         {row.label}
                       </span>
                     </td>
@@ -273,7 +273,7 @@ export function AgendaGridForm({
                     {row.kind === "recognize_music" && (
                       <div className="flex flex-col gap-1.5 sm:flex-row">
                         <div className="sm:w-1/2">
-                          <label className="block text-[10px] uppercase tracking-widest text-slate/60">
+                          <label className="block text-[10px] uppercase tracking-wider text-ink-muted/60">
                             Chorister
                           </label>
                           <PersonSelect
@@ -283,7 +283,7 @@ export function AgendaGridForm({
                           />
                         </div>
                         <div className="sm:w-1/2">
-                          <label className="block text-[10px] uppercase tracking-widest text-slate/60">
+                          <label className="block text-[10px] uppercase tracking-wider text-ink-muted/60">
                             Organist
                           </label>
                           <PersonSelect
@@ -309,12 +309,12 @@ export function AgendaGridForm({
           <button
             type="submit"
             disabled={!dirty || pending}
-            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending ? "Saving..." : "Save All Changes"}
           </button>
-          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-          {!pending && !dirty && state.success && !state.error && <p className="text-sm text-sage">Saved.</p>}
+          {state.error && <p className="text-sm text-danger">{state.error}</p>}
+          {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
         </div>
       )}
     </form>

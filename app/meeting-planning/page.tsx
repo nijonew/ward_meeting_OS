@@ -36,7 +36,7 @@ export default async function MeetingPlanningPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Planning" />
-        <p className="mt-10 text-slate">Only the Bishopric can access meeting planning.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can access meeting planning.</p>
       </main>
     );
   }
@@ -45,12 +45,12 @@ export default async function MeetingPlanningPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader tag="Meeting Planning" />
 
-      <Link href="/" className="mt-6 text-xs text-slate hover:text-ink">
+      <Link href="/" className="mt-6 text-xs text-ink-muted hover:text-ink">
         &larr; Home
       </Link>
 
-      <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Planning</h1>
-      <p className="mt-2 text-sm text-slate">
+      <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Planning</h1>
+      <p className="mt-2 text-sm text-ink-muted">
         Schedule, cancel, and adjust rotations, or jump into a meeting&rsquo;s own agenda.
       </p>
 

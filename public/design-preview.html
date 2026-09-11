@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ward OS — Design Direction Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=Courier+Prime:wght@400;700&family=Archivo:wght@500;700;800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: oklch(96% 0.003 250);
+    --ink: oklch(20% 0.01 250);
+    --muted: oklch(48% 0.01 250);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+  .intro {
+    max-width: 62ch;
+    margin-bottom: 3rem;
+  }
+  .intro p.eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+  }
+  .intro h1 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    line-height: 1.25;
+    margin: 0 0 0.75rem;
+    font-weight: 500;
+  }
+  .intro p.sub {
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.6;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(320px, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .columns { grid-template-columns: 1fr; max-width: 560px; margin: 0 auto; }
+  }
+
+  .direction {
+    border-radius: var(--radius, 10px);
+    padding: 2rem 1.75rem 2.25rem;
+    background: var(--paper);
+    color: var(--fg);
+    position: relative;
+    overflow: hidden;
+  }
+  .direction.recommended {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .badge {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: var(--accent-on);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+  }
+  .direction .kicker {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    margin: 0 0 0.4rem;
+  }
+  .direction h2 {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem;
+    line-height: 1.2;
+  }
+
+  /* swatches */
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.75rem;
+  }
+  .swatch {
+    border-radius: 6px;
+    padding: 0.6rem 0.55rem 0.5rem;
+    font-family: var(--mono);
+  }
+  .swatch .name {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: block;
+  }
+  .swatch .value {
+    font-size: 0.56rem;
+    opacity: 0.75;
+    display: block;
+    margin-top: 0.2rem;
+  }
+
+  /* type sample */
+  .type-sample {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+    margin-bottom: 1.75rem;
+  }
+  .type-sample .thesis {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.15rem;
+    line-height: 1.35;
+    margin: 0 0 0.6rem;
+  }
+  .type-sample .body-sample {
+    font-family: var(--body);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--muted-fg);
+    margin: 0 0 0.6rem;
+  }
+  .type-sample .mono-sample {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  .type-sample .face-labels {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted-fg);
+    margin-top: 0.9rem;
+    line-height: 1.7;
+  }
+
+  /* representative UI */
+  .ui-demo {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+    margin-bottom: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .ui-tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 10px);
+    padding: 0.85rem 1rem;
+  }
+  .ui-tile .ui-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    margin: 0 0 0.3rem;
+  }
+  .ui-tile .ui-title {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0 0 0.15rem;
+  }
+  .ui-tile .ui-desc {
+    font-family: var(--body);
+    font-size: 0.82rem;
+    color: var(--muted-fg);
+    margin: 0;
+  }
+  .ui-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 10px);
+    padding: 0.65rem 0.9rem;
+    font-family: var(--body);
+    font-size: 0.82rem;
+  }
+  .ui-row .role { color: var(--muted-fg); }
+  .ui-row .pill {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: var(--accent-on);
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .ui-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .ui-btn {
+    font-family: var(--body);
+    font-weight: 600;
+    font-size: 0.82rem;
+    background: var(--accent);
+    color: var(--accent-on);
+    border: none;
+    border-radius: var(--radius, 8px);
+    padding: 0.55rem 1rem;
+    cursor: default;
+  }
+  .ui-link {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+  }
+
+  .reason {
+    font-family: var(--body);
+    font-style: normal;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--fg);
+    border-top: 1px solid var(--line);
+    padding-top: 1.1rem;
+    margin: 0;
+  }
+  .reason strong { color: var(--accent); font-weight: 600; }
+
+  .pick {
+    margin-top: 3.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid oklch(85% 0.005 250);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  /* ---------- Direction A: The Program ---------- */
+  .direction.a {
+    --paper: oklch(96.5% 0.008 85);
+    --surface: oklch(99% 0.004 85);
+    --fg: oklch(23% 0.025 255);
+    --muted-fg: oklch(50% 0.02 250);
+    --line: oklch(87% 0.012 85);
+    --accent: oklch(40% 0.085 215);
+    --accent-on: oklch(98% 0.01 215);
+    --display: 'Bricolage Grotesque', sans-serif;
+    --body: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --radius: 8px;
+  }
+
+  /* ---------- Direction B: The Gathering ---------- */
+  .direction.b {
+    --paper: oklch(95.5% 0.01 75);
+    --surface: oklch(98% 0.006 75);
+    --fg: oklch(26% 0.02 60);
+    --muted-fg: oklch(51% 0.018 70);
+    --line: oklch(84% 0.014 75);
+    --accent: oklch(42% 0.07 150);
+    --accent-on: oklch(98% 0.01 150);
+    --display: 'Schibsted Grotesk', sans-serif;
+    --body: 'Work Sans', sans-serif;
+    --mono: 'Courier Prime', monospace;
+    --radius: 12px;
+  }
+
+  /* ---------- Direction C: The Ledger ---------- */
+  .direction.c {
+    --paper: oklch(96% 0.004 250);
+    --surface: oklch(99% 0.002 250);
+    --fg: oklch(21% 0.02 260);
+    --muted-fg: oklch(46% 0.015 255);
+    --line: oklch(80% 0.01 250);
+    --accent: oklch(38% 0.11 20);
+    --accent-on: oklch(98% 0.005 20);
+    --display: 'Archivo', sans-serif;
+    --body: 'Public Sans', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --radius: 4px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="intro">
+      <p class="eyebrow">Ward OS — Phase 1 · Design Direction</p>
+      <h1>Efficient enough for a volunteer&rsquo;s spare hour, quiet enough for Sunday morning.</h1>
+      <p class="sub">Three directions, same underlying app. Each one is a genuinely different palette, type pairing, and visual character &mdash; not a color swap on the same template. Pick the one that feels right, or tell me to go with the recommended one.</p>
+    </div>
+
+    <div class="columns">
+
+      <!-- DIRECTION A -->
+      <section class="direction a recommended">
+        <span class="badge">Recommended</span>
+        <p class="kicker">Direction 1</p>
+        <h2>The Program</h2>
+
+        <div class="swatches">
+          <div class="swatch" style="background: var(--paper); color: var(--fg); border: 1px solid var(--line);">
+            <span class="name">Paper</span><span class="value">oklch(96.5% .008 85)</span>
+          </div>
+          <div class="swatch" style="background: var(--fg); color: var(--paper);">
+            <span class="name">Ink</span><span class="value">oklch(23% .025 255)</span>
+          </div>
+          <div class="swatch" style="background: var(--accent); color: var(--accent-on);">
+            <span class="name">Accent</span><span class="value">oklch(40% .085 215)</span>
+          </div>
+          <div class="swatch" style="background: var(--surface); color: var(--fg); border: 1px solid var(--line);">
+            <span class="name">Surface</span><span class="value">oklch(99% .004 85)</span>
+          </div>
+          <div class="swatch" style="background: var(--muted-fg); color: var(--paper);">
+            <span class="name">Muted</span><span class="value">oklch(50% .02 250)</span>
+          </div>
+          <div class="swatch" style="background: var(--line); color: var(--fg);">
+            <span class="name">Line</span><span class="value">oklch(87% .012 85)</span>
+          </div>
+        </div>
+
+        <div class="type-sample">
+          <p class="thesis">Efficient enough for a volunteer&rsquo;s spare hour, quiet enough for Sunday morning.</p>
+          <p class="body-sample">Rotations, hymns, and speakers are already in place before you open the page &mdash; add only what takes an actual person to think of.</p>
+          <p class="mono-sample">Sacrament Meeting &middot; Sep 13</p>
+          <p class="face-labels">Display: Bricolage Grotesque &nbsp;/&nbsp; Body: IBM Plex Sans &nbsp;/&nbsp; Utility: IBM Plex Mono</p>
+        </div>
+
+        <div class="ui-demo">
+          <div class="ui-tile">
+            <p class="ui-eyebrow">This week</p>
+            <p class="ui-title">Sacrament Meeting Program</p>
+            <p class="ui-desc">Today&rsquo;s program</p>
+          </div>
+          <div class="ui-row">
+            <span class="role">Opening Hymn &mdash; &ldquo;Come, Thou Fount&rdquo;</span>
+            <span class="pill">Set</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-link">&larr; Meeting Planning</span>
+            <span class="ui-actions"><button class="ui-btn">Save All Changes</button></span>
+          </div>
+        </div>
+
+        <p class="reason"><strong>Why it fits &mdash;</strong> Built on the Church&rsquo;s own real digital language: the same clean sans and quiet teal used at churchofjesuschrist.org, shaped into the printed program every member already holds.</p>
+      </section>
+
+      <!-- DIRECTION B -->
+      <section class="direction b">
+        <p class="kicker">Direction 2</p>
+        <h2>The Gathering</h2>
+
+        <div class="swatches">
+          <div class="swatch" style="background: var(--paper); color: var(--fg); border: 1px solid var(--line);">
+            <span class="name">Linen</span><span class="value">oklch(95.5% .01 75)</span>
+          </div>
+          <div class="swatch" style="background: var(--fg); color: var(--paper);">
+            <span class="name">Ink</span><span class="value">oklch(26% .02 60)</span>
+          </div>
+          <div class="swatch" style="background: var(--accent); color: var(--accent-on);">
+            <span class="name">Accent</span><span class="value">oklch(42% .07 150)</span>
+          </div>
+          <div class="swatch" style="background: var(--surface); color: var(--fg); border: 1px solid var(--line);">
+            <span class="name">Surface</span><span class="value">oklch(98% .006 75)</span>
+          </div>
+          <div class="swatch" style="background: var(--muted-fg); color: var(--paper);">
+            <span class="name">Muted</span><span class="value">oklch(51% .018 70)</span>
+          </div>
+          <div class="swatch" style="background: var(--line); color: var(--fg);">
+            <span class="name">Seam</span><span class="value">oklch(84% .014 75)</span>
+          </div>
+        </div>
+
+        <div class="type-sample">
+          <p class="thesis">Efficient enough for a volunteer&rsquo;s spare hour, quiet enough for Sunday morning.</p>
+          <p class="body-sample">Rotations, hymns, and speakers are already in place before you open the page &mdash; add only what takes an actual person to think of.</p>
+          <p class="mono-sample">Sacrament Meeting &middot; Sep 13</p>
+          <p class="face-labels">Display: Schibsted Grotesk &nbsp;/&nbsp; Body: Work Sans &nbsp;/&nbsp; Utility: Courier Prime</p>
+        </div>
+
+        <div class="ui-demo">
+          <div class="ui-tile">
+            <p class="ui-eyebrow">This week</p>
+            <p class="ui-title">Sacrament Meeting Program</p>
+            <p class="ui-desc">Today&rsquo;s program</p>
+          </div>
+          <div class="ui-row">
+            <span class="role">Opening Hymn &mdash; &ldquo;Come, Thou Fount&rdquo;</span>
+            <span class="pill">Set</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-link">&larr; Meeting Planning</span>
+            <span class="ui-actions"><button class="ui-btn">Save All Changes</button></span>
+          </div>
+        </div>
+
+        <p class="reason"><strong>Why it fits &mdash;</strong> Built for the volunteer at the kitchen table on a Tuesday night: warm and unhurried, organized like notes passed around a full room, not a corporate dashboard.</p>
+      </section>
+
+      <!-- DIRECTION C -->
+      <section class="direction c">
+        <p class="kicker">Direction 3</p>
+        <h2>The Ledger</h2>
+
+        <div class="swatches">
+          <div class="swatch" style="background: var(--paper); color: var(--fg); border: 1px solid var(--line);">
+            <span class="name">Paper</span><span class="value">oklch(96% .004 250)</span>
+          </div>
+          <div class="swatch" style="background: var(--fg); color: var(--paper);">
+            <span class="name">Ink</span><span class="value">oklch(21% .02 260)</span>
+          </div>
+          <div class="swatch" style="background: var(--accent); color: var(--accent-on);">
+            <span class="name">Accent</span><span class="value">oklch(38% .11 20)</span>
+          </div>
+          <div class="swatch" style="background: var(--surface); color: var(--fg); border: 1px solid var(--line);">
+            <span class="name">Surface</span><span class="value">oklch(99% .002 250)</span>
+          </div>
+          <div class="swatch" style="background: var(--muted-fg); color: var(--paper);">
+            <span class="name">Muted</span><span class="value">oklch(46% .015 255)</span>
+          </div>
+          <div class="swatch" style="background: var(--line); color: var(--fg);">
+            <span class="name">Rule</span><span class="value">oklch(80% .01 250)</span>
+          </div>
+        </div>
+
+        <div class="type-sample">
+          <p class="thesis">Efficient enough for a volunteer&rsquo;s spare hour, quiet enough for Sunday morning.</p>
+          <p class="body-sample">Rotations, hymns, and speakers are already in place before you open the page &mdash; add only what takes an actual person to think of.</p>
+          <p class="mono-sample">Sacrament Meeting &middot; Sep 13</p>
+          <p class="face-labels">Display: Archivo &nbsp;/&nbsp; Body: Public Sans &nbsp;/&nbsp; Utility: JetBrains Mono</p>
+        </div>
+
+        <div class="ui-demo">
+          <div class="ui-tile">
+            <p class="ui-eyebrow">This week</p>
+            <p class="ui-title">Sacrament Meeting Program</p>
+            <p class="ui-desc">Today&rsquo;s program</p>
+          </div>
+          <div class="ui-row">
+            <span class="role">Opening Hymn &mdash; &ldquo;Come, Thou Fount&rdquo;</span>
+            <span class="pill">Set</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-link">&larr; Meeting Planning</span>
+            <span class="ui-actions"><button class="ui-btn">Save All Changes</button></span>
+          </div>
+        </div>
+
+        <p class="reason"><strong>Why it fits &mdash;</strong> Treats the meeting itself as the object of design: ordered and numbered, for the leader who needs to scan a whole agenda in under a minute before it starts.</p>
+      </section>
+
+    </div>
+
+    <p class="pick">Reply 1, 2, or 3 &mdash; or say &ldquo;go with the recommendation.&rdquo;</p>
+  </div>
+</body>
+</html>

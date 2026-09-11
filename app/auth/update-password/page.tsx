@@ -11,11 +11,11 @@ export default function UpdatePasswordPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <Link href="/login" className="text-xs text-slate hover:text-ink">
+      <Link href="/login" className="text-xs text-ink-muted hover:text-ink">
         &larr; Sign in
       </Link>
       <h1 className="mt-2 font-display text-2xl">Set your password</h1>
-      <p className="mt-2 text-sm text-slate">Choose a password you&rsquo;ll use to sign in from now on.</p>
+      <p className="mt-2 text-sm text-ink-muted">Choose a password you&rsquo;ll use to sign in from now on.</p>
 
       <form action={formAction} className="mt-6 flex flex-col gap-3">
         <input
@@ -24,7 +24,7 @@ export default function UpdatePasswordPage() {
           required
           minLength={8}
           placeholder="New password (8+ characters)"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
         <input
           type="password"
@@ -32,16 +32,16 @@ export default function UpdatePasswordPage() {
           required
           minLength={8}
           placeholder="Confirm password"
-          className="rounded-md border border-rule bg-card px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
         >
           {pending ? "Saving..." : "Set password"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
       </form>
     </main>
   );

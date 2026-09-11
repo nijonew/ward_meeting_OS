@@ -31,7 +31,7 @@ export function PushCallingForm({
           name="meeting_id"
           required
           defaultValue=""
-          className="rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+          className="rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
         >
           <option value="" disabled>
             Choose meeting&hellip;
@@ -45,13 +45,13 @@ export function PushCallingForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-brass px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-brass/90 disabled:opacity-50"
+          className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent/90 disabled:opacity-50"
         >
           {pending ? "Adding..." : "Add to Sacrament Meeting"}
         </button>
       </form>
-      {state.error && <p className="mt-1 text-xs text-red-600">{state.error}</p>}
-      {!pending && state.success && !state.error && <p className="mt-1 text-xs text-sage">Added.</p>}
+      {state.error && <p className="mt-1 text-xs text-danger">{state.error}</p>}
+      {!pending && state.success && !state.error && <p className="mt-1 text-xs text-success">Added.</p>}
     </div>
   );
 }

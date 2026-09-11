@@ -23,12 +23,12 @@ const SACRAMENT_CONTENT_TABLES = new Set([
 
 function TableList({ tables }: { tables: AdminTableConfig[] }) {
   return (
-    <ul className="divide-y divide-rule rounded-lg border border-rule bg-card">
+    <ul className="divide-y divide-rule rounded border border-rule bg-surface">
       {tables.map((t) => (
         <li key={t.table}>
           <Link href={`/admin/${t.table}`} className="flex items-baseline justify-between px-6 py-4 hover:bg-paper">
             <span className="font-medium text-ink">{t.label}</span>
-            {t.description && <span className="ml-4 truncate text-xs text-slate">{t.description}</span>}
+            {t.description && <span className="ml-4 truncate text-xs text-ink-muted">{t.description}</span>}
           </Link>
         </li>
       ))}
@@ -44,7 +44,7 @@ export default async function AdminIndexPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Admin" />
-        <p className="mt-10 text-slate">Only the Bishopric can access table admin.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can access table admin.</p>
       </main>
     );
   }
@@ -58,16 +58,16 @@ export default async function AdminIndexPage() {
       <AppHeader tag="Admin" />
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Table Admin</h1>
-        <p className="mt-2 text-sm text-slate">
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Table Admin</h1>
+        <p className="mt-2 text-sm text-ink-muted">
           Direct edit access to the underlying data tables. Fields tied to app logic (rotation order,
-          meeting stage, and the like) are intentionally left out here &mdash; use their dedicated pages
+          meeting stage, and the like) are intentionally left out here. Use their dedicated pages
           for those.
         </p>
       </section>
 
       {everydayTables.length === 0 ? (
-        <p className="text-sm text-slate">No tables configured yet.</p>
+        <p className="text-sm text-ink-muted">No tables configured yet.</p>
       ) : (
         <TableList tables={everydayTables} />
       )}
@@ -75,8 +75,8 @@ export default async function AdminIndexPage() {
       {sacramentTables.length > 0 && (
         <section>
           <h2 className="font-display text-xl">Sacrament Meeting Content</h2>
-          <p className="mt-1 text-xs text-slate">
-            Raw-data fallback for troubleshooting or a bulk fix &mdash; for everyday planning, open that
+          <p className="mt-1 text-xs text-ink-muted">
+            Raw-data fallback for troubleshooting or a bulk fix. For everyday planning, open that
             meeting&rsquo;s own Planning view instead. It already brings Music, Speakers, RABNM, and
             Rotations together in one screen for that meeting.
           </p>
@@ -88,17 +88,17 @@ export default async function AdminIndexPage() {
 
       <section>
         <h2 className="font-display text-xl">Other Admin Tools</h2>
-        <p className="mt-1 text-xs text-slate">
+        <p className="mt-1 text-xs text-ink-muted">
           Not generic-grid editors -- these have dedicated add/remove/reorder UIs of their own.
         </p>
-        <ul className="mt-3 divide-y divide-rule rounded-lg border border-rule bg-card">
+        <ul className="mt-3 divide-y divide-rule rounded border border-rule bg-surface">
           <li>
             <Link
               href="/admin/meeting-templates"
               className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
             >
               <span className="font-medium text-ink">Meeting Templates</span>
-              <span className="ml-4 truncate text-xs text-slate">
+              <span className="ml-4 truncate text-xs text-ink-muted">
                 Default agenda elements new meetings are seeded with, by meeting type (and format,
                 for Sacrament Meeting)
               </span>

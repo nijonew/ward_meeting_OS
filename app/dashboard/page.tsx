@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
+import { LedgerIndex } from "@/components/LedgerIndex";
 import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
@@ -48,11 +49,13 @@ function MeetingRow({
   isBuilt,
   canManage,
   showType,
+  position,
 }: {
   meeting: Meeting;
   isBuilt: boolean;
   canManage: boolean;
   showType: boolean;
+  position: number;
 }) {
   // Admins land on the meeting's own hub (tabs for Planning/Conducting/
   // Public, or Template/Planning/Live) same as always; everyone else
@@ -65,7 +68,7 @@ function MeetingRow({
   const dateCell = isBuilt ? (
     <Link
       href={href}
-      className="inline-flex items-center whitespace-nowrap rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+      className="inline-flex items-center whitespace-nowrap rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
     >
       {formatMeetingDate(meeting.date)}
     </Link>
@@ -83,24 +86,27 @@ function MeetingRow({
   };
 
   return (
-    <tr className={["border-t border-rule/60", meeting.cancelled ? "bg-red-950/5" : ""].join(" ")}>
+    <tr className={["border-t border-rule-strong/40", meeting.cancelled ? "bg-danger/5" : ""].join(" ")}>
+      <td className="px-2 py-2 align-top">
+        <LedgerIndex position={position} current={position === 1} />
+      </td>
       <td className="px-2 py-2 align-top">{dateCell}</td>
-      {showType && <td className="px-2 py-2 align-top text-sm text-slate">{meeting.title}</td>}
+      {showType && <td className="px-2 py-2 align-top text-sm text-ink-muted">{meeting.title}</td>}
       <td className="px-2 py-2 align-top">
         <div className="flex flex-wrap items-center gap-2">
           <LifecycleBadge stage={meeting.stage} compact />
           {!isBuilt && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/70">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
               Coming soon
             </span>
           )}
           {meeting.cancelled && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-red-700">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-danger">
               Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
             </span>
           )}
           {meeting.noActivity && !meeting.cancelled && (
-            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-slate/50">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-ink-muted/50">
               No Activity
             </span>
           )}
@@ -113,7 +119,7 @@ function MeetingRow({
             <form action={uncancel}>
               <button
                 type="submit"
-                className="whitespace-nowrap rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
+                className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
               >
                 Un-cancel
               </button>
@@ -211,11 +217,11 @@ export default async function DashboardPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meetings" />
-        <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
-        <p className="mt-4 text-slate">Sign in to see meetings.</p>
+        <h1 className="rise-in mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
+        <p className="mt-4 text-ink-muted">Sign in to see meetings.</p>
         <Link
           href="/login"
-          className="mt-4 inline-flex w-fit items-center rounded-md bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+          className="mt-4 inline-flex w-fit items-center rounded bg-accent px-5 py-2.5 font-body text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
         >
           Sign in
         </Link>
@@ -243,17 +249,17 @@ export default async function DashboardPage({
           second path needs a real breadcrumb back out -- `isReadOnly`
           already distinguishes the two contexts exactly. */}
       {!isReadOnly && (
-        <Link href="/meeting-agendas" className="mt-6 text-xs text-slate hover:text-ink">
+        <Link href="/meeting-agendas" className="mt-6 text-xs text-ink-muted hover:text-ink">
           &larr; Meeting Agendas
         </Link>
       )}
 
-      <h1 className="mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
+      <h1 className="rise-in mt-10 font-display text-3xl leading-tight sm:text-4xl">{dashboardPageTitle(typeFilter)}</h1>
 
       {canCreate && unassignedAgendaItems.length > 0 && (
-        <section className="mt-10 rounded-lg border border-rule bg-card p-6">
+        <section className="mt-10 rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Unassigned Agenda Items</h2>
-          <p className="mt-1 text-xs text-slate">
+          <p className="mt-1 text-xs text-ink-muted">
             Submitted through the public form without a specific meeting. Assign each one to a
             meeting to bring it into that meeting&rsquo;s Agenda Items for review.
           </p>
@@ -265,29 +271,29 @@ export default async function DashboardPage({
                 if (meetingId) await assignAgendaItemToMeeting(item.id, meetingId);
               };
               return (
-                <li key={item.id} className="rounded-md border border-rule/60 p-3 text-sm">
+                <li key={item.id} className="rounded border border-rule/60 p-3 text-sm">
                   <p className="text-ink">{item.title}</p>
-                  {item.body && <p className="mt-1 text-slate">{item.body}</p>}
-                  <p className="mt-1 text-[11px] text-slate/60">Submitted by {item.submitted_by_name}</p>
+                  {item.body && <p className="mt-1 text-ink-muted">{item.body}</p>}
+                  <p className="mt-1 text-[11px] text-ink-muted/60">Submitted by {item.submitted_by_name}</p>
                   <form action={assign} className="mt-2 flex items-center gap-2">
                     <select
                       name="meeting_id"
                       required
                       defaultValue=""
-                      className="flex-1 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+                      className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     >
                       <option value="" disabled>
                         Choose a meeting&hellip;
                       </option>
                       {allMeetings.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.title} &mdash; {formatMeetingDate(m.date)}
+                          {m.title} &middot; {formatMeetingDate(m.date)}
                         </option>
                       ))}
                     </select>
                     <button
                       type="submit"
-                      className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90"
+                      className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper hover:bg-accent-deep"
                     >
                       Assign
                     </button>
@@ -301,7 +307,7 @@ export default async function DashboardPage({
 
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-xs uppercase tracking-widest text-slate">
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">
             {typeFilter ? (
               // The type name is already in the h1 above ("<Type>
               // Planning Dashboard") once filtered -- repeating it here
@@ -311,7 +317,7 @@ export default async function DashboardPage({
               // instead of a second copy of the name.
               <Link
                 href={dashboardHref({ readonly: isReadOnly, past: showPast })}
-                className="normal-case tracking-normal text-slate/70 hover:text-ink"
+                className="normal-case tracking-normal text-ink-muted/70 hover:text-ink"
               >
                 Show all types
               </Link>
@@ -320,19 +326,19 @@ export default async function DashboardPage({
             )}
             <Link
               href={dashboardHref({ type: typeFilter, readonly: isReadOnly, past: !showPast })}
-              className="ml-3 normal-case tracking-normal text-slate/70 hover:text-ink"
+              className="ml-3 normal-case tracking-normal text-ink-muted/70 hover:text-ink"
             >
               {showPast ? "Hide past meetings" : "Show past meetings"}
             </Link>
           </p>
           {canCreate && (
             <span className="flex items-center gap-3">
-              <Link href="/meeting-schedule" className="text-xs text-slate hover:text-ink">
+              <Link href="/meeting-schedule" className="text-xs text-ink-muted hover:text-ink">
                 Meeting Schedule
               </Link>
               <Link
                 href="/meetings/new"
-                className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90"
+                className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep"
               >
                 + New Meeting
               </Link>
@@ -341,34 +347,36 @@ export default async function DashboardPage({
         </div>
 
         {meetings.length === 0 ? (
-          <p className="mt-4 text-slate">No meetings scheduled yet.</p>
+          <p className="mt-4 text-ink-muted">No meetings scheduled yet.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                  <th className="w-8 px-2 py-2" aria-hidden="true" />
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                     Date
                   </th>
                   {!typeFilter && (
-                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                    <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                       Type
                     </th>
                   )}
-                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                  <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                     Stage
                   </th>
                   <th className="px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {meetings.map((meeting) => (
+                {meetings.map((meeting, i) => (
                   <MeetingRow
                     key={meeting.id}
                     meeting={meeting}
                     isBuilt={builtSlugs.has(meeting.meetingType)}
                     canManage={canCreate}
                     showType={!typeFilter}
+                    position={i + 1}
                   />
                 ))}
               </tbody>
@@ -377,8 +385,8 @@ export default async function DashboardPage({
         )}
       </section>
 
-      <footer className="mt-auto pt-16 text-xs text-slate">
-        Ward OS &mdash; planning, conducting, and publishing meetings from one source of truth.
+      <footer className="mt-auto pt-16 text-xs text-ink-muted">
+        Ward OS &middot; planning, conducting, and publishing meetings from one source of truth.
       </footer>
     </main>
   );

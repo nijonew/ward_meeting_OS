@@ -8,7 +8,7 @@ import type { PersonOption } from "@/lib/data/people";
 import type { SelectOption } from "@/lib/data/select-options";
 
 const initialState: { error?: string; success?: boolean } = {};
-const INPUT_CLASS = "w-full min-w-[9rem] rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
+const INPUT_CLASS = "w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 type SortDirection = "asc" | "desc";
 
 const COLUMNS = [
@@ -144,7 +144,7 @@ export function CallingPlanningGridForm({
           <thead>
             <tr>
               {COLUMNS.map((c) => (
-                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   <button
                     type="button"
                     onClick={() => toggleSort(c.key)}
@@ -218,7 +218,7 @@ export function CallingPlanningGridForm({
                 </td>
                 <td className="px-2 py-1.5">
                   <select name={`${row.id}::release_person_id`} defaultValue={row.release_person_id ?? ""} className={INPUT_CLASS}>
-                    <option value="">&mdash; None / Previously Vacant &mdash;</option>
+                    <option value="">None / Previously Vacant</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -240,7 +240,7 @@ export function CallingPlanningGridForm({
                     type="button"
                     disabled={deleting}
                     onClick={() => removeRow(row.id)}
-                    className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                    className="text-xs text-danger/70 hover:text-danger disabled:opacity-30"
                   >
                     Delete
                   </button>
@@ -249,19 +249,19 @@ export function CallingPlanningGridForm({
             ))}
           </tbody>
         </table>
-        {visibleCount === 0 && <p className="mt-3 text-sm text-slate">No rows match the current filters.</p>}
+        {visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No rows match the current filters.</p>}
       </div>
 
       <div className="mt-4 flex items-center gap-3">
         <button
           type="submit"
           disabled={!dirty || pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-sage">Saved.</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
+        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
       </div>
     </form>
   );

@@ -24,34 +24,34 @@ export function GenerateForm({
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">{heading}</h2>
-      <p className="mt-1 text-sm text-slate">
+      <p className="mt-1 text-sm text-ink-muted">
         Creates real {itemLabelPlural} from the active cadence rules above, for any dates that
-        don&rsquo;t already have one. Safe to run again later &mdash; existing ones are never
+        don&rsquo;t already have one. Safe to run again later, since existing ones are never
         duplicated.
       </p>
 
       <form action={formAction} className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="text-xs text-slate">
+        <label className="text-xs text-ink-muted">
           Through
           <input
             type="date"
             name="through_date"
             required
-            className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+            className="ml-2 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
           />
         </label>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+          className="rounded bg-accent px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
         >
           {pending ? "Generating..." : "Generate"}
         </button>
       </form>
 
-      {state.error && <p className="mt-3 text-sm text-red-600">{state.error}</p>}
+      {state.error && <p className="mt-3 text-sm text-danger">{state.error}</p>}
       {state.created !== undefined && (
         <p className="mt-3 text-sm text-ink">
           Created {state.created} {state.created === 1 ? itemLabelSingular : itemLabelPlural}

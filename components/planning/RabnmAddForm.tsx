@@ -52,7 +52,7 @@ export function RabnmAddForm({
           required
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         >
           <option value="" disabled>
             Choose type
@@ -69,7 +69,7 @@ export function RabnmAddForm({
             name="calling_id"
             required
             defaultValue=""
-            className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           >
             <option value="" disabled>
               Choose the calling
@@ -87,7 +87,7 @@ export function RabnmAddForm({
         name="person_ids"
         multiple
         size={4}
-        className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+        className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
       >
         {people.map((p) => (
           <option key={p.id} value={p.id}>
@@ -95,29 +95,29 @@ export function RabnmAddForm({
           </option>
         ))}
       </select>
-      <p className="text-xs text-slate/60">Ctrl/Cmd-click to select more than one person.</p>
+      <p className="text-xs text-ink-muted/60">Ctrl/Cmd-click to select more than one person.</p>
 
       <input
         type="text"
         name="detail"
         placeholder={type && DETAIL_PLACEHOLDERS[type] ? DETAIL_PLACEHOLDERS[type] : "Detail"}
-        className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+        className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
       />
 
       {showEventDate && (
-        <label className="text-xs text-slate">
+        <label className="text-xs text-ink-muted">
           {EVENT_DATE_LABELS[type] ?? "Date"}
           <input
             type="date"
             name="event_date"
-            className="mt-1 block rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
       )}
 
       <button
         type="submit"
-        className="mt-1 w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+        className="mt-1 w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
       >
         Add
       </button>

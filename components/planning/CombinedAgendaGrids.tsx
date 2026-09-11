@@ -99,12 +99,12 @@ export function CombinedAgendaGrids({
           type="button"
           onClick={handleSaveAll}
           disabled={!dirty || pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {!pending && !dirty && bothSaved && <p className="text-sm text-sage">Saved.</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
+        {!pending && !dirty && bothSaved && <p className="text-sm text-success">Saved.</p>}
       </div>
     </div>
   );

@@ -57,11 +57,11 @@ export default async function YouthActivitiesPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Youth Activities" />
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">Upcoming Activities</h2>
 
         {activities.length === 0 ? (
-          <p className="mt-4 text-sm text-slate">Nothing scheduled yet.</p>
+          <p className="mt-4 text-sm text-ink-muted">Nothing scheduled yet.</p>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
             {activities.map((item) => {
@@ -88,24 +88,24 @@ export default async function YouthActivitiesPage() {
                 <li
                   key={item.id}
                   className={[
-                    "rounded-md border px-3 py-2 text-sm",
-                    item.cancelled ? "border-red-900/30 bg-red-950/5" : "border-rule/60",
+                    "rounded border px-3 py-2 text-sm",
+                    item.cancelled ? "border-danger/30 bg-danger/5" : "border-rule/60",
                   ].join(" ")}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-ink">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                         {formatDate(item.activity_date)}
                         {item.activity_time ? ` · ${item.activity_time}` : ""}
                       </span>{" "}
                       {item.title}
                       {item.cancelled && (
-                        <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-red-700">
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">
                           Cancelled
                         </span>
                       )}
                       {!item.confirmed && !item.cancelled && (
-                        <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-brass">
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">
                           Tentative
                         </span>
                       )}
@@ -114,25 +114,25 @@ export default async function YouthActivitiesPage() {
                       <span className="flex flex-wrap items-center gap-2">
                         <span
                           className={[
-                            "font-mono text-[10px] uppercase tracking-widest",
-                            item.status === "published" ? "text-sage" : "text-brass",
+                            "font-mono text-[10px] uppercase tracking-wider",
+                            item.status === "published" ? "text-success" : "text-accent",
                           ].join(" ")}
                         >
                           {item.status}
                         </span>
                         <form action={toggleStatus}>
-                          <button type="submit" className="text-xs text-slate hover:text-ink">
+                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                             {item.status === "published" ? "Unpublish" : "Publish"}
                           </button>
                         </form>
                         <form action={toggleConfirmed}>
-                          <button type="submit" className="text-xs text-slate hover:text-ink">
+                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                             {item.confirmed ? "Mark Tentative" : "Confirm"}
                           </button>
                         </form>
                         {item.cancelled ? (
                           <form action={uncancel}>
-                            <button type="submit" className="text-xs text-slate hover:text-ink">
+                            <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                               Un-cancel
                             </button>
                           </form>
@@ -151,13 +151,13 @@ export default async function YouthActivitiesPage() {
                               placeholder="Reason (optional)"
                               className="w-32 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
                             />
-                            <button type="submit" className="text-xs text-slate hover:text-ink">
+                            <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                               Cancel
                             </button>
                           </form>
                         )}
                         <form action={remove}>
-                          <button type="submit" className="text-xs text-slate hover:text-ink">
+                          <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                             Delete
                           </button>
                         </form>
@@ -165,25 +165,25 @@ export default async function YouthActivitiesPage() {
                     )}
                   </div>
                   {item.cancelled ? (
-                    <p className="mt-1 text-red-700">
+                    <p className="mt-1 text-danger">
                       This activity has been cancelled{item.cancellation_note ? `: ${item.cancellation_note}` : "."}
                     </p>
                   ) : (
-                    <p className="mt-1 text-slate">
+                    <p className="mt-1 text-ink-muted">
                       {item.group_name}
-                      {item.planning_group ? ` — planned by ${item.planning_group}` : ""}
-                      {item.development_category ? ` — ${item.development_category}` : ""}
-                      {item.location ? ` — ${item.location}` : ""}
+                      {item.planning_group ? ` · planned by ${item.planning_group}` : ""}
+                      {item.development_category ? ` · ${item.development_category}` : ""}
+                      {item.location ? ` · ${item.location}` : ""}
                     </p>
                   )}
                   {(item.youth_lead || item.advisor_lead) && (
-                    <p className="mt-1 text-[11px] text-slate/60">
+                    <p className="mt-1 text-[11px] text-ink-muted/60">
                       {item.youth_lead ? `Youth lead: ${item.youth_lead}` : ""}
                       {item.youth_lead && item.advisor_lead ? " · " : ""}
                       {item.advisor_lead ? `Advisor: ${item.advisor_lead}` : ""}
                     </p>
                   )}
-                  {item.notes && <p className="mt-1 text-slate">{item.notes}</p>}
+                  {item.notes && <p className="mt-1 text-ink-muted">{item.notes}</p>}
                 </li>
               );
             })}
@@ -194,47 +194,47 @@ export default async function YouthActivitiesPage() {
       {canManage && <GenerateYouthActivitiesForm />}
 
       {canManage && (
-        <div className="rounded-lg border border-rule bg-card p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Add Activity</h2>
           <form action={add} className="mt-4 flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="text-sm text-slate">
+              <label className="text-sm text-ink-muted">
                 Date
                 <input
                   type="date"
                   name="activity_date"
                   required
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
-              <label className="text-sm text-slate">
+              <label className="text-sm text-ink-muted">
                 Time
                 <input
                   type="time"
                   name="activity_time"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
             </div>
 
-            <label className="text-sm text-slate">
+            <label className="text-sm text-ink-muted">
               Title
               <input
                 type="text"
                 name="title"
                 required
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="text-sm text-slate">
+              <label className="text-sm text-ink-muted">
                 Group
                 <select
                   name="group_name"
                   required
                   defaultValue=""
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 >
                   <option value="" disabled>
                     Choose group
@@ -246,14 +246,14 @@ export default async function YouthActivitiesPage() {
                   ))}
                 </select>
               </label>
-              <label className="text-sm text-slate">
+              <label className="text-sm text-ink-muted">
                 Development Category
                 <select
                   name="development_category"
                   defaultValue=""
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 >
-                  <option value="">&mdash; None &mdash;</option>
+                  <option value="">None</option>
                   {YOUTH_DEVELOPMENT_CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>
                       {c.label}
@@ -263,46 +263,46 @@ export default async function YouthActivitiesPage() {
               </label>
             </div>
 
-            <label className="text-sm text-slate">
+            <label className="text-sm text-ink-muted">
               Location
               <input
                 type="text"
                 name="location"
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="text-sm text-slate">
+              <label className="text-sm text-ink-muted">
                 Youth Lead
                 <input
                   type="text"
                   name="youth_lead"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
-              <label className="text-sm text-slate">
+              <label className="text-sm text-ink-muted">
                 Advisor Lead
                 <input
                   type="text"
                   name="advisor_lead"
-                  className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                  className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
             </div>
 
-            <label className="text-sm text-slate">
+            <label className="text-sm text-ink-muted">
               Notes
               <textarea
                 name="notes"
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
 
             <button
               type="submit"
-              className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+              className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
             >
               Add &amp; Publish
             </button>
@@ -319,7 +319,7 @@ export default async function YouthActivitiesPage() {
             onDelete={deleteScheduleRule}
             onToggle={toggleScheduleRuleActive}
           />
-          <p className="-mt-3 text-[11px] text-slate/60">
+          <p className="-mt-3 text-[11px] text-ink-muted/60">
             For a recurring activity like a weekly Wednesday night, add one rule here instead of
             entering it week by week. Use Edit to change a rule in place, or Copy to start a new
             one from its values.

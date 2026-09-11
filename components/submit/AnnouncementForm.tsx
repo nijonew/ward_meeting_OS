@@ -9,14 +9,14 @@ import {
   OTHER_VALUE,
 } from "@/lib/data/announcement-constants";
 
-const INPUT_CLASS = "rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink";
-const LABEL_CLASS = "text-xs text-slate";
+const INPUT_CLASS = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
+const LABEL_CLASS = "text-xs text-ink-muted";
 
 /** Renders a fieldset of checkboxes sharing one `name` -- FormData's
  *  getAll(name) on submit collects every box the visitor checked. */
 function CheckboxGroup({ name, options }: { name: string; options: readonly string[] }) {
   return (
-    <fieldset className="rounded-md border border-rule px-3 py-2">
+    <fieldset className="rounded border border-rule px-3 py-2">
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {options.map((opt) => (
           <label key={opt} className="flex items-start gap-2 text-sm text-ink">
@@ -139,7 +139,7 @@ export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) 
 
       <button
         type="submit"
-        className="mt-1 w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90"
+        className="mt-1 w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
       >
         Submit
       </button>

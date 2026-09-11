@@ -39,23 +39,23 @@ export default async function SubmitAnnouncementPage({
 
       <section className="mt-10">
         <h1 className="font-display text-2xl">Submit an Announcement</h1>
-        <p className="mt-2 text-sm text-slate">
-          It goes live right away &mdash; the Bishopric can remove it afterward if needed.
+        <p className="mt-2 text-sm text-ink-muted">
+          It goes live right away. The Bishopric can remove it afterward if needed.
         </p>
 
         {!attendsMeetings ? (
-          <p className="mt-4 text-sm text-slate">
+          <p className="mt-4 text-sm text-ink-muted">
             Announcement submission is limited to those who attend a meeting by calling. Ask the
             Bishopric if you think this is wrong.
           </p>
         ) : (
           <>
             {success && (
-              <p className="mt-4 rounded-md border border-rule bg-card p-4 text-sm text-ink">
-                Thanks &mdash; your submission has been received.
+              <p className="mt-4 rounded border border-rule bg-surface p-4 text-sm text-ink">
+                Thanks. Your submission has been received.
               </p>
             )}
-            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+            {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
             <AnnouncementForm onSubmit={submitAnnouncement} />
           </>
