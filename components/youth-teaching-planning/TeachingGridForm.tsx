@@ -2,7 +2,6 @@
 
 import { useState, useActionState } from "react";
 import { saveTeachingGrid } from "@/app/youth-teaching-planning/actions";
-import { LedgerIndex } from "@/components/LedgerIndex";
 import type { TeachingGridRow } from "@/lib/data/teaching-assignments";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -57,7 +56,6 @@ export function TeachingGridForm({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="w-8 px-2 py-2" aria-hidden="true" />
               <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Sunday
               </th>
@@ -69,11 +67,8 @@ export function TeachingGridForm({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
+            {rows.map((row) => (
               <tr key={row.classDate} className="border-t border-rule-strong/40">
-                <td className="px-2 py-2 align-top">
-                  <LedgerIndex position={i + 1} current={i === 0} />
-                </td>
                 <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
                 {classes.map((c) => (
                   <td key={c} className="px-2 py-1.5 align-top">

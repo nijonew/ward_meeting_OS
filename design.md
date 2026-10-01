@@ -3,19 +3,21 @@
 **Direction:** The Ledger (Direction 3 of 3, chosen 2026-09-10)
 **Status:** Source of truth for every visual decision from Phase 2 onward. If code and this file disagree, fix the code.
 
-**Implementation status (2026-09-10):** The home page went through the full five-phase
-process (direction, structure/motion, copy, assets, polish) and matches this file in every
-respect. Every other page in the app then received a second, sitewide pass: the palette and
-type tokens (Phase 1), 4px radius, the primary-button accent color, the `LifecycleBadge`
-rebuild, a light Calm load-in on each page's own heading, and an app-wide em-dash cleanup in
-UI copy. The ledger-index chip (`components/LedgerIndex.tsx`) has since been added to every
-grid where row order is real, fixed information -- Assignment Rotations, the Teaching
-Calendar, and the Dashboard meeting list -- and deliberately left off Calling Planning, whose
-rows are sortable/filterable and have no fixed sequence to number. Destructive actions and
-validation errors sitewide (real record deletion, `CancelMeetingButton`, "Cancelled" labels,
-form error text) have since moved off ad hoc red-600/700 onto the `danger` token itself,
-leaving every other use of the app's shared neutral button style (Save, Add, Publish,
-back-links, dismiss-this-form "Cancel") untouched.
+**Implementation status (2026-10-01):** This is a **reskin only**. Every page's existing
+layout, tile placement, section order, and copy is deliberately unchanged from before the
+redesign -- the user's explicit scope ("I don't really want to change the content, tile
+placement... I am in favor of updating the look, colors, fonts, branding").
+
+What is applied, app-wide: the OKLCH palette and type tokens, 4px corner radius, the
+primary-button `accent` color, the `LifecycleBadge` rebuild, the `danger` token on
+destructive actions and validation errors, tightened mono letter-spacing, and a quiet
+rise-in on each page's own heading.
+
+What was built and then **removed** at the user's request: a restructured home page (hero,
+thesis line, reordered sections, rewritten copy, a ledger-line hero graphic) and the
+ledger-index chip in grid leading columns. Both reworked page content rather than its look.
+Do not reintroduce either without being asked. The one branding addition kept is the
+monogram favicon (`app/icon.svg`).
 
 ---
 
@@ -109,16 +111,15 @@ direction is deliberately cool and architectural; a warm cast reads as the old c
 ## Layout & spacing
 
 - Base unit 4px; rhythm in multiples of 8 (8 / 16 / 24 / 32 / 48 / 64).
-- Content width: ~48rem for planning/form pages (unchanged from today — it already works for
-  dense grids); the home page itself can breathe to ~56rem.
+- Content width: ~48rem throughout, unchanged from today — it already works for dense grids,
+  and page widths are layout, which this reskin does not touch.
 - **Corner radius: 4px, everywhere.** This is a deliberate, visible departure from the current
   app's 8–10px rounded cards — sharper, ruled, architectural. No exceptions for "just this one
   card."
 - Cards/tiles: 1px `rule` border, 4px radius, `surface` background, no shadow. Elevation comes
   from spacing and the ledger rule, never from drop-shadow.
-- Tables/grids: keep the existing dense grid interaction pattern (it works) — reskin with
-  `rule-strong` row dividers and, where order genuinely matters, a ledger-index chip in the
-  leading column.
+- Tables/grids: keep the existing dense grid interaction pattern and column set exactly as is
+  — reskin with `rule-strong` row dividers only. Do not add or remove columns.
 
 ## Signature element
 
@@ -127,9 +128,10 @@ prefixes anything where position in a sequence is real information: an agenda li
 the meeting, a rotation's upcoming order, a Speakers & Music item's slot. Filled `accent`/
 `accent-soft` for the current or next item, quiet `ink-muted`-on-`rule` for the rest.
 
-This is the one recurring graphic device in the whole app. It shows up exactly where sequence
-is real information and nowhere else — a decorative number badge on a tile that has no order
-(like "Announcements") would dilute it. When in doubt, leave it off.
+**Not currently in use.** It was built (`components/LedgerIndex.tsx`) and wired into the
+Assignment Rotations, Teaching Calendar, and Dashboard grids, then removed on 2026-10-01:
+adding a column changes a page's content, and this redesign is a reskin only. The idea is
+kept here as a documented option, not as something the app does today.
 
 ## Motion (structural + polish)
 
@@ -158,10 +160,7 @@ real information becomes legible.
   *current* stage, `ink-muted`-on-`rule` for past/future stages. No brass-style filled pill for
   every stage — accent is reserved for "this is happening now," not decoration.
 - **Grids** (Assignment Rotations, Calling Planning, Teaching Calendar, Dashboard list) —
-  unchanged dirty-tracking/Save-All-Changes interaction; reskinned with `rule-strong` row
-  dividers and the ledger-index chip in the leading column wherever the row has a real order.
-  Calling Planning is the one exception: its rows are sortable/filterable with no fixed
-  sequence, so it keeps a plain divider and no chip.
+  unchanged interaction, unchanged columns; reskinned with `rule-strong` row dividers only.
 - **Forms/inputs** — 4px radius, 1px `rule` border, `surface` background, `accent` focus ring.
 
 ## Copy rules

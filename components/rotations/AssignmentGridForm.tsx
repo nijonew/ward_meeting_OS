@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useActionState } from "react";
 import { saveAssignmentGrid } from "@/app/rotations/actions";
-import { LedgerIndex } from "@/components/LedgerIndex";
 import type { GridColumn, GridRow } from "@/lib/data/rotations";
 import type { PersonOption } from "@/lib/data/people";
 import type { MeetingTypeSlug } from "@/lib/types";
@@ -82,7 +81,6 @@ export function AssignmentGridForm({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="w-8 px-2 py-2" aria-hidden="true" />
               <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Meeting
               </th>
@@ -99,11 +97,8 @@ export function AssignmentGridForm({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
+            {rows.map((row) => (
               <tr key={row.meetingId} className="border-t border-rule-strong/40">
-                <td className="px-2 py-2 align-top">
-                  <LedgerIndex position={i + 1} current={i === 0} />
-                </td>
                 <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.date)}</td>
                 {columns.map((c) => {
                   const cell = row.cells[c.key];
