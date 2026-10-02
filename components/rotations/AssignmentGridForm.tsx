@@ -22,9 +22,9 @@ function PersonCell({ name, people, value }: { name: string; people: PersonOptio
     <select
       name={name}
       defaultValue={value ?? ""}
-      className="w-full min-w-[9rem] rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+      className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
     >
-      <option value="">&mdash; Unassigned &mdash;</option>
+      <option value="">Unassigned</option>
       {people.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -81,15 +81,15 @@ export function AssignmentGridForm({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Meeting
               </th>
               {columns.map((c) => (
-                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   {c.label}
                   {c.eligiblePeople.length === 0 && (
-                    <span className="mt-0.5 block normal-case tracking-normal text-red-700">
-                      No one eligible &mdash; check callings
+                    <span className="mt-0.5 block normal-case tracking-normal text-danger">
+                      No one eligible, check callings
                     </span>
                   )}
                 </th>
@@ -98,7 +98,7 @@ export function AssignmentGridForm({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.meetingId} className="border-t border-rule/60">
+              <tr key={row.meetingId} className="border-t border-rule-strong/40">
                 <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.date)}</td>
                 {columns.map((c) => {
                   const cell = row.cells[c.key];
@@ -127,12 +127,12 @@ export function AssignmentGridForm({
         <button
           type="submit"
           disabled={!dirty || pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-sage">Saved.</p>}
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
+        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
       </div>
     </form>
   );

@@ -7,7 +7,7 @@ import type { PersonOption } from "@/lib/data/people";
 import { submitBulkMusicRows } from "@/app/music/actions";
 
 function typeLabel(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "–";
   return MUSIC_TYPES.find((t) => t.value === value)?.label ?? value;
 }
 
@@ -42,9 +42,9 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Bulk Add Music</h2>
-      <p className="mt-1 text-xs text-slate">
+      <p className="mt-1 text-xs text-ink-muted">
         Paste rows copied from a spreadsheet: Date, Type, Hymn Number, Piece Name, Performer,
         Group Name, Accompanist. A header row is fine if included. Meetings that don&rsquo;t
         exist yet are created automatically.
@@ -59,67 +59,67 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
         }}
         rows={8}
         placeholder={"8/9/2026\tOpening Hymn\t19\tCome, Come, Ye Saints\n8/9/2026\tMusical Number\t\tHow Great Thou Art\tJane Doe"}
-        className="mt-3 block w-full rounded-md border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink"
+        className="mt-3 block w-full rounded border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink"
       />
 
       <button
         type="button"
         onClick={handlePreview}
         disabled={!text.trim()}
-        className="mt-3 rounded-md border border-rule px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:opacity-50"
+        className="mt-3 rounded border border-rule px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:opacity-50"
       >
         Preview
       </button>
 
       {parsed && (
         <div className="mt-4">
-          <p className="text-xs text-slate">
+          <p className="text-xs text-ink-muted">
             {validCount} of {parsed.length} row{parsed.length === 1 ? "" : "s"} ready to submit.
           </p>
 
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-xs">
               <thead>
-                <tr className="border-b border-rule text-slate">
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Date</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Type</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Piece</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Performer</th>
-                  <th className="py-1.5 pr-3 font-mono uppercase tracking-widest">Accompanist</th>
-                  <th className="py-1.5 font-mono uppercase tracking-widest">Status</th>
+                <tr className="border-b border-rule text-ink-muted">
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Date</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Type</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Piece</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Performer</th>
+                  <th className="py-1.5 pr-3 font-mono uppercase tracking-wider">Accompanist</th>
+                  <th className="py-1.5 font-mono uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {parsed.map((row, i) => (
                   <tr key={i} className="border-b border-rule/40">
-                    <td className="py-1.5 pr-3">{row.dateIso ?? (row.dateText || "—")}</td>
+                    <td className="py-1.5 pr-3">{row.dateIso ?? (row.dateText || "–")}</td>
                     <td className="py-1.5 pr-3">{typeLabel(row.type) || row.typeText}</td>
                     <td className="py-1.5 pr-3">
-                      {row.pieceName ?? "—"}
+                      {row.pieceName ?? "–"}
                       {row.hymnNumber ? ` (Hymn ${row.hymnNumber})` : ""}
                     </td>
                     <td className="py-1.5 pr-3">
                       {row.matchedIndividualName ? (
                         row.matchedIndividualName
                       ) : row.performerText ? (
-                        <span className="text-brass">{row.performerText} (unmatched)</span>
+                        <span className="text-accent">{row.performerText} (unmatched)</span>
                       ) : (
-                        "—"
+                        "–"
                       )}
                     </td>
                     <td className="py-1.5 pr-3">
                       {row.matchedAccompanistName ??
                         (row.accompanistText ? (
-                          <span className="text-brass">{row.accompanistText} (unmatched)</span>
+                          <span className="text-accent">{row.accompanistText} (unmatched)</span>
                         ) : (
-                          "—"
+                          "–"
                         ))}
                     </td>
                     <td className="py-1.5">
                       {row.errors.length > 0 ? (
-                        <span className="text-red-600">{row.errors.join("; ")}</span>
+                        <span className="text-danger">{row.errors.join("; ")}</span>
                       ) : (
-                        <span className="text-sage">OK</span>
+                        <span className="text-success">OK</span>
                       )}
                     </td>
                   </tr>
@@ -132,14 +132,14 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
             type="button"
             onClick={handleSubmit}
             disabled={validCount === 0 || pending}
-            className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+            className="mt-4 rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
           >
             {pending ? "Submitting..." : `Submit ${validCount} row${validCount === 1 ? "" : "s"}`}
           </button>
         </div>
       )}
 
-      {result?.error && <p className="mt-3 text-sm text-red-600">{result.error}</p>}
+      {result?.error && <p className="mt-3 text-sm text-danger">{result.error}</p>}
       {result?.count !== undefined && (
         <p className="mt-3 text-sm text-ink">
           Submitted {result.count} item{result.count === 1 ? "" : "s"} for Bishopric approval.

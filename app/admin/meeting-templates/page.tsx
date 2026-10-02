@@ -17,8 +17,8 @@ function TabLink({ href, active, label }: { href: string; active: boolean; label
     <Link
       href={href}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
-        active ? "bg-ink text-paper" : "text-slate hover:text-ink",
+        "rounded px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
+        active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >
       {label}
@@ -38,14 +38,14 @@ export default async function MeetingTemplatesAdminPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Templates" />
-        <p className="mt-10 text-slate">Only the Bishopric can edit meeting templates.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can edit meeting templates.</p>
       </main>
     );
   }
 
   const meetingTypes = await getMeetingTypes();
   if (meetingTypes.length === 0) {
-    return <p className="text-slate">No meeting types configured.</p>;
+    return <p className="text-ink-muted">No meeting types configured.</p>;
   }
 
   const { type: rawType, format: rawFormat } = await searchParams;
@@ -73,18 +73,18 @@ export default async function MeetingTemplatesAdminPage({
       <AppHeader tag="Meeting Templates" />
 
       <section className="mt-4">
-        <Link href="/admin" className="text-xs text-slate hover:text-ink">
+        <Link href="/admin" className="text-xs text-ink-muted hover:text-ink">
           &larr; All tables
         </Link>
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Templates</h1>
-        <p className="mt-2 text-sm text-slate">
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Templates</h1>
+        <p className="mt-2 text-sm text-ink-muted">
           The default agenda new meetings are seeded with at creation time. Editing here never
-          changes a meeting that already exists &mdash; edit one specific meeting&rsquo;s own agenda
+          changes a meeting that already exists. Edit one specific meeting&rsquo;s own agenda
           from its <em>Agenda Elements</em> page instead (linked from its Planning view).
         </p>
       </section>
 
-      <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+      <div className="flex w-fit flex-wrap gap-1 rounded border border-rule p-1">
         {meetingTypes.map((mt) => (
           <TabLink
             key={mt.id}
@@ -96,7 +96,7 @@ export default async function MeetingTemplatesAdminPage({
       </div>
 
       {isSacrament && (
-        <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+        <div className="flex w-fit flex-wrap gap-1 rounded border border-rule p-1">
           {SPECIAL_FORMATS.map((f) => (
             <TabLink
               key={f.value}
@@ -108,15 +108,15 @@ export default async function MeetingTemplatesAdminPage({
         </div>
       )}
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">
           {selectedType.name}
-          {isSacrament && ` — ${SPECIAL_FORMATS.find((f) => f.value === formatKey)?.label}`}
+          {isSacrament && ` · ${SPECIAL_FORMATS.find((f) => f.value === formatKey)?.label}`}
         </h2>
 
         <div className="mt-4 flex flex-col gap-2">
           {included.length === 0 ? (
-            <p className="text-sm text-slate">No elements added yet.</p>
+            <p className="text-sm text-ink-muted">No elements added yet.</p>
           ) : (
             included.map((el, idx) => {
               const moveUp = async () => {
@@ -140,7 +140,7 @@ export default async function MeetingTemplatesAdminPage({
               return (
                 <div
                   key={el.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">{el.label}</span>
 
@@ -153,9 +153,9 @@ export default async function MeetingTemplatesAdminPage({
                           min={1}
                           max={el.max_slots ?? undefined}
                           defaultValue={el.slot_count ?? 1}
-                          className="w-14 rounded-md border border-rule bg-paper px-2 py-1 text-xs text-ink"
+                          className="w-14 rounded border border-rule bg-paper px-2 py-1 text-xs text-ink"
                         />
-                        <button type="submit" className="text-xs text-slate hover:text-ink">
+                        <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                           Set
                         </button>
                       </form>
@@ -164,7 +164,7 @@ export default async function MeetingTemplatesAdminPage({
                       <button
                         type="submit"
                         disabled={idx === 0}
-                        className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                       >
                         &uarr;
                       </button>
@@ -173,13 +173,13 @@ export default async function MeetingTemplatesAdminPage({
                       <button
                         type="submit"
                         disabled={idx === included.length - 1}
-                        className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                       >
                         &darr;
                       </button>
                     </form>
                     <form action={remove}>
-                      <button type="submit" className="text-xs text-slate hover:text-ink">
+                      <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                         Remove
                       </button>
                     </form>
@@ -192,7 +192,7 @@ export default async function MeetingTemplatesAdminPage({
       </div>
 
       {available.length > 0 && (
-        <div className="rounded-lg border border-rule bg-card p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Add Element</h2>
           <div className="mt-4 flex flex-col gap-2">
             {available.map((el) => {
@@ -203,11 +203,11 @@ export default async function MeetingTemplatesAdminPage({
               return (
                 <div
                   key={el.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">{el.label}</span>
                   <form action={add}>
-                    <button type="submit" className="text-xs text-slate hover:text-ink">
+                    <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                       Add
                     </button>
                   </form>

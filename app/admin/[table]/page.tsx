@@ -21,7 +21,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Admin" />
-        <p className="mt-10 text-slate">Only the Bishopric can access table admin.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can access table admin.</p>
       </main>
     );
   }
@@ -66,11 +66,11 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
       <AppHeader tag="Admin" />
 
       <section className="mt-4">
-        <Link href="/admin" className="text-xs text-slate hover:text-ink">
+        <Link href="/admin" className="text-xs text-ink-muted hover:text-ink">
           &larr; All tables
         </Link>
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{config.label}</h1>
-        {config.description && <p className="mt-2 text-sm text-slate">{config.description}</p>}
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{config.label}</h1>
+        {config.description && <p className="mt-2 text-sm text-ink-muted">{config.description}</p>}
       </section>
 
       <AdminTableEditor

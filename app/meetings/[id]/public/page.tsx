@@ -30,14 +30,14 @@ export default async function PublicViewPage({
     const meeting = await getMeetingById(meetingId);
     const todayIso = new Date().toISOString().slice(0, 10);
     if (!meeting || meeting.stage === "archived" || meeting.date !== todayIso) {
-      return <p className="text-slate">This program isn&rsquo;t available right now.</p>;
+      return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
     }
   }
 
   const view = await getPublicSacramentView(meetingId);
 
   if (!view) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
   return (
@@ -48,7 +48,7 @@ export default async function PublicViewPage({
           className="flex items-baseline justify-between gap-4 border-b border-rule/40 py-2 last:border-0"
         >
           <span className="text-ink">{item.heading}</span>
-          {item.detail && <span className="text-right text-slate">{item.detail}</span>}
+          {item.detail && <span className="text-right text-ink-muted">{item.detail}</span>}
         </div>
       ))}
     </div>

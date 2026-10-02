@@ -34,7 +34,7 @@ export default async function WardBusinessPage({
 
   const meeting = await getMeetingById(meetingId);
   if (!meeting) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
   if (meeting.stage === "archived") {
     redirect(`/meetings/${meetingId}/archived`);
@@ -48,7 +48,7 @@ export default async function WardBusinessPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href={`/meetings/${meetingId}/planning`} className="text-xs text-slate hover:text-ink">
+      <Link href={`/meetings/${meetingId}/planning`} className="text-xs text-ink-muted hover:text-ink">
         &larr; Planning
       </Link>
       <RabnmSection
