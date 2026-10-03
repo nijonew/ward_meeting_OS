@@ -20,20 +20,20 @@ export function Tile({ title, description, href, comingSoon }: TileProps) {
   const card = (
     <div
       className={[
-        "flex h-full flex-col rounded-lg border px-5 py-4 transition-colors",
-        isDisabled ? "border-rule/60" : "border-rule bg-card hover:border-ink/30",
+        "flex h-full flex-col rounded border px-5 py-4 transition-colors",
+        isDisabled ? "border-rule/60" : "border-rule bg-surface hover:border-rule-strong",
       ].join(" ")}
     >
       <span className={["font-display text-lg", isDisabled ? "text-ink/40" : "text-ink"].join(" ")}>
         {title}
       </span>
       {description && (
-        <span className={["mt-1 text-sm", isDisabled ? "text-slate/60" : "text-slate"].join(" ")}>
+        <span className={["mt-1 text-sm", isDisabled ? "text-ink-muted/60" : "text-ink-muted"].join(" ")}>
           {description}
         </span>
       )}
       {isDisabled && (
-        <span className="mt-2 font-mono text-[10px] uppercase tracking-widest text-slate/70">
+        <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
           Coming soon
         </span>
       )}

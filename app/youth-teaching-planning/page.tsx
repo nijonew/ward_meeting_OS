@@ -48,7 +48,7 @@ export default async function YouthTeachingPlanningPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Youth Teaching Planning" />
-        <p className="mt-10 text-slate">Only youth leaders and the Bishopric can view youth teaching planning.</p>
+        <p className="mt-10 text-ink-muted">Only youth leaders and the Bishopric can view youth teaching planning.</p>
       </main>
     );
   }
@@ -63,18 +63,18 @@ export default async function YouthTeachingPlanningPage({
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Youth Teaching Planning" />
 
-        <Link href="/" className="mt-6 text-xs text-slate hover:text-ink">
+        <Link href="/" className="mt-6 text-xs text-ink-muted hover:text-ink">
           &larr; Home
         </Link>
 
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
-        <p className="mt-2 text-sm text-slate">
-          Sunday teaching assignments for each class. Short free-text entries only &mdash; not linked
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          Sunday teaching assignments for each class. Short free-text entries only, not linked
           to any person or calling record.
         </p>
 
         {accessibleClasses.length === 0 ? (
-          <p className="mt-6 text-sm text-slate">
+          <p className="mt-6 text-sm text-ink-muted">
             You haven&rsquo;t been assigned to teach a class yet. Ask the Bishopric if you think this
             is wrong.
           </p>
@@ -99,8 +99,8 @@ export default async function YouthTeachingPlanningPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Youth Teaching Planning" />
-        <p className="mt-10 text-slate">You don&rsquo;t have access to that class.</p>
-        <Link href="/youth-teaching-planning" className="mt-4 text-sm text-slate hover:text-ink">
+        <p className="mt-10 text-ink-muted">You don&rsquo;t have access to that class.</p>
+        <Link href="/youth-teaching-planning" className="mt-4 text-sm text-ink-muted hover:text-ink">
           &larr; Youth Teaching Planning
         </Link>
       </main>
@@ -115,35 +115,35 @@ export default async function YouthTeachingPlanningPage({
       <AppHeader tag="Youth Teaching Planning" />
 
       <section className="mt-4">
-        <Link href="/youth-teaching-planning" className="text-xs text-slate hover:text-ink">
+        <Link href="/youth-teaching-planning" className="text-xs text-ink-muted hover:text-ink">
           &larr; Youth Teaching Planning
         </Link>
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{rawClass}</h1>
-        <p className="mt-2 text-sm text-slate">
-          Sunday teaching assignments. Short free-text entries only &mdash; not linked to any person
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{rawClass}</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          Sunday teaching assignments. Short free-text entries only, not linked to any person
           or calling record, so type whatever&rsquo;s useful (a name, a lesson topic, or both).
         </p>
       </section>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <form method="get" className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="class" value={rawClass} />
-          <label className="text-xs text-slate">
+          <label className="text-xs text-ink-muted">
             Through
             <input
               type="date"
               name="through"
               defaultValue={throughDate}
-              className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+              className="ml-2 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
             />
           </label>
-          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Update range
           </button>
         </form>
 
         {grid.rows.length === 0 ? (
-          <p className="mt-4 text-sm text-slate">No Sundays in this range.</p>
+          <p className="mt-4 text-sm text-ink-muted">No Sundays in this range.</p>
         ) : (
           <TeachingGridForm classes={grid.classes} rows={grid.rows} />
         )}

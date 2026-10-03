@@ -1,23 +1,28 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
+import { Archivo, Public_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
+// Type pairing from design.md ("The Ledger"): Archivo (display), Public
+// Sans (body), JetBrains Mono (utility -- dates, stage text, ledger
+// numerals only, never headings or body copy).
+const archivo = Archivo({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  weight: ["600", "700", "800"],
+  variable: "--font-archivo",
   display: "swap",
 });
 
-const inter = Inter({
+const publicSans = Public_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600"],
+  variable: "--font-public-sans",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
-  variable: "--font-plex-mono",
+  variable: "--font-jetbrains-mono",
   display: "swap",
 });
 
@@ -33,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} antialiased`}>
+      <body className={`${archivo.variable} ${publicSans.variable} ${jetbrainsMono.variable} antialiased`}>
         {children}
       </body>
     </html>

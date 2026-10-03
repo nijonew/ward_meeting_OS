@@ -81,7 +81,7 @@ export default async function PlanningViewPage({
 
   const meeting = await getMeetingById(meetingId);
   if (!meeting) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
   // Editing is admin-only (2026-09-08 -- this page previously had no
   // role check at all, so any logged-in account could edit any
@@ -99,7 +99,7 @@ export default async function PlanningViewPage({
 
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
   const isSacrament = meeting.meetingType === "sacrament-meeting";
@@ -191,12 +191,12 @@ export default async function PlanningViewPage({
   return (
     <div className="flex flex-col gap-6">
       {isSacrament && sacramentData && (
-        <form action={saveFormat} className="flex items-center gap-2 text-sm text-slate">
+        <form action={saveFormat} className="flex items-center gap-2 text-sm text-ink-muted">
           Format
           <select
             name="special_format"
             defaultValue={sacramentData.planning?.special_format ?? "standard"}
-            className="rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+            className="rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
           >
             {SPECIAL_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -204,15 +204,15 @@ export default async function PlanningViewPage({
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Save
           </button>
         </form>
       )}
 
       {templateElements.length === 0 ? (
-        <div className="rounded-lg border border-rule bg-card p-6">
-          <p className="text-sm text-slate">
+        <div className="rounded border border-rule bg-surface p-6">
+          <p className="text-sm text-ink-muted">
             No agenda elements yet. Add some in the{" "}
             <a href={`/meetings/${meetingId}/template`} className="underline">
               agenda editor
@@ -221,9 +221,9 @@ export default async function PlanningViewPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-rule bg-card p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Agenda</h2>
-          <p className="mt-1 text-xs text-slate">
+          <p className="mt-1 text-xs text-ink-muted">
             Every element on this meeting&rsquo;s agenda, in order. Edit any line, then save once.
             Add, remove, or reorder the lines themselves in the{" "}
             <a href={`/meetings/${meetingId}/template`} className="underline">
@@ -241,7 +241,7 @@ export default async function PlanningViewPage({
                 people={people}
               >
                 <div className="border-t-2 border-rule pt-4">
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-slate/70">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                     Teaching Program
                   </span>
                   <SacramentProgramSection meetingId={meetingId} items={resolvedProgramItems} people={people} />

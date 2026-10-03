@@ -15,14 +15,14 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
 
   return (
     <form action={formAction} className="mt-4 flex flex-col gap-3">
-      <label className="text-sm text-slate">
+      <label className="text-sm text-ink-muted">
         Meeting Type
         <select
           name="meeting_type_id"
           required
           value={meetingTypeId}
           onChange={(e) => setMeetingTypeId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         >
           <option value="" disabled>
             Choose a meeting type
@@ -36,12 +36,12 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
       </label>
 
       {isSacrament && (
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Special Format
           <select
             name="special_format"
             defaultValue="standard"
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           >
             {SPECIAL_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -49,40 +49,40 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-slate/70">
+          <span className="mt-1 block text-xs text-ink-muted/70">
             Picks this meeting&rsquo;s starting agenda elements. Changing it later (in Meeting Info)
-            won&rsquo;t re-populate the agenda &mdash; add/remove elements yourself if you change your mind.
+            won&rsquo;t re-populate the agenda. Add or remove elements yourself if you change your mind.
           </span>
         </label>
       )}
 
-      <label className="text-sm text-slate">
+      <label className="text-sm text-ink-muted">
         Date
         <input
           type="date"
           name="date"
           required
-          className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Time (optional)
           <input
             type="time"
             name="time_of_day"
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
-        <label className="text-sm text-slate">
+        <label className="text-sm text-ink-muted">
           Duration, minutes (optional)
           <input
             type="number"
             name="duration_minutes"
             min={5}
             step={5}
-            className="mt-1 block w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
         </label>
       </div>
@@ -90,12 +90,12 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
       <button
         type="submit"
         disabled={pending}
-        className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+        className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
       >
         {pending ? "Creating..." : "Create Meeting"}
       </button>
 
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {state.error && <p className="text-sm text-danger">{state.error}</p>}
     </form>
   );
 }

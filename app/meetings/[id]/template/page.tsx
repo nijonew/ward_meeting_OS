@@ -39,14 +39,14 @@ export default async function TemplatePage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Agenda Elements" />
-        <p className="mt-10 text-slate">Only the Bishopric can edit agenda elements.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can edit agenda elements.</p>
       </main>
     );
   }
 
   const meeting = await getMeetingWithType(meetingId);
   if (!meeting) {
-    return <p className="text-slate">Could not load this meeting.</p>;
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
   // Archived meetings are read-only from here on -- editing the agenda
   // after the fact would contradict "the agenda as it was finalized"
@@ -68,12 +68,12 @@ export default async function TemplatePage({
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Agenda Elements" />
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <h2 className="font-display text-xl">
-          {meeting.meetingTypeName} &mdash; {formatDate(meeting.date)}
+          {meeting.meetingTypeName} &middot; {formatDate(meeting.date)}
         </h2>
-        <p className="mt-1 text-xs text-slate">
-          Only affects this meeting &mdash; add, remove, or reorder elements here without changing
+        <p className="mt-1 text-xs text-ink-muted">
+          Only affects this meeting. Add, remove, or reorder elements here without changing
           any other {meeting.meetingTypeName}. New meetings start from the default list managed at{" "}
           <Link href="/admin/meeting-templates" className="underline">
             Admin &rsaquo; Meeting Templates
@@ -83,7 +83,7 @@ export default async function TemplatePage({
 
         <div className="mt-4 flex flex-col gap-2">
           {included.length === 0 ? (
-            <p className="text-sm text-slate">No elements added yet.</p>
+            <p className="text-sm text-ink-muted">No elements added yet.</p>
           ) : (
             included.map((el, idx) => {
               const moveUp = async () => {
@@ -107,7 +107,7 @@ export default async function TemplatePage({
               return (
                 <div
                   key={el.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">{el.label}</span>
 
@@ -120,9 +120,9 @@ export default async function TemplatePage({
                           min={1}
                           max={el.max_slots ?? undefined}
                           defaultValue={el.slot_count ?? 1}
-                          className="w-14 rounded-md border border-rule bg-paper px-2 py-1 text-xs text-ink"
+                          className="w-14 rounded border border-rule bg-paper px-2 py-1 text-xs text-ink"
                         />
-                        <button type="submit" className="text-xs text-slate hover:text-ink">
+                        <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                           Set
                         </button>
                       </form>
@@ -131,7 +131,7 @@ export default async function TemplatePage({
                       <button
                         type="submit"
                         disabled={idx === 0}
-                        className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                       >
                         &uarr;
                       </button>
@@ -140,13 +140,13 @@ export default async function TemplatePage({
                       <button
                         type="submit"
                         disabled={idx === included.length - 1}
-                        className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                       >
                         &darr;
                       </button>
                     </form>
                     <form action={remove}>
-                      <button type="submit" className="text-xs text-slate hover:text-ink">
+                      <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                         Remove
                       </button>
                     </form>
@@ -159,7 +159,7 @@ export default async function TemplatePage({
       </div>
 
       {available.length > 0 && (
-        <div className="rounded-lg border border-rule bg-card p-6">
+        <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Add Element</h2>
           <div className="mt-4 flex flex-col gap-2">
             {available.map((el) => {
@@ -170,11 +170,11 @@ export default async function TemplatePage({
               return (
                 <div
                   key={el.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
                 >
                   <span className="text-ink">{el.label}</span>
                   <form action={add}>
-                    <button type="submit" className="text-xs text-slate hover:text-ink">
+                    <button type="submit" className="text-xs text-ink-muted hover:text-ink">
                       Add
                     </button>
                   </form>

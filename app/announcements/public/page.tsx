@@ -48,33 +48,33 @@ export default async function PublicAnnouncementsPage() {
       <AppHeader tag="Announcements" />
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Announcements</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Announcements</h1>
       </section>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         {announcements.length === 0 ? (
-          <p className="text-sm text-slate">Nothing posted yet.</p>
+          <p className="text-sm text-ink-muted">Nothing posted yet.</p>
         ) : (
           <ul className="flex flex-col gap-4">
             {announcements.map((a) => {
               const dateRange = formatDateRange(a);
               const meta = [a.organization, a.announcement_type].filter(Boolean).join(" · ");
               return (
-                <li key={a.id} className="rounded-md border border-rule/60 px-3 py-2 text-sm">
+                <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <span className="font-display text-base text-ink">{a.title}</span>
                     {dateRange && (
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-slate/70">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                         {dateRange}
                       </span>
                     )}
                   </div>
-                  {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-slate/60">{meta}</p>}
-                  {a.body && <p className="mt-2 whitespace-pre-wrap text-slate">{a.body}</p>}
-                  {a.location && <p className="mt-1 text-[11px] text-slate/70">Location: {a.location}</p>}
+                  {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
+                  {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
+                  {a.location && <p className="mt-1 text-[11px] text-ink-muted/70">Location: {a.location}</p>}
                   {a.link_url && (
                     <p className="mt-1 text-[11px]">
-                      <a href={a.link_url} className="underline text-slate hover:text-ink">
+                      <a href={a.link_url} className="underline text-ink-muted hover:text-ink">
                         More info
                       </a>
                     </p>

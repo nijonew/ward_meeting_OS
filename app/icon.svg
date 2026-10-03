@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Favicon per design.md's Assets plan: a small monogram mark, flat,
+       two colors, no gradient -- accent on surface. Hardcoded color
+       values (not CSS variables) since a favicon is loaded as a
+       standalone document with no access to the app's stylesheet. -->
+  <rect width="32" height="32" rx="6" fill="oklch(38% 0.11 20)" />
+  <text
+    x="16"
+    y="23"
+    text-anchor="middle"
+    font-family="system-ui, sans-serif"
+    font-weight="800"
+    font-size="18"
+    fill="oklch(99% 0.002 250)"
+  >W</text>
+</svg>

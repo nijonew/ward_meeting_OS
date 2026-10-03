@@ -175,11 +175,11 @@ export function AdminTableEditor({
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-rule bg-card p-6">
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+    <div className="overflow-x-auto rounded border border-rule bg-surface p-6">
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
       <table className="w-full min-w-[720px] text-sm">
         <thead>
-          <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-widest text-slate/70">
+          <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
             {columns.map((c) => (
               <th key={c.column} className="pb-2 pr-3">
                 <button
@@ -217,7 +217,7 @@ export function AdminTableEditor({
                     type="button"
                     disabled={!isDirty(row.id) || pending}
                     onClick={() => saveRow(row)}
-                    className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                    className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                   >
                     Save
                   </button>
@@ -225,7 +225,7 @@ export function AdminTableEditor({
                     type="button"
                     disabled={pending}
                     onClick={() => removeRow(row)}
-                    className="text-xs text-slate hover:text-ink"
+                    className="text-xs text-danger/70 hover:text-danger"
                   >
                     Delete
                   </button>
@@ -250,7 +250,7 @@ export function AdminTableEditor({
                 type="button"
                 disabled={pending}
                 onClick={addRow}
-                className="w-fit rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+                className="w-fit rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
               >
                 Add
               </button>
@@ -292,7 +292,7 @@ function AdminCellInput({
   if (column.type === "select" || column.type === "foreign_key") {
     return (
       <select value={value == null ? "" : String(value)} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>
-        <option value="">{column.required ? "— choose —" : "— none —"}</option>
+        <option value="">{column.required ? "Choose" : "None"}</option>
         {(options ?? []).map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

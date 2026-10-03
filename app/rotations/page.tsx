@@ -53,8 +53,8 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
     <Link
       href={`/rotations?type=${slug}`}
       className={[
-        "rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-widest transition-colors",
-        active ? "bg-ink text-paper" : "text-slate hover:text-ink",
+        "rounded px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors",
+        active ? "bg-ink text-paper" : "text-ink-muted hover:text-ink",
       ].join(" ")}
     >
       {label}
@@ -77,15 +77,15 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
   const nextUpName = rotation.members[rotation.next_index % Math.max(rotation.members.length, 1)]?.person_name;
 
   return (
-    <div className="rounded-lg border border-rule bg-card p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-display text-xl">{ELEMENT_LABELS[rotation.element_key] ?? rotation.element_key}</h2>
-          <p className="text-xs text-slate">{rotation.meeting_type_name}</p>
+          <p className="text-xs text-ink-muted">{rotation.meeting_type_name}</p>
         </div>
         {rotation.eligibility_source !== "manual" && (
           <form action={sync}>
-            <button type="submit" className="text-xs text-slate hover:text-ink">
+            <button type="submit" className="text-xs text-ink-muted hover:text-ink">
               Sync from {rotation.eligibility_source === "calling_names" ? "callings" : "standing attendees"}
             </button>
           </form>
@@ -93,10 +93,10 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
       </div>
 
       {rotation.members.length === 0 ? (
-        <p className="mt-4 text-sm text-slate">No one in this rotation yet.</p>
+        <p className="mt-4 text-sm text-ink-muted">No one in this rotation yet.</p>
       ) : (
         <>
-          <p className="mt-4 text-xs text-slate">
+          <p className="mt-4 text-xs text-ink-muted">
             Next up: <span className="text-ink">{nextUpName}</span>
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
@@ -116,14 +116,14 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
               return (
                 <li
                   key={m.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-rule/60 px-3 py-1.5 text-sm"
+                  className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-1.5 text-sm"
                 >
-                  <span className={idx === rotation.next_index % rotation.members.length ? "text-ink" : "text-slate"}>
+                  <span className={idx === rotation.next_index % rotation.members.length ? "text-ink" : "text-ink-muted"}>
                     {m.person_name}
                   </span>
                   <span className="flex items-center gap-2">
                     <form action={moveUp}>
-                      <button type="submit" disabled={idx === 0} className="text-xs text-slate hover:text-ink disabled:opacity-30">
+                      <button type="submit" disabled={idx === 0} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
                         &uarr;
                       </button>
                     </form>
@@ -131,13 +131,13 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
                       <button
                         type="submit"
                         disabled={idx === rotation.members.length - 1}
-                        className="text-xs text-slate hover:text-ink disabled:opacity-30"
+                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
                       >
                         &darr;
                       </button>
                     </form>
                     <form action={remove}>
-                      <button type="submit" className="text-xs text-slate hover:text-ink">
+                      <button type="submit" className="text-xs text-danger/70 hover:text-danger">
                         Remove
                       </button>
                     </form>
@@ -151,7 +151,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
 
       {availablePeople.length > 0 && (
         <form action={addMember} className="mt-4 flex items-center gap-2">
-          <select name="person_id" defaultValue="" className="flex-1 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
+          <select name="person_id" defaultValue="" className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
             <option value="" disabled>
               Add someone&hellip;
             </option>
@@ -161,7 +161,7 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink/90">
+          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper hover:bg-accent-deep">
             Add
           </button>
         </form>
@@ -184,7 +184,7 @@ export default async function RotationsPage({
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Assignment Rotations" />
-        <p className="mt-10 text-slate">Only the Bishopric can manage assignment rotations.</p>
+        <p className="mt-10 text-ink-muted">Only the Bishopric can manage assignment rotations.</p>
       </main>
     );
   }
@@ -207,49 +207,49 @@ export default async function RotationsPage({
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Assignment Rotations" />
 
-      <Link href="/meeting-planning" className="text-xs text-slate hover:text-ink">
+      <Link href="/meeting-planning" className="text-xs text-ink-muted hover:text-ink">
         &larr; Meeting Planning
       </Link>
 
       <section className="mt-4">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
-        <p className="mt-2 text-sm text-slate">
-          Every upcoming meeting down one side, every role across the top &mdash; fill in who&rsquo;s
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          Every upcoming meeting down one side, every role across the top. Fill in who&rsquo;s
           actually assigned. This is the real, applied assignment for that meeting, however it got
-          there (a fixed calling order, a rotation, or a manual pick) &mdash; editing a cell here
+          there (a fixed calling order, a rotation, or a manual pick). Editing a cell here
           never changes whose turn is next for the rotations below, it only overrides this one
           meeting.
         </p>
       </section>
 
-      <div className="flex w-fit flex-wrap gap-1 rounded-md border border-rule p-1">
+      <div className="flex w-fit flex-wrap gap-1 rounded border border-rule p-1">
         {MEETING_TYPE_TABS.map((t) => (
           <TypeTab key={t.slug} slug={t.slug} active={t.slug === selectedType} label={t.label} />
         ))}
       </div>
 
-      <div className="rounded-lg border border-rule bg-card p-6">
+      <div className="rounded border border-rule bg-surface p-6">
         <form method="get" className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="type" value={selectedType} />
-          <label className="text-xs text-slate">
+          <label className="text-xs text-ink-muted">
             Through
             <input
               type="date"
               name="through"
               defaultValue={throughDate}
-              className="ml-2 rounded-md border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+              className="ml-2 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
             />
           </label>
-          <button type="submit" className="rounded-md border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Update range
           </button>
         </form>
 
         {selectedType === "sacrament-meeting" && (
-          <p className="mt-3 text-[11px] text-slate/60">
-            No Presiding column &mdash; it always defaults to whoever holds the Bishop calling.
+          <p className="mt-3 text-[11px] text-ink-muted/60">
+            No Presiding column. It always defaults to whoever holds the Bishop calling.
             Conducting cycles automatically by calendar month (Bishop &rarr; 1st Counselor &rarr; 2nd
-            Counselor) based on who currently holds each calling &mdash; if it shows the same person
+            Counselor) based on who currently holds each calling. If it shows the same person
             every month, check that both counselor callings actually have a current holder set
             (Table Admin &rarr; Callings). The dropdown itself already only offers whichever of the
             three currently has a holder.
@@ -257,7 +257,7 @@ export default async function RotationsPage({
         )}
 
         {grid.rows.length === 0 ? (
-          <p className="mt-4 text-sm text-slate">
+          <p className="mt-4 text-sm text-ink-muted">
             No {MEETING_TYPE_TABS.find((t) => t.slug === selectedType)?.label} meetings scheduled in
             this range yet.
           </p>
@@ -268,7 +268,7 @@ export default async function RotationsPage({
 
       <section className="mt-2">
         <h2 className="font-display text-xl">Rotation Order</h2>
-        <p className="mt-1 text-sm text-slate">
+        <p className="mt-1 text-sm text-ink-muted">
           Whoever&rsquo;s next gets pre-filled automatically when a new meeting is created. This is
           secondary to the grid above -- it only sets the *default* for a meeting that doesn&rsquo;t
           have one yet, or after everyone above has had a turn. Presiding and Conducting aren&rsquo;t
