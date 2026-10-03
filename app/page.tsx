@@ -8,13 +8,23 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
 import type { AppRole } from "@/lib/supabase/get-session-user";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 
-// Sacrament Meeting deliberately excluded (2026-09-10, the user's own
-// request: "remove sacrament meeting from 'my meetings'") -- its own
-// tile in the "This week" tier above already covers the one thing a
-// non-admin would want (today's public program), and admins reach it
-// through Administration -> Meeting Planning -> Meeting Agendas
-// instead, so a third entry point here was redundant.
-const ALL_MEETING_TYPES: MeetingTypeSlug[] = ["bishopric-meeting", "ward-council", "youth-council"];
+// Sacrament Meeting restored 2026-10-03 (the user's own request: "I
+// want it available to bishopric and admin members") -- reverses the
+// 2026-09-10 removal below. Still bishopric-only here, same as the
+// other three types in this list; a non-admin's own list
+// (rawVisibleTypes, calling-based) never includes it regardless, so
+// this change only affects what an admin sees.
+//
+// ~~Sacrament Meeting deliberately excluded (2026-09-10, the user's own
+// request: "remove sacrament meeting from 'my meetings'")~~ -- the
+// reasoning at the time: its own tile in the "This week" tier above
+// already covers the one thing a non-admin would want (today's public
+// program), and admins could reach it through Administration -> Meeting
+// Planning -> Meeting Agendas instead, so a third entry point here
+// seemed redundant. In practice that chain turned out to be a real
+// point of friction for the one thing that matters most (getting to a
+// meeting to plan it), so a direct entry point is back.
+const ALL_MEETING_TYPES: MeetingTypeSlug[] = ["sacrament-meeting", "bishopric-meeting", "ward-council", "youth-council"];
 
 // Per the user's request (2026-09-09): the landing page's browser tab
 // now reads "Dashboard" and /dashboard's reads "Meeting Dashboard" (see
