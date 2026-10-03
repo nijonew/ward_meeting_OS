@@ -3,11 +3,12 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
 import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
+import { DeleteMeetingButton } from "@/components/dashboard/DeleteMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
-import { cancelMeeting, uncancelMeeting } from "@/app/dashboard/actions";
+import { cancelMeeting, uncancelMeeting, deleteMeeting } from "@/app/dashboard/actions";
 import { MEETING_TYPE_LABELS, type Meeting, type MeetingTypeSlug } from "@/lib/types";
 
 function formatMeetingDate(iso: string) {
@@ -60,7 +61,11 @@ function MeetingRow({
   // -- the public program for Sacrament Meeting, the calling-based
   // read-only view (which enforces its own access) for the other three.
   const nonAdminHref = meeting.meetingType === "sacrament-meeting" ? "public" : "archived";
-  const href = canManage ? `/meetings/${meeting.id}` : `/meetings/${meeting.id}/${nonAdminHref}`;
+  // Straight to Planning (2026-10-03, the user's own request: "when
+  // entering a meeting instance from a dashboard please default to the
+  // planning view") -- the bare /meetings/[id] route itself just
+  // redirects here anyway now, so this skips that extra hop.
+  const href = canManage ? `/meetings/${meeting.id}/planning` : `/meetings/${meeting.id}/${nonAdminHref}`;
 
   const dateCell = isBuilt ? (
     <Link
@@ -80,6 +85,10 @@ function MeetingRow({
   const cancel = async (formData: FormData) => {
     "use server";
     await cancelMeeting(formData);
+  };
+  const deleteThis = async () => {
+    "use server";
+    await deleteMeeting(meeting.id);
   };
 
   return (
@@ -107,20 +116,26 @@ function MeetingRow({
         </div>
       </td>
       <td className="px-2 py-2 align-top">
-        {canManage &&
-          meeting.stage !== "archived" &&
-          (meeting.cancelled ? (
-            <form action={uncancel}>
-              <button
-                type="submit"
-                className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
-              >
-                Un-cancel
-              </button>
-            </form>
-          ) : (
-            <CancelMeetingButton meetingId={meeting.id} cancelAction={cancel} />
-          ))}
+        {canManage && meeting.stage !== "archived" && (
+          <div className="flex flex-wrap items-center gap-2">
+            {meeting.cancelled ? (
+              <form action={uncancel}>
+                <button
+                  type="submit"
+                  className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
+                >
+                  Un-cancel
+                </button>
+              </form>
+            ) : (
+              <CancelMeetingButton meetingId={meeting.id} cancelAction={cancel} />
+            )}
+            <DeleteMeetingButton
+              meetingLabel={`${meeting.title} on ${formatMeetingDate(meeting.date)}`}
+              deleteAction={deleteThis}
+            />
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -339,6 +354,15 @@ export default async function DashboardPage({
             </span>
           )}
         </div>
+
+        {canCreate && meetings.length > 0 && (
+          <p className="mt-2 text-xs text-ink-muted">
+            Cancel marks a meeting as not happening -- it stays visible, with a reason, so anyone
+            checking normal meeting times sees it&rsquo;s superseded. Delete removes a meeting
+            record outright, for a genuine mistake like an accidental duplicate -- it only ever
+            affects that one meeting&rsquo;s own data, never another meeting on the same date.
+          </p>
+        )}
 
         {meetings.length === 0 ? (
           <p className="mt-4 text-ink-muted">No meetings scheduled yet.</p>

@@ -99,8 +99,10 @@ reconstructed from both:
 - `053` (new `sacrament_visiting_authorities` table -- the Visiting
   Authorities multi-select + write-in list, see Known open items
   below): still needs to be run.
+- `054` (new `delete_meeting_cascade` Postgres function -- the Delete
+  Meeting action, see Known open items below): still needs to be run.
 
-Next migration should be `054_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `055_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2465,6 +2467,73 @@ before fully closing it out.
     call about what belongs in a public-facing program (RABNM/calling
     business already stay out of it on purpose), not something to
     decide without asking first.
+- **Delete Meeting, distinct from Cancel; a duplicate-date guard on
+  creation; entering a meeting now defaults to Planning -- all
+  2026-10-03, the user's own request** after accidentally creating a
+  second Sacrament Meeting for an already-planned date: "I want to be
+  able to delete that meeting. But then what does that mean when I do
+  that? Does it impact the agenda of the meeting I actually want on
+  that date? Can we have a way to notify someone that they are creating
+  a meeting that is already there and that they can be then be taken to
+  that meeting planning?"
+  - **Delete Meeting** (`deleteMeeting`, `app/dashboard/actions.ts`,
+    new `DeleteMeetingButton.tsx`, next to Cancel/Un-cancel on
+    `/dashboard`): removes a meeting record and everything tied to it
+    outright, for a genuine mistake -- Cancel (unchanged) keeps a real
+    meeting on the calendar, visibly marked as not happening, which is
+    a completely different concept (informational, nothing deleted). A
+    short explanatory line now sits above the dashboard's meeting list
+    for exactly this distinction, since it was a real question the user
+    asked, not just a feature request.
+  - **Answering "does it impact the other meeting on that date": no.**
+    Every table scoped to a meeting is keyed by that specific meeting's
+    own `id`, never by date -- deleting meeting A can never touch
+    meeting B's rows even if they share a date. New `delete_meeting_cascade`
+    Postgres function (migration `054`) does the actual cleanup, in one
+    atomic transaction, across every table found to hold meeting-scoped
+    data (`sacrament_assignments`, `bishopric_assignments`,
+    `sacrament_music`, `sacrament_planning`, `sacrament_speakers_adults/
+    youth`, `sacrament_rabnm` + its `sacrament_rabnm_people` join rows,
+    `sacrament_program_items`, `sacrament_visiting_authorities`,
+    `meeting_planned_elements`, `meeting_element_notes`, `agenda_items`,
+    `meeting_action_items`, `council_notes`, `bishopric_minutes`) --
+    done as one Postgres function rather than a sequence of separate
+    `.delete()` calls from the server action specifically so a failure
+    partway through can't leave orphaned rows, and so it doesn't matter
+    whether each table's own `meetings` foreign key happens to cascade
+    or not (several of these tables predate this repo's migration
+    history, so that was never something to assume either way).
+    `calling_planning.announced_meeting_id` -- a reference *to* a
+    meeting, not data belonging to it -- is set to null instead of
+    deleted, so real calling-planning history is never destroyed just
+    because the meeting it was announced in gets removed.
+  - **Incidental gaps found and fixed while in here**: `cancelMeeting`/
+    `uncancelMeeting` had no server-side role check at all (only the
+    dashboard page's own `canManage` gate kept the controls out of a
+    non-admin's view) -- the same gap already found and fixed for
+    several other actions this session, now closed for these two as
+    well. Same for `createMeeting` (`/meetings/new`'s own action) --
+    found while adding the duplicate-date guard below.
+  - **Duplicate-date guard on creation** (`app/meetings/new/actions.ts`):
+    before inserting, checks for an existing meeting of the same type
+    and date; if one exists, refuses to create a second and returns a
+    link straight to the existing meeting's Planning view instead of
+    silently creating a duplicate. `lib/data/meeting-schedule.ts`'s
+    Generate Meetings already had this same check built in (it skips
+    any candidate date that already has a meeting) -- `/meetings/new`'s
+    manual "+ New Meeting" form was the one creation path that didn't,
+    and is exactly how the user's own duplicate happened.
+  - **Entering a meeting now defaults to Planning** (the user's own
+    words: "when entering a meeting instance from a dashboard please
+    default to the planning view"): the bare `/meetings/[id]` route
+    (previously just "Choose a view above to get started") now
+    redirects straight to `/meetings/[id]/planning` -- Planning's own
+    existing gate already handles everything that needs to happen from
+    there (a non-admin to the read-only view, an archived meeting to
+    its own view), so nothing needed duplicating. The dashboard's own
+    date-button link and a freshly created meeting's redirect both go
+    straight to `/planning` now too, skipping that extra redirect hop
+    rather than relying on it alone.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

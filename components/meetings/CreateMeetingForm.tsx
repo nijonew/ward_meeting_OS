@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { createMeeting, type CreateMeetingState } from "@/app/meetings/new/actions";
 import type { MeetingTypeOption } from "@/lib/data/meeting-types";
@@ -95,7 +96,20 @@ export function CreateMeetingForm({ meetingTypes }: { meetingTypes: MeetingTypeO
         {pending ? "Creating..." : "Create Meeting"}
       </button>
 
-      {state.error && <p className="text-sm text-danger">{state.error}</p>}
+      {state.error && (
+        <p className="text-sm text-danger">
+          {state.error}
+          {state.existingMeetingId && (
+            <>
+              {" "}
+              <Link href={`/meetings/${state.existingMeetingId}/planning`} className="underline">
+                Go to that meeting&rsquo;s planning instead
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      )}
     </form>
   );
 }
