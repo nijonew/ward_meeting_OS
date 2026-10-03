@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
+import { MeetingTabNav } from "@/components/meetings/MeetingTabNav";
 import { getMeetingById } from "@/lib/data/meetings";
 import type { MeetingLifecycleStage } from "@/lib/types";
 
@@ -89,17 +90,7 @@ export default async function MeetingLayout({
         </div>
       </section>
 
-      <nav className="mt-6 flex gap-1 border-b border-rule">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.slug}
-            href={`/meetings/${meeting.id}/${tab.slug}`}
-            className="border-b-2 border-transparent px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
+      <MeetingTabNav meetingId={meeting.id} tabs={tabs} />
 
       <div className="mt-8 flex-1">{children}</div>
 

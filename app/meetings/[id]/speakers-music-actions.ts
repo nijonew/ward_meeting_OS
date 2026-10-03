@@ -8,6 +8,15 @@ import { lookupHymn1985Title } from "@/lib/data/hymnal";
 
 type ActionResult = { success: true } | { error: string };
 
+/** Looser shape than ActionResult, used only by the two actions bound
+ *  into useActionState below (saveProgramSpeaker/saveProgramMusic) --
+ *  useActionState needs one type that covers both the initial ("not
+ *  saved yet") state and every real result, and `{ error?: string;
+ *  success?: boolean }` lets both fields be read directly in JSX
+ *  without narrowing, matching the pattern AgendaGridForm.tsx already
+ *  uses for the same kind of per-form save state. */
+export type SaveActionResult = { error?: string; success?: boolean };
+
 /**
  * Actions behind /meetings/[id]/speakers-music (2026-09-09) -- the
  * freely add/remove/reorderable Speakers & Music list the user asked
@@ -146,13 +155,38 @@ export async function moveProgramItem(meetingId: string, itemId: string, directi
  *  words) is a UI-only distinction (SpeakerPersonOrGuestField hides the
  *  guest input until asked for); this write accepts either, same as
  *  every other speaker-picking form in this app. No topic field, per
- *  the same note. */
+ *  the same note.
+ *
+ * `_prevState` (unused, 2026-10-03) exists only so `ItemRow` can bind
+ * this into `useActionState` -- see that component's own comment for
+ * why a bare async form action was the wrong shape here (React resets
+ * an uncontrolled form once a plain-function action completes; a
+ * `useActionState`-bound one doesn't).
+ *
+ * **Bug fixed 2026-10-03** (the user's own report: speakers added here
+ * "didn't show up in the public view but they did in the conducting
+ * view"): never set `confirmed`, which `sacrament_speakers_adults/youth`
+ * still has (deliberately kept, per the Table Admin queue's own
+ * decision) and `lib/data/public-view.ts`/`speaker-prayer-history.ts`
+ * both still filter on (`confirmed = true`) -- the checkbox that used
+ * to set this was intentionally dropped from this UI when it was
+ * built ("treat it as ready once filled," same reasoning as dropping
+ * `sacrament_assignments.confirmed` entirely), but nothing was ever
+ * added here to actually set it true in that checkbox's place, so
+ * every speaker saved through this flow silently stayed `confirmed =
+ * false` (or whatever the column default is) forever -- invisible to
+ * the public program and to the "who's due for a turn" history, visible
+ * everywhere else (Conducting, Planning itself) since neither of those
+ * filters on it. Now always sets `confirmed: true` on both insert and
+ * update, matching "filled in = ready," the same rule this app already
+ * uses everywhere else a confirm step was removed. */
 export async function saveProgramSpeaker(
   meetingId: string,
   table: "sacrament_speakers_adults" | "sacrament_speakers_youth",
   slot: string,
+  _prevState: SaveActionResult,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<SaveActionResult> {
   const auth = await requireBishopric();
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();
@@ -166,13 +200,13 @@ export async function saveProgramSpeaker(
   if (existingId) {
     const { error } = await supabase
       .from(table)
-      .update({ speaker_id: personId, guest_speaker_name: guestName })
+      .update({ speaker_id: personId, guest_speaker_name: guestName, confirmed: true })
       .eq("id", existingId);
     if (error) return { error: error.message };
   } else {
     const { error } = await supabase
       .from(table)
-      .insert({ meeting_id: meetingId, slot, speaker_id: personId, guest_speaker_name: guestName });
+      .insert({ meeting_id: meetingId, slot, speaker_id: personId, guest_speaker_name: guestName, confirmed: true });
     if (error) return { error: error.message };
   }
 
@@ -185,13 +219,17 @@ export async function saveProgramSpeaker(
  *  individual or group name, accompanist)", the user's own words),
  *  Accompanist (a real person). Intermediate Hymn: Hymn Number + Title
  *  only, same as every other hymn line in this app -- no performer/
- *  accompanist, it's congregational. */
+ *  accompanist, it's congregational.
+ *
+ * `_prevState` (unused, 2026-10-03) -- see saveProgramSpeaker's own
+ * comment just above; same `useActionState`-binding reason. */
 export async function saveProgramMusic(
   meetingId: string,
   type: "musical_number" | "intermediate_hymn",
   slot: string,
+  _prevState: SaveActionResult,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<SaveActionResult> {
   const auth = await requireBishopric();
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();

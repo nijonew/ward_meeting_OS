@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 047
+## Current migration number: 050
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -78,15 +78,20 @@ reconstructed from both:
   above): confirmed run.
 - `047` (new `sacrament_program_templates` table -- Speakers & Music
   pre-fill by format, see the Dynamic planning view architecture entry
-  above): still needs to be run.
+  above): confirmed run (2026-10-03).
 - `048` (one-time backfill: fills `sacrament_music.piece_name` from
   Music Reference wherever a hymn number was saved with no title --
-  see the hymn-title auto-fill entry below): still needs to be run.
+  see the hymn-title auto-fill entry below): confirmed run (2026-10-03).
 - `049` (one-time bulk import: 412 names into `people`, skipping any
-  that already exist -- see the bulk people import entry below): still
-  needs to be run.
+  that already exist -- see the bulk people import entry below):
+  confirmed run (2026-10-03).
+- `050` (one-time backfill: sets `confirmed = true` on every existing
+  `sacrament_speakers_adults/youth` row that already has a real speaker
+  -- fixes a real bug where speakers added through the Speakers & Music
+  list never showed in the public program, see Known open items below):
+  still needs to be run.
 
-Next migration should be `050_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `051_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are

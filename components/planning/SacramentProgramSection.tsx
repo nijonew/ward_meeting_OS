@@ -1,18 +1,20 @@
 "use client";
 
-import { useTransition } from "react";
+import { useActionState, useTransition } from "react";
 import {
   addProgramItem,
   removeProgramItem,
   moveProgramItem,
   saveProgramSpeaker,
   saveProgramMusic,
+  type SaveActionResult,
 } from "@/app/meetings/[id]/speakers-music-actions";
 import { allProgramItemOptions, type ResolvedProgramItem } from "@/lib/data/sacrament-program-shared";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
 import type { PersonOption } from "@/lib/data/people";
 
 const INPUT = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
+const initialSaveState: SaveActionResult = {};
 
 function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meetingId: string; people: PersonOption[] }) {
   const [removing, startRemove] = useTransition();
@@ -28,13 +30,24 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
     await moveProgramItem(meetingId, item.id, direction);
   });
 
-  const saveSpeaker = async (formData: FormData) => {
-    const table = item.kind === "youth_speaker" ? "sacrament_speakers_youth" : "sacrament_speakers_adults";
-    await saveProgramSpeaker(meetingId, table, item.itemKey, formData);
-  };
-  const saveMusic = async (formData: FormData) => {
-    await saveProgramMusic(meetingId, item.kind as "musical_number" | "intermediate_hymn", item.itemKey, formData);
-  };
+  // `useActionState` rather than a bare async form action (2026-10-03,
+  // the user's own report: a saved speaker "did not stay populated...
+  // the field became as if nothing was entered") -- React automatically
+  // resets an uncontrolled form once a plain-function action completes,
+  // which blanked these fields back to their mount-time defaultValue
+  // right after every successful save, even though the save itself
+  // worked fine (resolveProgramItems/Conducting both showed the real
+  // saved value -- only this form's own display was wrong). A
+  // useActionState-bound action doesn't get that auto-reset.
+  const speakerTable = item.kind === "youth_speaker" ? "sacrament_speakers_youth" : "sacrament_speakers_adults";
+  const [speakerState, saveSpeakerAction, speakerPending] = useActionState(
+    saveProgramSpeaker.bind(null, meetingId, speakerTable, item.itemKey),
+    initialSaveState
+  );
+  const [musicState, saveMusicAction, musicPending] = useActionState(
+    saveProgramMusic.bind(null, meetingId, item.kind as "musical_number" | "intermediate_hymn", item.itemKey),
+    initialSaveState
+  );
 
   return (
     <li className="rounded border border-rule/60 p-3">
@@ -54,16 +67,22 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
       </div>
 
       {(item.kind === "speaker" || item.kind === "youth_speaker") && (
-        <form action={saveSpeaker} className="mt-2 flex flex-wrap items-center gap-2">
+        <form action={saveSpeakerAction} className="mt-2 flex flex-wrap items-center gap-2">
           <SpeakerPersonOrGuestField people={people} defaultPersonId={item.personId} defaultGuestName={item.guestName} />
-          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep">
-            Save
+          <button
+            type="submit"
+            disabled={speakerPending}
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
+          >
+            {speakerPending ? "Saving..." : "Save"}
           </button>
+          {speakerState?.error && <p className="text-xs text-danger">{speakerState.error}</p>}
+          {!speakerPending && speakerState?.success && <p className="text-xs text-success">Saved.</p>}
         </form>
       )}
 
       {item.kind === "musical_number" && (
-        <form action={saveMusic} className="mt-2 flex flex-wrap items-center gap-2">
+        <form action={saveMusicAction} className="mt-2 flex flex-wrap items-center gap-2">
           <input type="text" name="piece_name" defaultValue={item.title} placeholder="Title" className={INPUT} />
           <input type="text" name="performer" defaultValue={item.performer} placeholder="Individual or group name" className={INPUT} />
           <select name="accompanist_id" defaultValue={item.accompanistId} className={INPUT}>
@@ -74,14 +93,20 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep">
-            Save
+          <button
+            type="submit"
+            disabled={musicPending}
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
+          >
+            {musicPending ? "Saving..." : "Save"}
           </button>
+          {musicState?.error && <p className="text-xs text-danger">{musicState.error}</p>}
+          {!musicPending && musicState?.success && <p className="text-xs text-success">Saved.</p>}
         </form>
       )}
 
       {item.kind === "intermediate_hymn" && (
-        <form action={saveMusic} className="mt-2 flex flex-wrap items-center gap-2">
+        <form action={saveMusicAction} className="mt-2 flex flex-wrap items-center gap-2">
           <input
             type="text"
             inputMode="numeric"
@@ -91,9 +116,15 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
             className={`${INPUT} w-16`}
           />
           <input type="text" name="piece_name" defaultValue={item.title} placeholder="Hymn title" className={INPUT} />
-          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep">
-            Save
+          <button
+            type="submit"
+            disabled={musicPending}
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
+          >
+            {musicPending ? "Saving..." : "Save"}
           </button>
+          {musicState?.error && <p className="text-xs text-danger">{musicState.error}</p>}
+          {!musicPending && musicState?.success && <p className="text-xs text-success">Saved.</p>}
         </form>
       )}
 
