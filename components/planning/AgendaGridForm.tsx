@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
-import type { AgendaRow } from "@/lib/data/agenda-rows";
+import { FIELD_SEPARATOR, type AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
+import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
@@ -118,6 +119,84 @@ function MusicCell({
           className={`${INPUT} sm:w-40`}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Visiting Authorities: a dynamic number of person-or-guest rows, a "+"
+ * to add another (2026-10-03, the user's own request: "much like the
+ * other dropdowns on the page, but with a + button underneath the
+ * dropdown to add a second row for another visiting authority
+ * continuously" -- reversing this element's first pass as its own
+ * separate management page). The row count lives entirely in this
+ * component's own React state -- adding/removing a row never touches
+ * the server; everything saves together with the rest of the grid on
+ * the next "Save All Changes," same as every other field here. Field
+ * names are indexed by position (`<fieldPrefix>::<n>::person_id` /
+ * `::guest_name`, see SpeakerPersonOrGuestField's own field-name props)
+ * -- saveAgendaGrid collects every row under the prefix, drops
+ * genuinely blank ones, and replaces the meeting's whole
+ * sacrament_visiting_authorities list with what's left, rather than
+ * diffing row by row.
+ *
+ * "Remove" only ever drops the trailing row, not an arbitrary one in
+ * the middle -- these are uncontrolled inputs (defaultValue-based, like
+ * every other field in this grid), so reordering/reindexing an
+ * arbitrary removal correctly would need controlled state this
+ * component otherwise has no reason to carry. To drop a row that isn't
+ * last, just clear its own selection -- a blank row is dropped at save
+ * time the same as if it had never been added.
+ *
+ * `onDirty` is called directly on add/remove, since neither is a
+ * native form-control change the surrounding `<form>`'s own `onChange`
+ * would otherwise catch.
+ */
+function VisitingAuthoritiesField({
+  row,
+  onDirty,
+}: {
+  row: Extract<AgendaRow, { kind: "visiting_authorities" }>;
+  onDirty: () => void;
+}) {
+  const [rowCount, setRowCount] = useState(Math.max(row.rows.length, 1));
+
+  const addRow = () => {
+    setRowCount((n) => n + 1);
+    onDirty();
+  };
+  const removeLastRow = () => {
+    setRowCount((n) => Math.max(n - 1, 1));
+    onDirty();
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: rowCount }, (_, i) => {
+        const existing = row.rows[i];
+        return (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <SpeakerPersonOrGuestField
+              people={row.eligiblePeople}
+              defaultPersonId={existing?.personId ?? ""}
+              defaultGuestName={existing?.guestName ?? ""}
+              personFieldName={`${row.fieldPrefix}${FIELD_SEPARATOR}${i}${FIELD_SEPARATOR}person_id`}
+              guestFieldName={`${row.fieldPrefix}${FIELD_SEPARATOR}${i}${FIELD_SEPARATOR}guest_name`}
+              personPlaceholder="Choose a visiting authority"
+              guestToggleLabel="Write in a name instead"
+              personToggleLabel="Choose from the list instead"
+            />
+            {rowCount > 1 && i === rowCount - 1 && (
+              <button type="button" onClick={removeLastRow} className="text-xs text-danger/70 hover:text-danger">
+                Remove
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <button type="button" onClick={addRow} className="w-fit text-xs text-ink-muted underline hover:text-ink">
+        + Add another
+      </button>
     </div>
   );
 }
@@ -324,6 +403,10 @@ export function AgendaGridForm({
                     )}
 
                     {row.kind === "stake_business" && <StakeBusinessCell row={row} />}
+
+                    {row.kind === "visiting_authorities" && (
+                      <VisitingAuthoritiesField row={row} onDirty={() => setDirty(true)} />
+                    )}
                   </td>
                 </tr>
               );

@@ -2461,13 +2461,10 @@ before fully closing it out.
     Presidency counselors) -- multiple High Council seats just need to
     share the exact name `"High Council"` to all appear here; no
     uniqueness constraint on `callings.name` prevents that.
-  - **On its own page**, `/meetings/[id]/visiting-authorities`, same
-    reasoning as Ward Business: its own add/remove `<form>`s can't nest
-    inside the agenda grid's single big `<form>`. The grid's own
-    Visiting Authorities line is now a banner with a link, checked
-    before the generic switch exactly like Ward Business/Stake
-    Business/Recognize Music already are (still cataloged as
-    `free_text`, just no longer rendered as one).
+  - ~~On its own page, `/meetings/[id]/visiting-authorities`, same
+    reasoning as Ward Business~~ -- true only for the rest of this same
+    day, see the follow-up note right after this list, which moves it
+    back inline.
   - **Write-in reuses `SpeakerPersonOrGuestField`** (the exact same
     person-or-guest toggle Speaker/Youth Speaker rows already use) --
     gained optional label props (`personPlaceholder`, `guestPlaceholder`,
@@ -2486,6 +2483,53 @@ before fully closing it out.
     call about what belongs in a public-facing program (RABNM/calling
     business already stay out of it on purpose), not something to
     decide without asking first.
+
+  **Moved back inline the same day**, per the user's own immediate
+  follow-up: "Instead of a separate management space lets have it much
+  like the other dropdowns on the page, but with a + button underneath
+  the dropdown to add a second row for another visiting authority
+  continuously." The separate page, its own actions file, and
+  `VisitingAuthoritiesSection.tsx` are all deleted outright, not left
+  unlinked -- `sacrament_visiting_authorities` (migration `053`) and
+  `VISITING_AUTHORITY_CALLING_NAMES` are completely unchanged, only how
+  the list is edited moved.
+  - **New `visiting_authorities` `AgendaRow` kind** (`lib/data/agenda-rows.ts`)
+    renders directly in the grid instead of a banner-with-link. Unlike
+    Speakers & Music (which genuinely needs its own real `<form>`s per
+    item, hence staying inline-but-separate between the two grid
+    halves), this element's row *count* is purely a client-side React
+    state concern -- a new `VisitingAuthoritiesField`
+    (`components/planning/AgendaGridForm.tsx`) adds/removes rows in its
+    own `useState`, and every row's fields submit together with the
+    rest of the grid on the one "Save All Changes" click. That
+    sidesteps the nested-form problem entirely rather than solving it --
+    there's only ever the grid's own single `<form>`, nothing nested
+    inside it.
+  - **Field names are positionally indexed**
+    (`visiting_authority::<n>::person_id` / `::guest_name`, via new
+    `personFieldName`/`guestFieldName` override props on
+    `SpeakerPersonOrGuestField`) rather than carrying each row's real
+    database id -- `saveAgendaGrid` collects every row under the
+    prefix, drops any that end up genuinely blank (no person, no guest
+    name), and **replaces the meeting's whole
+    `sacrament_visiting_authorities` list** with what's left (delete
+    all, then re-insert) instead of diffing row by row. Simpler than
+    tracking per-row identity across add/remove, and safe here
+    specifically because this whole field group only ever saves as one
+    unit, never a single row in isolation.
+  - **"Remove" only drops the trailing row**, not an arbitrary one in
+    the middle -- every field in this grid is an uncontrolled input
+    (`defaultValue`-based), and correctly reindexing an arbitrary
+    removal would need controlled state this component otherwise has
+    no reason to carry. To drop a row that isn't last, clear its own
+    selection instead -- a blank row is dropped at save time the same
+    as if it had never been added.
+  - Adding or removing a row doesn't fire a native form `change` event
+    (nothing's value actually changed), which is what the grid's own
+    "Save All Changes" dirty-tracking listens for -- `VisitingAuthoritiesField`
+    takes an explicit `onDirty` callback instead, called directly on
+    every add/remove, same pattern `MultiPersonSelect.tsx` already
+    established for Calling Planning's chip-style picker.
 - **Delete Meeting, distinct from Cancel; a duplicate-date guard on
   creation; entering a meeting now defaults to Planning -- all
   2026-10-03, the user's own request** after accidentally creating a

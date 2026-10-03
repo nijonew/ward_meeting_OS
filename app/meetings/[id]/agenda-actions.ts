@@ -55,6 +55,9 @@ interface SpeakerPatch {
  *   planning::has_stake_business             -> sacrament_planning (boolean)
  *   music::<type>::<slot|->::number|title|performer -> sacrament_music
  *   speaker::<adults|youth>::<slot>::person|guest|topic -> sacrament_speakers_*
+ *   visiting_authority::<n>::person_id|guest_name -> sacrament_visiting_authorities
+ *     (a dynamic-row field group, not individually addressable rows --
+ *     see its own write-up below, right before that block)
  *
  * Every write is scoped to exactly the fields that were submitted --
  * nothing does a blanket "delete every row for this meeting first",
@@ -82,6 +85,7 @@ export async function saveAgendaGrid(
   const planning = new Map<string, string>();
   const music = new Map<string, MusicPatch>();
   const speakers = new Map<string, SpeakerPatch>();
+  const visitingAuthorities = new Map<string, { personId: string; guestName: string }>();
 
   for (const [name, rawValue] of formData.entries()) {
     const parts = name.split(FIELD_SEPARATOR);
@@ -132,6 +136,16 @@ export async function saveAgendaGrid(
         if (field === "guest") entry.guest = value;
         if (field === "topic") entry.topic = value;
         speakers.set(mapKey, entry);
+        break;
+      }
+
+      case "visiting_authority": {
+        if (parts.length !== 3) break;
+        const [, indexStr, field] = parts;
+        const entry = visitingAuthorities.get(indexStr) ?? { personId: "", guestName: "" };
+        if (field === "person_id") entry.personId = value;
+        if (field === "guest_name") entry.guestName = value;
+        visitingAuthorities.set(indexStr, entry);
         break;
       }
 
@@ -302,6 +316,42 @@ export async function saveAgendaGrid(
         topic,
       });
       if (error) return { error: error.message };
+    }
+  }
+
+  // --- visiting authorities ----------------------------------------------
+  // Rendered as one field group with a dynamic row count (2026-10-03,
+  // "much like the other dropdowns on the page... a + button... to add
+  // another row"), not individually addressable rows the way speakers
+  // or music items are -- so a save here replaces the meeting's whole
+  // sacrament_visiting_authorities list with whatever was submitted
+  // (dropping genuinely blank rows) rather than diffing row by row.
+  // Only touched when the element is actually on this meeting's agenda:
+  // `visitingAuthorities.size > 0` means at least one row's fields were
+  // submitted, even if every one of them turns out blank -- which is
+  // exactly "remove everything," handled below by inserting nothing.
+  if (visitingAuthorities.size > 0) {
+    const entries = Array.from(visitingAuthorities.entries())
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, entry]) => entry)
+      .filter((entry) => entry.personId || entry.guestName);
+
+    const { error: deleteError } = await supabase
+      .from("sacrament_visiting_authorities")
+      .delete()
+      .eq("meeting_id", meetingId);
+    if (deleteError) return { error: deleteError.message };
+
+    if (entries.length > 0) {
+      const { error: insertError } = await supabase.from("sacrament_visiting_authorities").insert(
+        entries.map((entry, i) => ({
+          meeting_id: meetingId,
+          person_id: entry.personId || null,
+          guest_name: entry.guestName || null,
+          sort_order: i * 10,
+        }))
+      );
+      if (insertError) return { error: insertError.message };
     }
   }
 

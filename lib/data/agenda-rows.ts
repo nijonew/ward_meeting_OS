@@ -3,6 +3,7 @@ import type { RoleAssignmentValue } from "@/lib/data/meeting-elements";
 import type { ElementNoteValue } from "@/lib/data/meeting-element-notes";
 import type { MusicRow, SpeakerRow, PlanningInfo } from "@/lib/data/sacrament-planning";
 import type { PersonOption } from "@/lib/data/people";
+import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import { slotLabel } from "@/lib/data/sacrament-constants";
 
 /**
@@ -121,6 +122,28 @@ export type AgendaRow =
       announcerField: string;
       hasStakeBusiness: boolean;
       announcerValue: string;
+    }
+  /** Visiting Authorities: a dynamic number of person-or-guest rows,
+   *  one line each, a "+" to add another (2026-10-03, the user's own
+   *  request: "much like the other dropdowns on the page, but with a +
+   *  button underneath the dropdown to add a second row... reused
+   *  inline rather than a separate management page). `fieldPrefix` is
+   *  the field-name root each row's index nests under
+   *  (`<fieldPrefix>::<n>::person_id` / `::guest_name`) --
+   *  `saveAgendaGrid` collects every row under it, drops genuinely
+   *  blank ones, and replaces the meeting's whole
+   *  sacrament_visiting_authorities list with what's left, since this
+   *  renders as a single field group rather than individually
+   *  addressable rows. `rows` is empty for a meeting with none saved
+   *  yet -- the field itself always shows at least one row regardless,
+   *  same as it would for any other empty dropdown. */
+  | {
+      kind: "visiting_authorities";
+      id: string;
+      label: string;
+      fieldPrefix: string;
+      rows: { personId: string; guestName: string }[];
+      eligiblePeople: PersonOption[];
     };
 
 /** Music types that only ever have one per meeting -- rendered as a
@@ -145,6 +168,9 @@ export interface AgendaRowInputs {
   music: MusicRow[];
   speakersAdults: SpeakerRow[];
   speakersYouth: SpeakerRow[];
+  /** Already-saved Visiting Authorities, in order -- see that row
+   *  kind's own comment above. */
+  visitingAuthorities: VisitingAuthorityRow[];
   /** Calling-restricted eligible-people list per person_role element key
    *  -- null means no calling-based rule is configured, fall back to
    *  `allPeople`. See getEligiblePeopleByElementKey (lib/data/rotations.ts). */
@@ -179,6 +205,7 @@ export function buildAgendaRows({
   music,
   speakersAdults,
   speakersYouth,
+  visitingAuthorities,
   eligibilityByKey,
   allPeople,
   defaultPresidingId,
@@ -221,16 +248,28 @@ export function buildAgendaRows({
 
     // Visiting Authorities (2026-10-03, the user's own request: a
     // calling-restricted multi-select -- Stake Presidency + High
-    // Council -- plus a write-in option, multiple per meeting). Same
-    // reasoning as Ward Business just above: its own add/remove forms
-    // can't nest inside this grid's single big <form>, so it moves to
-    // its own page too. Still cataloged as resolution_kind 'free_text'
-    // (checked before the generic switch, same as Ward Business/Stake
-    // Business/Recognize Music above) -- it was never actually wired
-    // into the live agenda before this, so there's no existing
-    // free-text data this displaces.
+    // Council -- plus a write-in option, multiple per meeting).
+    // Rendered inline, "much like the other dropdowns on the page"
+    // (the user's own words, 2026-10-03 follow-up, reversing this
+    // element's first pass as its own separate management page) --
+    // the dynamic row count is handled entirely client-side
+    // (VisitingAuthoritiesField in AgendaGridForm.tsx just adds/removes
+    // rows in React state), so unlike Ward Business/Speakers & Music
+    // this never needs its own real `<form>`s and can live directly in
+    // this grid's single big one. Still cataloged as resolution_kind
+    // 'free_text' (checked before the generic switch, same as Ward
+    // Business/Stake Business/Recognize Music above) -- it was never
+    // actually wired into the live agenda before this, so there's no
+    // existing free-text data this displaces.
     if (isSacrament && key === "visiting_authorities") {
-      rows.push({ kind: "banner", id: el.id, label: el.label, href: `/meetings/${meetingId}/visiting-authorities` });
+      rows.push({
+        kind: "visiting_authorities",
+        id: el.id,
+        label: el.label,
+        fieldPrefix: "visiting_authority",
+        rows: visitingAuthorities.map((v) => ({ personId: v.personId, guestName: v.guestName })),
+        eligiblePeople: eligibleFor(key),
+      });
       continue;
     }
 

@@ -16,12 +16,18 @@ import type { PersonOption } from "@/lib/data/people";
  * Reused for Visiting Authorities (2026-10-03, "a potential write-in
  * option as well") -- same person-or-guest shape, different copy, via
  * the optional label props below (all default to the original Speaker
- * wording so every existing caller is unaffected).
+ * wording so every existing caller is unaffected). `personFieldName`/
+ * `guestFieldName` default to the original "person_id"/"guest_name" too
+ * -- Visiting Authorities' own dynamic row list (VisitingAuthoritiesField,
+ * AgendaGridForm.tsx) overrides both, since each row needs its own
+ * uniquely-indexed field name rather than a fixed one.
  */
 export function SpeakerPersonOrGuestField({
   people,
   defaultPersonId,
   defaultGuestName,
+  personFieldName = "person_id",
+  guestFieldName = "guest_name",
   personPlaceholder = "Choose speaker",
   guestPlaceholder = "Guest name",
   guestToggleLabel = "Guest speaker instead",
@@ -30,6 +36,8 @@ export function SpeakerPersonOrGuestField({
   people: PersonOption[];
   defaultPersonId: string;
   defaultGuestName: string;
+  personFieldName?: string;
+  guestFieldName?: string;
   personPlaceholder?: string;
   guestPlaceholder?: string;
   guestToggleLabel?: string;
@@ -42,12 +50,12 @@ export function SpeakerPersonOrGuestField({
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
-          name="guest_name"
+          name={guestFieldName}
           defaultValue={defaultGuestName}
           placeholder={guestPlaceholder}
           className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
-        <input type="hidden" name="person_id" value="" />
+        <input type="hidden" name={personFieldName} value="" />
         <button type="button" onClick={() => setShowGuest(false)} className="text-xs text-ink-muted hover:text-ink">
           {personToggleLabel}
         </button>
@@ -58,7 +66,7 @@ export function SpeakerPersonOrGuestField({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
-        name="person_id"
+        name={personFieldName}
         defaultValue={defaultPersonId}
         className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
       >
@@ -69,7 +77,7 @@ export function SpeakerPersonOrGuestField({
           </option>
         ))}
       </select>
-      <input type="hidden" name="guest_name" value="" />
+      <input type="hidden" name={guestFieldName} value="" />
       <button type="button" onClick={() => setShowGuest(true)} className="text-xs text-ink-muted hover:text-ink">
         {guestToggleLabel}
       </button>
