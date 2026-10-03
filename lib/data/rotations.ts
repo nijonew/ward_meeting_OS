@@ -126,6 +126,39 @@ export async function computeEligiblePersonIds(
 }
 
 /**
+ * Like computeEligiblePersonIds's "calling_names" source, but for the
+ * fixed-by-calling elements only (fixedCallingNamesForKey below) --
+ * merges calling names matched EXACTLY with calling names matched by
+ * PREFIX (see VISITING_AUTHORITY_CALLING_NAME_PREFIXES's own comment
+ * for why Visiting Authorities needs this). Two separate queries,
+ * unioned, rather than one combined `.or()` filter -- simpler to read
+ * and avoids escaping concerns for a list this short.
+ */
+async function computeEligiblePersonIdsForFixedCalling(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  exactNames: string[],
+  prefixes: string[]
+): Promise<string[]> {
+  const ids = new Set<string>();
+
+  if (exactNames.length > 0) {
+    const { data } = await supabase.from("callings").select("current_holder_id").in("name", exactNames).eq("active", true);
+    for (const row of (data ?? []) as { current_holder_id: string | null }[]) {
+      if (row.current_holder_id) ids.add(row.current_holder_id);
+    }
+  }
+
+  for (const prefix of prefixes) {
+    const { data } = await supabase.from("callings").select("current_holder_id").ilike("name", `${prefix}%`).eq("active", true);
+    for (const row of (data ?? []) as { current_holder_id: string | null }[]) {
+      if (row.current_holder_id) ids.add(row.current_holder_id);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+/**
  * Finds eligible people for a rotation based on its configured source, and
  * replaces its membership list with them (preserving existing sort order
  * for anyone still eligible, appending anyone new at the end, and
@@ -314,15 +347,26 @@ export const STAKE_PRESIDENCY_CALLING_NAMES = [
 /** Visiting Authorities' own eligible list (2026-10-03, the user's own
  *  request: "a dropdown that includes those in Stake Presidency
  *  callings (President and Counselors) and any in High Council
- *  callings"). "High Council" is matched exactly against
- *  `callings.name`, same as every other name in this file -- if the
- *  ward records multiple High Council seats as separate rows, they
- *  just need to share this exact name string to all show up here (no
- *  uniqueness constraint on `callings.name` prevents that). If this
- *  list comes back empty despite real High Council members existing,
- *  suspect a name mismatch first (see STAKE_PRESIDENCY_CALLING_NAMES's
- *  own note above -- this has already happened once). */
-export const VISITING_AUTHORITY_CALLING_NAMES = [...STAKE_PRESIDENCY_CALLING_NAMES, "High Council"];
+ *  callings"). Stake Presidency stays an EXACT match (one calling,
+ *  one row) -- see STAKE_PRESIDENCY_CALLING_NAMES above. */
+export const VISITING_AUTHORITY_CALLING_NAMES = STAKE_PRESIDENCY_CALLING_NAMES;
+
+/** High Council members are matched by PREFIX, not exact name --
+ *  corrected 2026-10-03 after the first guess (plain "High Council")
+ *  came back empty: the user's own words, "the calling is called Stake
+ *  High Councilor and then there are parenthesis. any calling with
+ *  Stake High Councilor should be included." This ward records one
+ *  row per seat ("Stake High Councilor (<area>)"), so there's no
+ *  single exact string that covers all of them -- same underlying
+ *  gotcha as STAKE_PRESIDENCY_CALLING_NAMES's own naming mismatch
+ *  above, just a prefix this time instead of a different literal
+ *  string. See computeEligiblePersonIdsForFixedCalling below -- this
+ *  prefix matching is deliberately scoped to just this fixed list, not
+ *  folded into computeEligiblePersonIds' general calling_names source,
+ *  so an admin-configured rotation's own eligibility_calling_names
+ *  (typed names, elsewhere in this app) stays exact-match-only and
+ *  can't be silently widened by a coincidental prefix. */
+export const VISITING_AUTHORITY_CALLING_NAME_PREFIXES = ["Stake High Councilor"];
 
 /**
  * The calling-restricted eligible-people list for one person_role agenda
@@ -350,12 +394,19 @@ export const VISITING_AUTHORITY_CALLING_NAMES = [...STAKE_PRESIDENCY_CALLING_NAM
  *  applyFixedSacramentRoles) plus Visiting Authorities (2026-10-03,
  *  never rotation-driven at all, just a standing pool of who's allowed
  *  to be picked). Returns null for anything else, so callers fall
- *  through to the real `rotations` table lookup. */
-function fixedCallingNamesForKey(meetingTypeSlug: MeetingTypeSlug, elementKey: string): string[] | null {
+ *  through to the real `rotations` table lookup. `prefixes` is only
+ *  ever non-empty for Visiting Authorities' High Council seats -- see
+ *  VISITING_AUTHORITY_CALLING_NAME_PREFIXES. */
+function fixedCallingNamesForKey(
+  meetingTypeSlug: MeetingTypeSlug,
+  elementKey: string
+): { exact: string[]; prefixes: string[] } | null {
   if (meetingTypeSlug !== "sacrament-meeting") return null;
-  if (elementKey === "presiding") return [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES];
-  if (elementKey === "conducting") return CONDUCTING_CALLING_ORDER;
-  if (elementKey === "visiting_authorities") return VISITING_AUTHORITY_CALLING_NAMES;
+  if (elementKey === "presiding") return { exact: [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES], prefixes: [] };
+  if (elementKey === "conducting") return { exact: CONDUCTING_CALLING_ORDER, prefixes: [] };
+  if (elementKey === "visiting_authorities") {
+    return { exact: VISITING_AUTHORITY_CALLING_NAMES, prefixes: VISITING_AUTHORITY_CALLING_NAME_PREFIXES };
+  }
   return null;
 }
 
@@ -368,7 +419,7 @@ export async function getEligiblePeopleForElement(
 
   const fixedNames = fixedCallingNamesForKey(meetingTypeSlug, elementKey);
   if (fixedNames) {
-    const ids = await computeEligiblePersonIds(supabase, "calling_names", fixedNames, meetingTypeId);
+    const ids = await computeEligiblePersonIdsForFixedCalling(supabase, fixedNames.exact, fixedNames.prefixes);
     return personOptionsByIds(supabase, ids);
   }
 
@@ -406,7 +457,7 @@ export async function getEligiblePeopleByElementKey(
   const fixedKeys = elementKeys.filter((k) => fixedCallingNamesForKey(meetingTypeSlug, k) !== null);
   for (const key of fixedKeys) {
     const names = fixedCallingNamesForKey(meetingTypeSlug, key)!;
-    const ids = await computeEligiblePersonIds(supabase, "calling_names", names, meetingTypeId);
+    const ids = await computeEligiblePersonIdsForFixedCalling(supabase, names.exact, names.prefixes);
     result[key] = await personOptionsByIds(supabase, ids);
   }
 

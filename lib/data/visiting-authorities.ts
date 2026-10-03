@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server";
  * Visiting Authorities (migration 053, 2026-10-03) -- a freely
  * add/remove list of recognized visitors for one Sacrament Meeting,
  * each either a real person (calling-restricted to Stake Presidency +
- * High Council, see lib/data/rotations.ts's VISITING_AUTHORITY_CALLING_NAMES)
- * or a write-in guest name. See that migration's own comment for why
+ * High Council, see lib/data/rotations.ts's VISITING_AUTHORITY_CALLING_NAMES/
+ * VISITING_AUTHORITY_CALLING_NAME_PREFIXES) or a write-in guest name.
+ * See that migration's own comment for why
  * this is a new table rather than the free-text field this element was
  * previously (never actually) cataloged as.
  */

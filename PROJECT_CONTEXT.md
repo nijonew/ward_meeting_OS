@@ -2454,17 +2454,28 @@ before fully closing it out.
     write-in `guest_name`, never both, with its own `sort_order`.
   - New `VISITING_AUTHORITY_CALLING_NAMES` (`lib/data/rotations.ts`) --
     `STAKE_PRESIDENCY_CALLING_NAMES` (already existed, for Presiding's
-    own dropdown) plus `"High Council"`. Resolved the exact same way
+    own dropdown) -- plus High Council. Resolved the exact same way
     Presiding/Conducting already are -- fixed by calling, not a real
     `rotations` row -- via a new shared `fixedCallingNamesForKey`
     helper both `getEligiblePeopleForElement`/`getEligiblePeopleByElementKey`
     now call, replacing their previous presiding/conducting-only
-    special case. **If "any in High Council callings" doesn't show up
-    as expected, suspect a name mismatch first** (exact string match
-    against `callings.name`, same gotcha already hit once for the Stake
-    Presidency counselors) -- multiple High Council seats just need to
-    share the exact name `"High Council"` to all appear here; no
-    uniqueness constraint on `callings.name` prevents that.
+    special case. **First guess was a plain exact-match `"High
+    Council"`, which came back empty -- fixed 2026-10-03** once the
+    user reported it and gave the real naming: "the calling is called
+    Stake High Councilor and then there are parenthesis. any calling
+    with Stake High Councilor should be included." This ward records
+    one row per seat (`"Stake High Councilor (<area>)"`), so no single
+    exact string could ever cover all of them -- the same underlying
+    gotcha as the Stake Presidency counselor mismatch, just needing a
+    prefix instead of a different literal string this time. New
+    `VISITING_AUTHORITY_CALLING_NAME_PREFIXES = ["Stake High Councilor"]`
+    and `computeEligiblePersonIdsForFixedCalling` (merges an exact-match
+    query with an `ilike "<prefix>%"` query per prefix, unioning the
+    results) -- deliberately scoped to just the fixed-by-calling
+    elements, not folded into `computeEligiblePersonIds`' general
+    `calling_names` source, so an admin-configured rotation's own typed
+    `eligibility_calling_names` stays exact-match-only elsewhere in the
+    app and can't be silently widened by a coincidental prefix.
   - ~~On its own page, `/meetings/[id]/visiting-authorities`, same
     reasoning as Ward Business~~ -- true only for the rest of this same
     day, see the follow-up note right after this list, which moves it
