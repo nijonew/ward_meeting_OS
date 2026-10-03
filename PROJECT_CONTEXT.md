@@ -110,6 +110,25 @@ exclusive access.
   section below calls **admins**; it reserves the word **bishopric** for
   the three-person presidency only (Bishop + both counselors). Use that
   distinction in conversation and new UI copy going forward.
+  **No in-app UI sets this at all** (confirmed 2026-10-03 while
+  answering the user's own question, "how do I ensure my log-in is
+  linked to the correct role") -- `profiles` isn't in Table Admin's
+  registry (nothing writes to it anywhere in `app/`), so the only way
+  to set or change someone's role today is directly in the Supabase
+  dashboard's Table Editor (`profiles` table, `role` column, matched by
+  `email`) -- not through Ward OS at all. This is separate from
+  `people.profile_id` (migration `030`, editable via Table Admin's
+  People grid as "Login Account"), which links a login to a *person*
+  record for calling-based access (My meetings tiles, Youth Teaching
+  Planning class scoping, rotation eligibility) -- a Bishopric account
+  still needs that link set (and a real calling recorded in
+  `/callings`) to resolve calling-based features correctly, even though
+  `role = 'bishopric'` alone already grants full admin access
+  everywhere regardless of it. A real gap, not yet raised by the user
+  as something to build -- an admin-facing "set this person's role" UI
+  would need its own scoping (who's allowed to grant `bishopric` to
+  someone else?) before building; don't start it without that
+  discussion.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for
