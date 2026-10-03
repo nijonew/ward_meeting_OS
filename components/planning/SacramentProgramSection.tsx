@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useTransition } from "react";
+import { useActionState, useTransition } from "react";
 import {
   addProgramItem,
   removeProgramItem,
@@ -11,7 +11,8 @@ import {
 } from "@/app/meetings/[id]/speakers-music-actions";
 import { allProgramItemOptions, type ResolvedProgramItem } from "@/lib/data/sacrament-program-shared";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
-import { resolveHymnTitle, type HymnalIndexEntry } from "@/lib/data/hymnal-shared";
+import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
+import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 import type { PersonOption } from "@/lib/data/people";
 
 const INPUT = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
@@ -29,11 +30,10 @@ function ItemRow({
   hymnalIndex: HymnalIndexEntry[];
 }) {
   // Live hymn-title pre-fill for Intermediate Hymn (2026-10-03, the
-  // user's own request) -- see AgendaGridForm.tsx's MusicCell for the
-  // same pattern and its own fuller comment. Declared unconditionally
-  // (rules of hooks) even though it's only used by the intermediate_hymn
-  // branch below.
-  const hymnTitleRef = useRef<HTMLInputElement>(null);
+  // user's own request) -- see lib/hooks/use-hymn-title-live-fill.ts for
+  // the shared logic. Declared unconditionally (rules of hooks) even
+  // though it's only used by the intermediate_hymn branch below.
+  const { titleRef: hymnTitleRef, onNumberChange: onHymnNumberChange } = useHymnTitleLiveFill(hymnalIndex);
   const [removing, startRemove] = useTransition();
   const [moving, startMove] = useTransition();
 
@@ -130,12 +130,7 @@ function ItemRow({
             defaultValue={item.hymnNumber}
             placeholder="# or C#"
             className={`${INPUT} w-16`}
-            onChange={(e) => {
-              const titleInput = hymnTitleRef.current;
-              if (!titleInput || titleInput.value.trim()) return;
-              const title = resolveHymnTitle(e.target.value, hymnalIndex);
-              if (title) titleInput.value = title;
-            }}
+            onChange={(e) => onHymnNumberChange(e.target.value)}
           />
           <input
             ref={hymnTitleRef}

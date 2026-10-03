@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
 import type { AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
-import { resolveHymnTitle, type HymnalIndexEntry } from "@/lib/data/hymnal-shared";
+import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
+import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
@@ -74,10 +75,10 @@ function StakeBusinessCell({
  * Hymn number + title, wired so typing a number live-fills the title
  * from Music Reference (2026-10-03, the user's own request: "If I put
  * in a hymn number please then pre-fill the name next to it with the
- * associated hymn"). Both inputs stay uncontrolled -- only the title's
- * live DOM value is nudged via a ref when the number changes, and only
- * when the title is currently blank, so a title someone already typed
- * in themselves is never overwritten. A "C" prefix means Children's
+ * associated hymn"). Both inputs stay uncontrolled -- see
+ * useHymnTitleLiveFill (lib/hooks/use-hymn-title-live-fill.ts) for how
+ * the title's live DOM value is kept in sync without ever overwriting a
+ * title someone typed in themselves. A "C" prefix means Children's
  * Songbook (resolveHymnTitle, lib/data/hymnal-shared.ts) -- anything
  * else matches across the 1985 Hymnal and Hymns for Home and Church,
  * which never overlap each other by number. */
@@ -88,7 +89,7 @@ function MusicCell({
   row: Extract<AgendaRow, { kind: "music" }>;
   hymnalIndex: HymnalIndexEntry[];
 }) {
-  const titleRef = useRef<HTMLInputElement>(null);
+  const { titleRef, onNumberChange } = useHymnTitleLiveFill(hymnalIndex);
 
   return (
     <div className="flex flex-col gap-1.5 sm:flex-row">
@@ -98,12 +99,7 @@ function MusicCell({
         defaultValue={row.numberValue}
         placeholder="# or C#"
         className={`${INPUT} sm:w-16`}
-        onChange={(e) => {
-          const titleInput = titleRef.current;
-          if (!titleInput || titleInput.value.trim()) return;
-          const title = resolveHymnTitle(e.target.value, hymnalIndex);
-          if (title) titleInput.value = title;
-        }}
+        onChange={(e) => onNumberChange(e.target.value)}
       />
       <input
         ref={titleRef}

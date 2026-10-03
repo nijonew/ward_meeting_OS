@@ -2368,6 +2368,25 @@ before fully closing it out.
     "C" prefix works there too) since they share the same lookup
     functions. `BulkMusicEntry.tsx`'s own instructions text was updated
     to mention the convention.
+  - **Bug fixed 2026-10-03, same day**: the live pre-fill only checked
+    whether the title field was *blank* before writing to it -- correct
+    for the first digit typed, but that digit's own auto-fill then made
+    every later digit's "is it blank" check come back false, even though
+    nothing the user actually typed was in there. The user's own report
+    nailed both halves of this exactly: "I started to type 121 and it
+    only recognized the 1 and brought up the corresponding hymn number 1
+    title. Then when I deleted the 121 the hymn number 1 title stayed."
+    New shared hook `lib/hooks/use-hymn-title-live-fill.ts` (replacing
+    the duplicated inline logic in both `AgendaGridForm.tsx`'s
+    `MusicCell` and `SacramentProgramSection.tsx`'s intermediate_hymn
+    row) tracks the *exact value it last wrote* into the title field
+    instead of just "blank or not" -- a later keystroke can tell "still
+    holds what I filled last time, safe to replace" apart from "the user
+    has since typed their own title, leave it alone." An unresolved
+    number now also clears the title back to blank (rather than leaving
+    a stale, no-longer-matching title showing), which is what fixes the
+    second half of the report too -- deleting the number back to nothing
+    correctly clears whatever title came from it.
 - **Header wordmark replaced with the ward's own name, 2026-10-03** (the
   user's own request: "I would like to take the name Ward OS and make
   it much less conspicuous. Let put it only in the footer as is
