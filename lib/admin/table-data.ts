@@ -8,7 +8,10 @@ type MutationResult = { success: true } | { error: string };
 
 export async function getAdminRows(config: AdminTableConfig): Promise<AdminRow[]> {
   const supabase = await createClient();
-  const columns = ["id", ...config.columns.map((c) => c.column)].join(", ");
+  // reverse_lookup columns have no real column on this table at all (see
+  // AdminColumnConfig.reverseLookup) -- selecting one would just error.
+  const realColumns = config.columns.filter((c) => c.type !== "reverse_lookup");
+  const columns = ["id", ...realColumns.map((c) => c.column)].join(", ");
   const query = supabase.from(config.table).select(columns);
   const { data, error } = config.orderBy
     ? await query.order(config.orderBy.column, { ascending: config.orderBy.ascending ?? true })
@@ -143,6 +146,49 @@ export async function getScopedFkOptions(
 }
 
 /**
+ * For every reverse_lookup column (e.g. People's "Calling" column --
+ * callings.current_holder_id points AT a person, so there's no real
+ * column on `people` to select) -- one batched query per column against
+ * the real table that holds the foreign key, grouping every matching
+ * row's label(s) by which of `rows` it points at. Returns
+ * { "<column>": { "<this-table's-row-id>": "Elders Quorum President" } },
+ * comma-joining more than one match.
+ */
+export async function getReverseLookupValues(
+  config: AdminTableConfig,
+  rows: AdminRow[]
+): Promise<Record<string, Record<string, string>>> {
+  const supabase = await createClient();
+  const result: Record<string, Record<string, string>> = {};
+  const rowIds = rows.map((r) => r.id);
+
+  for (const col of config.columns) {
+    if (!col.reverseLookup) continue;
+    if (rowIds.length === 0) {
+      result[col.column] = {};
+      continue;
+    }
+
+    const { table, foreignKeyColumn, labelColumn } = col.reverseLookup;
+    const { data } = await supabase
+      .from(table)
+      .select(`${foreignKeyColumn}, ${labelColumn}`)
+      .in(foreignKeyColumn, rowIds);
+
+    const byRowId: Record<string, string[]> = {};
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
+      const targetId = r[foreignKeyColumn];
+      if (typeof targetId !== "string") continue;
+      (byRowId[targetId] ??= []).push(String(r[labelColumn] ?? ""));
+    }
+
+    result[col.column] = Object.fromEntries(Object.entries(byRowId).map(([id, labels]) => [id, labels.join(", ")]));
+  }
+
+  return result;
+}
+
+/**
  * Strips an incoming patch down to only columns declared in the config.
  * This is the actual security boundary for the generic editor: even if a
  * caller (or a tampered client request) sends extra fields, anything not
@@ -161,7 +207,7 @@ function sanitizePatch(config: AdminTableConfig, patch: Record<string, unknown>)
   const clean: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(patch)) {
     const colConfig = columnConfigs.get(key);
-    if (!colConfig) continue;
+    if (!colConfig || colConfig.type === "reverse_lookup") continue;
     const isTextType = colConfig.type === "text" || colConfig.type === "long_text";
     clean[key] = value === "" && !isTextType ? null : value;
   }

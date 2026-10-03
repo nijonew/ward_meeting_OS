@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
-import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions } from "@/lib/admin/table-data";
+import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions, getReverseLookupValues } from "@/lib/admin/table-data";
 import { getSelectOptions } from "@/lib/data/select-options";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { updateRow, insertRow, deleteRow } from "./actions";
@@ -61,6 +61,10 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
   // list (e.g. release_person_id narrowed to each row's own calling).
   const scopedFkOptions = await getScopedFkOptions(config, rows);
 
+  // reverse_lookup columns (e.g. People's "Calling") have no real column
+  // on this table to come back with `rows` -- resolved separately.
+  const reverseLookupValues = await getReverseLookupValues(config, rows);
+
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Admin" />
@@ -79,6 +83,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
         rows={rows}
         fkOptions={fkOptions}
         scopedFkOptions={scopedFkOptions}
+        reverseLookupValues={reverseLookupValues}
         onUpdate={updateRow}
         onInsert={insertRow}
         onDelete={deleteRow}

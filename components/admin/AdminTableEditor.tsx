@@ -40,6 +40,7 @@ export function AdminTableEditor({
   rows,
   fkOptions,
   scopedFkOptions,
+  reverseLookupValues,
   onUpdate,
   onInsert,
   onDelete,
@@ -50,6 +51,9 @@ export function AdminTableEditor({
   fkOptions: Record<string, AdminOption[]>;
   /** Per-column, per-scope-value option overrides -- see AdminColumnConfig.scopedBy. */
   scopedFkOptions?: Record<string, Record<string, AdminOption[]>>;
+  /** Per-column, per-row display text for a reverse_lookup column --
+   *  see AdminColumnConfig.reverseLookup. */
+  reverseLookupValues?: Record<string, Record<string, string>>;
   onUpdate: (table: string, id: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onInsert: (table: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onDelete: (table: string, id: string) => Promise<ActionResult>;
@@ -85,6 +89,10 @@ export function AdminTableEditor({
     }
 
     const sorted = [...rows].sort((a, b) => {
+      if (column.type === "reverse_lookup") {
+        const byRow = reverseLookupValues?.[column.column] ?? {};
+        return compareValues(byRow[a.id] ?? "", byRow[b.id] ?? "");
+      }
       const rawA = a[sort.column];
       const rawB = b[sort.column];
       const va = labels ? (labels.get(String(rawA)) ?? rawA) : rawA;
@@ -92,7 +100,7 @@ export function AdminTableEditor({
       return compareValues(va, vb);
     });
     return sort.direction === "desc" ? sorted.reverse() : sorted;
-  }, [rows, sort, columns, fkOptions]);
+  }, [rows, sort, columns, fkOptions, reverseLookupValues]);
 
   // No local copy of `rows`: onUpdate/onInsert/onDelete are server actions
   // called inside startTransition, so Next refreshes this route's props
@@ -203,12 +211,16 @@ export function AdminTableEditor({
             <tr key={row.id} className="border-b border-rule/40 last:border-0">
               {columns.map((c) => (
                 <td key={c.column} className="py-2 pr-3">
-                  <AdminCellInput
-                    column={c}
-                    value={valueFor(row, c.column)}
-                    options={optionsFor(c, row)}
-                    onChange={(v) => setValue(row, c, v)}
-                  />
+                  {c.type === "reverse_lookup" ? (
+                    <span className="text-xs text-ink-muted">{reverseLookupValues?.[c.column]?.[row.id] || "—"}</span>
+                  ) : (
+                    <AdminCellInput
+                      column={c}
+                      value={valueFor(row, c.column)}
+                      options={optionsFor(c, row)}
+                      onChange={(v) => setValue(row, c, v)}
+                    />
+                  )}
                 </td>
               ))}
               <td className="whitespace-nowrap py-2">
@@ -237,12 +249,16 @@ export function AdminTableEditor({
           <tr className="border-t-2 border-rule">
             {columns.map((c) => (
               <td key={c.column} className="py-2 pr-3">
-                <AdminCellInput
-                  column={c}
-                  value={newRow[c.column]}
-                  options={optionsFor(c, null)}
-                  onChange={(v) => setNewRowValue(c, v)}
-                />
+                {c.type === "reverse_lookup" ? (
+                  <span className="text-xs text-ink-muted/50">—</span>
+                ) : (
+                  <AdminCellInput
+                    column={c}
+                    value={newRow[c.column]}
+                    options={optionsFor(c, null)}
+                    onChange={(v) => setNewRowValue(c, v)}
+                  />
+                )}
               </td>
             ))}
             <td className="py-2">

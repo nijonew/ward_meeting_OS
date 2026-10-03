@@ -33,12 +33,6 @@ const PERSON_AGE_GROUPS = [
   { value: "child", label: "Child" },
 ];
 
-const PERSON_ATTENDANCE_STATUSES = [
-  { value: "attending", label: "Attending" },
-  { value: "not_attending", label: "Not Attending" },
-  { value: "moved", label: "Moved" },
-];
-
 const SONGBOOKS = [
   { value: "hymns_for_home_and_church", label: "Hymns for Home and Church" },
   { value: "hymns_1985", label: "Hymns of The Church of Jesus Christ of Latter-day Saints" },
@@ -272,20 +266,23 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "people",
     label: "People",
     description:
-      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. active controls whether someone shows up in assignment pickers; Age Group and Attendance Status are informational labels and don't affect that.",
+      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. Calling is read-only here (edit who holds a calling via /callings or Table Admin's own Callings grid instead). Attendance Status, Active, and Notes still exist on this table -- active still controls assignment-picker visibility -- but aren't editable from this grid anymore (2026-10-03, the user's own request); edit them directly in Supabase if ever needed.",
     orderBy: { column: "name", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
       { column: "age_group", label: "Age Group", type: "select", options: PERSON_AGE_GROUPS },
-      { column: "attendance_status", label: "Attendance Status", type: "select", required: true, options: PERSON_ATTENDANCE_STATUSES },
-      { column: "active", label: "Active", type: "boolean" },
+      {
+        column: "calling",
+        label: "Calling",
+        type: "reverse_lookup",
+        reverseLookup: { table: "callings", foreignKeyColumn: "current_holder_id", labelColumn: "name" },
+      },
       {
         column: "profile_id",
         label: "Login Account",
         type: "foreign_key",
         foreignKey: { table: "profiles", valueColumn: "id", labelColumn: "display_name" },
       },
-      { column: "notes", label: "Notes", type: "long_text" },
     ],
   },
 

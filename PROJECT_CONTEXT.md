@@ -2704,6 +2704,54 @@ before fully closing it out.
     action under it commits immediately rather than through the grid's
     submit. Replaces the old `banner`-with-`href`-to-its-own-page
     special case for the `ward_business` element key.
+- **Table Admin's People grid: Attendance Status/Active/Notes dropped,
+  Calling added, 2026-10-03** (the user's own request: "Let's not
+  include the attendance field, the active checkbox, and the notes
+  field. Let's include the calling field."). All three real columns
+  (`attendance_status`, `active`, `notes`) still exist on `people`,
+  untouched -- this only removes them from Table Admin's own grid, not
+  from the schema. **Real consequence, not yet raised by the user as a
+  problem:** this grid was the only in-app place that ever edited
+  `active` (which still gates assignment-picker visibility, per the
+  grid's own updated description) or `attendance_status` -- there's now
+  no UI anywhere to change either one; only directly in the Supabase
+  dashboard. Flagged here rather than silently left for someone to
+  discover later.
+  - **"Calling" is a genuinely new kind of column, not just a hidden
+    one re-shown**: `people` has no `calling_id` of its own --
+    `callings.current_holder_id` points *at* a person, not the other
+    way around, so there was no existing column to surface. New
+    `AdminColumnConfig.reverseLookup`/`AdminColumnType: "reverse_lookup"`
+    (`lib/admin/types.ts`) is a small, deliberately generic extension
+    of the config-driven engine (matching how `scopedBy`/`specialOptions`/
+    `createIfMissing` were each added before it) rather than a
+    People-only special case inside `AdminTableEditor.tsx` -- that
+    component's own top comment is explicit that it "has no per-table
+    logic of its own," so a one-off branch there would have broken
+    that principle for a need (showing a reverse relationship) that's
+    likely to come up again elsewhere.
+  - **New `getReverseLookupValues()`** (`lib/admin/table-data.ts`) --
+    one batched query per `reverse_lookup` column against the table
+    that actually holds the foreign key (`callings`, filtered to
+    `current_holder_id in (these people's ids)`), grouped back onto
+    each person and comma-joined if more than one calling resolves to
+    the same person (nothing stops that from being real). `getAdminRows`
+    now excludes `reverse_lookup` columns from its own `select(...)`
+    list -- there's no real `people.calling` column to select, and
+    trying to would just error.
+  - **Read-only everywhere it renders**: `AdminTableEditor.tsx` shows
+    plain text (an em dash when empty) for a `reverse_lookup` cell
+    instead of `AdminCellInput`, both for existing rows and the blank
+    "add new" row (a brand-new person has no calling yet regardless).
+    Sorting its column header works too, sorting by the resolved text
+    rather than a nonexistent raw `row[column]`. `sanitizePatch` now
+    also explicitly drops a `reverse_lookup` key from any incoming
+    patch as defense-in-depth, on top of the UI already never
+    producing one to send.
+  - To actually change who holds a calling, use `/callings` or Table
+    Admin's own Callings grid (`current_holder_id`) -- this column is
+    display-only by design, matching how the user framed it ("include
+    the calling field," not "let me edit it from here").
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

@@ -16,7 +16,8 @@ export type AdminColumnType =
   | "date"
   | "time"
   | "select"
-  | "foreign_key";
+  | "foreign_key"
+  | "reverse_lookup";
 
 /** value/label plus an optional raw date, so a "meetings" lookup's
  *  options can be grouped onto a calendar (see MeetingDatePicker). */
@@ -27,7 +28,9 @@ export interface AdminOption {
 }
 
 export interface AdminColumnConfig {
-  /** Actual database column name. */
+  /** Actual database column name -- except for type: "reverse_lookup",
+   *  which has no real column on this table at all (see `reverseLookup`
+   *  below); there, this is just a unique display key. */
   column: string;
   /** Display label for the grid header. */
   label: string;
@@ -72,6 +75,18 @@ export interface AdminColumnConfig {
    * into the rest of the row in the same save.
    */
   specialOptions?: (AdminOption & { patch?: Record<string, unknown> })[];
+  /**
+   * For type: "reverse_lookup" only -- a read-only display column for a
+   * relationship this table doesn't hold the foreign key for itself,
+   * e.g. People's "Calling" column: `callings.current_holder_id` points
+   * AT a person, not the other way around, so there's no real column on
+   * `people` to select or edit here. `table`/`foreignKeyColumn` say
+   * where to look (rows whose `foreignKeyColumn` equals this row's id);
+   * `labelColumn` is what to display. Comma-joins more than one match,
+   * since nothing stops a person from holding more than one calling at
+   * once. See getReverseLookupValues (table-data.ts).
+   */
+  reverseLookup?: { table: string; foreignKeyColumn: string; labelColumn: string };
 }
 
 export interface AdminTableConfig {
