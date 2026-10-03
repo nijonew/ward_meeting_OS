@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { WARD_NAME } from "@/lib/config";
+import { getWardName } from "@/lib/data/ward-settings";
 import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
@@ -54,6 +54,7 @@ const YOUTH_LEADER_ROLES: AppRole[] = [
 export default async function HomePage() {
   const { user, profile } = await getSessionUser();
   const role = profile?.role ?? null;
+  const wardName = await getWardName();
 
   const isBishopric = role === "bishopric";
   const isMusicPlanner = role === "music_planner" || isBishopric;
@@ -83,7 +84,7 @@ export default async function HomePage() {
       <AppHeader />
 
       <section className="mt-10">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">{WARD_NAME}</h1>
+        <h1 className="font-display text-3xl leading-tight sm:text-4xl">{wardName} Ward</h1>
         {!user && <p className="mt-2 text-ink-muted">Sign in for meeting and planning tools.</p>}
       </section>
 

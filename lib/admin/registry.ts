@@ -115,6 +115,14 @@ const PERSON_FK = { table: "people", valueColumn: "id", labelColumn: "name" };
  *   or hand-editing it in a grid defeats the point of it being one.
  */
 export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
+  ward_settings: {
+    table: "ward_settings",
+    label: "Ward Settings",
+    description:
+      "The ward's own display name, shown as \"<name> Ward\" in the header on every page. Keep exactly one row -- there's nowhere else this is defined, and deleting it (or adding a second row) leaves the header showing a generic fallback.",
+    columns: [{ column: "ward_name", label: "Ward Name", type: "text", required: true }],
+  },
+
   admin_select_options: {
     table: "admin_select_options",
     label: "Dropdown Option Lists",

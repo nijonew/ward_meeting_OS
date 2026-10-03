@@ -1,50 +1,24 @@
-"use client";
-
 import Link from "next/link";
-import { useActionState } from "react";
-import { signInWithPassword } from "@/app/auth/actions";
+import { getWardName } from "@/lib/data/ward-settings";
+import { LoginForm } from "@/components/auth/LoginForm";
 
-const initialState: { error?: string } = {};
-
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(signInWithPassword, initialState);
+/** Converted to an async Server Component 2026-10-03 so the heading can
+ *  read the admin-configurable ward name instead of a hardcoded "Ward
+ *  OS" -- see components/AppHeader.tsx's own comment for the full
+ *  context. The actual sign-in form (the only part needing client
+ *  state) moved into LoginForm.tsx. */
+export default async function LoginPage() {
+  const wardName = await getWardName();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
       <Link href="/" className="text-xs text-ink-muted hover:text-ink">
         &larr; Home
       </Link>
-      <h1 className="mt-2 font-display text-2xl">Ward OS</h1>
+      <h1 className="mt-2 font-display text-2xl">{wardName} Ward</h1>
       <p className="mt-2 text-sm text-ink-muted">Sign in with your email and password.</p>
 
-      <form action={formAction} className="mt-6 flex flex-col gap-3">
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="you@example.com"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
-        />
-        <input
-          type="password"
-          name="password"
-          required
-          placeholder="Password"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-50"
-        >
-          {pending ? "Signing in..." : "Sign in"}
-        </button>
-        {state.error && <p className="text-sm text-danger">{state.error}</p>}
-      </form>
-
-      <Link href="/auth/reset-password" className="mt-4 text-xs text-ink-muted underline">
-        Forgot your password, or signing in for the first time?
-      </Link>
+      <LoginForm />
     </main>
   );
 }

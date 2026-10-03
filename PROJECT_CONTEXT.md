@@ -93,8 +93,11 @@ reconstructed from both:
 - `051` (`sacrament_music.hymn_number` integer -> text -- live hymn-title
   pre-fill + the "C" prefix for Children's Songbook numbers, see Known
   open items below): still needs to be run.
+- `052` (new `ward_settings` table, a singleton row holding the ward's
+  own display name -- the header wordmark change, see Known open items
+  below): still needs to be run.
 
-Next migration should be `052_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `053_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2360,6 +2363,48 @@ before fully closing it out.
     "C" prefix works there too) since they share the same lookup
     functions. `BulkMusicEntry.tsx`'s own instructions text was updated
     to mention the convention.
+- **Header wordmark replaced with the ward's own name, 2026-10-03** (the
+  user's own request: "I would like to take the name Ward OS and make
+  it much less conspicuous. Let put it only in the footer as is
+  currently done. Then let's put the title '_______ Ward' in place of
+  where Ward OS was in the header. The '______ Ward' name will be
+  defined by the admin in admin tools"). `AppHeader.tsx` (used on every
+  page except the three pre-auth ones) now renders "`<ward name>` Ward"
+  instead of the literal "Ward OS" wordmark; `/login` (the one pre-auth
+  page that had its own "Ward OS" heading, since it has no `AppHeader`)
+  matches. Every footer was left exactly as it already was, per the
+  user's own words ("as is currently done") -- `app/page.tsx`'s and
+  `app/dashboard/page.tsx`'s still say "Ward OS" literally.
+  - New `ward_settings` table (migration `052`) -- a deliberate
+    singleton (exactly one row), not a key/value settings scheme, since
+    this is the only setting of its kind so far. Added to Table Admin
+    as "Ward Settings" (one text column, `ward_name`) per the user's
+    own words ("defined by the admin in admin tools") -- the generic
+    engine has no concept of "exactly one row," so its own description
+    just says so explicitly, same treatment every other
+    easy-to-misconfigure small table in this registry already gets
+    (e.g. `admin_select_options`). New `lib/data/ward-settings.ts`'s
+    `getWardName()` reads it, falling back to the plain word "Ward" on
+    any error or a missing row -- this renders on every single page,
+    including fully public ones with no session at all, so it must
+    never be the reason a page fails to render.
+  - Replaces the old `lib/config.tsx`/`WARD_NAME` -- an env-var-only
+    constant (`NEXT_PUBLIC_WARD_NAME`, defaulting to the literal string
+    "Ward OS") that nobody could actually change without a code deploy,
+    despite that file's own comment already anticipating this exact
+    future need ("later, read it from a wards table"). `lib/config.tsx`
+    is deleted outright, not left as unused dead code -- `app/page.tsx`
+    was its only other caller (its own separate hero `<h1>`, previously
+    showing "Ward OS" by coincidence since the env var was never set in
+    production) and now uses `getWardName()` too, rendering the same
+    "`<ward name>` Ward" text as the header -- left unchanged would
+    have directly contradicted the user's own stated goal here, even
+    though they only explicitly named "the header."
+  - `/login` was a Client Component (`useActionState`) with no way to
+    call an async server fetch directly -- split into an async Server
+    Component page (fetches `getWardName()` for its heading) plus a new
+    `components/auth/LoginForm.tsx` Client Component for just the
+    actual form, the only part that needs client state.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 
