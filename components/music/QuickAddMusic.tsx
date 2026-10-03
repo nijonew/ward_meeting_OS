@@ -45,9 +45,9 @@ export function QuickAddMusic({ people }: { people: PersonOption[] }) {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <input
-            type="number"
+            type="text"
             name="hymn_number"
-            placeholder="Hymn number"
+            placeholder="Hymn # (or C# for Children's Songbook)"
             className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
           <input

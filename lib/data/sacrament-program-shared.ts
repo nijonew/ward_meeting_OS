@@ -93,7 +93,7 @@ export interface ResolvedProgramItem {
  *  duplicates that data, it only records order and membership. */
 export function resolveProgramItems(
   items: ProgramItemRow[],
-  music: { slot: string | null; hymn_number: number | null; piece_name: string | null; group_name: string | null; individual_name: string | null; accompanist_id: string | null }[],
+  music: { slot: string | null; hymn_number: string | null; piece_name: string | null; group_name: string | null; individual_name: string | null; accompanist_id: string | null }[],
   speakersAdults: { slot: string; speaker_id: string | null; guest_speaker_name: string | null }[],
   speakersYouth: { slot: string; speaker_id: string | null; guest_speaker_name: string | null }[]
 ): ResolvedProgramItem[] {
@@ -130,7 +130,7 @@ export function resolveProgramItems(
         label,
         personId: "",
         guestName: "",
-        hymnNumber: existing?.hymn_number != null ? String(existing.hymn_number) : "",
+        hymnNumber: existing?.hymn_number ?? "",
         title: existing?.piece_name ?? "",
         performer: existing?.group_name ?? existing?.individual_name ?? "",
         accompanistId: existing?.accompanist_id ?? "",

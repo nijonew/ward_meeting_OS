@@ -302,7 +302,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...MUSIC_TYPES] },
       { column: "slot", label: "Slot", type: "text" },
-      { column: "hymn_number", label: "Hymn #", type: "number" },
+      { column: "hymn_number", label: "Hymn #", type: "text" },
       { column: "piece_name", label: "Piece Name", type: "text" },
       { column: "individual_id", label: "Individual", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "group_name", label: "Group Name", type: "text" },

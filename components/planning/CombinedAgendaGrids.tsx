@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
 import type { AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
+import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 
 const OPENING_FORM_ID = "agenda-form-opening";
 const CLOSING_FORM_ID = "agenda-form-closing";
@@ -31,6 +32,7 @@ export function CombinedAgendaGrids({
   openingRows,
   closingRows,
   people,
+  hymnalIndex,
   children,
 }: {
   meetingId: string;
@@ -38,6 +40,7 @@ export function CombinedAgendaGrids({
   openingRows: AgendaRow[];
   closingRows: AgendaRow[];
   people: PersonOption[];
+  hymnalIndex: HymnalIndexEntry[];
   /** Rendered between the two forms -- Teaching Program (SacramentProgramSection
    *  plus its own section heading), which can't live inside either `<form>`
    *  (its own add/remove/save controls are real forms of their own). */
@@ -67,6 +70,7 @@ export function CombinedAgendaGrids({
         roleTable={roleTable}
         rows={openingRows}
         people={people}
+        hymnalIndex={hymnalIndex}
         formId={OPENING_FORM_ID}
         hideActions
         onDirtyChange={setDirtyA}
@@ -84,6 +88,7 @@ export function CombinedAgendaGrids({
           roleTable={roleTable}
           rows={closingRows}
           people={people}
+          hymnalIndex={hymnalIndex}
           formId={CLOSING_FORM_ID}
           hideActions
           onDirtyChange={setDirtyB}

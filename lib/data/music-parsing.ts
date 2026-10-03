@@ -7,7 +7,7 @@ export interface ParsedMusicRow {
   dateIso: string | null;
   type: MusicTypeValue | null;
   typeText: string;
-  hymnNumber: number | null;
+  hymnNumber: string | null;
   pieceName: string | null;
   performerText: string | null;
   matchedIndividualId: string | null;
@@ -78,8 +78,13 @@ export function parseBulkMusicText(text: string, people: PersonOption[]): Parsed
     if (typeText && !type) errors.push(`Unrecognized type "${typeText}"`);
     if (!typeText) errors.push("Missing type");
 
-    const hymnNumber = hymnText.trim() ? Number.parseInt(hymnText, 10) : null;
-    if (hymnText.trim() && Number.isNaN(hymnNumber)) errors.push("Hymn number isn't a number");
+    // A free-text identifier now, not a validated integer (2026-10-03)
+    // -- "C20" means Children's Songbook #20, anything else matches
+    // across the 1985 Hymnal and Hymns for Home and Church (see
+    // lib/data/hymnal-shared.ts). No format to validate against here;
+    // a number that matches nothing in Music Reference just leaves the
+    // title blank at save time rather than erroring out the row.
+    const hymnNumber = hymnText.trim() || null;
 
     const performerMatch = performerText ? findPersonMatch(performerText, people) : null;
     const accompanistMatch = accompanistText ? findPersonMatch(accompanistText, people) : null;
@@ -90,7 +95,7 @@ export function parseBulkMusicText(text: string, people: PersonOption[]): Parsed
       dateIso,
       type,
       typeText,
-      hymnNumber: Number.isNaN(hymnNumber) ? null : hymnNumber,
+      hymnNumber,
       pieceName: pieceName || null,
       performerText: performerText || null,
       matchedIndividualId: performerMatch?.id ?? null,

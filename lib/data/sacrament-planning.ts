@@ -34,7 +34,7 @@ export interface MusicRow {
   id: string;
   type: string;
   slot: string | null;
-  hymn_number: number | null;
+  hymn_number: string | null;
   piece_name: string | null;
   individual_name: string | null;
   group_name: string | null;
@@ -111,7 +111,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         id: string;
         type: string;
         slot: string | null;
-        hymn_number: number | null;
+        hymn_number: string | null;
         piece_name: string | null;
         status: string;
         group_name: string | null;

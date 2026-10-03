@@ -29,7 +29,7 @@ interface RawMusic {
   id: string;
   type: string;
   slot: string | null;
-  hymn_number: number | null;
+  hymn_number: string | null;
   piece_name: string | null;
   individual_id: string | null;
   group_name: string | null;

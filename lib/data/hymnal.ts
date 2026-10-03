@@ -1,49 +1,57 @@
 import { createClient } from "@/lib/supabase/server";
+import { resolveHymnTitle, type HymnalIndexEntry } from "@/lib/data/hymnal-shared";
+
+export * from "@/lib/data/hymnal-shared";
 
 /**
- * Looks up hymn titles from Music Reference (hymnal_songs), 1985 Hymnal
- * specifically -- the hymnal every congregational hymn type this app
- * tracks (Opening/Sacrament/Closing/Intermediate Hymn) is actually sung
- * from. Musical Number never carries a hymn_number in any of this
- * app's forms, so it's never affected by this.
- *
- * Built 2026-09-10 after the user reported hymn numbers being entered
- * -- via the bulk paste tool at /music, and via the agenda grid -- with
- * no title alongside them. Every write path that accepts a bare hymn
- * number now calls this to fill the title in automatically instead of
- * leaving it blank, rather than only ever trusting whatever text (if
- * any) happened to come with the number.
- *
- * Returns a Map keyed by hymn number, missing an entry for any number
- * with no match in Music Reference -- callers should leave the title
- * blank in that case (a genuine gap in Music Reference, or a typo in
- * the number) rather than block the save over it.
+ * The full Music Reference table (all three collections), fetched once
+ * and handed down to the planning page's client components so a hymn
+ * number resolves to its title instantly as it's typed, with no
+ * per-keystroke round trip -- Music Reference is small enough (a few
+ * hundred rows total) that shipping the whole thing is simpler and
+ * faster than a server action per keystroke. See
+ * lib/data/hymnal-shared.ts's resolveHymnTitle for how a raw input
+ * string (e.g. "223", "C20") is matched against it.
  */
-export async function lookupHymn1985Titles(hymnNumbers: number[]): Promise<Map<number, string>> {
-  const unique = Array.from(new Set(hymnNumbers)).filter((n) => Number.isFinite(n));
+export async function getHymnalIndex(): Promise<HymnalIndexEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("hymnal_songs").select("songbook, number, title");
+  return (data ?? []) as HymnalIndexEntry[];
+}
+
+/**
+ * Looks up hymn titles from Music Reference for a batch of raw
+ * hymn-number field values -- the server-side save-time fallback used
+ * by every write path that accepts a bare hymn number (bulk paste and
+ * the single-item form at /music, the agenda grid's music rows,
+ * Intermediate Hymn in the Speakers & Music list). Built 2026-09-10
+ * after the user reported hymn numbers being entered with no title
+ * alongside them; generalized 2026-10-03 to resolve against all three
+ * Music Reference collections (previously 1985 Hymnal only) once the
+ * "C" prefix convention existed to disambiguate the Children's
+ * Songbook from it.
+ *
+ * Returns a Map keyed by the exact raw input string, missing an entry
+ * for any input with no match (a genuine gap in Music Reference, a
+ * typo, or an unparseable input) -- callers should leave the title
+ * blank in that case rather than block the save over it.
+ */
+export async function lookupHymnTitles(rawInputs: string[]): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(rawInputs.map((r) => r.trim()).filter(Boolean)));
   if (unique.length === 0) return new Map();
 
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("hymnal_songs")
-    .select("number, title")
-    .eq("songbook", "hymns_1985")
-    .in(
-      "number",
-      unique.map((n) => String(n))
-    );
-
-  const map = new Map<number, string>();
-  for (const row of (data ?? []) as { number: string; title: string }[]) {
-    const n = Number.parseInt(row.number, 10);
-    if (Number.isFinite(n)) map.set(n, row.title);
+  const index = await getHymnalIndex();
+  const map = new Map<string, string>();
+  for (const raw of unique) {
+    const title = resolveHymnTitle(raw, index);
+    if (title) map.set(raw, title);
   }
   return map;
 }
 
-/** Single-number convenience wrapper around lookupHymn1985Titles, for
- *  the write paths that only ever handle one hymn at a time. */
-export async function lookupHymn1985Title(hymnNumber: number): Promise<string | null> {
-  const map = await lookupHymn1985Titles([hymnNumber]);
-  return map.get(hymnNumber) ?? null;
+/** Single-input convenience wrapper around lookupHymnTitles, for the
+ *  write paths that only ever handle one hymn at a time. */
+export async function lookupHymnTitle(rawInput: string): Promise<string | null> {
+  const map = await lookupHymnTitles([rawInput]);
+  return map.get(rawInput.trim()) ?? null;
 }

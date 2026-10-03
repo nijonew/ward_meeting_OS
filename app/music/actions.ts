@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
-import { lookupHymn1985Title, lookupHymn1985Titles } from "@/lib/data/hymnal";
+import { lookupHymnTitle, lookupHymnTitles } from "@/lib/data/hymnal";
 import type { ParsedMusicRow } from "@/lib/data/music-parsing";
 
 type ActionResult = { success: true; count: number } | { error: string };
@@ -29,10 +29,13 @@ export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<Actio
   // titles") -- the bulk paste format's title column is optional per
   // row, so a row with just a date/type/number never got a title
   // otherwise. Batched into one lookup rather than one query per row.
+  // hymn_number is a free-text identifier (migration 051) -- "C20"
+  // means Children's Songbook #20, anything else matches across the
+  // 1985 Hymnal and Hymns for Home and Church (2026-10-03).
   const numbersNeedingTitles = validRows
-    .filter((r) => r.hymnNumber != null && !r.pieceName)
+    .filter((r) => r.hymnNumber && !r.pieceName)
     .map((r) => r.hymnNumber!);
-  const titleByNumber = await lookupHymn1985Titles(numbersNeedingTitles);
+  const titleByNumber = await lookupHymnTitles(numbersNeedingTitles);
 
   const meetingIdCache = new Map<string, string>();
   const insertRows: Record<string, unknown>[] = [];
@@ -41,7 +44,7 @@ export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<Actio
     const meetingId = await getOrCreateMeetingId(row.dateIso!, "sacrament-meeting", meetingIdCache);
     if (!meetingId) continue;
 
-    const pieceName = row.pieceName || (row.hymnNumber != null ? titleByNumber.get(row.hymnNumber) ?? null : null);
+    const pieceName = row.pieceName || (row.hymnNumber ? titleByNumber.get(row.hymnNumber) ?? null : null);
 
     insertRows.push({
       meeting_id: meetingId,
@@ -97,11 +100,10 @@ export async function addSingleMusicItem(formData: FormData): Promise<ActionResu
     return { error: "Could not find or create that meeting." };
   }
 
-  const hymnNumberRaw = String(formData.get("hymn_number") ?? "").trim();
-  const hymnNumber = hymnNumberRaw ? Number.parseInt(hymnNumberRaw, 10) : null;
+  const hymnNumber = String(formData.get("hymn_number") ?? "").trim() || null;
   let pieceName = String(formData.get("piece_name") ?? "").trim() || null;
-  if (hymnNumber != null && !pieceName) {
-    pieceName = await lookupHymn1985Title(hymnNumber);
+  if (hymnNumber && !pieceName) {
+    pieceName = await lookupHymnTitle(hymnNumber);
   }
 
   const { error } = await supabase.from("sacrament_music").insert({

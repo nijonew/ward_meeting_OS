@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState, useRef, useTransition } from "react";
 import {
   addProgramItem,
   removeProgramItem,
@@ -11,12 +11,29 @@ import {
 } from "@/app/meetings/[id]/speakers-music-actions";
 import { allProgramItemOptions, type ResolvedProgramItem } from "@/lib/data/sacrament-program-shared";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
+import { resolveHymnTitle, type HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import type { PersonOption } from "@/lib/data/people";
 
 const INPUT = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
 const initialSaveState: SaveActionResult = {};
 
-function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meetingId: string; people: PersonOption[] }) {
+function ItemRow({
+  item,
+  meetingId,
+  people,
+  hymnalIndex,
+}: {
+  item: ResolvedProgramItem;
+  meetingId: string;
+  people: PersonOption[];
+  hymnalIndex: HymnalIndexEntry[];
+}) {
+  // Live hymn-title pre-fill for Intermediate Hymn (2026-10-03, the
+  // user's own request) -- see AgendaGridForm.tsx's MusicCell for the
+  // same pattern and its own fuller comment. Declared unconditionally
+  // (rules of hooks) even though it's only used by the intermediate_hymn
+  // branch below.
+  const hymnTitleRef = useRef<HTMLInputElement>(null);
   const [removing, startRemove] = useTransition();
   const [moving, startMove] = useTransition();
 
@@ -109,13 +126,25 @@ function ItemRow({ item, meetingId, people }: { item: ResolvedProgramItem; meeti
         <form action={saveMusicAction} className="mt-2 flex flex-wrap items-center gap-2">
           <input
             type="text"
-            inputMode="numeric"
             name="hymn_number"
             defaultValue={item.hymnNumber}
-            placeholder="#"
+            placeholder="# or C#"
             className={`${INPUT} w-16`}
+            onChange={(e) => {
+              const titleInput = hymnTitleRef.current;
+              if (!titleInput || titleInput.value.trim()) return;
+              const title = resolveHymnTitle(e.target.value, hymnalIndex);
+              if (title) titleInput.value = title;
+            }}
           />
-          <input type="text" name="piece_name" defaultValue={item.title} placeholder="Hymn title" className={INPUT} />
+          <input
+            ref={hymnTitleRef}
+            type="text"
+            name="piece_name"
+            defaultValue={item.title}
+            placeholder="Hymn title"
+            className={INPUT}
+          />
           <button
             type="submit"
             disabled={musicPending}
@@ -159,10 +188,12 @@ export function SacramentProgramSection({
   meetingId,
   items,
   people,
+  hymnalIndex,
 }: {
   meetingId: string;
   items: ResolvedProgramItem[];
   people: PersonOption[];
+  hymnalIndex: HymnalIndexEntry[];
 }) {
   const [adding, startAdd] = useTransition();
   const usedKeys = new Set(items.map((i) => i.itemKey.startsWith("intermediate_hymn") ? "intermediate_hymn" : i.itemKey));
@@ -186,7 +217,7 @@ export function SacramentProgramSection({
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {items.map((item) => (
-            <ItemRow key={item.id} item={item} meetingId={meetingId} people={people} />
+            <ItemRow key={item.id} item={item} meetingId={meetingId} people={people} hymnalIndex={hymnalIndex} />
           ))}
         </ul>
       )}

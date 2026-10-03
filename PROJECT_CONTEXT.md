@@ -90,8 +90,11 @@ reconstructed from both:
   -- fixes a real bug where speakers added through the Speakers & Music
   list never showed in the public program, see Known open items below):
   still needs to be run.
+- `051` (`sacrament_music.hymn_number` integer -> text -- live hymn-title
+  pre-fill + the "C" prefix for Children's Songbook numbers, see Known
+  open items below): still needs to be run.
 
-Next migration should be `051_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `052_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2295,6 +2298,68 @@ before fully closing it out.
   can't be reliably guessed from a name alone -- an admin can set it
   per person afterward via Table Admin's People grid if wanted. Still
   needs to be run.
+- **Live hymn-title pre-fill + the "C" prefix for Children's Songbook,
+  2026-10-03** (the user's own request: "If I put in a hymn number
+  please then pre-fill the name next to it with the associated hymn...
+  we need to add a way to distinguish the children's song book numbers
+  from those of the 1985 hymn book... add a 'C' prior to the children's
+  song book numbers"). Two changes, both in Sacrament Meeting's Planning
+  view only (the agenda grid's own hymn rows, and Intermediate Hymn in
+  the Speakers & Music list):
+  - **Hymn number is now a free-text identifier, not an integer**
+    (migration `051`, `sacrament_music.hymn_number` -- same `integer ->
+    text` idiom `hymnal_songs.number` already needed for its own
+    lettered variants, migration `026`). A bare number (e.g. "223")
+    matches across the 1985 Hymnal and Hymns for Home and Church, which
+    the user confirmed never overlap each other by number; a "C" prefix
+    (e.g. "C20") means Children's Songbook specifically, since its
+    numbering does genuinely collide with the 1985 Hymnal's. New
+    `lib/data/hymnal-shared.ts` (`parseHymnNumberInput`/`resolveHymnTitle`)
+    is the one place this convention is implemented -- no `createClient`
+    import, so it runs both server-side (`lib/data/hymnal.ts`'s
+    `lookupHymnTitle(s)`, the existing save-time fallback from
+    2026-09-10, now generalized to all three collections instead of
+    1985-only) and client-side (see below). Every write path that
+    touches `hymn_number` (`app/music/actions.ts`,
+    `app/meetings/[id]/agenda-actions.ts`,
+    `app/meetings/[id]/speakers-music-actions.ts`,
+    `lib/data/music-parsing.ts`) was updated to stop
+    parsing/validating it as an integer -- it's just trimmed text now.
+    Every display site that reads it (`public-view.ts`,
+    `conducting-rows.ts`, `sacrament-planning.ts`, `music-list.ts`,
+    `sacrament-program-shared.ts`, `agenda-rows.ts`,
+    `archived/page.tsx`, `RecentMusicList.tsx`) needed only a type
+    annotation change -- all of them already just interpolated the
+    value into a string. Table Admin's Sacrament Meeting Music grid and
+    the single-add form at `/music` (`QuickAddMusic.tsx`, previously
+    `type="number"`, which would have silently blocked typing a "C" at
+    all) both switched to plain text inputs to match.
+  - **Live pre-fill as you type**, not just at save time: new
+    `getHymnalIndex()` (`lib/data/hymnal.ts`) fetches the *entire*
+    Music Reference table once per Planning-page load (a few hundred
+    rows total -- small enough that shipping the whole thing beats a
+    server round trip per keystroke) and hands it down as a plain
+    prop to `AgendaGridForm` (new `MusicCell` sub-component) and
+    `SacramentProgramSection` (`ItemRow`'s intermediate_hymn branch).
+    Both wire a hymn-number input's `onChange` to call
+    `resolveHymnTitle` against that index and, if it matches *and* the
+    title field is currently blank, set the title input's live DOM
+    value via a `ref` -- both fields stay uncontrolled
+    (`defaultValue`-based) otherwise, so this never risks the same
+    kind of React-auto-reset bug just fixed elsewhere in this file
+    (Known open items' speaker-confirmed entry) -- nothing about
+    controlled/uncontrolled submission semantics changed, only a
+    same-render DOM nudge on a sibling field. Never overwrites a title
+    someone already typed in themselves, matching the save-time
+    fallback's own rule.
+  - Deliberately scoped to the Planning view only, per the user's own
+    words ("in the meeting planning views") -- `/music`'s bulk-paste
+    and single-add tools do NOT get the live typing preview, though
+    they automatically benefit from the same underlying generalization
+    (the save-time fallback now matches all three collections, and the
+    "C" prefix works there too) since they share the same lookup
+    functions. `BulkMusicEntry.tsx`'s own instructions text was updated
+    to mention the convention.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

@@ -17,6 +17,7 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getEligiblePeopleByElementKey } from "@/lib/data/rotations";
 import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
+import { getHymnalIndex } from "@/lib/data/hymnal";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
@@ -107,13 +108,19 @@ export default async function PlanningViewPage({
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, programItems] = await Promise.all([
+  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, programItems, hymnalIndex] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
     getRoleAssignments(meetingId, roleTable),
     getElementNotes(meetingId),
     isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
     isSacrament ? getSacramentProgramItems(meetingId) : Promise.resolve([]),
+    // Only Sacrament Meeting's agenda ever has a hymn-number field, but
+    // fetching this unconditionally (it's small -- a few hundred rows)
+    // is simpler than threading an isSacrament check through every
+    // caller that needs it (2026-10-03, live hymn-title pre-fill --
+    // see components/planning/AgendaGridForm.tsx's MusicCell).
+    getHymnalIndex(),
   ]);
 
   // Meetings created before the per-meeting agenda existed have zero
@@ -239,16 +246,28 @@ export default async function PlanningViewPage({
                 openingRows={openingRows}
                 closingRows={closingRows}
                 people={people}
+                hymnalIndex={hymnalIndex}
               >
                 <div className="border-t-2 border-rule pt-4">
                   <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                     Teaching Program
                   </span>
-                  <SacramentProgramSection meetingId={meetingId} items={resolvedProgramItems} people={people} />
+                  <SacramentProgramSection
+                    meetingId={meetingId}
+                    items={resolvedProgramItems}
+                    people={people}
+                    hymnalIndex={hymnalIndex}
+                  />
                 </div>
               </CombinedAgendaGrids>
             ) : (
-              <AgendaGridForm meetingId={meetingId} roleTable={roleTable} rows={openingRows} people={people} />
+              <AgendaGridForm
+                meetingId={meetingId}
+                roleTable={roleTable}
+                rows={openingRows}
+                people={people}
+                hymnalIndex={hymnalIndex}
+              />
             )}
           </div>
         </div>

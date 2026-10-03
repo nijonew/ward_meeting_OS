@@ -4,7 +4,7 @@ export interface RecentMusicItem {
   id: string;
   date: string;
   type: string;
-  hymn_number: number | null;
+  hymn_number: string | null;
   piece_name: string | null;
   performer: string | null;
 }
@@ -30,7 +30,7 @@ export async function getRecentMusic(): Promise<RecentMusicItem[]> {
     const r = row as {
       id: string;
       type: string;
-      hymn_number: number | null;
+      hymn_number: string | null;
       piece_name: string | null;
       group_name: string | null;
       individual: unknown;

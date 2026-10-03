@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
 import type { AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
+import { resolveHymnTitle, type HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
@@ -70,6 +71,62 @@ function StakeBusinessCell({
 }
 
 /**
+ * Hymn number + title, wired so typing a number live-fills the title
+ * from Music Reference (2026-10-03, the user's own request: "If I put
+ * in a hymn number please then pre-fill the name next to it with the
+ * associated hymn"). Both inputs stay uncontrolled -- only the title's
+ * live DOM value is nudged via a ref when the number changes, and only
+ * when the title is currently blank, so a title someone already typed
+ * in themselves is never overwritten. A "C" prefix means Children's
+ * Songbook (resolveHymnTitle, lib/data/hymnal-shared.ts) -- anything
+ * else matches across the 1985 Hymnal and Hymns for Home and Church,
+ * which never overlap each other by number. */
+function MusicCell({
+  row,
+  hymnalIndex,
+}: {
+  row: Extract<AgendaRow, { kind: "music" }>;
+  hymnalIndex: HymnalIndexEntry[];
+}) {
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex flex-col gap-1.5 sm:flex-row">
+      <input
+        type="text"
+        name={row.numberField}
+        defaultValue={row.numberValue}
+        placeholder="# or C#"
+        className={`${INPUT} sm:w-16`}
+        onChange={(e) => {
+          const titleInput = titleRef.current;
+          if (!titleInput || titleInput.value.trim()) return;
+          const title = resolveHymnTitle(e.target.value, hymnalIndex);
+          if (title) titleInput.value = title;
+        }}
+      />
+      <input
+        ref={titleRef}
+        type="text"
+        name={row.titleField}
+        defaultValue={row.titleValue}
+        placeholder="Hymn or piece title"
+        className={INPUT}
+      />
+      {row.showPerformer && (
+        <input
+          type="text"
+          name={row.performerField}
+          defaultValue={row.performerValue}
+          placeholder="Performer"
+          className={`${INPUT} sm:w-40`}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
  * The agenda itself, as an editable grid -- built 2026-09-09 from the
  * user's own spreadsheet agenda: "I want them to also be more
  * agenda-like. single line for each element with a field that can be
@@ -110,6 +167,7 @@ export function AgendaGridForm({
   roleTable,
   rows,
   people,
+  hymnalIndex,
   formId,
   hideActions,
   onDirtyChange,
@@ -119,6 +177,7 @@ export function AgendaGridForm({
   roleTable: "sacrament_assignments" | "bishopric_assignments";
   rows: AgendaRow[];
   people: PersonOption[];
+  hymnalIndex: HymnalIndexEntry[];
   formId?: string;
   hideActions?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
@@ -215,34 +274,7 @@ export function AgendaGridForm({
                       </div>
                     )}
 
-                    {row.kind === "music" && (
-                      <div className="flex flex-col gap-1.5 sm:flex-row">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          name={row.numberField}
-                          defaultValue={row.numberValue}
-                          placeholder="#"
-                          className={`${INPUT} sm:w-16`}
-                        />
-                        <input
-                          type="text"
-                          name={row.titleField}
-                          defaultValue={row.titleValue}
-                          placeholder="Hymn or piece title"
-                          className={INPUT}
-                        />
-                        {row.showPerformer && (
-                          <input
-                            type="text"
-                            name={row.performerField}
-                            defaultValue={row.performerValue}
-                            placeholder="Performer"
-                            className={`${INPUT} sm:w-40`}
-                          />
-                        )}
-                      </div>
-                    )}
+                    {row.kind === "music" && <MusicCell row={row} hymnalIndex={hymnalIndex} />}
 
                     {row.kind === "speaker" && (
                       <div className="flex flex-col gap-1.5 sm:flex-row">

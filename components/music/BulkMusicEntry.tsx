@@ -46,8 +46,11 @@ export function BulkMusicEntry({ people }: { people: PersonOption[] }) {
       <h2 className="font-display text-xl">Bulk Add Music</h2>
       <p className="mt-1 text-xs text-ink-muted">
         Paste rows copied from a spreadsheet: Date, Type, Hymn Number, Piece Name, Performer,
-        Group Name, Accompanist. A header row is fine if included. Meetings that don&rsquo;t
-        exist yet are created automatically.
+        Group Name, Accompanist. Hymn Number can be left blank with just a Piece Name, or just a
+        number to auto-fill the title from Music Reference -- prefix it with &ldquo;C&rdquo;
+        (e.g. C20) for a Children&rsquo;s Songbook number, since those overlap the 1985 Hymnal&rsquo;s
+        own numbering. A header row is fine if included. Meetings that don&rsquo;t exist yet are
+        created automatically.
       </p>
 
       <textarea

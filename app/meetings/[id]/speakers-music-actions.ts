@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { kindOfItemKey } from "@/lib/data/sacrament-program";
-import { lookupHymn1985Title } from "@/lib/data/hymnal";
+import { lookupHymnTitle } from "@/lib/data/hymnal";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -234,14 +234,17 @@ export async function saveProgramMusic(
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();
 
-  const hymnNumberRaw = String(formData.get("hymn_number") ?? "").trim();
-  const hymnNumber = hymnNumberRaw ? Number.parseInt(hymnNumberRaw, 10) : null;
+  // hymn_number is a free-text identifier (migration 051) -- "C20"
+  // means Children's Songbook #20, anything else matches across the
+  // 1985 Hymnal and Hymns for Home and Church (2026-10-03, the "C"
+  // prefix convention; see lib/data/hymnal-shared.ts).
+  const hymnNumber = String(formData.get("hymn_number") ?? "").trim() || null;
   // Auto-fill from Music Reference when a number was entered with no
   // title (2026-09-10, the user's own report) -- Intermediate Hymn is
   // the only kind this action ever gets a real hymn_number for.
   let pieceName = String(formData.get("piece_name") ?? "").trim() || null;
-  if (hymnNumber != null && !pieceName) {
-    pieceName = await lookupHymn1985Title(hymnNumber);
+  if (hymnNumber && !pieceName) {
+    pieceName = await lookupHymnTitle(hymnNumber);
   }
   const payload: Record<string, unknown> = {
     hymn_number: hymnNumber,

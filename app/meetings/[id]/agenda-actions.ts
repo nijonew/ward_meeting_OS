@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { FIELD_SEPARATOR } from "@/lib/data/agenda-rows";
-import { lookupHymn1985Titles } from "@/lib/data/hymnal";
+import { lookupHymnTitles } from "@/lib/data/hymnal";
 
 type SaveGridActionResult = { error?: string; success?: boolean };
 
@@ -205,16 +205,21 @@ export async function saveAgendaGrid(
   // Auto-fill missing titles from Music Reference (2026-09-10, the
   // user's own report: "hymn numbers... weren't submitted with
   // titles") -- batched into one lookup rather than one query per row.
-  const numbersNeedingTitles: number[] = [];
+  // hymn_number is a free-text identifier now (migration 051), not a
+  // plain integer -- "C20" means Children's Songbook #20, anything
+  // else matches across the 1985 Hymnal and Hymns for Home and Church
+  // (2026-10-03, the user's own request for the "C" prefix convention;
+  // see lib/data/hymnal-shared.ts).
+  const rawNumbersNeedingTitles: string[] = [];
   for (const patch of music.values()) {
-    const n = patch.number ? Number.parseInt(patch.number, 10) : null;
-    if (n != null && !Number.isNaN(n) && !patch.title) numbersNeedingTitles.push(n);
+    const num = patch.number?.trim() || null;
+    if (num && !patch.title) rawNumbersNeedingTitles.push(num);
   }
-  const titleByNumber = await lookupHymn1985Titles(numbersNeedingTitles);
+  const titleByNumber = await lookupHymnTitles(rawNumbersNeedingTitles);
 
   for (const patch of music.values()) {
-    const hymnNumber = patch.number ? Number.parseInt(patch.number, 10) : null;
-    const pieceName = patch.title || (hymnNumber != null ? titleByNumber.get(hymnNumber) ?? null : null);
+    const hymnNumber = patch.number?.trim() || null;
+    const pieceName = patch.title || (hymnNumber ? titleByNumber.get(hymnNumber) ?? null : null);
     const performer = patch.performer || null;
     const isEmpty = hymnNumber == null && !pieceName && !performer;
 
