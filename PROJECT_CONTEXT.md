@@ -1534,6 +1534,33 @@ avoid confusing the two.
 
 ## Known open items
 
+**Top priority, not yet root-caused (2026-10-03):** the user's first
+attempt to create a Sacrament Meeting after this session's reskin merge
++ migrations 047-049 landed: "when clicking on meeting planning,
+meeting agendas, sacrament meeting nothing happens." Everything traced
+statically so far looks safe -- `createMeeting`
+(`app/meetings/new/actions.ts`) properly surfaces its own insert
+error to the form, and every seeding helper it calls
+(`applyRotationsToNewMeeting`, `seedPlannedElementsForMeeting`,
+`seedSacramentProgramItemsForMeeting`) is defensive (catches/logs
+rather than throws, confirmed by reading each one), so an uncaught
+exception breaking the whole create flow seems unlikely. `meeting_types`
+having no real `sacrament-meeting` row also seems unlikely -- migration
+`033` (confirmed run and verified months ago) depends on that exact row
+existing via `(select id from meeting_types where slug =
+'sacrament-meeting')`, repeatedly, and real production Sacrament
+Meeting agenda data has flowed through it since. Couldn't reproduce
+directly -- logging into the user's own account isn't something this
+assistant will do even with credentials offered (entering a password is
+a hard rule, not a missing-access problem), so this needs the user's
+own next report: the most useful single test is going straight to
+`/meetings/new` (skipping the Meeting Planning → Meeting Agendas tile
+chain entirely) and reporting exactly what the Meeting Type dropdown
+shows and what happens on submit (a specific error message, a redirect,
+or truly nothing) -- that isolates "the tile chain is broken" from "the
+underlying create flow itself is broken." Restoring Sacrament Meeting
+to "My meetings" (below) is a parallel safety net, not a fix for this.
+
 **Current priority queue (set by the user 2026-09-08), work top to
 bottom:** ~~unified sacrament-meeting planning environment~~ (done) ->
 ~~calling-based non-admin viewer~~ (done) -> ~~non-admin post-archive
@@ -1847,7 +1874,7 @@ before fully closing it out.
     server/client boundary as a function, unlike a plain one (see the
     formatDate-prop bug elsewhere in this file).
 
-  **Sacrament Meeting removed from "My meetings" entirely, 2026-09-10**
+  ~~**Sacrament Meeting removed from "My meetings" entirely, 2026-09-10**~~
   (the user's own words: "remove sacrament meeting from 'my
   meetings'"). `ALL_MEETING_TYPES` (`app/page.tsx`) no longer includes
   it, and the non-admin branch stopped unconditionally folding
@@ -1862,6 +1889,24 @@ before fully closing it out.
   in behavior -- it already used the un-folded `rawVisibleTypes`, not
   `visibleMeetingTypes` -- but the two lists are now identical for a
   non-admin instead of one being a superset of the other.
+
+  **Reversed 2026-10-03**, per the user's own follow-up once they
+  actually tried to create a first Sacrament Meeting: "I want it
+  available to bishopric and admin members." `ALL_MEETING_TYPES` has
+  `sacrament-meeting` back in it; since that constant is only ever used
+  for the Bishopric branch (`visibleMeetingTypes = isBishopric ?
+  ALL_MEETING_TYPES : rawVisibleTypes`), a non-admin's own list is
+  completely unaffected -- still purely calling-based, still never
+  includes Sacrament Meeting. The Administration → Meeting Planning →
+  Meeting Agendas chain this removal leaned on turned out to be real
+  friction in practice for the one thing that matters most (reaching a
+  meeting to plan it) -- flagged alongside a separate, not-yet-diagnosed
+  report the same day that clicking through that exact chain "does
+  nothing" for a brand-new Bishopric account trying to create its first
+  Sacrament Meeting (see Known open items' new entry on this). A direct
+  tile is one more safety net while that's being chased down, not a
+  decision that the chain itself is deprecated -- it's unchanged, still
+  how `/meeting-agendas`' own per-type tiles reach `/dashboard`.
 - ~~Back links.~~ **Fixed 2026-09-06** (user's own request: "ensure all
   pages have a back link"). Audited all 28 `page.tsx` routes. Most
   already had one implicitly via `AppHeader`'s "Ward OS" wordmark
