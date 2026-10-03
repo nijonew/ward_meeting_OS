@@ -19,6 +19,7 @@ import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
+import { getCallableCallingPlanningItems, getCallingOptions } from "@/lib/data/calling-planning";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
@@ -60,9 +61,11 @@ import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
  * What deliberately stays its own section below the grid: the
  * collections that add and remove rows rather than filling in a fixed
  * line -- Agenda Items, Action Items -- plus Bishopric Minutes and
- * Council Notes. Ward Business still moves to its own page
- * (/meetings/[id]/ward-business) -- only Speakers & Music came back
- * inline, per the user's specific request. "Meeting Info" as its own
+ * Council Notes. Ward Business moved back inline too (2026-10-03, see
+ * lib/data/agenda-rows.ts's own `ward_business` row-kind comment) --
+ * Speakers & Music and Ward Business are now the only two
+ * non-standalone-page exceptions to the grid, per the user's own
+ * requests for each. "Meeting Info" as its own
  * section is gone (2026-09-09, the user's own request: "delete the
  * meeting info section") -- Special Format moved to a small control at
  * the very top of the page (below); Hidden Notes wasn't carried
@@ -109,22 +112,39 @@ export default async function PlanningViewPage({
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, programItems, hymnalIndex, visitingAuthorities] =
-    await Promise.all([
-      getPlannedElements(meetingId),
-      getActivePeople(),
-      getRoleAssignments(meetingId, roleTable),
-      getElementNotes(meetingId),
-      isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
-      isSacrament ? getSacramentProgramItems(meetingId) : Promise.resolve([]),
-      // Only Sacrament Meeting's agenda ever has a hymn-number field, but
-      // fetching this unconditionally (it's small -- a few hundred rows)
-      // is simpler than threading an isSacrament check through every
-      // caller that needs it (2026-10-03, live hymn-title pre-fill --
-      // see components/planning/AgendaGridForm.tsx's MusicCell).
-      getHymnalIndex(),
-      isSacrament ? getVisitingAuthorities(meetingId) : Promise.resolve([]),
-    ]);
+  const [
+    plannedElements,
+    people,
+    roleAssignments,
+    elementNotes,
+    sacramentData,
+    programItems,
+    hymnalIndex,
+    visitingAuthorities,
+    callablePlanningItems,
+    callingOptions,
+  ] = await Promise.all([
+    getPlannedElements(meetingId),
+    getActivePeople(),
+    getRoleAssignments(meetingId, roleTable),
+    getElementNotes(meetingId),
+    isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
+    isSacrament ? getSacramentProgramItems(meetingId) : Promise.resolve([]),
+    // Only Sacrament Meeting's agenda ever has a hymn-number field, but
+    // fetching this unconditionally (it's small -- a few hundred rows)
+    // is simpler than threading an isSacrament check through every
+    // caller that needs it (2026-10-03, live hymn-title pre-fill --
+    // see components/planning/AgendaGridForm.tsx's MusicCell).
+    getHymnalIndex(),
+    isSacrament ? getVisitingAuthorities(meetingId) : Promise.resolve([]),
+    // Ward Business's inline Calling Planning picker (2026-10-03) --
+    // small enough (every not-yet-announced row, ward-wide) to fetch
+    // unconditionally rather than threading isSacrament through here too.
+    isSacrament
+      ? getCallableCallingPlanningItems()
+      : Promise.resolve({ callings: [], releases: [] }),
+    isSacrament ? getCallingOptions() : Promise.resolve([]),
+  ]);
 
   // Meetings created before the per-meeting agenda existed have zero
   // planned-element rows (nothing was ever seeded for them) -- fall back
@@ -181,10 +201,13 @@ export default async function PlanningViewPage({
     speakersAdults: sacramentData?.speakersAdults ?? [],
     speakersYouth: sacramentData?.speakersYouth ?? [],
     visitingAuthorities,
+    rabnm: sacramentData?.rabnm ?? [],
+    callableCallings: callablePlanningItems.callings,
+    callableReleases: callablePlanningItems.releases,
+    callings: callingOptions,
     eligibilityByKey,
     allPeople: people,
     defaultPresidingId,
-    meetingId,
   };
 
   const openingRows: AgendaRow[] = isSacrament

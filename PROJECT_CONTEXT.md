@@ -101,8 +101,12 @@ reconstructed from both:
   below): still needs to be run.
 - `054` (new `delete_meeting_cascade` Postgres function -- the Delete
   Meeting action, see Known open items below): still needs to be run.
+- `055` (new `sacrament_rabnm.calling_planning_id` -- the explicit link
+  back to the Calling Planning row an announcement came from, needed
+  for Ward Business's inline pull/un-pull mechanism, see Known open
+  items below): still needs to be run.
 
-Next migration should be `055_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `056_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2597,6 +2601,109 @@ before fully closing it out.
     date-button link and a freshly created meeting's redirect both go
     straight to `/planning` now too, skipping that extra redirect hop
     rather than relying on it alone.
+- **Ward Business moved inline, calling-planning-sourced, and split
+  into Releases/Callings/Other, 2026-10-03** (the user's own request,
+  right after Visiting Authorities got the same treatment: "update
+  ward business like we just did the visiting authorities -- meaning
+  I want it in the agenda grid. It should be prefilled with items from
+  callings planning that are listed as ready to announce in sacrament
+  meeting. It should have the ability to call in other items from
+  calling planning even if they aren't marked as ready. It should be
+  divided into releases, callings, other."). Replaces the standalone
+  `/meetings/[id]/ward-business` page entirely -- deleted outright,
+  along with `RabnmSection.tsx` and `RabnmAddForm.tsx` (both
+  superseded), the same "don't leave a second, now-redundant place to
+  edit the same data" principle already applied everywhere else this
+  session.
+  - **New `sacrament_rabnm.calling_planning_id`** (migration `055`,
+    nullable FK into `calling_planning`) -- the explicit, reversible
+    link between one Ward Business announcement row and the Calling
+    Planning row it came from. `calling_id` alone can't serve this: a
+    calling can be re-planned more than once (a second presidency
+    change on the same calling, say), so matching back to "which
+    planning row did this announcement come from" by `calling_id` +
+    `type` would be fragile and ambiguous. Only ever set by the new
+    pull mechanism below -- a manually-added "Other" item (baby
+    blessing, baptism, etc.) has no Calling Planning row to link to and
+    leaves this null.
+  - **New `getCallableCallingPlanningItems()`** (`lib/data/calling-planning.ts`)
+    -- every `calling_planning` row not yet announced in any meeting
+    (`announced_meeting_id is null`), split into a Callings list (needs
+    exactly one candidate narrowed down, same threshold
+    `pushCallingToSacramentMeeting` already enforces) and a Releases
+    list (needs `release_person_id` set), each item flagged `ready`
+    when its own `calling_status`/`release_status` is already "To
+    Announce in Sacrament." A row can appear in both lists at once (a
+    presidency change pending both a new calling and a release).
+  - **New `app/meetings/[id]/ward-business-actions.ts`**:
+    `pullCallingPlanningIntoMeeting(meetingId, planningId, kind)` --
+    the meeting-side counterpart to Calling Planning's own
+    `pushCallingToSacramentMeeting` (left completely untouched, still
+    a second, independent entry point to the same effect from Calling
+    Planning's own page). Unlike that function, pulling isn't limited
+    to rows already marked "ready" -- the user's own explicit request
+    ("call in other items... even if they aren't marked as ready") --
+    pulling a row in at all *is* the decision to announce it, so it
+    still creates the `sacrament_rabnm`/`sacrament_rabnm_people` rows
+    and advances `calling_status`/`release_status` to the next step
+    (`to_be_set_apart`/`to_record`) regardless of where it started.
+    `removeCallingPlanningFromMeeting(meetingId, planningId)` reverses
+    it -- deletes the `sacrament_rabnm` row (and its
+    `sacrament_rabnm_people` rows, explicitly, same
+    don't-assume-a-cascade reasoning as `delete_meeting_cascade`) and
+    resets the Calling Planning row's `announced_meeting_id` and
+    status back to "To Announce in Sacrament," so it can be pulled into
+    a different meeting (or this one again) without manual cleanup.
+    Both are Bishopric-only, matching every other Ward Business action.
+  - **Releases and Callings are no longer manually typed in at
+    all** (except Presidency Change, see below) -- always pulled from
+    Calling Planning, either a "ready" suggestion or picked from a
+    "call in another" dropdown regardless of status. Calling Planning
+    stays the single source of truth for who's being called or
+    released; Ward Business is just another entry point into the same
+    underlying action its own "Ready to Announce" section already
+    provides. **Presidency Change is the one exception** -- it's folded
+    into the Callings group's own quick-add form instead, since Calling
+    Planning has no distinct status concept for it to be "ready" from.
+  - **New `components/planning/WardBusinessField.tsx`** -- the row's
+    actual content, rendered full-width in the grid (like a banner/
+    section row, not squeezed into the label+value two-column shape,
+    since it holds three whole sub-sections). Three labeled groups:
+    - **Releases** / **Callings**: already-saved items (`ExistingItem`,
+      Remove reverses the pull via `removeCallingPlanningFromMeeting`
+      when `calling_planning_id` is set, or calls the existing
+      `deleteRabnmItem` for a manually-added Presidency Change with no
+      such link) plus `CallablePicker` -- ready suggestions with an
+      inline Add button, and non-ready items in a "Call in another from
+      Calling Planning..." dropdown.
+    - **Other**: unchanged free-form types (baby blessing, baptism,
+      mission call, Aaronic Priesthood, new member record) -- same
+      fields as before (type, calling if relevant, people, detail,
+      event date), just rendered here instead of on the old standalone
+      page.
+  - **New `components/planning/RabnmQuickAddForm.tsx`** -- replaces
+    `RabnmAddForm.tsx`'s real `<form>` (which is exactly why Ward
+    Business needed its own page before: a `<form>` can't nest inside
+    the agenda grid's single big one) with refs + a plain
+    `type="button"` + `useTransition` calling the existing
+    `addRabnmItem` action directly. Every action in this row --
+    pulling a Calling Planning item in or out, adding/removing an
+    Other item -- is a plain button triggering an immediate server
+    action, never a `<form>` submission, so none of it conflicts with
+    the grid's own enclosing `<form>` either. This is a deliberately
+    different pattern from Visiting Authorities' deferred, bulk-saved
+    rows (built the same week) -- Ward Business's pulls have a real
+    side effect on a different table (`calling_planning`) the instant
+    they happen, so they can't wait for the grid's own "Save All
+    Changes" the way Visiting Authorities' simple self-contained
+    person-or-guest pairs can.
+  - **New `ward_business` `AgendaRow` kind** (`lib/data/agenda-rows.ts`)
+    carries the already-saved items plus both Calling Planning pull
+    lists plus `allPeople`/`callings` straight through -- no field
+    names of its own, unlike every other row kind here, since every
+    action under it commits immediately rather than through the grid's
+    submit. Replaces the old `banner`-with-`href`-to-its-own-page
+    special case for the `ward_business` element key.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

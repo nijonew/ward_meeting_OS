@@ -1,0 +1,26 @@
+-- 055_rabnm_calling_planning_link.sql
+--
+-- Ward Business rework (2026-10-03, the user's own request: "update
+-- ward business like we just did the visiting authorities... It should
+-- be prefilled with items from calling planning that are listed as
+-- ready to announce in sacrament meeting. It should have the ability to
+-- call in other items from calling planning even if they aren't marked
+-- as ready. It should be divided into releases, callings, other").
+--
+-- `sacrament_rabnm.calling_id` points at the *calling* itself, not at
+-- which `calling_planning` process produced the announcement -- a
+-- calling can be re-planned more than once over time, so that alone
+-- can't reliably answer "which calling_planning row did this
+-- announcement come from" (needed to let Ward Business un-pull/remove
+-- an announcement and correctly reset the calling_planning row it
+-- came from, rather than fragile matching on calling_id + type). This
+-- column makes that link explicit and unambiguous.
+--
+-- Only ever set for rows created through the calling_planning pull
+-- mechanism (Releases/Callings groups) -- "Other" items (baby
+-- blessings, baptisms, etc.) and any pre-existing row from before this
+-- shipped are left null, same as they always were.
+--
+-- Idempotent: safe to re-run (add column if not exists).
+
+alter table sacrament_rabnm add column if not exists calling_planning_id uuid references calling_planning(id);

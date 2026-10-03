@@ -1,9 +1,11 @@
 import type { TemplateElementRow } from "@/lib/data/meeting-elements";
 import type { RoleAssignmentValue } from "@/lib/data/meeting-elements";
 import type { ElementNoteValue } from "@/lib/data/meeting-element-notes";
-import type { MusicRow, SpeakerRow, PlanningInfo } from "@/lib/data/sacrament-planning";
+import type { MusicRow, SpeakerRow, PlanningInfo, RabnmRow } from "@/lib/data/sacrament-planning";
 import type { PersonOption } from "@/lib/data/people";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
+import type { CallableCallingItem } from "@/lib/data/calling-planning";
+import type { CallingOption } from "@/lib/data/callings";
 import { slotLabel } from "@/lib/data/sacrament-constants";
 
 /**
@@ -19,17 +21,20 @@ import { slotLabel } from "@/lib/data/sacrament-constants";
  * Reworked the same day, line by line, from the user's own notes
  * against a real agenda screenshot -- see each row kind's own comment
  * below for what changed and why. Ward Business moved to its own page
- * (/meetings/[id]/ward-business) since its own add/remove controls
- * can't be real <form>s nested inside this grid's single big <form>
- * (HTML forbids nested forms) -- it renders as a banner-with-link row
- * right here instead of a real field; the underlying catalog element
- * is untouched, just rendered differently. Speakers & Music briefly
- * got the same treatment the next day, then moved back inline
- * (2026-09-10, the user's own follow-up: "move the speaker/music
- * management items directly into the agenda rather than by link") --
- * the page renders it as its own component sitting *between* two
- * separate `AgendaGridForm` instances instead, sidestepping the
- * nested-form problem a different way (siblings, not descendants) --
+ * (/meetings/[id]/ward-business) at the time, since its own add/remove
+ * controls couldn't be real <form>s nested inside this grid's single
+ * big <form> (HTML forbids nested forms) -- it rendered as a
+ * banner-with-link row right here instead of a real field. Moved back
+ * inline 2026-10-03 (see the `ward_business` row kind's own comment
+ * below) once its add/remove actions were rebuilt as plain buttons
+ * instead of real `<form>`s, sidestepping the nesting problem
+ * entirely. Speakers & Music got the its-own-page treatment too,
+ * briefly, then moved back inline a different way
+ * (2026-09-10, the
+ * user's own follow-up: "move the speaker/music management items
+ * directly into the agenda rather than by link") -- the page renders
+ * it as its own component sitting *between* two separate
+ * `AgendaGridForm` instances instead (siblings, not descendants) --
  * see app/meetings/[id]/planning/page.tsx and
  * SacramentProgramSection.tsx for that split.
  *
@@ -144,6 +149,22 @@ export type AgendaRow =
       fieldPrefix: string;
       rows: { personId: string; guestName: string }[];
       eligiblePeople: PersonOption[];
+    }
+  /** Ward Business, inline (2026-10-03, the user's own request: "update
+   *  ward business like we just did the visiting authorities... divided
+   *  into releases, callings, other"). Every action under this row is
+   *  an immediate plain-button server action (WardBusinessField.tsx),
+   *  not a deferred grid field -- this row carries data only, no field
+   *  names of its own, unlike every other kind here. */
+  | {
+      kind: "ward_business";
+      id: string;
+      label: string;
+      items: RabnmRow[];
+      callableCallings: CallableCallingItem[];
+      callableReleases: CallableCallingItem[];
+      people: PersonOption[];
+      callings: CallingOption[];
     };
 
 /** Music types that only ever have one per meeting -- rendered as a
@@ -171,6 +192,13 @@ export interface AgendaRowInputs {
   /** Already-saved Visiting Authorities, in order -- see that row
    *  kind's own comment above. */
   visitingAuthorities: VisitingAuthorityRow[];
+  /** Already-saved Ward Business items (sacrament_rabnm), and the
+   *  Calling Planning pull candidates for the Callings/Releases groups
+   *  -- see the `ward_business` row kind's own comment above. */
+  rabnm: RabnmRow[];
+  callableCallings: CallableCallingItem[];
+  callableReleases: CallableCallingItem[];
+  callings: CallingOption[];
   /** Calling-restricted eligible-people list per person_role element key
    *  -- null means no calling-based rule is configured, fall back to
    *  `allPeople`. See getEligiblePeopleByElementKey (lib/data/rotations.ts). */
@@ -182,9 +210,6 @@ export interface AgendaRowInputs {
    *  vacant -- the row is simply left blank, same as any other
    *  unassigned role. */
   defaultPresidingId: string | null;
-  /** For building the Ward Business / Speakers & Music banner rows'
-   *  links to their own pages. */
-  meetingId: string;
 }
 
 /** How many rows a repeatable element gets: what the meeting's own
@@ -206,10 +231,13 @@ export function buildAgendaRows({
   speakersAdults,
   speakersYouth,
   visitingAuthorities,
+  rabnm,
+  callableCallings,
+  callableReleases,
+  callings,
   eligibilityByKey,
   allPeople,
   defaultPresidingId,
-  meetingId,
 }: AgendaRowInputs): AgendaRow[] {
   const rows: AgendaRow[] = [];
 
@@ -237,12 +265,21 @@ export function buildAgendaRows({
   for (const el of elements) {
     const key = el.key;
 
-    // Ward Business (2026-09-09: "a fixed line without any field" --
-    // the actual releases/callings/baby blessings/etc. list moved to
-    // its own page, /meetings/[id]/ward-business, since RabnmSection's
-    // own add/remove forms can't nest inside this grid's <form>).
+    // Ward Business, inline (2026-10-03, the user's own request: "update
+    // ward business like we just did the visiting authorities... divided
+    // into releases, callings, other"). Replaces the old banner-with-link
+    // to a standalone page -- see this row kind's own comment above.
     if (isSacrament && key === "ward_business") {
-      rows.push({ kind: "banner", id: el.id, label: el.label, href: `/meetings/${meetingId}/ward-business` });
+      rows.push({
+        kind: "ward_business",
+        id: el.id,
+        label: el.label,
+        items: rabnm,
+        callableCallings,
+        callableReleases,
+        people: allPeople,
+        callings,
+      });
       continue;
     }
 

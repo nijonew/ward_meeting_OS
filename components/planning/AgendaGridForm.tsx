@@ -8,6 +8,7 @@ import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
+import { WardBusinessField } from "@/components/planning/WardBusinessField";
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
@@ -302,6 +303,26 @@ export function AgendaGridForm({
                       <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
                         {row.label}
                       </span>
+                    </td>
+                  </tr>
+                );
+              }
+
+              if (row.kind === "ward_business") {
+                return (
+                  <tr key={row.id} className="border-t border-rule/60 align-top">
+                    <th scope="row" className="w-40 px-2 py-2 text-left align-top font-display text-sm font-normal text-ink sm:w-48">
+                      {row.label}
+                    </th>
+                    <td className="px-2 py-1.5">
+                      <WardBusinessField
+                        meetingId={meetingId}
+                        items={row.items}
+                        callableCallings={row.callableCallings}
+                        callableReleases={row.callableReleases}
+                        people={row.people}
+                        callings={row.callings}
+                      />
                     </td>
                   </tr>
                 );

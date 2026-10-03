@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getActivePeople } from "@/lib/data/people";
 
 export interface CallingDetail {
   id: string;
@@ -103,6 +104,99 @@ export async function getCallingOptions(): Promise<CallingOption[]> {
     .order("sort_order");
 
   return error || !data ? [] : data;
+}
+
+export interface CallableCallingItem {
+  /** calling_planning.id -- what Ward Business's pull/un-pull actions
+   *  key off (app/meetings/[id]/ward-business-actions.ts). */
+  id: string;
+  callingId: string;
+  callingName: string;
+  personId: string;
+  personName: string;
+  /** calling_status/release_status is already "To Announce in
+   *  Sacrament" -- surfaced first, as a ready-made suggestion. */
+  ready: boolean;
+}
+
+/**
+ * Calling Planning rows not yet announced in any meeting, split into
+ * "Callings" (a single narrowed-down candidate) and "Releases" (a
+ * release person set) -- for Ward Business's inline Calling Planning
+ * picker (2026-10-03, the user's own request: "prefilled with items
+ * from calling planning that are listed as ready to announce... the
+ * ability to call in other items from calling planning even if they
+ * aren't marked as ready"). `ready` flags the ones already marked "To
+ * Announce in Sacrament" (pushCallingToSacramentMeeting's own
+ * threshold) -- everything else is still returned, just not
+ * pre-suggested, so an admin can pull one in early if they choose to.
+ *
+ * A calling_status row with more than one candidate is left out of the
+ * Callings list entirely -- same rule pushCallingToSacramentMeeting
+ * already enforces: there's no single person yet to announce. A row
+ * can appear in both lists at once (e.g. a presidency change with both
+ * a new calling and a release pending).
+ */
+export async function getCallableCallingPlanningItems(): Promise<{
+  callings: CallableCallingItem[];
+  releases: CallableCallingItem[];
+}> {
+  const supabase = await createClient();
+  const [{ data: rows }, people] = await Promise.all([
+    supabase
+      .from("calling_planning")
+      .select("id, calling_status, candidate_person_ids, release_person_id, release_status, callings(id, name)")
+      .is("announced_meeting_id", null),
+    getActivePeople(),
+  ]);
+
+  const nameById = new Map(people.map((p) => [p.id, p.name]));
+  const callings: CallableCallingItem[] = [];
+  const releases: CallableCallingItem[] = [];
+
+  for (const row of (rows ?? []) as unknown[]) {
+    const r = row as {
+      id: string;
+      calling_status: string;
+      candidate_person_ids: string[] | null;
+      release_person_id: string | null;
+      release_status: string;
+      callings: { id: string; name: string } | { id: string; name: string }[] | null;
+    };
+    const calling = Array.isArray(r.callings) ? r.callings[0] : r.callings;
+    if (!calling) continue;
+
+    const candidateIds = r.candidate_person_ids ?? [];
+    if (candidateIds.length === 1) {
+      const personName = nameById.get(candidateIds[0]);
+      if (personName) {
+        callings.push({
+          id: r.id,
+          callingId: calling.id,
+          callingName: calling.name,
+          personId: candidateIds[0],
+          personName,
+          ready: r.calling_status === "to_announce",
+        });
+      }
+    }
+
+    if (r.release_person_id) {
+      const personName = nameById.get(r.release_person_id);
+      if (personName) {
+        releases.push({
+          id: r.id,
+          callingId: calling.id,
+          callingName: calling.name,
+          personId: r.release_person_id,
+          personName,
+          ready: r.release_status === "to_announce",
+        });
+      }
+    }
+  }
+
+  return { callings, releases };
 }
 
 /**
