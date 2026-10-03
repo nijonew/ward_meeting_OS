@@ -12,15 +12,28 @@ import type { PersonOption } from "@/lib/data/people";
  * a display toggle -- both inputs still share the field names
  * saveProgramSpeaker expects, so the parent <form> needs no changes to
  * support either mode.
+ *
+ * Reused for Visiting Authorities (2026-10-03, "a potential write-in
+ * option as well") -- same person-or-guest shape, different copy, via
+ * the optional label props below (all default to the original Speaker
+ * wording so every existing caller is unaffected).
  */
 export function SpeakerPersonOrGuestField({
   people,
   defaultPersonId,
   defaultGuestName,
+  personPlaceholder = "Choose speaker",
+  guestPlaceholder = "Guest name",
+  guestToggleLabel = "Guest speaker instead",
+  personToggleLabel = "Choose from People instead",
 }: {
   people: PersonOption[];
   defaultPersonId: string;
   defaultGuestName: string;
+  personPlaceholder?: string;
+  guestPlaceholder?: string;
+  guestToggleLabel?: string;
+  personToggleLabel?: string;
 }) {
   const [showGuest, setShowGuest] = useState(Boolean(defaultGuestName) && !defaultPersonId);
 
@@ -31,12 +44,12 @@ export function SpeakerPersonOrGuestField({
           type="text"
           name="guest_name"
           defaultValue={defaultGuestName}
-          placeholder="Guest name"
+          placeholder={guestPlaceholder}
           className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
         <input type="hidden" name="person_id" value="" />
         <button type="button" onClick={() => setShowGuest(false)} className="text-xs text-ink-muted hover:text-ink">
-          Choose from People instead
+          {personToggleLabel}
         </button>
       </div>
     );
@@ -49,7 +62,7 @@ export function SpeakerPersonOrGuestField({
         defaultValue={defaultPersonId}
         className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
       >
-        <option value="">Choose speaker</option>
+        <option value="">{personPlaceholder}</option>
         {people.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -58,7 +71,7 @@ export function SpeakerPersonOrGuestField({
       </select>
       <input type="hidden" name="guest_name" value="" />
       <button type="button" onClick={() => setShowGuest(true)} className="text-xs text-ink-muted hover:text-ink">
-        Guest speaker instead
+        {guestToggleLabel}
       </button>
     </div>
   );

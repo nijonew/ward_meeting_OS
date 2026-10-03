@@ -4,6 +4,7 @@ import { getElementNotes } from "@/lib/data/meeting-element-notes";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getSacramentProgramItems, resolveProgramItems, type ResolvedProgramItem } from "@/lib/data/sacrament-program";
+import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { buildConductingRows, type ConductingRow } from "@/lib/data/conducting-rows";
 
 export interface ConductingScript {
@@ -78,13 +79,14 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) return null;
 
-  const [plannedElements, roleAssignments, elementNotes, data, people, programItems] = await Promise.all([
+  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities] = await Promise.all([
     getPlannedElements(meetingId),
     getRoleAssignments(meetingId, "sacrament_assignments"),
     getElementNotes(meetingId),
     getSacramentPlanningData(meetingId),
     getActivePeople(),
     getSacramentProgramItems(meetingId),
+    getVisitingAuthorities(meetingId),
   ]);
 
   const templateElements =
@@ -109,6 +111,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
     planning: data.planning,
     music: data.music,
     rabnm: data.rabnm,
+    visitingAuthorities,
     peopleById,
   };
 

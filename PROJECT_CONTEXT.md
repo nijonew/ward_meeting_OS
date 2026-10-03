@@ -96,8 +96,11 @@ reconstructed from both:
 - `052` (new `ward_settings` table, a singleton row holding the ward's
   own display name -- the header wordmark change, see Known open items
   below): still needs to be run.
+- `053` (new `sacrament_visiting_authorities` table -- the Visiting
+  Authorities multi-select + write-in list, see Known open items
+  below): still needs to be run.
 
-Next migration should be `053_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `054_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2405,6 +2408,63 @@ before fully closing it out.
     Component page (fetches `getWardName()` for its heading) plus a new
     `components/auth/LoginForm.tsx` Client Component for just the
     actual form, the only part that needs client state.
+- **Visiting Authorities rebuilt as a calling-restricted multi-select +
+  write-in list, 2026-10-03** (the user's own request: "a dropdown that
+  includes those in Stake Presidency callings (President and
+  Counselors) and any in High Council callings... a potential write-in
+  option as well and allow for multiple visiting authorities to be
+  recognized"). Investigating this surfaced that "Visiting Authorities"
+  had never actually been wired into the live agenda anywhere -- it was
+  cataloged as a plain `resolution_kind: 'free_text'` element, but no
+  code anywhere (`agenda-rows.ts`, `conducting-rows.ts`, `public-view.ts`)
+  ever referenced the key by name, and the one place it *was* exposed
+  (`sacrament_planning.visiting_authorities`, Table Admin's raw grid) is
+  a completely separate, dead column nothing else reads or writes. So
+  this was really "build it for the first time," not "upgrade what's
+  there."
+  - New `sacrament_visiting_authorities` table (migration `053`) --
+    same "dynamic add/remove list" shape as Speakers & Music
+    (`sacrament_program_items`) and RABNM (`sacrament_rabnm`): one row
+    per recognized authority, each either a real `person_id` or a
+    write-in `guest_name`, never both, with its own `sort_order`.
+  - New `VISITING_AUTHORITY_CALLING_NAMES` (`lib/data/rotations.ts`) --
+    `STAKE_PRESIDENCY_CALLING_NAMES` (already existed, for Presiding's
+    own dropdown) plus `"High Council"`. Resolved the exact same way
+    Presiding/Conducting already are -- fixed by calling, not a real
+    `rotations` row -- via a new shared `fixedCallingNamesForKey`
+    helper both `getEligiblePeopleForElement`/`getEligiblePeopleByElementKey`
+    now call, replacing their previous presiding/conducting-only
+    special case. **If "any in High Council callings" doesn't show up
+    as expected, suspect a name mismatch first** (exact string match
+    against `callings.name`, same gotcha already hit once for the Stake
+    Presidency counselors) -- multiple High Council seats just need to
+    share the exact name `"High Council"` to all appear here; no
+    uniqueness constraint on `callings.name` prevents that.
+  - **On its own page**, `/meetings/[id]/visiting-authorities`, same
+    reasoning as Ward Business: its own add/remove `<form>`s can't nest
+    inside the agenda grid's single big `<form>`. The grid's own
+    Visiting Authorities line is now a banner with a link, checked
+    before the generic switch exactly like Ward Business/Stake
+    Business/Recognize Music already are (still cataloged as
+    `free_text`, just no longer rendered as one).
+  - **Write-in reuses `SpeakerPersonOrGuestField`** (the exact same
+    person-or-guest toggle Speaker/Youth Speaker rows already use) --
+    gained optional label props (`personPlaceholder`, `guestPlaceholder`,
+    `guestToggleLabel`, `personToggleLabel`), all defaulting to the
+    original Speaker wording so that caller is unaffected, so this
+    didn't need a near-duplicate component just for different button
+    copy ("Write in a name instead" / "Choose from the list instead").
+  - **Also wired into the Conducting script** (not originally asked for,
+    but a real, obvious gap once the data existed -- the whole point of
+    recognizing a visiting authority is presumably that the conductor
+    welcomes them by name during the meeting, and nothing did that
+    before): `buildConductingRows` gets a new `visiting_authorities`
+    dispatch branch, skipped entirely when none are recognized rather
+    than showing an empty line. **Deliberately left out of the public
+    program** (`public-view.ts`) for now -- that's a bigger judgment
+    call about what belongs in a public-facing program (RABNM/calling
+    business already stay out of it on purpose), not something to
+    decide without asking first.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

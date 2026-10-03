@@ -311,6 +311,19 @@ export const STAKE_PRESIDENCY_CALLING_NAMES = [
   "Stake Presidency Second Counselor",
 ];
 
+/** Visiting Authorities' own eligible list (2026-10-03, the user's own
+ *  request: "a dropdown that includes those in Stake Presidency
+ *  callings (President and Counselors) and any in High Council
+ *  callings"). "High Council" is matched exactly against
+ *  `callings.name`, same as every other name in this file -- if the
+ *  ward records multiple High Council seats as separate rows, they
+ *  just need to share this exact name string to all show up here (no
+ *  uniqueness constraint on `callings.name` prevents that). If this
+ *  list comes back empty despite real High Council members existing,
+ *  suspect a name mismatch first (see STAKE_PRESIDENCY_CALLING_NAMES's
+ *  own note above -- this has already happened once). */
+export const VISITING_AUTHORITY_CALLING_NAMES = [...STAKE_PRESIDENCY_CALLING_NAMES, "High Council"];
+
 /**
  * The calling-restricted eligible-people list for one person_role agenda
  * element -- the general-purpose version of what eligiblePeopleByColumn
@@ -332,6 +345,20 @@ export const STAKE_PRESIDENCY_CALLING_NAMES = [
  * holds the relevant calling -- surfaced as-is, not silently widened,
  * matching the applied-assignment grid's own "No one eligible" handling.
  */
+/** The three elements resolved directly from a fixed calling-name list
+ *  rather than a real `rotations` row -- Presiding/Conducting (see
+ *  applyFixedSacramentRoles) plus Visiting Authorities (2026-10-03,
+ *  never rotation-driven at all, just a standing pool of who's allowed
+ *  to be picked). Returns null for anything else, so callers fall
+ *  through to the real `rotations` table lookup. */
+function fixedCallingNamesForKey(meetingTypeSlug: MeetingTypeSlug, elementKey: string): string[] | null {
+  if (meetingTypeSlug !== "sacrament-meeting") return null;
+  if (elementKey === "presiding") return [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES];
+  if (elementKey === "conducting") return CONDUCTING_CALLING_ORDER;
+  if (elementKey === "visiting_authorities") return VISITING_AUTHORITY_CALLING_NAMES;
+  return null;
+}
+
 export async function getEligiblePeopleForElement(
   meetingTypeSlug: MeetingTypeSlug,
   meetingTypeId: string,
@@ -339,9 +366,9 @@ export async function getEligiblePeopleForElement(
 ): Promise<PersonOption[] | null> {
   const supabase = await createClient();
 
-  if (meetingTypeSlug === "sacrament-meeting" && (elementKey === "presiding" || elementKey === "conducting")) {
-    const names = elementKey === "presiding" ? [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES] : CONDUCTING_CALLING_ORDER;
-    const ids = await computeEligiblePersonIds(supabase, "calling_names", names, meetingTypeId);
+  const fixedNames = fixedCallingNamesForKey(meetingTypeSlug, elementKey);
+  if (fixedNames) {
+    const ids = await computeEligiblePersonIds(supabase, "calling_names", fixedNames, meetingTypeId);
     return personOptionsByIds(supabase, ids);
   }
 
@@ -376,9 +403,9 @@ export async function getEligiblePeopleByElementKey(
   const supabase = await createClient();
   const result: Record<string, PersonOption[] | null> = {};
 
-  const fixedKeys = elementKeys.filter((k) => meetingTypeSlug === "sacrament-meeting" && (k === "presiding" || k === "conducting"));
+  const fixedKeys = elementKeys.filter((k) => fixedCallingNamesForKey(meetingTypeSlug, k) !== null);
   for (const key of fixedKeys) {
-    const names = key === "presiding" ? [...CONDUCTING_CALLING_ORDER, ...STAKE_PRESIDENCY_CALLING_NAMES] : CONDUCTING_CALLING_ORDER;
+    const names = fixedCallingNamesForKey(meetingTypeSlug, key)!;
     const ids = await computeEligiblePersonIds(supabase, "calling_names", names, meetingTypeId);
     result[key] = await personOptionsByIds(supabase, ids);
   }

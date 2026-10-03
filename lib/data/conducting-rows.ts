@@ -1,6 +1,7 @@
 import type { TemplateElementRow, RoleAssignmentValue } from "@/lib/data/meeting-elements";
 import type { ElementNoteValue } from "@/lib/data/meeting-element-notes";
 import type { MusicRow, PlanningInfo, RabnmRow } from "@/lib/data/sacrament-planning";
+import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 
 /**
  * The Conducting view's read-only row model, built 2026-09-10 as the
@@ -40,6 +41,7 @@ export interface ConductingRowInputs {
   planning: PlanningInfo | null;
   music: MusicRow[];
   rabnm: RabnmRow[];
+  visitingAuthorities: VisitingAuthorityRow[];
   peopleById: Map<string, string>;
 }
 
@@ -97,6 +99,7 @@ export function buildConductingRows({
   planning,
   music,
   rabnm,
+  visitingAuthorities,
   peopleById,
 }: ConductingRowInputs): ConductingRow[] {
   const rows: ConductingRow[] = [];
@@ -117,6 +120,23 @@ export function buildConductingRows({
       for (const item of rabnm) {
         rows.push({ id: `rabnm-${item.id}`, kind: "field", label: item.type.replace(/_/g, " "), value: null, wording: rabnmPrompt(item) });
       }
+      continue;
+    }
+
+    // Visiting Authorities (2026-10-03, migration 053) -- read-only
+    // list of names from sacrament_visiting_authorities, skipped
+    // entirely when none are recognized rather than showing an empty
+    // line (nothing to say if nobody's being welcomed).
+    if (key === "visiting_authorities") {
+      if (visitingAuthorities.length === 0) continue;
+      const names = visitingAuthorities.map((v) => v.displayName || BLANK).join(", ");
+      rows.push({
+        id: el.id,
+        kind: "field",
+        label: el.label,
+        value: names,
+        wording: `We are pleased to welcome ${names} with us today.`,
+      });
       continue;
     }
 

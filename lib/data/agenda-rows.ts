@@ -219,6 +219,21 @@ export function buildAgendaRows({
       continue;
     }
 
+    // Visiting Authorities (2026-10-03, the user's own request: a
+    // calling-restricted multi-select -- Stake Presidency + High
+    // Council -- plus a write-in option, multiple per meeting). Same
+    // reasoning as Ward Business just above: its own add/remove forms
+    // can't nest inside this grid's single big <form>, so it moves to
+    // its own page too. Still cataloged as resolution_kind 'free_text'
+    // (checked before the generic switch, same as Ward Business/Stake
+    // Business/Recognize Music above) -- it was never actually wired
+    // into the live agenda before this, so there's no existing
+    // free-text data this displaces.
+    if (isSacrament && key === "visiting_authorities") {
+      rows.push({ kind: "banner", id: el.id, label: el.label, href: `/meetings/${meetingId}/visiting-authorities` });
+      continue;
+    }
+
     // Stake Business (2026-09-09: yes/no toggle + optional announcer,
     // replacing free text) -- checked before the generic switch since
     // it's still catalogued as resolution_kind 'free_text' but no
