@@ -1906,6 +1906,22 @@ and reduces redundant Supabase round trips everywhere both functions
 are already called more than once per request, not just on meeting
 pages.
 
+**Bug found and fixed the same day: Delete silently did nothing on
+failure.** The user's own report, right after the stage-gating fix
+below: "the delete button is there but doesn't seem to actually remove
+the meeting when pushed. I have browsed away from the page then back
+and the meeting remains." `MeetingRow`'s inline `deleteThis` closure
+called `deleteMeeting(meeting.id)` and discarded whatever it returned
+-- if `deleteMeeting` came back with `{ error: "..." }` (wrong feature,
+an RPC error, anything), nothing on screen ever said so; the row just
+stayed put with no feedback at all, indistinguishable from the button
+not working. `DeleteMeetingButton` now reads the result and shows the
+message inline under the button if there is one. **Still unconfirmed:
+what the actual underlying error is** -- this fix makes the real
+reason visible instead of swallowing it, but doesn't itself diagnose
+why a specific delete failed; ask the user to retry and report the
+exact message if it still doesn't work, now that there will be one.
+
 **Bug found and fixed the same day, surfaced by the report above:**
 `/dashboard`'s per-row Delete button was gated on `meeting.stage !==
 "archived"`, the exact same condition as Cancel/Un-cancel -- meaning a

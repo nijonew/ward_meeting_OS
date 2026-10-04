@@ -89,7 +89,10 @@ function MeetingRow({
   };
   const deleteThis = async () => {
     "use server";
-    await deleteMeeting(meeting.id);
+    // Returned, not discarded (2026-10-04, see DeleteMeetingButton's
+    // own comment on this) -- a failed delete needs to actually tell
+    // the admin it failed.
+    return await deleteMeeting(meeting.id);
   };
 
   return (

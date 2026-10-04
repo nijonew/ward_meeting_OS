@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 
 /**
  * Delete, distinct from Cancel (2026-10-03, the user's own distinction:
@@ -26,32 +26,49 @@ import { useTransition } from "react";
  * `deleteAction` is the inline "use server" closure MeetingRow defines
  * per row (wrapping deleteMeeting with this meeting's id) -- same
  * cross-boundary pattern as CancelMeetingButton's own cancelAction.
+ *
+ * **Bug found and fixed 2026-10-04** (the user's own report: "the
+ * delete button is there but doesn't seem to actually remove the
+ * meeting when pushed... I have browsed away from the page then back
+ * and the meeting remains"): `deleteAction`'s result was never read at
+ * all -- a failed delete (wrong feature, an RPC error, anything)
+ * returned `{ error: "..." }` from `deleteMeeting` straight into the
+ * void, with nothing on screen ever telling the admin it didn't work.
+ * Now reads the result and shows the message inline if there is one.
  */
 export function DeleteMeetingButton({
   meetingLabel,
   deleteAction,
 }: {
   meetingLabel: string;
-  deleteAction: () => Promise<void>;
+  deleteAction: () => Promise<{ success: true } | { error: string }>;
 }) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const handleClick = () => {
     const confirmed = window.confirm(
       `Permanently delete ${meetingLabel}?\n\nThis removes its entire agenda -- assignments, music, speakers, everything entered for it -- and cannot be undone. It will not affect any other meeting, even one on the same date.`
     );
     if (!confirmed) return;
-    startTransition(deleteAction);
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteAction();
+      if ("error" in result) setError(result.error);
+    });
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={pending}
-      className="whitespace-nowrap rounded border border-danger/40 px-3 py-1.5 text-xs text-danger hover:bg-danger/5 disabled:opacity-50"
-    >
-      {pending ? "Deleting..." : "Delete"}
-    </button>
+    <span className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={pending}
+        className="whitespace-nowrap rounded border border-danger/40 px-3 py-1.5 text-xs text-danger hover:bg-danger/5 disabled:opacity-50"
+      >
+        {pending ? "Deleting..." : "Delete"}
+      </button>
+      {error && <span className="text-[11px] text-danger">{error}</span>}
+    </span>
   );
 }
