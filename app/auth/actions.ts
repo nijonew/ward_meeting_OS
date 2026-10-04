@@ -21,6 +21,10 @@ export async function signInWithPassword(_prevState: unknown, formData: FormData
   redirect("/");
 }
 
+/** Backs both /auth/new-user and /auth/reset-password (split into two
+ *  pages 2026-10-03, different copy only) -- Supabase's own "send a
+ *  password-set link" flow doesn't distinguish a first-time sign-in
+ *  from a forgotten password, so one action serves both. */
 export async function requestPasswordReset(_prevState: unknown, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) {

@@ -125,7 +125,39 @@ exclusive access.
 ## Architecture
 
 - **Auth:** email/password (not magic link — that was broken and replaced).
-  First-time users must visit `/auth/reset-password` once to set a password.
+  First-time users must visit `/auth/new-user` once to set a password --
+  split from `/auth/reset-password` into its own page 2026-10-03 (the
+  user's own report: "There is not distinction between new user and
+  lost password. I would like to have separate links and pages for
+  that"). Both pages call the exact same `requestPasswordReset` action
+  under the hood (`app/auth/actions.ts`) -- there's no separate
+  mechanism to call instead, since an account only exists here once an
+  admin has already invited it directly through the Supabase dashboard
+  (no self-serve sign-up at all, per the "Adding new people"
+  workflow/policy below), so "first time signing in" and "forgot my
+  password" are the exact same question as far as Supabase's own
+  password-reset-email flow is concerned. Only the page copy differs;
+  `LoginForm.tsx`'s single combined link became two.
+  - **Known issue, reported 2026-10-03, not yet root-caused:** the
+    user tried `/auth/reset-password` while testing a new account and
+    got no email after 10 minutes (no error shown on the page either,
+    per their report). Nothing in this app's own code can be
+    confirmed or ruled out without direct access to the Supabase
+    dashboard (Authentication → Logs, and whether a custom SMTP
+    provider is configured) or to this Vercel project's actual
+    environment variable values, neither of which this assistant has.
+    Two real candidates worth checking directly, most likely first:
+    (1) Supabase's **default built-in email sender is low-volume and
+    not meant for production** -- if no custom SMTP provider is
+    configured in Authentication → Email settings, delivery can be
+    slow, rate-limited, or silently dropped; (2) check spam/junk.
+    Separately (wouldn't explain a *missing* email, but would break
+    the link inside one once it arrives): `requestPasswordReset`
+    builds its `redirectTo` from `process.env.NEXT_PUBLIC_SITE_URL`
+    with no fallback -- if that's unset in Vercel's production
+    environment variables, the link embedded in the email would point
+    at a broken URL. Worth confirming that's set to
+    `https://ward-meeting-os.vercel.app` while investigating this.
 - **Roles** (`profiles.role`): `bishopric` (Counselors + Exec Sec +
   Clerk, one shared role), `bishop` (its own distinct value as of
   2026-10-03, see below), `music_planner`, `communications_specialist`,

@@ -40,9 +40,14 @@ export function LoginForm() {
         {state.error && <p className="text-sm text-danger">{state.error}</p>}
       </form>
 
-      <Link href="/auth/reset-password" className="mt-4 text-xs text-ink-muted underline">
-        Forgot your password, or signing in for the first time?
-      </Link>
+      <div className="mt-4 flex flex-col gap-1.5">
+        <Link href="/auth/new-user" className="text-xs text-ink-muted underline">
+          Signing in for the first time?
+        </Link>
+        <Link href="/auth/reset-password" className="text-xs text-ink-muted underline">
+          Forgot your password?
+        </Link>
+      </div>
     </>
   );
 }
