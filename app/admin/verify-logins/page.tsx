@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getUnverifiedProfiles } from "@/lib/data/profile-verification";
 import { getActivePeople } from "@/lib/data/people";
 import { VerifyLoginRow } from "@/components/admin/VerifyLoginRow";
+import { SyncCallingRolesButton } from "@/components/admin/SyncCallingRolesButton";
 
 /**
  * Admin-only list of every login with no role set yet (2026-10-03,
@@ -45,6 +46,15 @@ export default async function VerifyLoginsPage() {
           Every login that hasn&rsquo;t been given a role yet -- they have no access to anything until
           one of these is resolved. Match each to a person (or add a new one), then set their role.
         </p>
+        <p className="mt-2 text-xs text-ink-muted">
+          Already-verified accounts whose role was set to match their calling (Table Admin&rsquo;s
+          &ldquo;Calling → Role Mapping&rdquo; table) update automatically from then on when that
+          calling changes hands. Use this only after adding a brand-new mapping, to apply it to
+          whoever already holds that calling right now:
+        </p>
+        <div className="mt-2">
+          <SyncCallingRolesButton />
+        </div>
       </section>
 
       {profiles.length === 0 ? (

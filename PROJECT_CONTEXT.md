@@ -110,8 +110,12 @@ reconstructed from both:
   Bishop-succession feature, see Architecture above): confirmed run
   ("no rows returned" is the expected, successful result -- it's pure
   DDL, no `SELECT`).
+- `057` (new `calling_role_mappings` table, `profiles.role_source`
+  column, and a real Postgres trigger on `callings` -- automatic role
+  sync from calling changes, see Architecture above): still needs to
+  be run.
 
-Next migration should be `057_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `058_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -155,26 +159,21 @@ exclusive access.
     admin still needs to verify your account"), so a freshly
     self-signed-up person isn't left looking at a confusingly bare
     page with no explanation.
-  - **Known issue, reported 2026-10-03, not yet root-caused:** the
-    user tried `/auth/reset-password` while testing a new account and
-    got no email after 10 minutes (no error shown on the page either,
-    per their report). Nothing in this app's own code can be
-    confirmed or ruled out without direct access to the Supabase
-    dashboard (Authentication → Logs, and whether a custom SMTP
-    provider is configured) or to this Vercel project's actual
-    environment variable values, neither of which this assistant has.
-    Two real candidates worth checking directly, most likely first:
-    (1) Supabase's **default built-in email sender is low-volume and
-    not meant for production** -- if no custom SMTP provider is
-    configured in Authentication → Email settings, delivery can be
-    slow, rate-limited, or silently dropped; (2) check spam/junk.
-    Separately (wouldn't explain a *missing* email, but would break
-    the link inside one once it arrives): `requestPasswordReset`
-    builds its `redirectTo` from `process.env.NEXT_PUBLIC_SITE_URL`
-    with no fallback -- if that's unset in Vercel's production
-    environment variables, the link embedded in the email would point
-    at a broken URL. Worth confirming that's set to
-    `https://ward-meeting-os.vercel.app` while investigating this.
+  - **Email delivery issue, reported 2026-10-03, resolved 2026-10-04:**
+    the user tried `/auth/reset-password` while testing a new account
+    and got no email after 10 minutes; a later `/auth/request-access`
+    attempt surfaced the real cause directly as "Error sending
+    confirmation email" -- Supabase's own default built-in email sender
+    (low-volume, not meant for production) failing outright rather
+    than just being slow. The user set up custom SMTP through their
+    own Gmail account (App Password + `smtp.gmail.com`) in the Supabase
+    dashboard and confirmed the full loop works end to end: sign up,
+    confirm, sign in, show up at `/admin/verify-logins`, get verified,
+    sign in again as the verified account. `NEXT_PUBLIC_SITE_URL`
+    wasn't the culprit here, but is still worth double-checking it's
+    set to `https://ward-meeting-os.vercel.app` in Vercel if a
+    password-reset *link* itself (as opposed to the email never
+    arriving at all) ever misbehaves.
 - **Roles** (`profiles.role`): `bishopric` (Counselors + Exec Sec +
   Clerk, one shared role), `bishop` (its own distinct value as of
   2026-10-03, see below), `music_planner`, `communications_specialist`,
@@ -245,6 +244,61 @@ exclusive access.
     real calling recorded in `/callings`) to resolve calling-based
     features correctly, even though `role` alone already grants full
     admin access everywhere regardless of it.
+  - **Role now auto-syncs from calling changes, built 2026-10-04**
+    (the user's own question after testing Verify Logins end to end:
+    "I want the admin to be able to link the new user to a name in the
+    people table somehow. That way, as their calling changes their
+    role will change also and update their access" -- confirmed
+    "fully automatic" when asked directly, over a manual-only
+    alternative). New `calling_role_mappings` table (migration `057`,
+    Table Admin-editable as "Calling → Role Mapping": calling, role,
+    priority) plus a real Postgres trigger on `callings` -- whenever
+    `current_holder_id` changes (via `/callings` or Table Admin's
+    generic grid, either one, since this is a trigger on the table
+    itself, not hooked into one specific code path), the previous and
+    new holders' linked profiles both get recomputed from whichever
+    mapped calling(s) they currently hold (`priority`, lower wins,
+    breaks a tie when someone holds more than one). Losing every
+    mapped calling sets role back to `null` -- which also means they
+    land back in the Verify Logins queue automatically, a deliberate,
+    useful side effect, not a bug.
+    - **"bishop" is deliberately not a mappable value** -- granting it
+      is restricted to a sitting Bishop specifically
+      (`verifyLogin`'s own `isBishop` check against the *acting* admin),
+      and a database trigger has no clean equivalent of "who's
+      acting" to enforce that same rule. Bishop succession stays a
+      deliberate, manual Verify Logins action, completely untouched by
+      this feature.
+    - **A manually-chosen role is never silently overwritten.** New
+      `profiles.role_source` (`'manual' | 'auto'`) is set by
+      `verifyLogin` itself, by comparing the admin's chosen role
+      against what the mapping would have derived for that person at
+      that moment: a match is tagged `'auto'` (this is the common
+      case -- most verifications really are "set their role to match
+      their calling," so most people DO get ongoing automatic
+      updates); a deliberate override is tagged `'manual'` and the
+      sync (`recompute_role_for_person`) skips them entirely, forever,
+      until a later `verifyLogin` call re-tags them. Without this, the
+      very first role grant through Verify Logins would have
+      permanently opted every single person out of their own later
+      automatic updates, since that's always how a role starts out --
+      an early version of this design missed that and had to be
+      corrected before shipping.
+    - **All three new functions are `security invoker`**, matching
+      this repo's own established convention (see
+      `025_apply_rotation_assignment_function.sql`'s own comment) --
+      they run with the privileges of whichever authenticated
+      Bishopric/Bishop admin's edit to `callings` fired them, governed
+      by the same RLS policies that already let Verify Logins' own
+      plain `profiles.role` update succeed, rather than bypassing RLS
+      with `security definer`.
+    - **New "Sync roles now" button** on `/admin/verify-logins`
+      (`sync_all_calling_roles`, a plain RPC call) -- the trigger only
+      fires on a *future* calling change; adding a brand-new mapping
+      row doesn't retroactively touch anyone already holding that
+      calling, since nothing fires on `calling_role_mappings` itself.
+      Only needed right after adding or changing a mapping, not
+      routine maintenance.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for
