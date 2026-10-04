@@ -11,7 +11,7 @@ import { createClient } from "./server";
  * agenda-items/notes, Sacrament Meeting's own extras, every standalone
  * tool, and one feature per Table Admin table).
  *
- * This is that second pass: ~58 granular features (the full catalog
+ * This is that second pass: ~56 granular features (the full catalog
  * also lives in the `features` table, migration `060`, purely for
  * display/grouping in the assignment UI -- this union is the real
  * source of truth for what code can check). A person's access is
@@ -19,14 +19,21 @@ import { createClient } from "./server";
  * they currently hold, via the new many-to-many `calling_features`
  * table (migration `060`) -- computed fresh on every request, never
  * cached, same as before.
+ *
+ * `sacrament_notes`/`sacrament_agenda_items` (the two per-type actions
+ * every other meeting type has) were removed again by migration `061`,
+ * the user's own call: Sacrament Meeting has no Minutes/Action Items/
+ * Council Notes concept (that's a Bishopric Meeting/Ward Council/
+ * Youth Council thing) and no agenda-item-submission workflow either
+ * (Submit an Agenda Item already excludes Sacrament Meeting from its
+ * own dropdown) -- both were speculative, never actually wired to
+ * anything real for this meeting type.
  */
 export type Feature =
   // Sacrament Meeting
   | "sacrament_viewing"
   | "sacrament_planning"
   | "sacrament_template"
-  | "sacrament_agenda_items"
-  | "sacrament_notes"
   | "sacrament_music"
   | "sacrament_conducting"
   | "sacrament_rabnm"

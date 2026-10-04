@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 060
+## Current migration number: 061
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -132,10 +132,12 @@ reconstructed from both:
 - `060` (new `features` catalog table + `calling_features` many-to-many
   join, seeds the full ~58-feature list, drops the ten `feature_*`
   boolean columns migration `057` added to `callings` -- the granular-
-  features permissions rework, see Architecture above): still needs to
-  be run.
+  features permissions rework, see Architecture above): confirmed run.
+- `061` (removes `sacrament_notes`/`sacrament_agenda_items` from the
+  `features` catalog -- the user's own call, not needed for Sacrament
+  Meeting, see Architecture above): still needs to be run.
 
-Next migration should be `061_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `062_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -383,6 +385,28 @@ exclusive access.
     (e.g. "Sacrament Meeting Viewing", "Bishopric Meeting Planning").
     The other ~38 features were already unique on their own and didn't
     need this.
+  - **`sacrament_notes`/`sacrament_agenda_items` removed entirely,
+    migration `061`** (2026-10-04, right after `060` was confirmed
+    run) -- the user's own call: "lets remove note taking and agenda
+    item features from sacrament meeting calling features. they are
+    not needed." Sacrament Meeting has no Minutes/Action Items/Council
+    Notes concept at all (that's exclusively a Bishopric Meeting/Ward
+    Council/Youth Council thing) and no agenda-item-submission workflow
+    either (Submit an Agenda Item's own dropdown already excludes
+    Sacrament Meeting) -- both were speculative entries from the
+    original per-meeting-type × per-action matrix that never had
+    anything real to attach to for this one type. Dropped from the
+    `Feature` union (`lib/supabase/get-session-user.ts`) and the
+    `features` table (`calling_features.feature_key`'s `on delete
+    cascade` means dropping the catalog row also removes any grant of
+    either to any calling automatically -- nothing else to clean up).
+    No application code needed to change: `meetingFeature()`'s return
+    type is produced via a cast, not a lookup, so the handful of call
+    sites that loop over every meeting type for a given action
+    (`getVisibleMeetingTypesForUser`'s `agenda_items` check,
+    `archived/page.tsx`'s `showRealTimeNotes`) simply never find
+    `sacrament_notes`/`sacrament_agenda_items` granted to anyone --
+    which is exactly the intended behavior, not a gap.
   - `AppHeader`'s "signed in as" name + feature-tooltip (added during
     the first pass, unchanged structurally) now lists whichever of the
     ~58 granular keys the signed-in account actually holds.
