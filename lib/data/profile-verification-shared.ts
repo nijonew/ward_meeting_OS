@@ -12,6 +12,7 @@ export interface UnverifiedProfile {
 export const GRANTABLE_ROLES: { value: StoredRole; label: string }[] = [
   { value: "bishop", label: "Bishop" },
   { value: "bishopric", label: "Bishopric (Counselor / Exec Sec / Clerk)" },
+  { value: "general", label: "General (no extra access)" },
   { value: "music_planner", label: "Music Planner" },
   { value: "communications_specialist", label: "Communications Specialist" },
   { value: "yw_presidency", label: "Young Women Presidency" },

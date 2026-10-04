@@ -299,6 +299,47 @@ exclusive access.
       calling, since nothing fires on `calling_role_mappings` itself.
       Only needed right after adding or changing a mapping, not
       routine maintenance.
+    - **Bulk-seeded with every existing calling, same day** (the
+      user's immediate follow-up: "add every calling into the
+      table/page so I don't have to manually add them. Then I can
+      manually assign the roles"). `role` had to become nullable
+      (`calling_role_mappings` previously required a non-null role per
+      row) specifically so this seed could insert one placeholder row
+      per calling -- `priority` defaulted from that calling's own
+      `sort_order` -- leaving most of them blank, since most callings
+      in any ward have nothing to do with any of these app roles.
+      Idempotent (only inserts a calling with no row yet), and amended
+      directly into migration `057` itself rather than a new `058`,
+      since `057` hadn't been confirmed run yet when this was added
+      (matching this file's own established convention -- see
+      migrations `041`/`047`'s history above). **Real bug caught and
+      fixed by this change, before it ever shipped:** every query that
+      picks "the mapped role" by lowest `priority` had to be corrected
+      to explicitly exclude a null-role row -- without that, a blank
+      placeholder row with a lower priority number than a real mapped
+      one could have outranked it for someone holding both callings at
+      once, silently producing no role (or the wrong one) instead of
+      the real mapped one. Fixed in both
+      `recompute_role_for_person`/`sync_all_calling_roles` (SQL) and
+      `verifyLogin`'s own `deriveRoleForPerson` helper (TypeScript) --
+      the same logic is duplicated in both places (see that
+      function's own comment for why), so both needed the same fix.
+    - **New `"general"` role, same day** (the user's own follow-up,
+      right after the bulk seed: "we probably need another role which
+      gives no extra access"). Grants nothing anywhere in the app --
+      not through any special-casing, simply because every permission
+      check here is an exact match against a specific role string, and
+      `"general"` was never added to any of them. Exists so a calling
+      with no real mapped role can still map to *something* other than
+      staying blank -- a holder who signs up gets `role = 'general'`
+      (via the trigger, or picked manually in Verify Logins) instead of
+      staying stuck at `role = null` and permanently sitting in the
+      Verify Logins queue. Added to `AppRole` itself (not just a
+      calling-mapping-only concept), to `GRANTABLE_ROLES`, and to both
+      the `calling_role_mappings` and `profiles` CHECK constraints --
+      the latter needed its own ALTER since migration `056` (which
+      first created `profiles_role_check`) was already confirmed run
+      by this point and couldn't be amended the way `057` still could.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for

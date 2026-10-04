@@ -12,6 +12,32 @@
 -- higher) breaks ties when one person holds more than one mapped
 -- calling at once.
 --
+-- Seeded with one row per EXISTING calling, `role` left null and
+-- `priority` defaulted from that calling's own `sort_order` (the
+-- user's own follow-up request: "add every calling into the
+-- table/page so I don't have to manually add them. Then I can
+-- manually assign the roles") -- `role` is nullable specifically so
+-- this bulk seed can insert a placeholder for every calling, most of
+-- which have nothing to do with any app role and are meant to just
+-- stay blank forever. A null-role row is never treated as a real
+-- mapping anywhere below (every query that picks "the mapped role"
+-- explicitly filters `role is not null`) -- without that filter, a
+-- blank row with a lower `priority` number than a real mapped one
+-- could have incorrectly outranked it when the same person holds
+-- both callings.
+--
+-- "general" (added the same day, the user's own follow-up: "we
+-- probably need another role which gives no extra access") is a real,
+-- assignable/mappable role like any other here -- it grants nothing
+-- anywhere in the app (every permission check is an exact match
+-- against a specific role string, and "general" never appears in any
+-- of them), but being a real non-null value still gets its holder out
+-- of the Verify Logins "needs verification" queue. Lets most of the
+-- bulk-seeded callings below map to something sensible (most wards
+-- have far more ordinary callings than ones that need a real app
+-- permission) instead of forcing a choice between "leave unmapped" and
+-- "grant real access nobody intended."
+--
 -- "bishop" is deliberately NOT an allowed value here -- granting it is
 -- restricted to a sitting Bishop only (app/admin/verify-logins/actions.ts's
 -- own isBishop check against the ACTING admin). A database trigger has
@@ -41,10 +67,11 @@
 -- update succeed, rather than bypassing RLS with SECURITY DEFINER.
 --
 -- recompute_role_for_person(): given a people.id, finds every calling
--- they currently hold, picks the highest-priority mapped one (if any),
--- and sets their linked profile's role to match -- or back to null if
--- none of their current callings are mapped. No-ops entirely for a
--- profile tagged 'manual', or one with no linked person at all.
+-- they currently hold, picks the highest-priority mapped one with a
+-- real (non-null) role (if any), and sets their linked profile's role
+-- to match -- or back to null if none of their current callings have
+-- a real mapped role. No-ops entirely for a profile tagged 'manual',
+-- or one with no linked person at all.
 --
 -- sync_calling_role(): trigger function on callings, fired after an
 -- INSERT or an UPDATE that changes current_holder_id -- recomputes
@@ -55,19 +82,22 @@
 -- itself, not hooked into any one specific code path.
 --
 -- sync_all_calling_roles(): the manual catch-up version -- recomputes
--- every person who currently holds any mapped calling, for after a
--- brand-new calling_role_mappings row is added (adding that row alone
+-- every person who currently holds a calling with a real mapped role,
+-- for after a brand-new (non-null) mapping is set -- that alone
 -- doesn't retroactively touch anyone already holding that calling,
--- since nothing fires a trigger on calling_role_mappings itself).
+-- since nothing fires a trigger on calling_role_mappings itself.
 -- Exposed as a "Sync roles now" button on /admin/verify-logins.
 --
--- Idempotent: safe to re-run.
+-- Idempotent: safe to re-run -- the seed only inserts a row for a
+-- calling that doesn't already have one, never touches a role an
+-- admin has since set.
 
 create table if not exists calling_role_mappings (
   id uuid primary key default gen_random_uuid(),
   calling_id uuid not null unique references callings(id) on delete cascade,
-  role text not null check (role in (
+  role text check (role in (
     'bishopric',
+    'general',
     'music_planner',
     'communications_specialist',
     'yw_presidency',
@@ -79,6 +109,45 @@ create table if not exists calling_role_mappings (
   priority integer not null default 0,
   created_at timestamp with time zone not null default now()
 );
+
+-- In case this ran once already under an earlier version of this file
+-- (before `role` was made nullable for the bulk seed below, and before
+-- "general" was added as a mappable value).
+alter table calling_role_mappings alter column role drop not null;
+alter table calling_role_mappings drop constraint if exists calling_role_mappings_role_check;
+alter table calling_role_mappings add constraint calling_role_mappings_role_check
+  check (role is null or role in (
+    'bishopric',
+    'general',
+    'music_planner',
+    'communications_specialist',
+    'yw_presidency',
+    'yw_advisor',
+    'yw_specialist',
+    'ym_advisor',
+    'ym_specialist'
+  ));
+
+-- Migration 056 created profiles_role_check before "general" existed
+-- (the user's own follow-up request, 2026-10-04: "we probably need
+-- another role which gives no extra access") -- 056 is already
+-- confirmed run in production, so it can't be amended in place the
+-- way this still-unrun file can; widening its constraint happens here
+-- instead, by the same name it already used.
+alter table profiles drop constraint if exists profiles_role_check;
+alter table profiles add constraint profiles_role_check
+  check (role is null or role in (
+    'bishop',
+    'bishopric',
+    'general',
+    'music_planner',
+    'communications_specialist',
+    'yw_presidency',
+    'yw_advisor',
+    'yw_specialist',
+    'ym_advisor',
+    'ym_specialist'
+  ));
 
 alter table calling_role_mappings enable row level security;
 
@@ -94,6 +163,13 @@ create policy "authenticated write calling_role_mappings"
   to authenticated
   using (true)
   with check (true);
+
+insert into calling_role_mappings (calling_id, role, priority)
+select c.id, null, coalesce(c.sort_order, 0)
+from callings c
+where not exists (
+  select 1 from calling_role_mappings crm where crm.calling_id = c.id
+);
 
 alter table profiles add column if not exists role_source text;
 
@@ -121,6 +197,7 @@ begin
   from callings c
   join calling_role_mappings crm on crm.calling_id = c.id
   where c.current_holder_id = p_person_id
+    and crm.role is not null
   order by crm.priority asc
   limit 1;
 
@@ -172,6 +249,7 @@ begin
     from callings c
     join calling_role_mappings crm on crm.calling_id = c.id
     where c.current_holder_id is not null
+      and crm.role is not null
   loop
     perform recompute_role_for_person(v_person_id);
   end loop;

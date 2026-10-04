@@ -15,11 +15,16 @@ async function requireAdminProfile(): Promise<SessionProfile | null> {
 /**
  * What calling_role_mappings (migration 057) would derive for this
  * person right now -- the highest-priority mapped calling among
- * whichever they currently hold, or null if none of their callings are
- * mapped. Mirrors recompute_role_for_person's own query exactly; kept
- * as a plain select here (rather than calling that Postgres function
- * directly) because verifyLogin needs to *compare* this against the
- * admin's chosen role, not just blindly apply it.
+ * whichever they currently hold, or null if none of their callings
+ * have a real (non-null) mapped role. Mirrors
+ * recompute_role_for_person's own query exactly, including filtering
+ * out a null `role` -- every calling got a placeholder
+ * calling_role_mappings row in the bulk seed (most left blank on
+ * purpose), so a blank row must never be mistaken for "this calling
+ * maps to nothing" vs. a real mapped one when picking by priority.
+ * Kept as a plain select here (rather than calling that Postgres
+ * function directly) because verifyLogin needs to *compare* this
+ * against the admin's chosen role, not just blindly apply it.
  */
 async function deriveRoleForPerson(supabase: Awaited<ReturnType<typeof createClient>>, personId: string): Promise<string | null> {
   const { data } = await supabase
@@ -27,10 +32,10 @@ async function deriveRoleForPerson(supabase: Awaited<ReturnType<typeof createCli
     .select("calling_role_mappings(role, priority)")
     .eq("current_holder_id", personId);
 
-  type Row = { calling_role_mappings: { role: string; priority: number }[] | { role: string; priority: number } | null };
+  type Row = { calling_role_mappings: { role: string | null; priority: number }[] | { role: string | null; priority: number } | null };
   const mapped = ((data ?? []) as Row[])
     .map((row) => (Array.isArray(row.calling_role_mappings) ? row.calling_role_mappings[0] : row.calling_role_mappings))
-    .filter((m): m is { role: string; priority: number } => Boolean(m));
+    .filter((m): m is { role: string; priority: number } => m !== null && m.role !== null);
 
   if (mapped.length === 0) return null;
   mapped.sort((a, b) => a.priority - b.priority);

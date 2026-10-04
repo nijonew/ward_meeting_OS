@@ -1,7 +1,17 @@
 import { createClient } from "./server";
 
+/** "general" (2026-10-04, the user's own request: "we probably need
+ *  another role which gives no extra access") grants nothing by
+ *  construction, not by any special-casing -- every permission check
+ *  in this app is an exact match against a specific role string, so a
+ *  value that never appears in any such check is automatically a dead
+ *  end. Exists so a verified account whose calling doesn't map to
+ *  anything special still has somewhere to land other than staying
+ *  stuck with `role = null` (and therefore stuck in the Verify Logins
+ *  queue) forever. */
 export type AppRole =
   | "bishopric"
+  | "general"
   | "music_planner"
   | "communications_specialist"
   | "yw_presidency"
