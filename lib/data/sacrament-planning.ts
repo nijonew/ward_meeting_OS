@@ -14,6 +14,12 @@ export interface PlanningInfo {
   has_stake_business: boolean;
   recognitions: string | null;
   hidden_notes: string | null;
+  /** The admin's own "this is done, print/publish it" signal
+   *  (2026-10-04) -- gates Communications Specialist's early preview
+   *  of the public program (see /meetings/[id]/public/page.tsx); never
+   *  affects the "day of the meeting" public cutoff everyone else
+   *  still gets regardless of this flag. */
+  ready_for_public: boolean;
 }
 
 export interface AssignmentRow {
@@ -80,7 +86,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
   const [planningRes, assignmentsRes, adultsRes, youthRes, musicRes, rabnmRes] = await Promise.all([
     supabase
       .from("sacrament_planning")
-      .select("special_format, ward_business, stake_business, has_stake_business, recognitions, hidden_notes")
+      .select("special_format, ward_business, stake_business, has_stake_business, recognitions, hidden_notes, ready_for_public")
       .eq("meeting_id", meetingId)
       .maybeSingle(),
     supabase

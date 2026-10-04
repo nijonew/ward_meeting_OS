@@ -34,6 +34,7 @@ export function CombinedAgendaGrids({
   people,
   hymnalIndex,
   children,
+  footer,
 }: {
   meetingId: string;
   roleTable: "sacrament_assignments" | "bishopric_assignments";
@@ -45,6 +46,12 @@ export function CombinedAgendaGrids({
    *  plus its own section heading), which can't live inside either `<form>`
    *  (its own add/remove/save controls are real forms of their own). */
   children?: ReactNode;
+  /** Rendered inside the closing form, at the very bottom of the page
+   *  (2026-10-04) -- the "ready for public" checkbox, so it submits
+   *  with the same combined Save All Changes click. Falls back to the
+   *  opening form if there's no closing one (rare -- only when a
+   *  template has nothing after the split point). */
+  footer?: ReactNode;
 }) {
   const [dirtyA, setDirtyA] = useState(false);
   const [dirtyB, setDirtyB] = useState(false);
@@ -78,6 +85,7 @@ export function CombinedAgendaGrids({
           setStateA(state);
           setPendingA(isPending);
         }}
+        footer={closingRows.length === 0 ? footer : undefined}
       />
 
       {children}
@@ -96,6 +104,7 @@ export function CombinedAgendaGrids({
             setStateB(state);
             setPendingB(isPending);
           }}
+          footer={footer}
         />
       )}
 

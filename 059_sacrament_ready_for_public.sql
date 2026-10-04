@@ -1,0 +1,22 @@
+-- 059_sacrament_ready_for_public.sql
+--
+-- New `sacrament_planning.ready_for_public` boolean (2026-10-04, the
+-- user's own request): a checkbox at the bottom of the Planning
+-- grid's closing half, set by an admin once a Sacrament Meeting's
+-- program is finished and ready for public consumption.
+--
+-- Gates Communications Specialist's early preview of
+-- /meetings/[id]/public specifically -- narrows what was previously
+-- unconditional any-time access (shipped 2026-10-04 earlier the same
+-- day, see PROJECT_CONTEXT.md's Known open items) down to "once this
+-- is checked." The user's own words: "Non-bishopric and
+-- non-communication specialist users would only see the sacrament
+-- meeting on the day of the meeting. communication specialists would
+-- see it once it is marked as public." Bishopric keeps unconditional
+-- any-time preview (building the program comes before it's ready);
+-- everyone else still only ever sees it on the actual day, regardless
+-- of this flag.
+--
+-- Idempotent: safe to re-run.
+
+alter table sacrament_planning add column if not exists ready_for_public boolean not null default false;

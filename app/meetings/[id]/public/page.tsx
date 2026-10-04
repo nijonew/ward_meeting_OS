@@ -1,5 +1,6 @@
 import { getPublicSacramentView } from "@/lib/data/public-view";
 import { getMeetingById } from "@/lib/data/meetings";
+import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export default async function PublicViewPage({
@@ -26,17 +27,35 @@ export default async function PublicViewPage({
   // real production data; matches the same fix in
   // getTodaysPublishedSacramentMeeting.
   //
-  // Communications Specialist gets the same any-stage/any-date preview
-  // as the Bishopric (2026-10-04, the user's own report: wants "to
-  // read the public view of upcoming sacrament meetings at any time")
-  // -- their job is preparing bulletins/communications ahead of the
-  // actual day, so waiting for the public cutoff defeats the purpose.
+  // Communications Specialist originally got the same any-stage/any-date
+  // preview as the Bishopric (2026-10-04, the user's own report: wants
+  // "to read the public view of upcoming sacrament meetings at any
+  // time"). Narrowed the same day once the "ready for public" checkbox
+  // existed (the user's own words): "communication specialists would
+  // see it once it is marked as public" -- their early access now
+  // depends on the admin actually marking the program done, not just
+  // on their role. Bishopric keeps unconditional any-stage/any-date
+  // preview regardless (building the program comes before it's ready);
+  // everyone else still only ever sees it on the actual day.
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric") && !hasFeature(profile, "communications_specialist")) {
+  if (!hasFeature(profile, "bishopric")) {
     const meeting = await getMeetingById(meetingId);
-    const todayIso = new Date().toISOString().slice(0, 10);
-    if (!meeting || meeting.stage === "archived" || meeting.date !== todayIso) {
+    // Archived is admin-only, full stop, regardless of the "ready for
+    // public" flag or who's asking -- the Vision workflow's own rule
+    // ("no calling-based or public access at all once archived") isn't
+    // something the early-preview exception below should be able to
+    // outlive once the meeting is actually over.
+    if (!meeting || meeting.stage === "archived") {
       return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
+    }
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+    if (meeting.date !== todayIso) {
+      const canPreviewEarly = hasFeature(profile, "communications_specialist");
+      const readyForPublic = canPreviewEarly ? (await getSacramentPlanningData(meetingId)).planning?.ready_for_public : false;
+      if (!canPreviewEarly || !readyForPublic) {
+        return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
+      }
     }
   }
 

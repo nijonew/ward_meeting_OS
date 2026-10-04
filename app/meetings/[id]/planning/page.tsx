@@ -273,6 +273,17 @@ export default async function PlanningViewPage({
                 closingRows={closingRows}
                 people={people}
                 hymnalIndex={hymnalIndex}
+                footer={
+                  <label className="mt-4 flex items-center gap-1.5 border-t border-rule/60 pt-4 text-sm text-ink">
+                    <input type="hidden" name="planning::ready_for_public" value="" />
+                    <input
+                      type="checkbox"
+                      name="planning::ready_for_public"
+                      defaultChecked={sacramentData?.planning?.ready_for_public ?? false}
+                    />
+                    This meeting is complete and ready for public consumption
+                  </label>
+                }
               >
                 <div className="border-t-2 border-rule pt-4">
                   <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">

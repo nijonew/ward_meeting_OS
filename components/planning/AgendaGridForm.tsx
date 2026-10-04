@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
 import { FIELD_SEPARATOR, type AgendaRow } from "@/lib/data/agenda-rows";
 import type { PersonOption } from "@/lib/data/people";
@@ -248,6 +248,7 @@ export function AgendaGridForm({
   hideActions,
   onDirtyChange,
   onStateChange,
+  footer,
 }: {
   meetingId: string;
   roleTable: "sacrament_assignments" | "bishopric_assignments";
@@ -258,6 +259,12 @@ export function AgendaGridForm({
   hideActions?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onStateChange?: (state: { error?: string; success?: boolean }, pending: boolean) => void;
+  /** Rendered inside this form, after the grid and before the Save
+   *  button -- Sacrament Meeting's "ready for public" checkbox
+   *  (2026-10-04) is the first use, passed in by the closing grid half
+   *  specifically so it submits with the same "Save All Changes"
+   *  click rather than needing a button of its own. */
+  footer?: ReactNode;
 }) {
   const boundSave = saveAgendaGrid.bind(null, meetingId, roleTable);
   const [state, formAction, pending] = useActionState(boundSave, initialState);
@@ -433,6 +440,8 @@ export function AgendaGridForm({
           </tbody>
         </table>
       </div>
+
+      {footer}
 
       {!hideActions && (
         <div className="mt-4 flex items-center gap-3">

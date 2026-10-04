@@ -125,8 +125,12 @@ reconstructed from both:
   code finished deploying. A schema-dropping migration like this one
   should land at the same time as the code that stops depending on the
   dropped column, not meaningfully before it.
+- `059` (new `sacrament_planning.ready_for_public` boolean -- the
+  "ready for public consumption" checkbox gating Communications
+  Specialist's early preview, see Known open items below): still
+  needs to be run.
 
-Next migration should be `059_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `060_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1744,6 +1748,37 @@ of these:
   this role. Added a "Sacrament Meeting Programs" tile, visible only to
   Communications Specialist, linking to
   `/dashboard?type=sacrament-meeting&readonly=1`.
+
+**Communications Specialist's early preview narrowed to a real "ready
+for public" flag, same day.** The unconditional any-time preview
+above turned out to be too broad -- the user's own follow-up: "add a
+checkbox at the bottom of each meeting planning sheet that depicts
+that the meeting is complete and ready for public consumption...
+communication specialists would see it once it is marked as public,"
+with everyone else (non-Bishopric, non-Communications-Specialist)
+unaffected, still day-of only regardless of the flag. New
+`sacrament_planning.ready_for_public` (migration `059`), a checkbox
+rendered inside the Planning page's *closing* agenda-grid half, right
+at the bottom (`AgendaGridForm` gained an optional `footer` prop for
+this, submitted via the existing `planning::ready_for_public` field
+convention `saveAgendaGrid` already parses, same as
+`has_stake_business`) -- so it submits with the same combined "Save
+All Changes" click rather than needing a button of its own.
+`/meetings/[id]/public`'s gate now checks this flag for Communications
+Specialist specifically: Bishopric keeps unconditional any-stage/
+any-date preview (building the program comes before it's ready to
+check the box); Communications Specialist gets it only once
+`ready_for_public` is true; an **archived** meeting stays admin-only
+for anyone else regardless of the flag's value, matching the Vision
+workflow's own "no public access at all once archived" rule -- the
+flag was deliberately not allowed to outlive that cutoff.
+
+Separately, the user also reported the dashboard "defaulting to
+public" instead of Planning when opening a meeting -- traced to the
+account being tested with (the Communications Specialist test
+account, confirmed by the user's own follow-up) rather than an actual
+bug: `MeetingRow`'s existing `canManage ? planning : public` routing
+is correct as-is and was left unchanged.
 
 **Top priority, not yet root-caused (2026-10-03):** the user's first
 attempt to create a Sacrament Meeting after this session's reskin merge
