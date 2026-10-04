@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { OTHER_VALUE } from "@/lib/data/announcement-constants";
@@ -57,8 +57,8 @@ export async function submitAnnouncement(formData: FormData) {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (profile?.role !== "bishopric" && profile?.role !== "communications_specialist") {
-    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.role);
+  if (!hasFeature(profile, "bishopric") && !hasFeature(profile, "communications_specialist")) {
+    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
     if (allowedTypes.length === 0) {
       redirect(
         `/submit/announcement?error=${encodeURIComponent(
@@ -159,8 +159,8 @@ export async function submitAgendaItem(formData: FormData) {
     redirect(`/submit/agenda-item?error=${encodeURIComponent("Meeting, date, and description are required.")}`);
   }
 
-  if (profile?.role !== "bishopric") {
-    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.role);
+  if (!hasFeature(profile, "bishopric")) {
+    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
     if (!allowedTypes.includes(meetingTypeSlug)) {
       redirect(
         `/submit/agenda-item?error=${encodeURIComponent(

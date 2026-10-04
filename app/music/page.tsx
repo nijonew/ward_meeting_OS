@@ -5,7 +5,7 @@ import { QuickAddMusic } from "@/components/music/QuickAddMusic";
 import { RecentMusicList } from "@/components/music/RecentMusicList";
 import { getActivePeople } from "@/lib/data/people";
 import { getRecentMusic } from "@/lib/data/music-list";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export default async function MusicPage() {
   const { user, profile } = await getSessionUser();
@@ -25,7 +25,7 @@ export default async function MusicPage() {
     );
   }
 
-  const canEnterMusic = profile?.role === "music_planner" || profile?.role === "bishopric";
+  const canEnterMusic = hasFeature(profile, "music_planner") || hasFeature(profile, "bishopric");
 
   if (!canEnterMusic) {
     return (

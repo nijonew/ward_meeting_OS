@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 import { getWardName } from "@/lib/data/ward-settings";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
 
 /**
@@ -20,15 +20,26 @@ import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
  * Gained an admin-only "needs verification" banner the same day, per
  * the user's own request: "there is notification for admins at the top
  * of the page (only seen by admins) to verify the individual and their
- * calling." Checks for logins with no role yet (see
+ * calling." Checks for logins not yet linked to a person (see
  * lib/data/profile-verification.ts) only when the viewer is already an
  * admin -- nobody else triggers that extra query, since this component
  * renders on nearly every route in the app.
+ *
+ * Gained a "signed in as" name next to Sign out, 2026-10-04, per the
+ * user's own request after hitting exactly the confusion this solves
+ * (testing against the wrong account without realizing it once roles
+ * became calling-derived): "likely need to display some way to
+ * identify the user showing the user is logged in as." Hovering it
+ * shows the account's current features in a plain title tooltip --
+ * useful for the same debugging moment, without adding visible
+ * clutter to the header itself.
  */
 export async function AppHeader({ tag }: { tag?: string }) {
   const [{ user, profile }, wardName] = await Promise.all([getSessionUser(), getWardName()]);
-  const isAdmin = profile?.role === "bishopric";
+  const isAdmin = hasFeature(profile, "bishopric");
   const unverifiedCount = isAdmin ? await getUnverifiedProfileCount() : 0;
+  const whoAmI = profile?.display_name || profile?.email || null;
+  const featureList = profile && profile.features.size > 0 ? Array.from(profile.features).sort().join(", ") : "no features";
 
   return (
     <>
@@ -49,6 +60,11 @@ export async function AppHeader({ tag }: { tag?: string }) {
         </Link>
         <div className="flex items-center gap-4">
           {tag && <span className="font-mono text-xs uppercase tracking-wider text-ink-muted">{tag}</span>}
+          {whoAmI && (
+            <span className="text-xs text-ink-muted" title={`Features: ${featureList}`}>
+              {whoAmI}
+            </span>
+          )}
           {user ? (
             <form action={signOut}>
               <button

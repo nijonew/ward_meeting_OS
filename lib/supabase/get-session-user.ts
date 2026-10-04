@@ -1,26 +1,30 @@
 import { createClient } from "./server";
 
-/** "general" (2026-10-04, the user's own request: "we probably need
- *  another role which gives no extra access") grants nothing by
- *  construction, not by any special-casing -- every permission check
- *  in this app is an exact match against a specific role string, so a
- *  value that never appears in any such check is automatically a dead
- *  end. Exists so a verified account whose calling doesn't map to
- *  anything special still has somewhere to land other than staying
- *  stuck with `role = null` (and therefore stuck in the Verify Logins
- *  queue) forever.
+/**
+ * Permissions, reworked 2026-10-04 (the user's own request, after
+ * noticing the role system and the Calling -> Role Mapping table built
+ * minutes earlier were duplicating the same information two ways: "I
+ * want to eliminate roles. I want the calling table to include a way
+ * to select the features that are available to that calling.")
  *
- *  "ward_council"/"youth_council" (same day, the user's own request)
- *  grant viewing access to that specific meeting type -- a ROLE-based
- *  alternative path to the exact same access the existing calling-based
- *  `meeting_type_members` mechanism already grants (see
- *  lib/data/meeting-type-access.ts's getVisibleMeetingTypesForUser,
- *  which unions both sources together). Neither grants anything beyond
- *  that one meeting type -- not admin access, not the other council's
- *  meetings. */
-export type AppRole =
+ * There is no more `profiles.role` at all. A person's access is simply
+ * the union of every feature flag (a boolean column on `callings`,
+ * `feature_<name>`) across whichever active callings they currently
+ * hold -- computed fresh on every request, not cached. Holding two
+ * callings that each grant a feature just means both features are
+ * present; there's no priority/tie-breaking concept anymore, since
+ * flags OR together instead of one value winning.
+ *
+ * This replaces the entire previous role system in one step: the
+ * "bishop" vs "bishopric" split, `role_source`, `calling_role_mappings`,
+ * and the "general" (no-access) role all existed only to support a
+ * single cached `role` value -- none of them are needed once access is
+ * a live-computed set instead of a stored column. See migration `057`
+ * for the schema side, and PROJECT_CONTEXT.md's Architecture section
+ * for the full history of what this replaced and why.
+ */
+export type Feature =
   | "bishopric"
-  | "general"
   | "music_planner"
   | "communications_specialist"
   | "ward_council"
@@ -31,37 +35,37 @@ export type AppRole =
   | "ym_advisor"
   | "ym_specialist";
 
-/**
- * Every value profiles.role can actually hold in the database --
- * every AppRole plus "bishop", added 2026-10-03 as its own distinct
- * value rather than folding the Bishop into the shared "bishopric"
- * role (the user's own request: "let's make the bishop its own role
- * rather than lumping it in the bishopric role. A bishop can
- * essentially give ownership to the next bishop and is the one that
- * can grant that access."). See SessionProfile.role/isBishop below for
- * how this gets normalized back down to one check everywhere else.
- */
-export type StoredRole = AppRole | "bishop";
+export const ALL_FEATURES: Feature[] = [
+  "bishopric",
+  "music_planner",
+  "communications_specialist",
+  "ward_council",
+  "youth_council",
+  "yw_presidency",
+  "yw_advisor",
+  "yw_specialist",
+  "ym_advisor",
+  "ym_specialist",
+];
 
 export interface SessionProfile {
-  /**
-   * Normalized: a stored "bishop" reads as "bishopric" here. Every
-   * existing `role === "bishopric"` check across this app (there are
-   * dozens) keeps working completely unchanged, and the Bishop keeps
-   * exactly the same full admin access everywhere "bishopric" already
-   * had -- nothing elsewhere needed to change for this to be true.
-   */
-  role: AppRole | null;
-  /**
-   * True only when the raw database value is literally "bishop" -- the
-   * one place in the app that needs to tell a sitting Bishop apart
-   * from the rest of the admin group: granting the "bishop" role to a
-   * successor (app/admin/verify-logins/actions.ts) is restricted to
-   * whoever already holds it, not any bishopric-equivalent account.
-   */
-  isBishop: boolean;
+  features: Set<Feature>;
+  /** True once a `people` row links to this login (`profile_id` set).
+   *  "Needs verification" (the Verify Logins queue/banner) means the
+   *  opposite of this, not "features is empty" -- an ordinary verified
+   *  member with no feature-granting calling has an empty `features`
+   *  set too, and that's a completely normal, expected state. */
+  isLinked: boolean;
   display_name: string | null;
   email: string | null;
+}
+
+/** `profile?.features.has("bishopric")` reads fine inline, but the
+ *  negated form every gate actually needs (`role !== "bishopric"`
+ *  under the old system) is easiest as its own helper -- `hasFeature`
+ *  handles a null profile safely either way. */
+export function hasFeature(profile: SessionProfile | null, feature: Feature): boolean {
+  return profile?.features.has(feature) ?? false;
 }
 
 export async function getSessionUser() {
@@ -74,22 +78,32 @@ export async function getSessionUser() {
     return { user: null, profile: null as SessionProfile | null };
   }
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("role, display_name, email")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profileRow }, { data: person }] = await Promise.all([
+    supabase.from("profiles").select("display_name, email").eq("id", user.id).maybeSingle(),
+    supabase.from("people").select("id").eq("profile_id", user.id).maybeSingle(),
+  ]);
 
-  if (!data) {
-    return { user, profile: null as SessionProfile | null };
+  const features = new Set<Feature>();
+  if (person) {
+    const featureColumns = ALL_FEATURES.map((f) => `feature_${f}`).join(", ");
+    const { data: callings } = await supabase
+      .from("callings")
+      .select(featureColumns)
+      .eq("current_holder_id", person.id)
+      .eq("active", true);
+
+    for (const row of (callings ?? []) as unknown as Record<string, boolean | null>[]) {
+      for (const feature of ALL_FEATURES) {
+        if (row[`feature_${feature}`]) features.add(feature);
+      }
+    }
   }
 
-  const rawRole = data.role as StoredRole | null;
   const profile: SessionProfile = {
-    role: rawRole === "bishop" ? "bishopric" : (rawRole as AppRole | null),
-    isBishop: rawRole === "bishop",
-    display_name: data.display_name as string | null,
-    email: data.email as string | null,
+    features,
+    isLinked: Boolean(person),
+    display_name: (profileRow?.display_name as string | null) ?? null,
+    email: (profileRow?.email as string | null) ?? null,
   };
   return { user, profile };
 }

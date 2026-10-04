@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { getGeneralSubmissions } from "@/lib/data/general-submissions";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { setSubmissionStatus } from "@/app/announcements/actions";
 
 export default async function AnnouncementsInboxPage() {
@@ -11,7 +11,7 @@ export default async function AnnouncementsInboxPage() {
     redirect("/login");
   }
 
-  if (profile?.role !== "bishopric") {
+  if (!hasFeature(profile, "bishopric")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Announcements" />

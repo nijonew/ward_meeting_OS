@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { FIELD_SEPARATOR } from "@/lib/data/agenda-rows";
 import { lookupHymnTitles } from "@/lib/data/hymnal";
 
@@ -76,7 +76,7 @@ export async function saveAgendaGrid(
   // Same gate the planning page itself enforces -- re-checked here
   // rather than trusting the UI, matching every other role-gated action
   // in this app.
-  if (profile?.role !== "bishopric") return { error: "Not authorized." };
+  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
 
   const supabase = await createClient();
 

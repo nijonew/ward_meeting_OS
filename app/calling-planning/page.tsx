@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import {
   getAllCallingPlanningRows,
   getCallingOptions,
@@ -23,7 +23,7 @@ export default async function CallingPlanningPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (profile?.role !== "bishopric") {
+  if (!hasFeature(profile, "bishopric")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Calling Planning" />

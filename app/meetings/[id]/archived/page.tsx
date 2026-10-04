@@ -13,7 +13,7 @@ import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople, type PersonOption } from "@/lib/data/people";
 import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 
 /**
@@ -102,7 +102,7 @@ export default async function ArchivedMeetingPage({
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
-  const isAdmin = profile?.role === "bishopric";
+  const isAdmin = hasFeature(profile, "bishopric");
 
   if (meeting.meetingType === "sacrament-meeting") {
     // Deliberate difference from the other three types (Vision
@@ -136,7 +136,7 @@ export default async function ArchivedMeetingPage({
       );
     }
   } else {
-    const hasAccess = isAdmin || (await getVisibleMeetingTypesForUser(user.id, profile?.role)).includes(meeting.meetingType);
+    const hasAccess = isAdmin || (await getVisibleMeetingTypesForUser(user.id, profile?.features)).includes(meeting.meetingType);
     if (!hasAccess) {
       return (
         <div className="rounded border border-rule bg-surface p-6">

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
 import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
-import type { AppRole } from "@/lib/supabase/get-session-user";
+import type { Feature } from "@/lib/supabase/get-session-user";
 
 /**
  * The 6 real YM/YW classes -- excludes the "Combined ..." pseudo-values
@@ -110,14 +110,14 @@ export async function getTaughtClassesForUser(userId: string): Promise<string[]>
  * people assigned to the youth group to see only their group unless it
  * is the bishopric or young women presidency. Bishopric can see all
  * groups. young women presidency can see all young women groups."
- * Bishopric and Young Women Presidency stay role-based (every class /
+ * Bishopric and Young Women Presidency stay feature-based (every class /
  * every YW class, respectively, regardless of any youth_class_teachers
- * row); everyone else -- including the other 4 youth-leader roles,
+ * row); everyone else -- including the other 4 youth-leader features,
  * which used to get blanket access to the whole calendar -- is narrowed
  * down to exactly the class(es) they're specifically assigned to teach.
  */
-export async function getAccessibleClasses(userId: string, role: AppRole | null): Promise<string[]> {
-  if (role === "bishopric") return TEACHING_CLASSES;
-  if (role === "yw_presidency") return YW_CLASSES;
+export async function getAccessibleClasses(userId: string, features: Set<Feature>): Promise<string[]> {
+  if (features.has("bishopric")) return TEACHING_CLASSES;
+  if (features.has("yw_presidency")) return YW_CLASSES;
   return getTaughtClassesForUser(userId);
 }

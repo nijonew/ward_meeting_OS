@@ -10,13 +10,6 @@ import {
   slotLabel,
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
-import { GRANTABLE_ROLES } from "@/lib/data/profile-verification-shared";
-
-/** Same role list Verify Logins offers, minus "bishop" -- granting
- *  that one stays a manual, sitting-Bishop-only action (migration
- *  057's own comment explains why a calling mapping can't enforce
- *  that same restriction), never something a calling can auto-grant. */
-const CALLING_MAPPABLE_ROLES = GRANTABLE_ROLES.filter((r) => r.value !== "bishop");
 import { TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
 
 /** Fields whose choices can be edited via the "Dropdown Option Lists"
@@ -209,6 +202,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   callings: {
     table: "callings",
     label: "Callings",
+    description:
+      "The \"feature_*\" columns are what replaced the old role system (2026-10-04): whoever holds this calling automatically gets every feature checked here, and loses it automatically the moment they no longer hold it -- no separate role to set anywhere. \"Requires Self Handoff\" restricts reassigning this one calling (to a different real person, not vacating it) to whoever currently holds it -- used for Bishop succession, but works for any calling you flag this way.",
     orderBy: { column: "sort_order", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
@@ -216,18 +211,17 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "current_holder_id", label: "Current Holder", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "sort_order", label: "Sort Order", type: "number" },
       { column: "active", label: "Active", type: "boolean" },
-    ],
-  },
-
-  calling_role_mappings: {
-    table: "calling_role_mappings",
-    label: "Calling → Role Mapping",
-    description:
-      "Whoever holds a calling listed here automatically gets the matching app role (and loses it automatically if they stop holding it, unless an admin has since set their role manually via Verify Logins). Priority breaks ties when one person holds more than one mapped calling -- lower number wins. Adding a row here doesn't retroactively apply to someone already holding that calling -- use \"Sync roles now\" on /admin/verify-logins for that. Bishop is deliberately not an option -- that stays a manual grant through Verify Logins.",
-    columns: [
-      { column: "calling_id", label: "Calling", type: "foreign_key", required: true, foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
-      { column: "role", label: "Role", type: "select", required: true, options: CALLING_MAPPABLE_ROLES },
-      { column: "priority", label: "Priority", type: "number" },
+      { column: "feature_bishopric", label: "Bishopric", type: "boolean" },
+      { column: "feature_music_planner", label: "Music Planner", type: "boolean" },
+      { column: "feature_communications_specialist", label: "Communications Specialist", type: "boolean" },
+      { column: "feature_ward_council", label: "Ward Council", type: "boolean" },
+      { column: "feature_youth_council", label: "Youth Council", type: "boolean" },
+      { column: "feature_yw_presidency", label: "YW Presidency", type: "boolean" },
+      { column: "feature_yw_advisor", label: "YW Advisor", type: "boolean" },
+      { column: "feature_yw_specialist", label: "YW Specialist", type: "boolean" },
+      { column: "feature_ym_advisor", label: "YM Advisor", type: "boolean" },
+      { column: "feature_ym_specialist", label: "YM Specialist", type: "boolean" },
+      { column: "requires_self_handoff", label: "Requires Self Handoff", type: "boolean" },
     ],
   },
 

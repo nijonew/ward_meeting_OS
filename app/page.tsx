@@ -4,8 +4,8 @@ import { Tile, TileGrid } from "@/components/Tile";
 import { getWardName } from "@/lib/data/ward-settings";
 import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
-import type { AppRole } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import type { Feature } from "@/lib/supabase/get-session-user";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 
 // Sacrament Meeting restored 2026-10-03 (the user's own request: "I
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
  * implements.
  */
 
-const YOUTH_LEADER_ROLES: AppRole[] = [
+const YOUTH_LEADER_FEATURES: Feature[] = [
   "yw_presidency",
   "yw_advisor",
   "yw_specialist",
@@ -53,12 +53,11 @@ const YOUTH_LEADER_ROLES: AppRole[] = [
 
 export default async function HomePage() {
   const { user, profile } = await getSessionUser();
-  const role = profile?.role ?? null;
   const wardName = await getWardName();
 
-  const isBishopric = role === "bishopric";
-  const isMusicPlanner = role === "music_planner" || isBishopric;
-  const isYouthLeader = (role && YOUTH_LEADER_ROLES.includes(role)) || isBishopric;
+  const isBishopric = hasFeature(profile, "bishopric");
+  const isMusicPlanner = hasFeature(profile, "music_planner") || isBishopric;
+  const isYouthLeader = YOUTH_LEADER_FEATURES.some((f) => hasFeature(profile, f)) || isBishopric;
 
   const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
 
@@ -69,7 +68,7 @@ export default async function HomePage() {
   // that apply to the person by nature of their calling." Sacrament
   // Meeting no longer gets a tile here at all (2026-09-10) -- see
   // ALL_MEETING_TYPES's own comment above.
-  const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id, role) : [];
+  const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id, profile?.features) : [];
   const visibleMeetingTypes = isBishopric ? ALL_MEETING_TYPES : rawVisibleTypes;
   // This is the same list as visibleMeetingTypes for a non-admin now
   // that Sacrament Meeting isn't unconditionally folded in -- kept as
@@ -82,11 +81,11 @@ export default async function HomePage() {
   // Specialist outright (2026-10-04 bug fix -- the role's name promised
   // exactly this and nothing had ever actually wired it in; see
   // app/submit/announcement/page.tsx's own comment). Kept separate from
-  // attendsMeetings itself rather than folding the role into that
+  // attendsMeetings itself rather than folding the feature into that
   // broader check, since attendsMeetings also gates Meeting Agenda
   // Items, which Communications Specialist has no business reason to
   // need.
-  const canSubmitAnnouncement = attendsMeetings || role === "communications_specialist";
+  const canSubmitAnnouncement = attendsMeetings || hasFeature(profile, "communications_specialist");
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -95,7 +94,7 @@ export default async function HomePage() {
       <section className="mt-10">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">{wardName} Ward</h1>
         {!user && <p className="mt-2 text-ink-muted">Sign in for meeting and planning tools.</p>}
-        {user && !role && (
+        {user && !profile?.isLinked && (
           <p className="mt-2 text-sm text-ink-muted">
             You&rsquo;re signed in, but an admin still needs to verify your account before you
             have access to anything else.
@@ -169,7 +168,7 @@ export default async function HomePage() {
                 href="/submit/announcement"
               />
             )}
-            {role === "communications_specialist" && (
+            {hasFeature(profile, "communications_specialist") && (
               <Tile
                 title="Sacrament Meeting Programs"
                 description="Preview upcoming and past programs, not just today's"

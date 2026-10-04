@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { submitAnnouncement } from "@/app/submit/actions";
 import { AnnouncementForm } from "@/components/submit/AnnouncementForm";
@@ -42,8 +42,8 @@ export default async function SubmitAnnouncementPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const canAlwaysSubmit = profile?.role === "bishopric" || profile?.role === "communications_specialist";
-  const attendsMeetings = canAlwaysSubmit || (await getVisibleMeetingTypesForUser(user.id, profile?.role)).length > 0;
+  const canAlwaysSubmit = hasFeature(profile, "bishopric") || hasFeature(profile, "communications_specialist");
+  const attendsMeetings = canAlwaysSubmit || (await getVisibleMeetingTypesForUser(user.id, profile?.features)).length > 0;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-12 sm:px-8">

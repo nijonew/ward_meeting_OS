@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
 import { seedSacramentProgramItemsForMeeting } from "@/lib/data/sacrament-program";
@@ -19,7 +19,7 @@ export async function createMeeting(
   // duplicate-date guard below) -- this action had no role check at
   // all before, only the page's own gate, the same gap already found
   // and fixed for several other actions this session.
-  if (profile?.role !== "bishopric") return { error: "Not authorized." };
+  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
 
   const meeting_type_id = formData.get("meeting_type_id") as string;
   const date = formData.get("date") as string;

@@ -1,5 +1,5 @@
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { getYouthActivityScheduleRules } from "@/lib/data/youth-activity-cadence-rules";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
@@ -22,7 +22,7 @@ import { YouthActivityScheduleManager } from "@/components/schedule/YouthActivit
 import { GenerateForm } from "@/components/schedule/GenerateForm";
 import { GenerateYouthActivitiesForm } from "@/components/youth-activities/GenerateYouthActivitiesForm";
 
-const MANAGE_ROLES = [
+const MANAGE_FEATURES: Feature[] = [
   "bishopric",
   "yw_presidency",
   "yw_advisor",
@@ -43,7 +43,7 @@ export default async function YouthActivitiesPage() {
   // No login required to view -- RLS on youth_activities already limits
   // anonymous/other-role visitors to published rows only.
   const { profile } = await getSessionUser();
-  const canManage = Boolean(profile?.role && MANAGE_ROLES.includes(profile.role));
+  const canManage = MANAGE_FEATURES.some((f) => hasFeature(profile, f));
 
   const activities = await getYouthActivities();
   const scheduleRules = canManage ? await getYouthActivityScheduleRules() : [];

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { kindOfItemKey } from "@/lib/data/sacrament-program";
 import { lookupHymnTitle } from "@/lib/data/hymnal";
 
@@ -36,7 +36,7 @@ export type SaveActionResult = { error?: string; success?: boolean };
 async function requireBishopric(): Promise<{ userId: string } | ActionResult> {
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
-  if (profile?.role !== "bishopric") return { error: "Not authorized." };
+  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
   return { userId: user.id };
 }
 

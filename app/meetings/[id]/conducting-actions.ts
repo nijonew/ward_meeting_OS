@@ -1,6 +1,6 @@
 "use server";
 
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getConductingRows } from "@/lib/data/conducting";
 import type { ConductingRow } from "@/lib/data/conducting-rows";
 
@@ -16,7 +16,7 @@ import type { ConductingRow } from "@/lib/data/conducting-rows";
  */
 export async function refreshConductingScript(meetingId: string): Promise<ConductingRow[] | null> {
   const { profile } = await getSessionUser();
-  if (profile?.role !== "bishopric") return null;
+  if (!hasFeature(profile, "bishopric")) return null;
 
   const script = await getConductingRows(meetingId);
   return script?.rows ?? null;

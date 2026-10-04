@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
 import { insertAdminRow, updateAdminRow, deleteAdminRow } from "@/lib/admin/table-data";
 
@@ -14,7 +14,7 @@ type ActionResult = { success: true } | { error: string };
  */
 async function requireBishopric(): Promise<ActionResult | null> {
   const { profile } = await getSessionUser();
-  if (profile?.role !== "bishopric") return { error: "Not authorized." };
+  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
   return null;
 }
 

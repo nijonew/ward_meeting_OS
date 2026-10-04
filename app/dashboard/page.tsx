@@ -6,7 +6,7 @@ import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton"
 import { DeleteMeetingButton } from "@/components/dashboard/DeleteMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
 import { cancelMeeting, uncancelMeeting, deleteMeeting } from "@/app/dashboard/actions";
 import { MEETING_TYPE_LABELS, type Meeting, type MeetingTypeSlug } from "@/lib/types";
@@ -243,7 +243,7 @@ export default async function DashboardPage({
     .filter((m) => !typeFilter || m.meetingType === typeFilter)
     .filter((m) => showPast || m.date >= todayIso);
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
-  const canCreate = profile?.role === "bishopric" && !isReadOnly;
+  const canCreate = hasFeature(profile, "bishopric") && !isReadOnly;
   const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
 
   return (

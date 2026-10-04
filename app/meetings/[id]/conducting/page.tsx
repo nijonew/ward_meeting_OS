@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getConductingRows } from "@/lib/data/conducting";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { ConductingScriptView } from "@/components/planning/ConductingScriptView";
 
 /**
@@ -28,7 +28,7 @@ export default async function ConductingViewPage({
   // already found and fixed for Planning/Live on 2026-09-08. Whoever
   // conducts is Bishopric; a non-admin wanting this meeting's program
   // wants the actual public page instead.
-  if (profile?.role !== "bishopric") {
+  if (!hasFeature(profile, "bishopric")) {
     redirect(`/meetings/${meetingId}/public`);
   }
 

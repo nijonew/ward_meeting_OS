@@ -13,7 +13,7 @@ import { getActivePeople } from "@/lib/data/people";
 import { getCurrentHolderIdByCallingName } from "@/lib/data/callings";
 import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getEligiblePeopleByElementKey } from "@/lib/data/rotations";
 import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
@@ -82,7 +82,7 @@ export default async function PlanningViewPage({
   if (!user) {
     redirect("/login");
   }
-  const isAdmin = profile?.role === "bishopric";
+  const isAdmin = hasFeature(profile, "bishopric");
 
   const meeting = await getMeetingById(meetingId);
   if (!meeting) {

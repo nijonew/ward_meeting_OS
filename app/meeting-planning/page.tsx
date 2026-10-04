@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 /**
  * Hub page for the landing page's "Meeting Planning" Administration
@@ -32,7 +32,7 @@ export default async function MeetingPlanningPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (profile?.role !== "bishopric") {
+  if (!hasFeature(profile, "bishopric")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Planning" />

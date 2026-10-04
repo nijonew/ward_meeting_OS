@@ -38,7 +38,7 @@ export async function saveTeachingGrid(_prevState: unknown, formData: FormData):
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
 
-  const accessibleClasses = await getAccessibleClasses(user.id, profile?.role ?? null);
+  const accessibleClasses = await getAccessibleClasses(user.id, profile?.features ?? new Set());
 
   const supabase = await createClient();
 

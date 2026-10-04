@@ -1,6 +1,6 @@
 import { getPublicSacramentView } from "@/lib/data/public-view";
 import { getMeetingById } from "@/lib/data/meetings";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export default async function PublicViewPage({
   params,
@@ -32,7 +32,7 @@ export default async function PublicViewPage({
   // -- their job is preparing bulletins/communications ahead of the
   // actual day, so waiting for the public cutoff defeats the purpose.
   const { profile } = await getSessionUser();
-  if (profile?.role !== "bishopric" && profile?.role !== "communications_specialist") {
+  if (!hasFeature(profile, "bishopric") && !hasFeature(profile, "communications_specialist")) {
     const meeting = await getMeetingById(meetingId);
     const todayIso = new Date().toISOString().slice(0, 10);
     if (!meeting || meeting.stage === "archived" || meeting.date !== todayIso) {

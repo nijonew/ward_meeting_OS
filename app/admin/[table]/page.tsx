@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
 import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions, getReverseLookupValues } from "@/lib/admin/table-data";
 import { getSelectOptions } from "@/lib/data/select-options";
@@ -17,7 +17,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
   const config = getAdminTableConfig(table);
   if (!config) notFound();
 
-  if (profile?.role !== "bishopric") {
+  if (!hasFeature(profile, "bishopric")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Admin" />

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getBishopricMeetingData } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { BishopricLiveView } from "@/components/bishopric/BishopricLiveView";
 
 export default async function LiveViewPage({
@@ -18,7 +18,7 @@ export default async function LiveViewPage({
   // with the URL, logged in or not, could read live meeting minutes.
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
-  const isAdmin = profile?.role === "bishopric";
+  const isAdmin = hasFeature(profile, "bishopric");
 
   const meeting = await getMeetingById(meetingId);
 

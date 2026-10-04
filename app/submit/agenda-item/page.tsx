@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getMeetingTypes } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { submitAgendaItem } from "@/app/submit/actions";
@@ -30,8 +30,8 @@ export default async function SubmitAgendaItemPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const isBishopric = profile?.role === "bishopric";
-  const allowedTypes = isBishopric ? null : await getVisibleMeetingTypesForUser(user.id, profile?.role);
+  const isBishopric = hasFeature(profile, "bishopric");
+  const allowedTypes = isBishopric ? null : await getVisibleMeetingTypesForUser(user.id, profile?.features);
 
   const meetingTypes = (await getMeetingTypes()).filter(
     (t) => t.slug !== "sacrament-meeting" && (allowedTypes === null || allowedTypes.includes(t.slug))

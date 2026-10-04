@@ -2,19 +2,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, type Feature } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses, getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
 // Who may even open this page at all -- unchanged from the old
 // /teaching-calendar's ACCESS_ROLES, per the user (2026-09-08): "youth
-// leaders and admins." Which SPECIFIC class(es) someone in one of these
-// roles then sees is the new, narrower question getAccessibleClasses
-// answers (2026-09-09) -- see that function for the real access-control
-// logic (Bishopric: every class; Young Women Presidency: every YW
-// class; everyone else: only class(es) they're specifically assigned to
-// teach via youth_class_teachers).
-const ACCESS_ROLES = ["bishopric", "yw_presidency", "yw_advisor", "yw_specialist", "ym_advisor", "ym_specialist"];
+// leaders and admins." Which SPECIFIC class(es) someone with one of
+// these features then sees is the new, narrower question
+// getAccessibleClasses answers (2026-09-09) -- see that function for
+// the real access-control logic (Bishopric: every class; Young Women
+// Presidency: every YW class; everyone else: only class(es) they're
+// specifically assigned to teach via youth_class_teachers).
+const ACCESS_FEATURES: Feature[] = ["bishopric", "yw_presidency", "yw_advisor", "yw_specialist", "ym_advisor", "ym_specialist"];
 
 function defaultThroughDate(): string {
   const d = new Date();
@@ -44,7 +44,7 @@ export default async function YouthTeachingPlanningPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!profile?.role || !ACCESS_ROLES.includes(profile.role)) {
+  if (!ACCESS_FEATURES.some((f) => profile?.features.has(f))) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Youth Teaching Planning" />
@@ -53,7 +53,7 @@ export default async function YouthTeachingPlanningPage({
     );
   }
 
-  const accessibleClasses = await getAccessibleClasses(user.id, profile.role);
+  const accessibleClasses = await getAccessibleClasses(user.id, profile?.features ?? new Set());
   const { through: rawThrough, class: rawClass } = await searchParams;
 
   // Hub view: no class picked yet -- show one tile per class this

@@ -1,5 +1,5 @@
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
 import { getWardEvents } from "@/lib/data/ward-events";
 import { getWardEventScheduleRules } from "@/lib/data/ward-event-schedule";
 import { addWardEvent, setWardEventStatus, deleteWardEvent } from "@/app/ward-events/actions";
@@ -13,7 +13,7 @@ import {
 import { WardEventScheduleManager } from "@/components/schedule/WardEventScheduleManager";
 import { GenerateForm } from "@/components/schedule/GenerateForm";
 
-const MANAGE_ROLES = ["bishopric", "communications_specialist"];
+const MANAGE_FEATURES: Feature[] = ["bishopric", "communications_specialist"];
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -27,7 +27,7 @@ export default async function WardEventsPage() {
   // No login required to view -- RLS on ward_events already limits
   // anonymous/other-role visitors to published rows only.
   const { profile } = await getSessionUser();
-  const canManage = Boolean(profile?.role && MANAGE_ROLES.includes(profile.role));
+  const canManage = MANAGE_FEATURES.some((f) => hasFeature(profile, f));
 
   const events = await getWardEvents();
   const scheduleRules = canManage ? await getWardEventScheduleRules() : [];
