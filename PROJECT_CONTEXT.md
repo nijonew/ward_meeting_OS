@@ -110,12 +110,23 @@ reconstructed from both:
   Bishop-succession feature, see Architecture above): confirmed run
   ("no rows returned" is the expected, successful result -- it's pure
   DDL, no `SELECT`).
-- `057` (new `calling_role_mappings` table, `profiles.role_source`
-  column, and a real Postgres trigger on `callings` -- automatic role
-  sync from calling changes, see Architecture above): still needs to
-  be run.
+- `057` (ten `feature_*` boolean columns plus `requires_self_handoff`
+  and its guard trigger, directly on `callings` -- the permissions
+  model, see Architecture above. Rewritten in place under this same
+  number: the file originally held a different design,
+  `calling_role_mappings` + an auto-sync trigger, which was deleted
+  before ever being confirmed run): confirmed run.
+- `058` (drops `profiles.role`/`role_source`, both added by migration
+  `056` -- superseded by `057`'s per-calling feature flags, see
+  Architecture above): confirmed run. **Caution for next time:** this
+  one was run slightly ahead of its matching code deploy, which left
+  the still-live old code querying a column that no longer existed --
+  every account (including the Bishop's) lost all access until the new
+  code finished deploying. A schema-dropping migration like this one
+  should land at the same time as the code that stops depending on the
+  dropped column, not meaningfully before it.
 
-Next migration should be `058_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `059_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -147,18 +158,20 @@ exclusive access.
     account without the ward admin setting that up first?"). New
     `/auth/request-access`, linked from `/auth/new-user`, calls a new
     `requestAccess` action -- plain `supabase.auth.signUp()`. No
-    separate "pending request" table or approval queue was needed:
-    the resulting `profiles` row comes in with `role = null` (same as
-    any admin-invited-but-unverified account), which is exactly what
+    separate "pending request" table or approval queue was needed: the
+    resulting login has no `people` row linking to it yet (same as any
+    admin-invited-but-unverified account), which is exactly what
     `/admin/verify-logins` already treats as "needs verification" --
-    see that feature's own entry below. This is a real, deliberate
-    extension of the "Adding new people" policy's identity-confirmation
-    step, not a loosening of it -- see that section's own note. The
-    landing page (`app/page.tsx`) gained a small inline notice for a
-    logged-in account with no role yet ("you're signed in, but an
-    admin still needs to verify your account"), so a freshly
-    self-signed-up person isn't left looking at a confusingly bare
-    page with no explanation.
+    see that feature's own entry below (now driven by the person-link
+    itself rather than a since-deleted `role is null` check, per the
+    "Permissions" rework later in this section). This is a real,
+    deliberate extension of the "Adding new people" policy's
+    identity-confirmation step, not a loosening of it -- see that
+    section's own note. The landing page (`app/page.tsx`) gained a
+    small inline notice for a logged-in, not-yet-linked account
+    ("you're signed in, but an admin still needs to verify your
+    account"), so a freshly self-signed-up person isn't left looking at
+    a confusingly bare page with no explanation.
   - **Email delivery issue, reported 2026-10-03, resolved 2026-10-04:**
     the user tried `/auth/reset-password` while testing a new account
     and got no email after 10 minutes; a later `/auth/request-access`
@@ -174,193 +187,106 @@ exclusive access.
     set to `https://ward-meeting-os.vercel.app` in Vercel if a
     password-reset *link* itself (as opposed to the email never
     arriving at all) ever misbehaves.
-- **Roles** (`profiles.role`): `bishopric` (Counselors + Exec Sec +
-  Clerk, one shared role), `bishop` (its own distinct value as of
-  2026-10-03, see below), `music_planner`, `communications_specialist`,
-  plus granular youth roles `yw_presidency`, `yw_advisor`,
-  `yw_specialist`, `ym_advisor`, `ym_specialist` (kept granular on
-  purpose, not consolidated). **Terminology note:** `bishopric` +
-  `bishop` together are what the "Vision & Intended Workflows" section
-  below calls **admins**; it reserves the word **bishopric** for the
-  three-person presidency only (Bishop + both counselors). Use that
-  distinction in conversation and new UI copy going forward.
-  - **In-app role-setting + login verification, built 2026-10-03**
-    (the user's own question, "how do I ensure my log-in is linked to
-    the correct role," followed by their own proposal: "a notification
-    for admins at the top of the page (only seen by admins) to verify
-    the individual and their calling"). Previously **no in-app UI set
-    this at all** -- `profiles` isn't in Table Admin's registry (by
-    deliberate design, unchanged), so role could only ever be set
-    directly in the Supabase dashboard. New `/admin/verify-logins`
-    (Bishopric-only) lists every login with `role is null` -- the
-    signal the user picked for "needs verification" over requiring a
-    person link too, since a null role means zero access to anything
-    today -- and bundles both of this app's separate linkages (role,
-    and `people.profile_id`) into one "Verify" action: match the login
-    to an existing person or create one inline, then set its role.
-    `AppHeader` grows a matching banner, shown only to an already-admin
-    viewer and only when that list is non-empty, linking straight
-    there -- exactly "at the top of the page, only seen by admins," per
-    the user's own framing. `getUnverifiedProfileCount()` only runs
-    when the viewer already resolved as admin, so nobody else triggers
-    the extra query even though `AppHeader` renders on nearly every
-    route.
-  - **"Bishop" split into its own role, same request**: the user's
-    answer when asked who should be allowed to grant the broad
-    `bishopric` role to someone else: "let's make the bishop its own
-    role rather than lumping it in the bishopric role. A bishop can
-    essentially give ownership to the next bishop and is the one that
-    can grant that access." Rather than touching every one of the
-    several dozen places in this app that check `role === "bishopric"`
-    to also accept a second value, the normalization happens in exactly
-    one place -- `getSessionUser()` (`lib/supabase/get-session-user.ts`)
-    reads a stored `"bishop"` value and returns it as `role:
-    "bishopric"` to every caller (so the Bishop keeps the exact same
-    full admin access everywhere "bishopric" already had, with zero
-    other files needing to change), plus a new `profile.isBishop`
-    boolean for the one place that actually needs to tell them apart:
-    `verifyLogin` (`app/admin/verify-logins/actions.ts`) refuses to
-    grant the `"bishop"` role itself unless the acting admin's own
-    `isBishop` is true -- re-checked server-side, not just hidden from
-    the role dropdown, matching this app's usual enforcement-boundary
-    pattern. Migration `056` makes sure the database doesn't reject the
-    new value (see that file's own comment -- `profiles` predates this
-    repo's migration history, so whether `role` was already constrained
-    at the DB level, and by what name, couldn't be known for certain;
-    the migration finds and replaces any existing CHECK constraint on
-    it dynamically rather than assuming one). **Confirmed 2026-10-03
-    by the user directly:** a brand-new signup's `profiles` row does
-    get `role = null` by default -- whatever creates that row isn't in
-    this repo's migration history (same situation as the constraint
-    itself), but the verification banner's whole detection logic
-    depends on exactly this, so it was worth the direct check rather
-    than assuming it.
+- **Permissions** (`callings.feature_<name>` boolean columns) --
+  **eliminated the whole idea of a stored "role" entirely, 2026-10-04**,
+  after a rapid design arc the same day: first a single `profiles.role`
+  (unchanged for most of this project's life) grew a same-day "bishop"
+  vs "bishopric" split, then an admin screen (`/admin/verify-logins`)
+  to set it, then a Postgres trigger (`calling_role_mappings`) to keep
+  it auto-synced from calling changes, then a "general" catch-all role
+  and two more role values (`ward_council`/`youth_council`) -- until
+  the user stepped back and noticed the trigger/mapping-table design
+  was duplicating the exact same idea the pre-existing
+  `meeting_type_members` table already expressed differently: "Could
+  we be duplicating effort here? What if we eliminated roles and just
+  granted access by callings?" followed immediately by the concrete
+  instruction: "I want to eliminate roles. I want the calling table to
+  include a way to select the features that are available to that
+  calling."
+  - **Current design**: ten `feature_bishopric`/`feature_music_planner`/
+    `feature_communications_specialist`/`feature_ward_council`/
+    `feature_youth_council`/`feature_yw_presidency`/`feature_yw_advisor`/
+    `feature_yw_specialist`/`feature_ym_advisor`/`feature_ym_specialist`
+    boolean columns live directly on `callings`, editable right on
+    that same Table Admin grid. A person's access is the **union** of
+    every true flag across whichever *active* callings they currently
+    hold -- computed fresh on every request by `getSessionUser()`
+    (`lib/supabase/get-session-user.ts`), never cached. Holding two
+    callings that both grant a feature is harmless (flags OR together);
+    there's no priority/tie-breaking concept the way the deleted
+    `calling_role_mappings.priority` needed, since nothing has to pick
+    one winner anymore. Every one of the several dozen places in this
+    app that used to check `profile.role === "bishopric"` now calls
+    `hasFeature(profile, "bishopric")` instead (same helper, same
+    import, mechanical one-for-one swap across every file).
+  - **Verify Logins is now pure identity-matching** -- link a login to
+    a person, full stop. There's no role to pick anymore; access comes
+    automatically from whichever calling(s) the linked person holds.
+    "Needs verification" (`lib/data/profile-verification.ts`) changed
+    definition accordingly: no more `role is null` (that column doesn't
+    exist), now "no `people` row has this `profile_id`" -- the exact
+    same real-world state (zero access, matched to nobody), just
+    derived from the person-link instead of a deleted column. An
+    ordinary verified member with no feature-granting calling has an
+    empty feature set and that's a completely normal, expected state
+    (no "general" placeholder needed anymore either).
+  - **Bishop succession, the one thing a cached role made easy, is
+    preserved by `callings.requires_self_handoff`** instead: a general-
+    purpose boolean (not hardcoded to any specific calling by name --
+    this app has been burned twice already guessing a real calling
+    name wrong, see `STAKE_PRESIDENCY_CALLING_NAMES`'s own history) that
+    the admin flags themselves on whichever calling(s) need it. A
+    Postgres trigger (`enforce_calling_handoff`, migration `057`)
+    rejects *transferring* a flagged calling from one real holder to a
+    different real one unless the acting user (`auth.uid()`) already
+    holds it -- vacating it to null, or assigning a first holder when
+    currently vacant, stays open to any admin, so a flagged calling can
+    never get permanently stuck if its holder is unavailable.
+  - **`"ward_council"`/`"youth_council"` features** grant viewing
+    access to exactly that one meeting type -- a feature-based
+    alternative path to the same access the pre-existing calling-based
+    `meeting_type_members` mechanism already grants, nothing more.
+    `getVisibleMeetingTypesForUser` (`lib/data/meeting-type-access.ts`)
+    takes an optional `features: Set<Feature>` and unions in whatever
+    those two features grant on top of the calling-based query.
+  - **Migrations `057`/`058`, both confirmed run 2026-10-04**: `057`
+    (rewritten in place, reusing the number, since the original
+    `calling_role_sync` draft -- the trigger/mapping-table design --
+    was never confirmed run before being superseded) adds the ten
+    `feature_*` columns plus `requires_self_handoff` and its guard
+    trigger. `058` drops `profiles.role`/`role_source` -- needed as a
+    genuinely new migration rather than an in-place amend, since those
+    columns were added by migration `056`, which *was* already
+    confirmed run by this point.
+  - **Known deploy-ordering gotcha, hit live during this change**: the
+    user ran `057`/`058` (dropping `profiles.role`) a few minutes
+    *before* the matching code was pushed -- the still-live old code
+    kept querying a column that no longer existed, so `getSessionUser()`
+    silently returned a null profile for literally everyone, including
+    the Bishop account itself, until the new code deployed. Not a bug
+    in the new design, just a reminder that a schema-dropping migration
+    and its matching code deploy need to land together, not DB-first.
+  - **Bootstrapping after this shipped**: every calling's `feature_*`
+    columns default to `false`, including Bishop's -- meaning nobody
+    had any access at all immediately after deploy, and Table Admin
+    (where you'd normally fix that) requires the Bishopric feature to
+    open at all. The user had to set `feature_bishopric = true` and
+    `current_holder_id` directly in Supabase's Table Editor for the
+    Bishop calling (confirming their own `people.profile_id` link
+    first) as a one-time manual step before the app itself could be
+    used to do the rest. This is inherent to the design, not a bug --
+    flagging it here in case a *second* ward ever adopts this app
+    fresh and hits the same empty-flags bootstrap moment.
+  - `AppHeader` gained a "signed in as" name next to Sign out (the
+    user's own request, right after hitting the deploy-ordering
+    confusion above and wanting an easy way to confirm which account
+    is active): shows `display_name` or `email`, with a hover tooltip
+    listing current features for quick debugging.
   - This is still separate from `people.profile_id` (migration `030`,
-    also settable from `/admin/verify-logins` now, or still editable
-    via Table Admin's People grid as "Login Account"), which links a
-    login to a *person* record for calling-based access (My meetings
-    tiles, Youth Teaching Planning class scoping, rotation eligibility)
-    -- a Bishopric or Bishop account still needs that link set (and a
-    real calling recorded in `/callings`) to resolve calling-based
-    features correctly, even though `role` alone already grants full
-    admin access everywhere regardless of it.
-  - **Role now auto-syncs from calling changes, built 2026-10-04**
-    (the user's own question after testing Verify Logins end to end:
-    "I want the admin to be able to link the new user to a name in the
-    people table somehow. That way, as their calling changes their
-    role will change also and update their access" -- confirmed
-    "fully automatic" when asked directly, over a manual-only
-    alternative). New `calling_role_mappings` table (migration `057`,
-    Table Admin-editable as "Calling → Role Mapping": calling, role,
-    priority) plus a real Postgres trigger on `callings` -- whenever
-    `current_holder_id` changes (via `/callings` or Table Admin's
-    generic grid, either one, since this is a trigger on the table
-    itself, not hooked into one specific code path), the previous and
-    new holders' linked profiles both get recomputed from whichever
-    mapped calling(s) they currently hold (`priority`, lower wins,
-    breaks a tie when someone holds more than one). Losing every
-    mapped calling sets role back to `null` -- which also means they
-    land back in the Verify Logins queue automatically, a deliberate,
-    useful side effect, not a bug.
-    - **"bishop" is deliberately not a mappable value** -- granting it
-      is restricted to a sitting Bishop specifically
-      (`verifyLogin`'s own `isBishop` check against the *acting* admin),
-      and a database trigger has no clean equivalent of "who's
-      acting" to enforce that same rule. Bishop succession stays a
-      deliberate, manual Verify Logins action, completely untouched by
-      this feature.
-    - **A manually-chosen role is never silently overwritten.** New
-      `profiles.role_source` (`'manual' | 'auto'`) is set by
-      `verifyLogin` itself, by comparing the admin's chosen role
-      against what the mapping would have derived for that person at
-      that moment: a match is tagged `'auto'` (this is the common
-      case -- most verifications really are "set their role to match
-      their calling," so most people DO get ongoing automatic
-      updates); a deliberate override is tagged `'manual'` and the
-      sync (`recompute_role_for_person`) skips them entirely, forever,
-      until a later `verifyLogin` call re-tags them. Without this, the
-      very first role grant through Verify Logins would have
-      permanently opted every single person out of their own later
-      automatic updates, since that's always how a role starts out --
-      an early version of this design missed that and had to be
-      corrected before shipping.
-    - **All three new functions are `security invoker`**, matching
-      this repo's own established convention (see
-      `025_apply_rotation_assignment_function.sql`'s own comment) --
-      they run with the privileges of whichever authenticated
-      Bishopric/Bishop admin's edit to `callings` fired them, governed
-      by the same RLS policies that already let Verify Logins' own
-      plain `profiles.role` update succeed, rather than bypassing RLS
-      with `security definer`.
-    - **New "Sync roles now" button** on `/admin/verify-logins`
-      (`sync_all_calling_roles`, a plain RPC call) -- the trigger only
-      fires on a *future* calling change; adding a brand-new mapping
-      row doesn't retroactively touch anyone already holding that
-      calling, since nothing fires on `calling_role_mappings` itself.
-      Only needed right after adding or changing a mapping, not
-      routine maintenance.
-    - **Bulk-seeded with every existing calling, same day** (the
-      user's immediate follow-up: "add every calling into the
-      table/page so I don't have to manually add them. Then I can
-      manually assign the roles"). `role` had to become nullable
-      (`calling_role_mappings` previously required a non-null role per
-      row) specifically so this seed could insert one placeholder row
-      per calling -- `priority` defaulted from that calling's own
-      `sort_order` -- leaving most of them blank, since most callings
-      in any ward have nothing to do with any of these app roles.
-      Idempotent (only inserts a calling with no row yet), and amended
-      directly into migration `057` itself rather than a new `058`,
-      since `057` hadn't been confirmed run yet when this was added
-      (matching this file's own established convention -- see
-      migrations `041`/`047`'s history above). **Real bug caught and
-      fixed by this change, before it ever shipped:** every query that
-      picks "the mapped role" by lowest `priority` had to be corrected
-      to explicitly exclude a null-role row -- without that, a blank
-      placeholder row with a lower priority number than a real mapped
-      one could have outranked it for someone holding both callings at
-      once, silently producing no role (or the wrong one) instead of
-      the real mapped one. Fixed in both
-      `recompute_role_for_person`/`sync_all_calling_roles` (SQL) and
-      `verifyLogin`'s own `deriveRoleForPerson` helper (TypeScript) --
-      the same logic is duplicated in both places (see that
-      function's own comment for why), so both needed the same fix.
-    - **New `"general"` role, same day** (the user's own follow-up,
-      right after the bulk seed: "we probably need another role which
-      gives no extra access"). Grants nothing anywhere in the app --
-      not through any special-casing, simply because every permission
-      check here is an exact match against a specific role string, and
-      `"general"` was never added to any of them. Exists so a calling
-      with no real mapped role can still map to *something* other than
-      staying blank -- a holder who signs up gets `role = 'general'`
-      (via the trigger, or picked manually in Verify Logins) instead of
-      staying stuck at `role = null` and permanently sitting in the
-      Verify Logins queue. Added to `AppRole` itself (not just a
-      calling-mapping-only concept), to `GRANTABLE_ROLES`, and to both
-      the `calling_role_mappings` and `profiles` CHECK constraints --
-      the latter needed its own ALTER since migration `056` (which
-      first created `profiles_role_check`) was already confirmed run
-      by this point and couldn't be amended the way `057` still could.
-    - **New `"ward_council"`/`"youth_council"` roles, same day** (the
-      user's own follow-up: "lets also add roles for Ward Council and
-      Ward Youth Council"). Each grants viewing access to exactly that
-      one meeting type -- a role-based alternative path to the same
-      access the pre-existing calling-based `meeting_type_members`
-      mechanism already grants, nothing more (not admin access, not
-      the other council's meetings). `getVisibleMeetingTypesForUser`
-      (`lib/data/meeting-type-access.ts`) gained an optional `role`
-      parameter and a small `ROLE_MEETING_TYPES` lookup, unioned
-      together with whatever the calling-based query already found --
-      every one of this function's five call sites (the landing
-      page's own tile list, `submitAnnouncement`/`submitAgendaItem`'s
-      access checks and their matching pages, and
-      `/meetings/[id]/archived`'s real `hasAccess` gate -- the actual
-      enforcement boundary for viewing a live or archived Ward
-      Council/Youth Council meeting) now passes the caller's own
-      already-fetched `profile?.role` through, so a role-granted
-      account is recognized everywhere the calling-based one already
-      was, with no second code path to keep in sync. Both CHECK
-      constraints (migration `057`, still unrun) gained the two new
-      values the same way `"general"` did just before it.
+    settable from `/admin/verify-logins` or Table Admin's People grid
+    as "Login Account"), which links a login to a *person* record --
+    without that link, a person's callings (and therefore features)
+    can never resolve for them no matter what's flagged on `callings`.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for
@@ -884,12 +810,13 @@ conflict.
 - **Bishopric** = Bishop, Bishopric First Counselor, Bishopric Second
   Counselor. Three people, no more.
 - **Admins** = Bishopric (above) + Ward Executive Secretary + Ward
-  Clerk. This is the group the app's single shared `bishopric`
-  `profiles.role` value actually represents today — say "admins" for
-  that permission group from now on, and reserve "bishopric" for the
-  three-person presidency specifically (e.g. the Conducting rotation
-  correctly cycles Bishop → 1st Counselor → 2nd Counselor only, not the
-  wider admin group — that one was already right).
+  Clerk. This is the group the app's shared `feature_bishopric` flag
+  (on whichever callings hold it -- Bishop, both Counselors, Exec Sec,
+  Clerk) actually represents today — say "admins" for that permission
+  group from now on, and reserve "bishopric" for the three-person
+  presidency specifically (e.g. the Conducting rotation correctly
+  cycles Bishop → 1st Counselor → 2nd Counselor only, not the wider
+  admin group — that one was already right).
 
 ### Workflow: Planning a non-Sacrament meeting (Bishopric Meeting, Ward Council, Youth Council)
 
@@ -1444,11 +1371,12 @@ wants it followed going forward:
    a person can now also create their own account directly, via
    `/auth/request-access` — the human-confirms-identity step this
    policy cares about didn't move or weaken, it just moved *after*
-   signup instead of before it. A self-created account comes in with
-   `role = null`, the exact same state an admin-invited-but-unverified
+   signup instead of before it. A self-created account has no `people`
+   row linking to it, the exact same state an admin-invited-but-unverified
    one is already in, so it lands in the same `/admin/verify-logins`
-   queue either way and gets zero real access until an admin matches
-   it to a person and sets a role -- see Architecture above.
+   queue either way and gets zero real access until an admin links it
+   to a person -- access then follows automatically from whichever
+   calling(s) that person holds, see Architecture above.
 4. Want **labels** on `people` beyond the current single `active`
    boolean: adult / youth / child, attending / not attending, moved
    (possibly = archived), etc.
