@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
@@ -255,7 +256,16 @@ export async function getOrCreateMeetingId(
   return created.id as string;
 }
 
-export async function getMeetingById(id: string): Promise<Meeting | null> {
+/**
+ * Wrapped in React's `cache()` (2026-10-04, found alongside
+ * getSessionUser's own identical fix while chasing a "very very slow
+ * to load" report) -- every meeting page's shared layout
+ * (app/meetings/[id]/layout.tsx) fetches this same meeting by the same
+ * id, and the page rendered inside it (Planning, Public, etc.) fetches
+ * it again independently -- `cache()` collapses repeat calls with the
+ * same `id` within one request into a single query.
+ */
+export const getMeetingById = cache(async (id: string): Promise<Meeting | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
@@ -268,4 +278,4 @@ export async function getMeetingById(id: string): Promise<Meeting | null> {
   }
 
   return mapMeetingRow(data);
-}
+});

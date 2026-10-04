@@ -1882,6 +1882,30 @@ only need to see the public agenda unlabeled." Two separate changes:
   keeps the full chrome unchanged, since they actually need to
   navigate between the three tabs.
 
+**Performance bug found and fixed the same day: meeting pages got "very
+very slow to load."** The user's initial report of both bugs above
+turned out to have a second, separate layer once the actual logic
+fixes landed -- clarified immediately after: "just kidding. it was
+just slow to load." Root cause: `getSessionUser()`
+(`lib/supabase/get-session-user.ts`) does 3-4 sequential Supabase round
+trips (an auth check, then profile+people in parallel, then a
+`callings`/`calling_features` join) and is called from `AppHeader` on
+nearly every page already -- the layout change earlier this same day
+(the unlabeled-public-chrome entry above) added a *third* independent
+call to it on every Sacrament Meeting page, on top of AppHeader's and
+the page's own, with no caching between them. Same problem, smaller
+scale, for `getMeetingById` (`lib/data/meetings.ts`): the shared
+layout and the page rendered inside it both fetch the exact same
+meeting by the exact same id, independently. Both functions are now
+wrapped in React's `cache()` -- repeated calls with the same arguments
+during a single request's render resolve to one shared promise instead
+of re-querying, with no change in freshness (a new page navigation is
+still a fresh call; `cache()` only lives for one request). No other
+behavior changed; this is a pure performance fix, not a logic change,
+and reduces redundant Supabase round trips everywhere both functions
+are already called more than once per request, not just on meeting
+pages.
+
 **Bug found and fixed the same day, surfaced by the report above:**
 `/dashboard`'s per-row Delete button was gated on `meeting.stage !==
 "archived"`, the exact same condition as Cancel/Un-cancel -- meaning a

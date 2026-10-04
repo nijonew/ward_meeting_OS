@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "./server";
 
 /**
@@ -120,7 +121,21 @@ export function hasAnyFeature(profile: SessionProfile | null, features: Feature[
   return features.some((f) => hasFeature(profile, f));
 }
 
-export async function getSessionUser() {
+/**
+ * Wrapped in React's `cache()` (2026-10-04, found while chasing a
+ * "very very slow to load" report on meeting pages) -- this function
+ * does 3-4 sequential Supabase round trips (auth, profile+people in
+ * parallel, then a callings/calling_features join), and it's called
+ * from AppHeader on nearly every page, from this meeting layout, AND
+ * from the page itself, all within the same request. Without this,
+ * every one of those call sites re-runs the whole thing from scratch
+ * -- `cache()` makes repeated calls during a single render pass (same
+ * arguments, here always none) resolve to one shared promise instead,
+ * with no change in freshness: a new request (a different page
+ * navigation) still gets a fresh call, since React's cache only lives
+ * for the one request/render.
+ */
+export const getSessionUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -161,4 +176,4 @@ export async function getSessionUser() {
     email: (profileRow?.email as string | null) ?? null,
   };
   return { user, profile };
-}
+});
