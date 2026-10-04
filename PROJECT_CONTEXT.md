@@ -340,6 +340,27 @@ exclusive access.
       the latter needed its own ALTER since migration `056` (which
       first created `profiles_role_check`) was already confirmed run
       by this point and couldn't be amended the way `057` still could.
+    - **New `"ward_council"`/`"youth_council"` roles, same day** (the
+      user's own follow-up: "lets also add roles for Ward Council and
+      Ward Youth Council"). Each grants viewing access to exactly that
+      one meeting type -- a role-based alternative path to the same
+      access the pre-existing calling-based `meeting_type_members`
+      mechanism already grants, nothing more (not admin access, not
+      the other council's meetings). `getVisibleMeetingTypesForUser`
+      (`lib/data/meeting-type-access.ts`) gained an optional `role`
+      parameter and a small `ROLE_MEETING_TYPES` lookup, unioned
+      together with whatever the calling-based query already found --
+      every one of this function's five call sites (the landing
+      page's own tile list, `submitAnnouncement`/`submitAgendaItem`'s
+      access checks and their matching pages, and
+      `/meetings/[id]/archived`'s real `hasAccess` gate -- the actual
+      enforcement boundary for viewing a live or archived Ward
+      Council/Youth Council meeting) now passes the caller's own
+      already-fetched `profile?.role` through, so a role-granted
+      account is recognized everywhere the calling-based one already
+      was, with no second code path to keep in sync. Both CHECK
+      constraints (migration `057`, still unrun) gained the two new
+      values the same way `"general"` did just before it.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for

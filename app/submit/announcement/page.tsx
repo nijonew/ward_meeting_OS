@@ -43,7 +43,7 @@ export default async function SubmitAnnouncementPage({
   if (!user) redirect("/login");
 
   const canAlwaysSubmit = profile?.role === "bishopric" || profile?.role === "communications_specialist";
-  const attendsMeetings = canAlwaysSubmit || (await getVisibleMeetingTypesForUser(user.id)).length > 0;
+  const attendsMeetings = canAlwaysSubmit || (await getVisibleMeetingTypesForUser(user.id, profile?.role)).length > 0;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-12 sm:px-8">

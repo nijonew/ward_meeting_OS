@@ -69,7 +69,7 @@ export default async function HomePage() {
   // that apply to the person by nature of their calling." Sacrament
   // Meeting no longer gets a tile here at all (2026-09-10) -- see
   // ALL_MEETING_TYPES's own comment above.
-  const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id) : [];
+  const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id, role) : [];
   const visibleMeetingTypes = isBishopric ? ALL_MEETING_TYPES : rawVisibleTypes;
   // This is the same list as visibleMeetingTypes for a non-admin now
   // that Sacrament Meeting isn't unconditionally folded in -- kept as

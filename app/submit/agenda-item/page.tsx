@@ -31,7 +31,7 @@ export default async function SubmitAgendaItemPage({
   if (!user) redirect("/login");
 
   const isBishopric = profile?.role === "bishopric";
-  const allowedTypes = isBishopric ? null : await getVisibleMeetingTypesForUser(user.id);
+  const allowedTypes = isBishopric ? null : await getVisibleMeetingTypesForUser(user.id, profile?.role);
 
   const meetingTypes = (await getMeetingTypes()).filter(
     (t) => t.slug !== "sacrament-meeting" && (allowedTypes === null || allowedTypes.includes(t.slug))

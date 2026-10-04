@@ -15,6 +15,8 @@ export const GRANTABLE_ROLES: { value: StoredRole; label: string }[] = [
   { value: "general", label: "General (no extra access)" },
   { value: "music_planner", label: "Music Planner" },
   { value: "communications_specialist", label: "Communications Specialist" },
+  { value: "ward_council", label: "Ward Council" },
+  { value: "youth_council", label: "Youth Council" },
   { value: "yw_presidency", label: "Young Women Presidency" },
   { value: "yw_advisor", label: "Young Women Advisor" },
   { value: "yw_specialist", label: "Young Women Specialist" },

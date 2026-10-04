@@ -38,6 +38,19 @@
 -- permission) instead of forcing a choice between "leave unmapped" and
 -- "grant real access nobody intended."
 --
+-- "ward_council"/"youth_council" (also added the same day, the user's
+-- own follow-up: "lets also add roles for Ward Council and Ward Youth
+-- Council") each grant viewing access to that one specific meeting
+-- type -- a role-based alternative path to the exact same access the
+-- pre-existing calling-based `meeting_type_members` mechanism already
+-- grants (see lib/data/meeting-type-access.ts's
+-- getVisibleMeetingTypesForUser, which now unions both sources
+-- together). Neither grants anything beyond that single meeting
+-- type -- wiring that is entirely application-level (TypeScript), not
+-- part of this migration or the trigger at all; this migration only
+-- needed to add the two values to both CHECK constraints below so the
+-- database will actually accept them.
+--
 -- "bishop" is deliberately NOT an allowed value here -- granting it is
 -- restricted to a sitting Bishop only (app/admin/verify-logins/actions.ts's
 -- own isBishop check against the ACTING admin). A database trigger has
@@ -100,6 +113,8 @@ create table if not exists calling_role_mappings (
     'general',
     'music_planner',
     'communications_specialist',
+    'ward_council',
+    'youth_council',
     'yw_presidency',
     'yw_advisor',
     'yw_specialist',
@@ -121,6 +136,8 @@ alter table calling_role_mappings add constraint calling_role_mappings_role_chec
     'general',
     'music_planner',
     'communications_specialist',
+    'ward_council',
+    'youth_council',
     'yw_presidency',
     'yw_advisor',
     'yw_specialist',
@@ -142,6 +159,8 @@ alter table profiles add constraint profiles_role_check
     'general',
     'music_planner',
     'communications_specialist',
+    'ward_council',
+    'youth_council',
     'yw_presidency',
     'yw_advisor',
     'yw_specialist',

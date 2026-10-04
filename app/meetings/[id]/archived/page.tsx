@@ -136,7 +136,7 @@ export default async function ArchivedMeetingPage({
       );
     }
   } else {
-    const hasAccess = isAdmin || (await getVisibleMeetingTypesForUser(user.id)).includes(meeting.meetingType);
+    const hasAccess = isAdmin || (await getVisibleMeetingTypesForUser(user.id, profile?.role)).includes(meeting.meetingType);
     if (!hasAccess) {
       return (
         <div className="rounded border border-rule bg-surface p-6">

@@ -8,12 +8,23 @@ import { createClient } from "./server";
  *  end. Exists so a verified account whose calling doesn't map to
  *  anything special still has somewhere to land other than staying
  *  stuck with `role = null` (and therefore stuck in the Verify Logins
- *  queue) forever. */
+ *  queue) forever.
+ *
+ *  "ward_council"/"youth_council" (same day, the user's own request)
+ *  grant viewing access to that specific meeting type -- a ROLE-based
+ *  alternative path to the exact same access the existing calling-based
+ *  `meeting_type_members` mechanism already grants (see
+ *  lib/data/meeting-type-access.ts's getVisibleMeetingTypesForUser,
+ *  which unions both sources together). Neither grants anything beyond
+ *  that one meeting type -- not admin access, not the other council's
+ *  meetings. */
 export type AppRole =
   | "bishopric"
   | "general"
   | "music_planner"
   | "communications_specialist"
+  | "ward_council"
+  | "youth_council"
   | "yw_presidency"
   | "yw_advisor"
   | "yw_specialist"

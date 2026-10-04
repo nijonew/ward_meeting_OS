@@ -58,7 +58,7 @@ export async function submitAnnouncement(formData: FormData) {
   if (!user) redirect("/login");
 
   if (profile?.role !== "bishopric" && profile?.role !== "communications_specialist") {
-    const allowedTypes = await getVisibleMeetingTypesForUser(user.id);
+    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.role);
     if (allowedTypes.length === 0) {
       redirect(
         `/submit/announcement?error=${encodeURIComponent(
@@ -160,7 +160,7 @@ export async function submitAgendaItem(formData: FormData) {
   }
 
   if (profile?.role !== "bishopric") {
-    const allowedTypes = await getVisibleMeetingTypesForUser(user.id);
+    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.role);
     if (!allowedTypes.includes(meetingTypeSlug)) {
       redirect(
         `/submit/agenda-item?error=${encodeURIComponent(
