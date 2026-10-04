@@ -117,20 +117,30 @@ function MeetingRow({
         </div>
       </td>
       <td className="px-2 py-2 align-top">
-        {canManage && meeting.stage !== "archived" && (
+        {canManage && (
           <div className="flex flex-wrap items-center gap-2">
-            {meeting.cancelled ? (
-              <form action={uncancel}>
-                <button
-                  type="submit"
-                  className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
-                >
-                  Un-cancel
-                </button>
-              </form>
-            ) : (
-              <CancelMeetingButton meetingId={meeting.id} cancelAction={cancel} />
-            )}
+            {/* Cancel/Un-cancel stay hidden once archived -- neither
+                lifecycle action means anything for a meeting that's
+                already over. Delete is NOT gated on that (2026-10-04,
+                the user's own report: "still need the ability to
+                delete a meeting that was created in duplicate by
+                accident") -- an accidental duplicate is just as likely
+                to have auto-archived by the time it's noticed as not,
+                and fixing a genuine mistake like that shouldn't depend
+                on the meeting's own stage. */}
+            {meeting.stage !== "archived" &&
+              (meeting.cancelled ? (
+                <form action={uncancel}>
+                  <button
+                    type="submit"
+                    className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
+                  >
+                    Un-cancel
+                  </button>
+                </form>
+              ) : (
+                <CancelMeetingButton meetingId={meeting.id} cancelAction={cancel} />
+              ))}
             <DeleteMeetingButton
               meetingLabel={`${meeting.title} on ${formatMeetingDate(meeting.date)}`}
               deleteAction={deleteThis}

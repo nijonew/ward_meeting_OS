@@ -1841,17 +1841,31 @@ plan meetings should see any of the views other than public. If
 someone can only see the public view they don't need to see any
 labels about it being public or any of the lifecycle labels. They
 only need to see the public agenda unlabeled." Two separate changes:
-- **Cancelled.** `app/meetings/[id]/planning/page.tsx`,
+- ~~**Cancelled.** `app/meetings/[id]/planning/page.tsx`,
   `conducting/page.tsx`, and `public/page.tsx` each now check
   `meeting.cancelled` right after loading the meeting (before any
   role branching) and, if true, render a plain "This meeting has been
   cancelled" line instead of their normal content -- applies
-  regardless of role; an admin still un-cancels from the dashboard
-  (where the Cancel/Un-cancel controls already live), not from inside
-  one of these three pages. Scoped to Sacrament Meeting only, matching
-  the request's own wording -- Bishopric Meeting/Ward Council/Youth
-  Council's Template/Planning/Live already show the layout's existing
-  Cancelled banner and weren't asked about here.
+  regardless of role.~~ **Partially reverted minutes later, same day
+  -- this broke two things the user then had to report separately:**
+  "still need the ability to delete a meeting that was created in
+  duplicate by accident. still need the planning view to be the
+  default for planners in meetings." Root cause: Planning and
+  Conducting are never reached by anyone *except* this meeting type's
+  own planner/conductor in the first place (a non-admin is always
+  redirected elsewhere first -- to `/archived` from Planning, to
+  `/public` from Conducting), so putting the cancelled check *before*
+  that redirect meant it only ever blocked the admin themselves, not
+  any real public viewer -- breaking "Planning defaults for planners"
+  in exactly the scenario where they'd most need it (confirming an
+  accidental duplicate before deleting it, or deciding whether to
+  un-cancel). Removed the check from both pages entirely; the shared
+  layout's own Cancelled badge already shows the meeting is cancelled
+  to anyone who can see those pages at all. **`public/page.tsx` is the
+  one exception that correctly keeps its check** -- it's the one page
+  a genuine non-admin/no-login viewer can actually reach, so showing
+  "This meeting has been cancelled" there instead of a stale agenda is
+  real, working protection, not a self-inflicted block.
 - **Unlabeled public-only chrome.** `app/meetings/[id]/layout.tsx`
   (the shared shell wrapping every `/meetings/[id]/*` page) now checks,
   for Sacrament Meeting specifically, whether the viewer holds
@@ -1867,6 +1881,22 @@ only need to see the public agenda unlabeled." Two separate changes:
   the only page they can ever reach too. Everyone with either feature
   keeps the full chrome unchanged, since they actually need to
   navigate between the three tabs.
+
+**Bug found and fixed the same day, surfaced by the report above:**
+`/dashboard`'s per-row Delete button was gated on `meeting.stage !==
+"archived"`, the exact same condition as Cancel/Un-cancel -- meaning a
+meeting that had already auto-archived (any past meeting with no real
+activity recorded, see `autoArchivePastMeetings`) couldn't be deleted
+at all, only cancelled or un-cancelled. An accidental duplicate meeting
+is just as likely to have quietly auto-archived by the time someone
+notices it as not. Delete is no longer gated on stage at all -- only
+Cancel/Un-cancel still hide once archived, since neither lifecycle
+action means anything for a meeting that's already over, while
+removing a genuine mistake like a duplicate record shouldn't depend on
+how much time has passed since it was created. (Toggle "Show past
+meetings" on `/dashboard` first if the duplicate is old enough to be
+hidden by the default date filter -- unrelated to this fix, already
+existing behavior.)
 
 **Bug found and fixed 2026-10-04: Communications Specialist couldn't
 actually do either of the two things its name promises.** The user's

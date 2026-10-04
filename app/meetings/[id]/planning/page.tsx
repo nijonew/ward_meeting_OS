@@ -88,18 +88,17 @@ export default async function PlanningViewPage({
   if (!meeting) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
-  // Cancelled Sacrament Meetings don't show Planning/Conducting/Public
-  // at all (2026-10-04, the user's own request) -- there's nothing to
-  // plan, conduct, or publish for a meeting that isn't happening.
-  // Applies regardless of role; an admin un-cancels from the dashboard
-  // (where the Cancel/Un-cancel controls already live), not from here.
-  if (meeting.meetingType === "sacrament-meeting" && meeting.cancelled) {
-    return (
-      <p className="text-ink-muted">
-        This meeting has been cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
-      </p>
-    );
-  }
+  // No cancelled check here (removed 2026-10-04, the same day it was
+  // added) -- this page is never reached by anyone who isn't already
+  // this meeting type's own planner (see the redirect right below),
+  // so blocking on `cancelled` here only ever blocked the planner
+  // themselves, breaking "Planning is the default view for planners"
+  // in exactly the one case (a cancelled meeting) where they most need
+  // to get in -- e.g. to confirm an accidental duplicate before
+  // deleting it from the dashboard, or to un-cancel it. The layout's
+  // own Cancelled badge already shows this meeting is cancelled; see
+  // app/meetings/[id]/public/page.tsx for where the cancelled check
+  // actually belongs (the one page a non-planner can reach).
   // Editing requires this specific meeting type's own planning feature
   // (2026-10-04, replacing a single blanket "bishopric" check -- see
   // PROJECT_CONTEXT.md's Architecture section). Before 2026-09-08 this
