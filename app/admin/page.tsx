@@ -50,7 +50,10 @@ export default async function AdminIndexPage() {
   }
 
   const allTables = Object.values(ADMIN_TABLES);
-  const everydayTables = allTables.filter((t) => !SACRAMENT_CONTENT_TABLES.has(t.table));
+  // Alphabetical, per the user's own request (2026-10-03) -- only this
+  // main list; "Sacrament Meeting Content" below and "Other Admin
+  // Tools" (Meeting Templates) each keep their own existing order.
+  const everydayTables = allTables.filter((t) => !SACRAMENT_CONTENT_TABLES.has(t.table)).sort((a, b) => a.label.localeCompare(b.label));
   const sacramentTables = allTables.filter((t) => SACRAMENT_CONTENT_TABLES.has(t.table));
 
   return (

@@ -2710,11 +2710,67 @@ before fully closing it out.
     person-or-guest pairs can.
   - **New `ward_business` `AgendaRow` kind** (`lib/data/agenda-rows.ts`)
     carries the already-saved items plus both Calling Planning pull
-    lists plus `allPeople`/`callings` straight through -- no field
-    names of its own, unlike every other row kind here, since every
-    action under it commits immediately rather than through the grid's
-    submit. Replaces the old `banner`-with-`href`-to-its-own-page
-    special case for the `ward_business` element key.
+    lists straight through -- no field names of its own, unlike every
+    other row kind here, since every action under it commits
+    immediately rather than through the grid's submit. Replaces the
+    old `banner`-with-`href`-to-its-own-page special case for the
+    `ward_business` element key.
+- **Ward Business reworked again the same day** -- the user's
+  immediate follow-up after seeing the three-group version above:
+  "I still don't like the format. I want it to appear more like the
+  calling planning table but with less information. Essentially I want
+  to be able to select by dropdown a line from the calling planning
+  table in either the release or calling section of ward business. The
+  dropdown should show the individual and the calling they are being
+  released from or called to. Remove the 'other' section." Two
+  sections now, not three:
+  - **One dropdown per section, not two.** The previous version split
+    each section into a "ready to announce" list (its own inline Add
+    buttons) and a separate "call in another" dropdown for everything
+    else. Collapsed into a single `<select>` per section listing every
+    not-yet-announced Calling Planning row for that half (ready ones
+    sorted first as a quiet convenience, no longer called out visually
+    -- matches "less information"), each option reading `"<person> —
+    <calling>"` exactly as asked. `pullCallingPlanningIntoMeeting`/
+    `removeCallingPlanningFromMeeting` (`app/meetings/[id]/ward-business-actions.ts`)
+    are completely unchanged -- this was a UI simplification only, the
+    underlying pull/un-pull mechanism and migration `055` link are
+    untouched.
+  - **Already-pulled items render as a plain two-column table**
+    (Person, Calling, Remove) instead of the previous bulleted list
+    with an inline type badge and inline detail/date text -- "more
+    like the calling planning table" in spirit (a real `<table>`,
+    label-light) without copying its full column set, since every
+    column that table has (Date Initiated, Status, Notes, etc.) lives
+    on the *Calling Planning* row, not the Ward Business announcement
+    of it.
+  - **"Other" is gone, and so is Presidency Change's manual quick-add.**
+    Nothing in Ward Business is typed in by hand anymore -- every row
+    comes from pulling a Calling Planning entry. A presidency change
+    doesn't need its own combined type to represent it: pulling that
+    row's release half into Releases and its calling half into
+    Callings (two ordinary pulls from the same Calling Planning row)
+    already produces the same two line items a dedicated
+    "presidency_change" type would have, so nothing was actually lost
+    by dropping it. `components/planning/RabnmQuickAddForm.tsx` and the
+    `addRabnmItem` server action it called are deleted outright --
+    `deleteRabnmItem` stays, now documented as reachable only for a row
+    predating this cutover (an old manually-added item from before
+    2026-10-03), so an admin can still remove one of those without
+    needing Table Admin's raw grid for just that case.
+  - **`people`/`callings` props dropped everywhere down the chain** --
+    `WardBusinessField` no longer needs a person list or a calling list
+    at all now that nothing is manually typed in, so they're gone from
+    its own props, the `ward_business` `AgendaRow` kind, `AgendaRowInputs`,
+    and the planning page's own data fetch (`getCallingOptions()` is no
+    longer called from here -- still used elsewhere, e.g.
+    `/calling-planning` itself, untouched).
+  - **Any pre-existing "Other" or `presidency_change` row is simply no
+    longer rendered here** -- it still exists in the database (nothing
+    was deleted), it's just not visible or manageable from this grid
+    anymore. Table Admin's own `sacrament_rabnm` table (already
+    registered as a raw-data fallback) remains the way to manage one
+    directly if that ever comes up.
 - **Table Admin's People grid: Attendance Status/Active/Notes dropped,
   Calling added, 2026-10-03** (the user's own request: "Let's not
   include the attendance field, the active checkbox, and the notes
@@ -2763,6 +2819,17 @@ before fully closing it out.
     Admin's own Callings grid (`current_holder_id`) -- this column is
     display-only by design, matching how the user framed it ("include
     the calling field," not "let me edit it from here").
+- **`/admin`'s main table list sorted alphabetically, 2026-10-03** (the
+  user's own request, naming the other two sections by sight to rule
+  them out: "not the sacrament section or the meeting section"). Only
+  `everydayTables` (the flat, unlabeled list at the top of the page)
+  is affected -- sorted by `label` via a plain `.sort((a, b) =>
+  a.label.localeCompare(b.label))` in `app/admin/page.tsx`. "The
+  sacrament section" is the existing "Sacrament Meeting Content" group
+  (`sacramentTables`); "the meeting section" is read as the existing
+  "Other Admin Tools" group, whose only entry today happens to be
+  Meeting Templates -- both keep their current (non-alphabetical)
+  order, untouched.
 
 ## Table Admin update queue (FIFO — work top to bottom)
 

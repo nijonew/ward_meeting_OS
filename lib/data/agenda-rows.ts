@@ -5,7 +5,6 @@ import type { MusicRow, SpeakerRow, PlanningInfo, RabnmRow } from "@/lib/data/sa
 import type { PersonOption } from "@/lib/data/people";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
-import type { CallingOption } from "@/lib/data/callings";
 import { slotLabel } from "@/lib/data/sacrament-constants";
 
 /**
@@ -151,10 +150,12 @@ export type AgendaRow =
       eligiblePeople: PersonOption[];
     }
   /** Ward Business, inline (2026-10-03, the user's own request: "update
-   *  ward business like we just did the visiting authorities... divided
-   *  into releases, callings, other"). Every action under this row is
-   *  an immediate plain-button server action (WardBusinessField.tsx),
-   *  not a deferred grid field -- this row carries data only, no field
+   *  ward business like we just did the visiting authorities," then
+   *  reworked again the same day into just two sections, both entirely
+   *  Calling-Planning-sourced -- see WardBusinessField.tsx's own top
+   *  comment for the full history). Every action under this row is an
+   *  immediate plain-button server action (WardBusinessField.tsx), not
+   *  a deferred grid field -- this row carries data only, no field
    *  names of its own, unlike every other kind here. */
   | {
       kind: "ward_business";
@@ -163,8 +164,6 @@ export type AgendaRow =
       items: RabnmRow[];
       callableCallings: CallableCallingItem[];
       callableReleases: CallableCallingItem[];
-      people: PersonOption[];
-      callings: CallingOption[];
     };
 
 /** Music types that only ever have one per meeting -- rendered as a
@@ -193,12 +192,11 @@ export interface AgendaRowInputs {
    *  kind's own comment above. */
   visitingAuthorities: VisitingAuthorityRow[];
   /** Already-saved Ward Business items (sacrament_rabnm), and the
-   *  Calling Planning pull candidates for the Callings/Releases groups
-   *  -- see the `ward_business` row kind's own comment above. */
+   *  Calling Planning pull candidates for the Releases/Callings
+   *  sections -- see the `ward_business` row kind's own comment above. */
   rabnm: RabnmRow[];
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
-  callings: CallingOption[];
   /** Calling-restricted eligible-people list per person_role element key
    *  -- null means no calling-based rule is configured, fall back to
    *  `allPeople`. See getEligiblePeopleByElementKey (lib/data/rotations.ts). */
@@ -234,7 +232,6 @@ export function buildAgendaRows({
   rabnm,
   callableCallings,
   callableReleases,
-  callings,
   eligibilityByKey,
   allPeople,
   defaultPresidingId,
@@ -265,10 +262,8 @@ export function buildAgendaRows({
   for (const el of elements) {
     const key = el.key;
 
-    // Ward Business, inline (2026-10-03, the user's own request: "update
-    // ward business like we just did the visiting authorities... divided
-    // into releases, callings, other"). Replaces the old banner-with-link
-    // to a standalone page -- see this row kind's own comment above.
+    // Ward Business, inline (2026-10-03) -- see this row kind's own
+    // comment above for the full history.
     if (isSacrament && key === "ward_business") {
       rows.push({
         kind: "ward_business",
@@ -277,8 +272,6 @@ export function buildAgendaRows({
         items: rabnm,
         callableCallings,
         callableReleases,
-        people: allPeople,
-        callings,
       });
       continue;
     }

@@ -59,55 +59,17 @@ export async function savePlanningInfo(meetingId: string, formData: FormData): P
   return { success: true };
 }
 
-export async function addRabnmItem(meetingId: string, formData: FormData): Promise<ActionResult> {
-  const denied = await requireBishopric();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-
-  const type = String(formData.get("type") ?? "");
-  const callingId = String(formData.get("calling_id") ?? "");
-  const detail = String(formData.get("detail") ?? "").trim();
-  const eventDate = String(formData.get("event_date") ?? "");
-  const personIds = formData
-    .getAll("person_ids")
-    .map(String)
-    .filter(Boolean);
-
-  if (!type) {
-    return { error: "Choose a type." };
-  }
-
-  const { data: rabnm, error } = await supabase
-    .from("sacrament_rabnm")
-    .insert({
-      meeting_id: meetingId,
-      type,
-      calling_id: callingId || null,
-      detail: detail || null,
-      event_date: eventDate || null,
-    })
-    .select("id")
-    .single();
-
-  if (error || !rabnm) {
-    return { error: error?.message ?? "Could not save." };
-  }
-
-  if (personIds.length > 0) {
-    const { error: peopleError } = await supabase
-      .from("sacrament_rabnm_people")
-      .insert(personIds.map((personId) => ({ rabnm_id: rabnm.id, person_id: personId })));
-
-    if (peopleError) {
-      return { error: peopleError.message };
-    }
-  }
-
-  revalidatePath(`/meetings/${meetingId}/planning`);
-  return { success: true };
-}
-
+/**
+ * Only ever reached today for a row predating the 2026-10-03 Ward
+ * Business rework (see WardBusinessField.tsx's own top comment) --
+ * everything added since comes through
+ * app/meetings/[id]/ward-business-actions.ts's
+ * pullCallingPlanningIntoMeeting/removeCallingPlanningFromMeeting
+ * instead, which also reverses the originating Calling Planning row.
+ * Kept so an old manually-added item (a baby blessing, a presidency
+ * change entered the old way, etc.) stays removable from here rather
+ * than needing Table Admin's raw grid for that one case.
+ */
 export async function deleteRabnmItem(rabnmId: string, meetingId: string): Promise<ActionResult> {
   const denied = await requireBishopric();
   if (denied) return denied;

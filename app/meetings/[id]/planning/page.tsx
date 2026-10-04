@@ -19,7 +19,7 @@ import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
-import { getCallableCallingPlanningItems, getCallingOptions } from "@/lib/data/calling-planning";
+import { getCallableCallingPlanningItems } from "@/lib/data/calling-planning";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
@@ -122,7 +122,6 @@ export default async function PlanningViewPage({
     hymnalIndex,
     visitingAuthorities,
     callablePlanningItems,
-    callingOptions,
   ] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
@@ -143,7 +142,6 @@ export default async function PlanningViewPage({
     isSacrament
       ? getCallableCallingPlanningItems()
       : Promise.resolve({ callings: [], releases: [] }),
-    isSacrament ? getCallingOptions() : Promise.resolve([]),
   ]);
 
   // Meetings created before the per-meeting agenda existed have zero
@@ -204,7 +202,6 @@ export default async function PlanningViewPage({
     rabnm: sacramentData?.rabnm ?? [],
     callableCallings: callablePlanningItems.callings,
     callableReleases: callablePlanningItems.releases,
-    callings: callingOptions,
     eligibilityByKey,
     allPeople: people,
     defaultPresidingId,

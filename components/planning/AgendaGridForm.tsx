@@ -320,8 +320,6 @@ export function AgendaGridForm({
                         items={row.items}
                         callableCallings={row.callableCallings}
                         callableReleases={row.callableReleases}
-                        people={row.people}
-                        callings={row.callings}
                       />
                     </td>
                   </tr>
