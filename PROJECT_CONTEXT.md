@@ -107,8 +107,9 @@ reconstructed from both:
   items below): still needs to be run.
 - `056` (makes sure `profiles.role` accepts a new `"bishop"` value,
   distinct from the shared `bishopric` role -- the Verify Logins /
-  Bishop-succession feature, see Architecture above): still needs to
-  be run.
+  Bishop-succession feature, see Architecture above): confirmed run
+  ("no rows returned" is the expected, successful result -- it's pure
+  DDL, no `SELECT`).
 
 Next migration should be `057_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -179,11 +180,13 @@ exclusive access.
     repo's migration history, so whether `role` was already constrained
     at the DB level, and by what name, couldn't be known for certain;
     the migration finds and replaces any existing CHECK constraint on
-    it dynamically rather than assuming one). **Not yet confirmed:**
-    what a brand-new signup's `profiles` row actually gets for `role`
-    by default -- whatever creates that row isn't in this repo's
-    migration history either, and the whole verification banner depends
-    on it coming in `null`, not some other default.
+    it dynamically rather than assuming one). **Confirmed 2026-10-03
+    by the user directly:** a brand-new signup's `profiles` row does
+    get `role = null` by default -- whatever creates that row isn't in
+    this repo's migration history (same situation as the constraint
+    itself), but the verification banner's whole detection logic
+    depends on exactly this, so it was worth the direct check rather
+    than assuming it.
   - This is still separate from `people.profile_id` (migration `030`,
     also settable from `/admin/verify-logins` now, or still editable
     via Table Admin's People grid as "Login Account"), which links a
