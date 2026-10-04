@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { LifecycleBadge } from "@/components/LifecycleBadge";
 import { MeetingTabNav } from "@/components/meetings/MeetingTabNav";
 import { getMeetingById } from "@/lib/data/meetings";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import type { MeetingLifecycleStage } from "@/lib/types";
 
 /** Sacrament Meeting never actually reaches Review/Ready/Live -- nothing
@@ -58,6 +59,41 @@ export default async function MeetingLayout({
 
   if (!meeting) {
     notFound();
+  }
+
+  // A viewer who can neither plan nor conduct a Sacrament Meeting can
+  // only ever reach its Public page (2026-10-04, the user's own
+  // request) -- they don't need the Planning/Conducting/Public tab
+  // nav (one of those labels literally says "Public"), the lifecycle
+  // stage badge, or the Cancelled banner's own chrome here; just the
+  // bare agenda the child page itself renders (that page handles a
+  // cancelled meeting on its own, with no surrounding chrome needed).
+  // Scoped to Sacrament Meeting specifically -- it's the only type
+  // with a "Public" concept at all; the other three types' calling-
+  // based read-only viewer (Live/Archived) is a different, already-
+  // settled design.
+  if (meeting.meetingType === "sacrament-meeting") {
+    const { profile } = await getSessionUser();
+    const canPlanOrConduct = hasFeature(profile, "sacrament_planning") || hasFeature(profile, "sacrament_conducting");
+    if (!canPlanOrConduct) {
+      return (
+        <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+          <AppHeader tag={meeting.title} />
+
+          <section className="mt-10">
+            <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">{meeting.title}</h1>
+            <p className="mt-1 text-ink-muted">{formatMeetingDate(meeting.date)}</p>
+          </section>
+
+          <div className="mt-8 flex-1">{children}</div>
+
+          <footer className="mt-auto pt-16 text-xs text-ink-muted">
+            Ward Meeting OS &middot; planning, conducting, and publishing meetings from one source of
+            truth.
+          </footer>
+        </main>
+      );
+    }
   }
 
   const baseTabs = meeting.meetingType === "sacrament-meeting" ? SACRAMENT_TABS : COLLABORATIVE_TABS;

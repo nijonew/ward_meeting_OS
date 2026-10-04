@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getConductingRows } from "@/lib/data/conducting";
+import { getMeetingById } from "@/lib/data/meetings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { ConductingScriptView } from "@/components/planning/ConductingScriptView";
 
@@ -31,6 +32,20 @@ export default async function ConductingViewPage({
   // this meeting's program wants the actual public page instead.
   if (!hasFeature(profile, "sacrament_conducting")) {
     redirect(`/meetings/${meetingId}/public`);
+  }
+
+  // Cancelled Sacrament Meetings don't show Planning/Conducting/Public
+  // at all (2026-10-04, the user's own request) -- see
+  // app/meetings/[id]/planning/page.tsx's own comment on this; a
+  // non-admin never reaches this page at all (redirected to /public
+  // above), which independently shows the same notice.
+  const meeting = await getMeetingById(meetingId);
+  if (meeting?.cancelled) {
+    return (
+      <p className="text-ink-muted">
+        This meeting has been cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
+      </p>
+    );
   }
 
   const script = await getConductingRows(meetingId);

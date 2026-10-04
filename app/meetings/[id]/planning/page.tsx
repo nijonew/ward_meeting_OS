@@ -88,6 +88,18 @@ export default async function PlanningViewPage({
   if (!meeting) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
+  // Cancelled Sacrament Meetings don't show Planning/Conducting/Public
+  // at all (2026-10-04, the user's own request) -- there's nothing to
+  // plan, conduct, or publish for a meeting that isn't happening.
+  // Applies regardless of role; an admin un-cancels from the dashboard
+  // (where the Cancel/Un-cancel controls already live), not from here.
+  if (meeting.meetingType === "sacrament-meeting" && meeting.cancelled) {
+    return (
+      <p className="text-ink-muted">
+        This meeting has been cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
+      </p>
+    );
+  }
   // Editing requires this specific meeting type's own planning feature
   // (2026-10-04, replacing a single blanket "bishopric" check -- see
   // PROJECT_CONTEXT.md's Architecture section). Before 2026-09-08 this

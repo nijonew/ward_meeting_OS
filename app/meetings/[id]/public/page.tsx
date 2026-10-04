@@ -38,14 +38,31 @@ export default async function PublicViewPage({
   // preview regardless (building the program comes before it's ready);
   // everyone else still only ever sees it on the actual day.
   const { profile } = await getSessionUser();
+  const meeting = await getMeetingById(meetingId);
+  if (!meeting) {
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
+  }
+
+  // Cancelled Sacrament Meetings don't show Planning/Conducting/Public
+  // at all (2026-10-04, the user's own request) -- see
+  // app/meetings/[id]/planning/page.tsx's own comment on this. Checked
+  // before the admin/non-admin branch below so it applies regardless
+  // of who's asking.
+  if (meeting.cancelled) {
+    return (
+      <p className="text-ink-muted">
+        This meeting has been cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
+      </p>
+    );
+  }
+
   if (!hasFeature(profile, "sacrament_planning")) {
-    const meeting = await getMeetingById(meetingId);
     // Archived is admin-only, full stop, regardless of the "ready for
     // public" flag or who's asking -- the Vision workflow's own rule
     // ("no calling-based or public access at all once archived") isn't
     // something the early-preview exception below should be able to
     // outlive once the meeting is actually over.
-    if (!meeting || meeting.stage === "archived") {
+    if (meeting.stage === "archived") {
       return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
     }
 

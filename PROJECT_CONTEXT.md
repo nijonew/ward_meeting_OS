@@ -1833,6 +1833,41 @@ avoid confusing the two.
 
 ## Known open items
 
+**Cancelled Sacrament Meetings hide Planning/Conducting/Public, and a
+public-only viewer sees no workflow chrome at all, 2026-10-04** (the
+user's own request): "when a sacrament meeting is cancelled please
+don't show the planning/conducting/public views. Only those who can
+plan meetings should see any of the views other than public. If
+someone can only see the public view they don't need to see any
+labels about it being public or any of the lifecycle labels. They
+only need to see the public agenda unlabeled." Two separate changes:
+- **Cancelled.** `app/meetings/[id]/planning/page.tsx`,
+  `conducting/page.tsx`, and `public/page.tsx` each now check
+  `meeting.cancelled` right after loading the meeting (before any
+  role branching) and, if true, render a plain "This meeting has been
+  cancelled" line instead of their normal content -- applies
+  regardless of role; an admin still un-cancels from the dashboard
+  (where the Cancel/Un-cancel controls already live), not from inside
+  one of these three pages. Scoped to Sacrament Meeting only, matching
+  the request's own wording -- Bishopric Meeting/Ward Council/Youth
+  Council's Template/Planning/Live already show the layout's existing
+  Cancelled banner and weren't asked about here.
+- **Unlabeled public-only chrome.** `app/meetings/[id]/layout.tsx`
+  (the shared shell wrapping every `/meetings/[id]/*` page) now checks,
+  for Sacrament Meeting specifically, whether the viewer holds
+  `sacrament_planning` or `sacrament_conducting` -- the only two
+  features that ever let an account reach anything beyond the Public
+  page. Without either, the layout skips its own meeting card
+  (`&larr; Meetings` breadcrumb, `LifecycleBadge`, the Cancelled
+  banner) and the Planning/Conducting/Public tab nav entirely, and
+  renders just the meeting title/date (identifying context, not a
+  workflow label) above the bare agenda the child page itself renders.
+  An account with only `sacrament_program_view` (the Communications-
+  Specialist-style early preview) gets this same treatment -- Public is
+  the only page they can ever reach too. Everyone with either feature
+  keeps the full chrome unchanged, since they actually need to
+  navigate between the three tabs.
+
 **Bug found and fixed 2026-10-04: Communications Specialist couldn't
 actually do either of the two things its name promises.** The user's
 own report, right after testing the role end-to-end for the first time
