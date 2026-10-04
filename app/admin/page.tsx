@@ -107,6 +107,18 @@ export default async function AdminIndexPage() {
               </span>
             </Link>
           </li>
+          <li>
+            <Link
+              href="/admin/verify-logins"
+              className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
+            >
+              <span className="font-medium text-ink">Verify Logins</span>
+              <span className="ml-4 truncate text-xs text-ink-muted">
+                Match a new login to a person and set their role -- also reachable from the banner
+                at the top of the page whenever one is waiting
+              </span>
+            </Link>
+          </li>
         </ul>
       </section>
     </main>

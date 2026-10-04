@@ -105,8 +105,12 @@ reconstructed from both:
   back to the Calling Planning row an announcement came from, needed
   for Ward Business's inline pull/un-pull mechanism, see Known open
   items below): still needs to be run.
+- `056` (makes sure `profiles.role` accepts a new `"bishop"` value,
+  distinct from the shared `bishopric` role -- the Verify Logins /
+  Bishop-succession feature, see Architecture above): still needs to
+  be run.
 
-Next migration should be `056_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `057_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -121,34 +125,74 @@ exclusive access.
 
 - **Auth:** email/password (not magic link — that was broken and replaced).
   First-time users must visit `/auth/reset-password` once to set a password.
-- **Roles** (`profiles.role`, fixed enum, not yet configurable):
-  `bishopric` (bishop + counselors + exec sec + clerk, one shared role),
-  `music_planner`, `communications_specialist`, plus granular youth roles
-  `yw_presidency`, `yw_advisor`, `yw_specialist`, `ym_advisor`, `ym_specialist`
-  (kept granular on purpose, not consolidated). **Terminology note:** this
-  `bishopric` role value is what the "Vision & Intended Workflows"
-  section below calls **admins**; it reserves the word **bishopric** for
-  the three-person presidency only (Bishop + both counselors). Use that
+- **Roles** (`profiles.role`): `bishopric` (Counselors + Exec Sec +
+  Clerk, one shared role), `bishop` (its own distinct value as of
+  2026-10-03, see below), `music_planner`, `communications_specialist`,
+  plus granular youth roles `yw_presidency`, `yw_advisor`,
+  `yw_specialist`, `ym_advisor`, `ym_specialist` (kept granular on
+  purpose, not consolidated). **Terminology note:** `bishopric` +
+  `bishop` together are what the "Vision & Intended Workflows" section
+  below calls **admins**; it reserves the word **bishopric** for the
+  three-person presidency only (Bishop + both counselors). Use that
   distinction in conversation and new UI copy going forward.
-  **No in-app UI sets this at all** (confirmed 2026-10-03 while
-  answering the user's own question, "how do I ensure my log-in is
-  linked to the correct role") -- `profiles` isn't in Table Admin's
-  registry (nothing writes to it anywhere in `app/`), so the only way
-  to set or change someone's role today is directly in the Supabase
-  dashboard's Table Editor (`profiles` table, `role` column, matched by
-  `email`) -- not through Ward OS at all. This is separate from
-  `people.profile_id` (migration `030`, editable via Table Admin's
-  People grid as "Login Account"), which links a login to a *person*
-  record for calling-based access (My meetings tiles, Youth Teaching
-  Planning class scoping, rotation eligibility) -- a Bishopric account
-  still needs that link set (and a real calling recorded in
-  `/callings`) to resolve calling-based features correctly, even though
-  `role = 'bishopric'` alone already grants full admin access
-  everywhere regardless of it. A real gap, not yet raised by the user
-  as something to build -- an admin-facing "set this person's role" UI
-  would need its own scoping (who's allowed to grant `bishopric` to
-  someone else?) before building; don't start it without that
-  discussion.
+  - **In-app role-setting + login verification, built 2026-10-03**
+    (the user's own question, "how do I ensure my log-in is linked to
+    the correct role," followed by their own proposal: "a notification
+    for admins at the top of the page (only seen by admins) to verify
+    the individual and their calling"). Previously **no in-app UI set
+    this at all** -- `profiles` isn't in Table Admin's registry (by
+    deliberate design, unchanged), so role could only ever be set
+    directly in the Supabase dashboard. New `/admin/verify-logins`
+    (Bishopric-only) lists every login with `role is null` -- the
+    signal the user picked for "needs verification" over requiring a
+    person link too, since a null role means zero access to anything
+    today -- and bundles both of this app's separate linkages (role,
+    and `people.profile_id`) into one "Verify" action: match the login
+    to an existing person or create one inline, then set its role.
+    `AppHeader` grows a matching banner, shown only to an already-admin
+    viewer and only when that list is non-empty, linking straight
+    there -- exactly "at the top of the page, only seen by admins," per
+    the user's own framing. `getUnverifiedProfileCount()` only runs
+    when the viewer already resolved as admin, so nobody else triggers
+    the extra query even though `AppHeader` renders on nearly every
+    route.
+  - **"Bishop" split into its own role, same request**: the user's
+    answer when asked who should be allowed to grant the broad
+    `bishopric` role to someone else: "let's make the bishop its own
+    role rather than lumping it in the bishopric role. A bishop can
+    essentially give ownership to the next bishop and is the one that
+    can grant that access." Rather than touching every one of the
+    several dozen places in this app that check `role === "bishopric"`
+    to also accept a second value, the normalization happens in exactly
+    one place -- `getSessionUser()` (`lib/supabase/get-session-user.ts`)
+    reads a stored `"bishop"` value and returns it as `role:
+    "bishopric"` to every caller (so the Bishop keeps the exact same
+    full admin access everywhere "bishopric" already had, with zero
+    other files needing to change), plus a new `profile.isBishop`
+    boolean for the one place that actually needs to tell them apart:
+    `verifyLogin` (`app/admin/verify-logins/actions.ts`) refuses to
+    grant the `"bishop"` role itself unless the acting admin's own
+    `isBishop` is true -- re-checked server-side, not just hidden from
+    the role dropdown, matching this app's usual enforcement-boundary
+    pattern. Migration `056` makes sure the database doesn't reject the
+    new value (see that file's own comment -- `profiles` predates this
+    repo's migration history, so whether `role` was already constrained
+    at the DB level, and by what name, couldn't be known for certain;
+    the migration finds and replaces any existing CHECK constraint on
+    it dynamically rather than assuming one). **Not yet confirmed:**
+    what a brand-new signup's `profiles` row actually gets for `role`
+    by default -- whatever creates that row isn't in this repo's
+    migration history either, and the whole verification banner depends
+    on it coming in `null`, not some other default.
+  - This is still separate from `people.profile_id` (migration `030`,
+    also settable from `/admin/verify-logins` now, or still editable
+    via Table Admin's People grid as "Login Account"), which links a
+    login to a *person* record for calling-based access (My meetings
+    tiles, Youth Teaching Planning class scoping, rotation eligibility)
+    -- a Bishopric or Bishop account still needs that link set (and a
+    real calling recorded in `/callings`) to resolve calling-based
+    features correctly, even though `role` alone already grants full
+    admin access everywhere regardless of it.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for

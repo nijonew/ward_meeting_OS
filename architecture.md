@@ -128,11 +128,15 @@ Collaborative planning meeting.
 
 Current implementation:
 
--   Bishopric (bishop, counselors, executive secretary, and ward clerk):
-    one shared role with full meeting editing. The app does not yet
-    distinguish between these four people individually — see
-    `PROJECT_CONTEXT.md`'s Table Admin queue for the open item tracking
-    this gap (matters most for who can add
+-   Bishopric: full meeting editing. The Bishop has their own distinct
+    `bishop` role (2026-10-03, so a sitting Bishop is the only one who
+    can grant that same role to a successor) but it resolves to the
+    exact same access as the shared `bishopric` role (counselors,
+    executive secretary, ward clerk) everywhere else — see
+    `PROJECT_CONTEXT.md`'s Architecture section for how. The app still
+    doesn't distinguish Counselors/Exec Sec/Clerk from each other
+    individually — see `PROJECT_CONTEXT.md`'s Table Admin queue for the
+    open item tracking that narrower gap (matters most for who can add
     Recognitions/Advancements/Baptisms/New Members records).
 -   Music Planner, Communications Specialist, and the granular youth
     roles (YW Presidency/Advisor/Specialist, YM Advisor/Specialist):
