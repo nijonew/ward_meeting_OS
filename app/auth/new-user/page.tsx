@@ -23,6 +23,12 @@ const initialState: { error?: string; success?: boolean } = {};
  * question Supabase answers identically either way: "does an account
  * with this email already exist, and if so, send it a link to set a
  * password." Only the page's own copy differs between the two.
+ *
+ * Gained a second path the same day, once the user asked "can the
+ * user create an account without the ward admin setting that up
+ * first?" -- the "ask your admin" line below became a real link to
+ * /auth/request-access, self-serve account creation, instead of a
+ * dead end.
  */
 export default function NewUserPage() {
   const [state, formAction, pending] = useActionState(requestPasswordReset, initialState);
@@ -57,7 +63,13 @@ export default function NewUserPage() {
         {state.success && <p className="text-sm text-ink">Check your email for a link to set your password.</p>}
       </form>
 
-      <p className="mt-4 text-xs text-ink-muted">Haven&rsquo;t been set up yet? Ask your ward&rsquo;s admin to add you first.</p>
+      <p className="mt-4 text-xs text-ink-muted">
+        Haven&rsquo;t been set up yet?{" "}
+        <Link href="/auth/request-access" className="underline">
+          Request access
+        </Link>{" "}
+        instead.
+      </p>
     </main>
   );
 }

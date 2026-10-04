@@ -131,13 +131,30 @@ exclusive access.
   lost password. I would like to have separate links and pages for
   that"). Both pages call the exact same `requestPasswordReset` action
   under the hood (`app/auth/actions.ts`) -- there's no separate
-  mechanism to call instead, since an account only exists here once an
-  admin has already invited it directly through the Supabase dashboard
-  (no self-serve sign-up at all, per the "Adding new people"
-  workflow/policy below), so "first time signing in" and "forgot my
-  password" are the exact same question as far as Supabase's own
-  password-reset-email flow is concerned. Only the page copy differs;
-  `LoginForm.tsx`'s single combined link became two.
+  mechanism to call instead, since an account that reaches `/auth/new-user`
+  this way was already invited directly through the Supabase dashboard,
+  so "first time signing in" and "forgot my password" are the exact
+  same question as far as Supabase's own password-reset-email flow is
+  concerned. Only the page copy differs; `LoginForm.tsx`'s single
+  combined link became two.
+  - **Self-serve sign-up added the same day** (the user's own
+    follow-up question, after reading `/auth/new-user`'s "ask your
+    ward's admin to add you first" line: "Can the user create an
+    account without the ward admin setting that up first?"). New
+    `/auth/request-access`, linked from `/auth/new-user`, calls a new
+    `requestAccess` action -- plain `supabase.auth.signUp()`. No
+    separate "pending request" table or approval queue was needed:
+    the resulting `profiles` row comes in with `role = null` (same as
+    any admin-invited-but-unverified account), which is exactly what
+    `/admin/verify-logins` already treats as "needs verification" --
+    see that feature's own entry below. This is a real, deliberate
+    extension of the "Adding new people" policy's identity-confirmation
+    step, not a loosening of it -- see that section's own note. The
+    landing page (`app/page.tsx`) gained a small inline notice for a
+    logged-in account with no role yet ("you're signed in, but an
+    admin still needs to verify your account"), so a freshly
+    self-signed-up person isn't left looking at a confusingly bare
+    page with no explanation.
   - **Known issue, reported 2026-10-03, not yet root-caused:** the
     user tried `/auth/reset-password` while testing a new account and
     got no email after 10 minutes (no error shown on the page either,
@@ -1306,6 +1323,16 @@ wants it followed going forward:
    authenticated account, then an **admin manually matches** that
    account to their existing `people` row (or creates one). No
    automatic matching by email — a human confirms identity first.
+   **Extended 2026-10-03** (the user's own question: "can the user
+   create an account without the ward admin setting that up first?"):
+   a person can now also create their own account directly, via
+   `/auth/request-access` — the human-confirms-identity step this
+   policy cares about didn't move or weaken, it just moved *after*
+   signup instead of before it. A self-created account comes in with
+   `role = null`, the exact same state an admin-invited-but-unverified
+   one is already in, so it lands in the same `/admin/verify-logins`
+   queue either way and gets zero real access until an admin matches
+   it to a person and sets a role -- see Architecture above.
 4. Want **labels** on `people` beyond the current single `active`
    boolean: adult / youth / child, attending / not attending, moved
    (possibly = archived), etc.

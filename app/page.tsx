@@ -86,6 +86,12 @@ export default async function HomePage() {
       <section className="mt-10">
         <h1 className="font-display text-3xl leading-tight sm:text-4xl">{wardName} Ward</h1>
         {!user && <p className="mt-2 text-ink-muted">Sign in for meeting and planning tools.</p>}
+        {user && !role && (
+          <p className="mt-2 text-sm text-ink-muted">
+            You&rsquo;re signed in, but an admin still needs to verify your account before you
+            have access to anything else.
+          </p>
+        )}
       </section>
 
       {/* Tier 0 -- everyone, no login required */}
