@@ -75,9 +75,18 @@ export default async function HomePage() {
   // that Sacrament Meeting isn't unconditionally folded in -- kept as
   // its own named check anyway, since it's a real, distinct concept
   // (attends *some* meeting by calling, or is Bishopric) that the
-  // Meeting Agenda Items/Submit an Announcement tiles below are gated
-  // on (2026-09-09, the user's own request).
+  // Meeting Agenda Items tile below is gated on (2026-09-09, the
+  // user's own request).
   const attendsMeetings = isBishopric || rawVisibleTypes.length > 0;
+  // Submit an Announcement shares that same gate, PLUS Communications
+  // Specialist outright (2026-10-04 bug fix -- the role's name promised
+  // exactly this and nothing had ever actually wired it in; see
+  // app/submit/announcement/page.tsx's own comment). Kept separate from
+  // attendsMeetings itself rather than folding the role into that
+  // broader check, since attendsMeetings also gates Meeting Agenda
+  // Items, which Communications Specialist has no business reason to
+  // need.
+  const canSubmitAnnouncement = attendsMeetings || role === "communications_specialist";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -135,7 +144,7 @@ export default async function HomePage() {
           Meeting/Cancel/Unassigned-Agenda-Items control surface even
           from here; that surface now lives only behind the
           Administration section's own Meeting Planning tile below. */}
-      {user && visibleMeetingTypes.length > 0 && (
+      {user && (visibleMeetingTypes.length > 0 || canSubmitAnnouncement) && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">My meetings</p>
           <TileGrid>
@@ -147,18 +156,25 @@ export default async function HomePage() {
               />
             ))}
             {attendsMeetings && (
-              <>
-                <Tile
-                  title="Meeting Agenda Items"
-                  description="Submit an agenda item for a meeting you attend"
-                  href="/submit/agenda-item"
-                />
-                <Tile
-                  title="Submit an Announcement"
-                  description="Share something with the ward"
-                  href="/submit/announcement"
-                />
-              </>
+              <Tile
+                title="Meeting Agenda Items"
+                description="Submit an agenda item for a meeting you attend"
+                href="/submit/agenda-item"
+              />
+            )}
+            {canSubmitAnnouncement && (
+              <Tile
+                title="Submit an Announcement"
+                description="Share something with the ward"
+                href="/submit/announcement"
+              />
+            )}
+            {role === "communications_specialist" && (
+              <Tile
+                title="Sacrament Meeting Programs"
+                description="Preview upcoming and past programs, not just today's"
+                href="/dashboard?type=sacrament-meeting&readonly=1"
+              />
             )}
           </TileGrid>
         </section>

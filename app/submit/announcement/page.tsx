@@ -20,6 +20,18 @@ import { AnnouncementForm } from "@/components/submit/AnnouncementForm";
  * -- there's no per-meeting-type access question for an announcement
  * the way there is for an agenda item, so this doesn't filter a
  * dropdown the way that page does; it's a single yes/no page gate.
+ *
+ * **Bug found and fixed 2026-10-04** (the user's own report: the
+ * Communications Specialist role "didn't give them the access I want
+ * them to have which would be access to create announcements"): the
+ * role was never actually wired into this check at all -- despite its
+ * name, a Communications Specialist with no calling-based meeting
+ * access (meeting_type_members) was blocked here exactly like anyone
+ * else with no calling. Added alongside Bishopric, not folded into
+ * the general `attendsMeetings` concept used elsewhere on this page
+ * (which also gates unrelated features like Meeting Agenda Items) --
+ * see app/page.tsx's own `canSubmitAnnouncement` for the matching
+ * landing-page tile fix.
  */
 export default async function SubmitAnnouncementPage({
   searchParams,
@@ -30,8 +42,8 @@ export default async function SubmitAnnouncementPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const isBishopric = profile?.role === "bishopric";
-  const attendsMeetings = isBishopric || (await getVisibleMeetingTypesForUser(user.id)).length > 0;
+  const canAlwaysSubmit = profile?.role === "bishopric" || profile?.role === "communications_specialist";
+  const attendsMeetings = canAlwaysSubmit || (await getVisibleMeetingTypesForUser(user.id)).length > 0;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-12 sm:px-8">

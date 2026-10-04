@@ -48,14 +48,16 @@ function deriveTitle(description: string): string {
  * submitAgendaItem. Re-checks "attends a meeting, or is Bishopric"
  * server-side too, not just via the page's own gate, for the same
  * defense-in-depth reason submitAgendaItem re-checks meeting-type
- * access.
+ * access. Also allows Communications Specialist outright (2026-10-04
+ * bug fix -- see app/submit/announcement/page.tsx's own comment),
+ * matching the page's own gate exactly.
  */
 export async function submitAnnouncement(formData: FormData) {
   const supabase = await createClient();
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (profile?.role !== "bishopric") {
+  if (profile?.role !== "bishopric" && profile?.role !== "communications_specialist") {
     const allowedTypes = await getVisibleMeetingTypesForUser(user.id);
     if (allowedTypes.length === 0) {
       redirect(

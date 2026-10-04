@@ -1660,6 +1660,47 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-04: Communications Specialist couldn't
+actually do either of the two things its name promises.** The user's
+own report, right after testing the role end-to-end for the first time
+via the new Verify Logins flow: setting someone's role to
+Communications Specialist "didn't give them the access I want them to
+have which would be access to create announcements and to read the
+public view of upcoming sacrament meetings at any time." Both gaps
+turned out to be real, pre-existing holes -- the role had only ever
+been wired into Ward Events/`/events` management
+(`app/ward-events/page.tsx`, `app/events/page.tsx`), never into either
+of these:
+- **Announcement submission** (`/submit/announcement` and
+  `submitAnnouncement`, `app/submit/actions.ts`) only ever checked
+  Bishopric or calling-based meeting access (`getVisibleMeetingTypesForUser`)
+  -- a Communications Specialist with no calling-based meeting access
+  was blocked exactly like anyone else with no calling, despite the
+  role's own name. Fixed by allowing the role outright at both the
+  page gate and the server action's own re-check. The landing page's
+  "Submit an Announcement" tile had the same gap (nested inside the
+  same `attendsMeetings` condition as the unrelated Meeting Agenda
+  Items tile) -- split into its own `canSubmitAnnouncement` check
+  (`attendsMeetings || role === "communications_specialist"`) kept
+  deliberately separate from `attendsMeetings` itself, since folding
+  the role into that broader flag would have also unlocked Meeting
+  Agenda Items, which has nothing to do with this role.
+- **Sacrament Meeting public view, any time** (`/meetings/[id]/public`)
+  only exempted Bishopric from the "today only, not archived" gate
+  everyone else gets. Added Communications Specialist to that same
+  exemption -- their job is preparing bulletins ahead of the actual
+  day, so waiting for the public cutoff defeats the purpose. This
+  alone wasn't enough, though: there was no visible way for this role
+  to ever *reach* a future meeting's public page at all (Sacrament
+  Meeting was never in any non-admin's "My meetings" tile list, by
+  design -- see Architecture above). `/dashboard` itself turned out to
+  have no role gate at all already (`canManage` is simply false for a
+  non-Bishopric account, which already correctly routes a date click
+  to `/meetings/[id]/public`) -- it just had no tile pointing at it for
+  this role. Added a "Sacrament Meeting Programs" tile, visible only to
+  Communications Specialist, linking to
+  `/dashboard?type=sacrament-meeting&readonly=1`.
+
 **Top priority, not yet root-caused (2026-10-03):** the user's first
 attempt to create a Sacrament Meeting after this session's reskin merge
 + migrations 047-049 landed: "when clicking on meeting planning,

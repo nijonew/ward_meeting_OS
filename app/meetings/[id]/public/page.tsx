@@ -25,8 +25,14 @@ export default async function PublicViewPage({
   // ever built to set them), so this check could never have passed in
   // real production data; matches the same fix in
   // getTodaysPublishedSacramentMeeting.
+  //
+  // Communications Specialist gets the same any-stage/any-date preview
+  // as the Bishopric (2026-10-04, the user's own report: wants "to
+  // read the public view of upcoming sacrament meetings at any time")
+  // -- their job is preparing bulletins/communications ahead of the
+  // actual day, so waiting for the public cutoff defeats the purpose.
   const { profile } = await getSessionUser();
-  if (profile?.role !== "bishopric") {
+  if (profile?.role !== "bishopric" && profile?.role !== "communications_specialist") {
     const meeting = await getMeetingById(meetingId);
     const todayIso = new Date().toISOString().slice(0, 10);
     if (!meeting || meeting.stage === "archived" || meeting.date !== todayIso) {
