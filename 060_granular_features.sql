@@ -74,38 +74,48 @@ create policy "authenticated write calling_features"
   using (true)
   with check (true);
 
+-- Meeting-type action labels spell out the meeting type name itself
+-- (e.g. "Sacrament Meeting Viewing", not just "Viewing") rather than
+-- relying on the category column alone -- found while scoping the
+-- Calling Features assignment UI (2026-10-04, the user's own report):
+-- "Viewing"/"Planning"/etc. repeat identically across all four meeting
+-- types, so a label shown without its category visibly attached
+-- nearby (a flat list, a tooltip, a search result) would be
+-- ambiguous. Every other feature's label already stands alone without
+-- this problem (each is unique to begin with), so only these 20
+-- needed the fix.
 insert into features (key, label, category, sort_order) values
   -- Sacrament Meeting
-  ('sacrament_viewing', 'Viewing', 'Sacrament Meeting', 1),
-  ('sacrament_planning', 'Planning', 'Sacrament Meeting', 2),
-  ('sacrament_template', 'Template Creation', 'Sacrament Meeting', 3),
-  ('sacrament_agenda_items', 'Agenda Item Adding', 'Sacrament Meeting', 4),
-  ('sacrament_notes', 'Note Taking', 'Sacrament Meeting', 5),
+  ('sacrament_viewing', 'Sacrament Meeting Viewing', 'Sacrament Meeting', 1),
+  ('sacrament_planning', 'Sacrament Meeting Planning', 'Sacrament Meeting', 2),
+  ('sacrament_template', 'Sacrament Meeting Template Creation', 'Sacrament Meeting', 3),
+  ('sacrament_agenda_items', 'Sacrament Meeting Agenda Item Adding', 'Sacrament Meeting', 4),
+  ('sacrament_notes', 'Sacrament Meeting Note Taking', 'Sacrament Meeting', 5),
   ('sacrament_music', 'Music Planning', 'Sacrament Meeting', 6),
   ('sacrament_conducting', 'Conducting Script', 'Sacrament Meeting', 7),
   ('sacrament_rabnm', 'Recognitions / Advancements / Baptisms / New Members', 'Sacrament Meeting', 8),
   ('sacrament_program_view', 'Public Program Preview (future meetings)', 'Sacrament Meeting', 9),
 
   -- Bishopric Meeting
-  ('bishopric_meeting_viewing', 'Viewing', 'Bishopric Meeting', 1),
-  ('bishopric_meeting_planning', 'Planning', 'Bishopric Meeting', 2),
-  ('bishopric_meeting_template', 'Template Creation', 'Bishopric Meeting', 3),
-  ('bishopric_meeting_agenda_items', 'Agenda Item Adding', 'Bishopric Meeting', 4),
-  ('bishopric_meeting_notes', 'Note Taking', 'Bishopric Meeting', 5),
+  ('bishopric_meeting_viewing', 'Bishopric Meeting Viewing', 'Bishopric Meeting', 1),
+  ('bishopric_meeting_planning', 'Bishopric Meeting Planning', 'Bishopric Meeting', 2),
+  ('bishopric_meeting_template', 'Bishopric Meeting Template Creation', 'Bishopric Meeting', 3),
+  ('bishopric_meeting_agenda_items', 'Bishopric Meeting Agenda Item Adding', 'Bishopric Meeting', 4),
+  ('bishopric_meeting_notes', 'Bishopric Meeting Note Taking', 'Bishopric Meeting', 5),
 
   -- Ward Council
-  ('ward_council_viewing', 'Viewing', 'Ward Council', 1),
-  ('ward_council_planning', 'Planning', 'Ward Council', 2),
-  ('ward_council_template', 'Template Creation', 'Ward Council', 3),
-  ('ward_council_agenda_items', 'Agenda Item Adding', 'Ward Council', 4),
-  ('ward_council_notes', 'Note Taking', 'Ward Council', 5),
+  ('ward_council_viewing', 'Ward Council Viewing', 'Ward Council', 1),
+  ('ward_council_planning', 'Ward Council Planning', 'Ward Council', 2),
+  ('ward_council_template', 'Ward Council Template Creation', 'Ward Council', 3),
+  ('ward_council_agenda_items', 'Ward Council Agenda Item Adding', 'Ward Council', 4),
+  ('ward_council_notes', 'Ward Council Note Taking', 'Ward Council', 5),
 
   -- Youth Council
-  ('youth_council_viewing', 'Viewing', 'Youth Council', 1),
-  ('youth_council_planning', 'Planning', 'Youth Council', 2),
-  ('youth_council_template', 'Template Creation', 'Youth Council', 3),
-  ('youth_council_agenda_items', 'Agenda Item Adding', 'Youth Council', 4),
-  ('youth_council_notes', 'Note Taking', 'Youth Council', 5),
+  ('youth_council_viewing', 'Youth Council Viewing', 'Youth Council', 1),
+  ('youth_council_planning', 'Youth Council Planning', 'Youth Council', 2),
+  ('youth_council_template', 'Youth Council Template Creation', 'Youth Council', 3),
+  ('youth_council_agenda_items', 'Youth Council Agenda Item Adding', 'Youth Council', 4),
+  ('youth_council_notes', 'Youth Council Note Taking', 'Youth Council', 5),
 
   -- Standalone tools
   ('announcement_adding', 'Announcement Adding', 'Tools', 1),

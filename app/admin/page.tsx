@@ -47,6 +47,7 @@ export default async function AdminIndexPage() {
   // sees an empty list, same as any other filtered view in this app.
   const canManageTemplates = hasFeature(profile, "meeting_templates_admin");
   const canVerifyLogins = hasFeature(profile, "verify_logins");
+  const canManageCallingFeatures = hasFeature(profile, "table_admin_callings");
   const allTables = Object.values(ADMIN_TABLES).filter((t) => hasFeature(profile, t.requiredFeature as Feature));
   // Alphabetical, per the user's own request (2026-10-03) -- only this
   // main list; "Sacrament Meeting Content" below and "Other Admin
@@ -87,13 +88,27 @@ export default async function AdminIndexPage() {
         </section>
       )}
 
-      {(canManageTemplates || canVerifyLogins) && (
+      {(canManageTemplates || canVerifyLogins || canManageCallingFeatures) && (
         <section>
           <h2 className="font-display text-xl">Other Admin Tools</h2>
           <p className="mt-1 text-xs text-ink-muted">
             Not generic-grid editors -- these have dedicated add/remove/reorder UIs of their own.
           </p>
           <ul className="mt-3 divide-y divide-rule rounded border border-rule bg-surface">
+            {canManageCallingFeatures && (
+              <li>
+                <Link
+                  href="/admin/calling-features"
+                  className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
+                >
+                  <span className="font-medium text-ink">Calling Features</span>
+                  <span className="ml-4 truncate text-xs text-ink-muted">
+                    Pick a calling, check off every feature it grants -- replaces hand-adding rows
+                    to the raw Calling Features table one at a time
+                  </span>
+                </Link>
+              </li>
+            )}
             {canManageTemplates && (
               <li>
                 <Link

@@ -226,7 +226,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "calling_features",
     label: "Calling Features",
     description:
-      "Which feature(s) each calling grants to whoever currently holds it (2026-10-04) -- one row per (calling, feature) pair. A calling with no rows here grants nothing. See /admin's own feature list for what each one does; grouped by category there (Sacrament Meeting, Bishopric Meeting, Ward Council, Youth Council, Tools, Table Admin).",
+      "Which feature(s) each calling grants to whoever currently holds it -- one row per (calling, feature) pair. A calling with no rows here grants nothing. Use the dedicated \"Calling Features\" tool (linked from Other Admin Tools below) instead for everyday assignment -- a checklist per calling, not one row at a time; this raw grid is a fallback for troubleshooting or a bulk fix.",
     requiredFeature: "table_admin_callings",
     columns: [
       { column: "calling_id", label: "Calling", type: "foreign_key", required: true, foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },

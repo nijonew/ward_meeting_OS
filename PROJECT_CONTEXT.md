@@ -340,9 +340,49 @@ exclusive access.
     The user will need to re-grant their own account's calling at least
     `table_admin_callings` directly in Supabase's Table Editor
     (`calling_features`, matched by `calling_id`/`feature_key`) as a
-    one-time manual step, then use Table Admin's new "Calling Features"
-    grid to assign the rest -- the same bootstrapping situation as the
-    first pass, one more time.
+    one-time manual step, then use the "Calling Features" tool below to
+    assign the rest -- the same bootstrapping situation as the first
+    pass, one more time.
+  - **Calling Features assignment UI** (`/admin/calling-features`,
+    built the same day the user first tried the raw grid approach and
+    flagged the real problem with it: "adding a row for each calling x
+    the number of features for that calling... could be thousands of
+    rows"): a dropdown to pick a calling, then every feature rendered
+    as a checkbox grouped by category (same fixed order as the
+    migration's own insert order -- Sacrament Meeting, Bishopric
+    Meeting, Ward Council, Youth Council, Tools, Table Admin -- since
+    `features` has no category-ordering column of its own, just a
+    per-feature `sort_order` within one), pre-checked for whatever that
+    calling already grants, one "Save Changes" button. `saveCallingFeatures`
+    (`app/admin/calling-features/actions.ts`) diffs the submitted
+    checked set against what's actually in `calling_features` and only
+    inserts/deletes the rows that changed, rather than clearing and
+    re-adding everything -- a save can never leave the calling with a
+    momentarily-empty feature set partway through. Same
+    dirty-tracking/Saving-Saved feedback pattern as every other "our
+    favorite grid format" page in this app
+    (`components/admin/CallingFeaturesForm.tsx`), same
+    `table_admin_callings` gate as the raw grid it's a front end for --
+    `/admin`'s "Other Admin Tools" section links to it, and the raw
+    `calling_features` Table Admin entry's own description now points
+    here for everyday use, keeping the generic grid itself only as a
+    troubleshooting/bulk-fix fallback.
+  - **Bug found and fixed the same day, before `060` was ever run**: the
+    meeting-type action features' labels (`sacrament_viewing`,
+    `bishopric_meeting_planning`, etc.) were just "Viewing"/"Planning"/
+    "Template Creation"/"Agenda Item Adding"/"Note Taking" -- identical
+    across all four meeting types, relying entirely on the `category`
+    column (shown as a heading on the new checklist, but not
+    necessarily visible everywhere a label might appear, e.g.
+    `AppHeader`'s feature tooltip if it ever switched from raw keys to
+    labels) to disambiguate. The user caught this directly: "it appears
+    that the meeting type viewing/template/planning features don't
+    have the meeting types in the feature titles." Fixed by amending
+    migration `060` in place (not yet run, so no new migration number
+    needed) -- all 20 of these labels now spell out their meeting type
+    (e.g. "Sacrament Meeting Viewing", "Bishopric Meeting Planning").
+    The other ~38 features were already unique on their own and didn't
+    need this.
   - `AppHeader`'s "signed in as" name + feature-tooltip (added during
     the first pass, unchanged structurally) now lists whichever of the
     ~58 granular keys the signed-in account actually holds.
