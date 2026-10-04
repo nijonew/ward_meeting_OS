@@ -48,16 +48,17 @@ function deriveTitle(description: string): string {
  * submitAgendaItem. Re-checks "attends a meeting, or is Bishopric"
  * server-side too, not just via the page's own gate, for the same
  * defense-in-depth reason submitAgendaItem re-checks meeting-type
- * access. Also allows Communications Specialist outright (2026-10-04
- * bug fix -- see app/submit/announcement/page.tsx's own comment),
- * matching the page's own gate exactly.
+ * access. Also allows the `announcement_adding` feature outright
+ * (2026-10-04, granular-features pass -- replaces the old scalar
+ * "bishopric"/"communications_specialist" role check), matching the
+ * page's own gate exactly.
  */
 export async function submitAnnouncement(formData: FormData) {
   const supabase = await createClient();
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric") && !hasFeature(profile, "communications_specialist")) {
+  if (!hasFeature(profile, "announcement_adding")) {
     const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
     if (allowedTypes.length === 0) {
       redirect(
@@ -143,7 +144,10 @@ export async function submitAnnouncement(formData: FormData) {
  * to decide which "My meetings" tiles show up -- this is a real access
  * boundary now that submission isn't open to anyone with the link, so
  * it can't rely on the UI alone to keep someone from POSTing a
- * meeting_type they have no calling-based access to.
+ * meeting_type they have no calling-based or feature-granted access
+ * to. No more separate "Bishopric bypasses this check" branch
+ * (2026-10-04, granular-features pass) -- an account holding that
+ * type's own planning feature is already included in this same list.
  */
 export async function submitAgendaItem(formData: FormData) {
   const supabase = await createClient();
@@ -159,15 +163,13 @@ export async function submitAgendaItem(formData: FormData) {
     redirect(`/submit/agenda-item?error=${encodeURIComponent("Meeting, date, and description are required.")}`);
   }
 
-  if (!hasFeature(profile, "bishopric")) {
-    const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
-    if (!allowedTypes.includes(meetingTypeSlug)) {
-      redirect(
-        `/submit/agenda-item?error=${encodeURIComponent(
-          "You don't have access to submit an agenda item for that meeting."
-        )}`
-      );
-    }
+  const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
+  if (!allowedTypes.includes(meetingTypeSlug)) {
+    redirect(
+      `/submit/agenda-item?error=${encodeURIComponent(
+        "You don't have access to submit an agenda item for that meeting."
+      )}`
+    );
   }
 
   const meetingId = await getOrCreateMeetingId(dateIso, meetingTypeSlug);

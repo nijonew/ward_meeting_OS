@@ -180,11 +180,11 @@ export default async function RotationsPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "rotations")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Assignment Rotations" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can manage assignment rotations.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to manage assignment rotations.</p>
       </main>
     );
   }

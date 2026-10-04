@@ -25,11 +25,11 @@ export default async function VerifyLoginsPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "verify_logins")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Admin" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can verify logins.</p>
+        <p className="mt-10 text-ink-muted">You don&rsquo;t have access to verify logins.</p>
       </main>
     );
   }

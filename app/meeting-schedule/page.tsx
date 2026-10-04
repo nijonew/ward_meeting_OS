@@ -12,11 +12,11 @@ export default async function MeetingSchedulePage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "meeting_schedule")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Schedule" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can manage the meeting schedule.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to manage the meeting schedule.</p>
       </main>
     );
   }

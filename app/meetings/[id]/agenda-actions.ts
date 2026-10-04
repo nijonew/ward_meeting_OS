@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { FIELD_SEPARATOR } from "@/lib/data/agenda-rows";
 import { lookupHymnTitles } from "@/lib/data/hymnal";
+import { getMeetingById } from "@/lib/data/meetings";
+import { meetingFeature } from "@/lib/data/meeting-features";
 
 type SaveGridActionResult = { error?: string; success?: boolean };
 
@@ -76,9 +78,15 @@ export async function saveAgendaGrid(
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
   // Same gate the planning page itself enforces -- re-checked here
-  // rather than trusting the UI, matching every other role-gated action
-  // in this app.
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  // rather than trusting the UI, matching every other feature-gated
+  // action in this app. `roleTable` alone can't tell apart Bishopric
+  // Meeting/Ward Council/Youth Council (all three share
+  // "bishopric_assignments"), so the meeting's own real type is looked
+  // up fresh rather than guessed from it (2026-10-04, replacing a
+  // single blanket "bishopric" check).
+  const meeting = await getMeetingById(meetingId);
+  if (!meeting) return { error: "Could not load this meeting." };
+  if (!hasFeature(profile, meetingFeature(meeting.meetingType, "planning"))) return { error: "Not authorized." };
 
   const supabase = await createClient();
 

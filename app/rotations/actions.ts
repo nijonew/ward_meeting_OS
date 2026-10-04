@@ -4,10 +4,21 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncRotationMembership, gridColumnsFor, gridTableFor, pushRotationToUpcomingMeetings } from "@/lib/data/rotations";
 import type { MeetingTypeSlug } from "@/lib/types";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 type ActionResult = { success: true } | { error: string };
 type PushActionResult = { error?: string; filled?: number; skippedExisting?: number };
 type SaveGridActionResult = { error?: string; success?: boolean };
+
+// None of these actions had a server-side check at all before this
+// (2026-10-04, found while converting the page's own gate to the
+// granular-features model) -- only the page's own gate kept the grid
+// and its controls out of a non-admin's view.
+async function requireRotationsFeature(): Promise<{ error: string } | null> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "rotations")) return { error: "Not authorized." };
+  return null;
+}
 
 /** Grid field names are "<meetingId>::<roleKey>" so one <form> can carry
  *  every row's selects at once (see app/rotations/page.tsx) -- this
@@ -35,6 +46,9 @@ export async function saveAssignmentGrid(
   _prevState: unknown,
   formData: FormData
 ): Promise<SaveGridActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const table = gridTableFor(meetingTypeSlug);
   const columnKeys = new Set(gridColumnsFor(meetingTypeSlug).map((c) => c.key));
@@ -76,6 +90,9 @@ export async function pushRotation(
   _prevState: unknown,
   formData: FormData
 ): Promise<PushActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
   const fromDate = String(formData.get("from_date") ?? "");
   if (!fromDate) return { error: "Choose a start date." };
 
@@ -87,6 +104,9 @@ export async function pushRotation(
 }
 
 export async function syncRotation(rotationId: string): Promise<ActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
   const result = await syncRotationMembership(rotationId);
   if (result.error) return { error: result.error };
   revalidatePath("/rotations");
@@ -94,6 +114,9 @@ export async function syncRotation(rotationId: string): Promise<ActionResult> {
 }
 
 export async function addRotationMember(rotationId: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const personId = String(formData.get("person_id") ?? "");
   if (!personId) return { error: "Choose a person." };
@@ -117,6 +140,9 @@ export async function addRotationMember(rotationId: string, formData: FormData):
 }
 
 export async function removeRotationMember(memberId: string): Promise<ActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("rotation_members").delete().eq("id", memberId);
   if (error) return { error: error.message };
@@ -129,6 +155,9 @@ export async function moveRotationMember(
   memberId: string,
   direction: "up" | "down"
 ): Promise<ActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const { data: members, error } = await supabase

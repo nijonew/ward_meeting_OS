@@ -25,10 +25,11 @@ export default async function ConductingViewPage({
   }
   // Had no role check at all before 2026-09-10 -- any logged-in account
   // could read any meeting's full conducting script, the same gap
-  // already found and fixed for Planning/Live on 2026-09-08. Whoever
-  // conducts is Bishopric; a non-admin wanting this meeting's program
-  // wants the actual public page instead.
-  if (!hasFeature(profile, "bishopric")) {
+  // already found and fixed for Planning/Live on 2026-09-08. Conducting
+  // only exists for Sacrament Meeting, hence its own dedicated feature
+  // (2026-10-04) rather than a per-type lookup; a non-admin wanting
+  // this meeting's program wants the actual public page instead.
+  if (!hasFeature(profile, "sacrament_conducting")) {
     redirect(`/meetings/${meetingId}/public`);
   }
 

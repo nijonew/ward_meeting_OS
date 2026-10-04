@@ -18,11 +18,11 @@ export default async function SpeakerPrayerHistoryPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "speaker_prayer_history")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Speaker & Prayer History" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can view speaker and prayer history.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to speaker and prayer history.</p>
       </main>
     );
   }

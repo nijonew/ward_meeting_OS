@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
 import { ADMIN_TABLES } from "@/lib/admin/registry";
 import type { AdminTableConfig } from "@/lib/admin/types";
 
@@ -40,16 +40,14 @@ export default async function AdminIndexPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Admin" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can access table admin.</p>
-      </main>
-    );
-  }
-
-  const allTables = Object.values(ADMIN_TABLES);
+  // Per-table now (2026-10-04, the user's own request: "table admin
+  // for each table as a separate listing") -- the index itself needs
+  // no blanket gate at all, it just lists whichever tables the viewer
+  // actually has a feature for; an account with none of them simply
+  // sees an empty list, same as any other filtered view in this app.
+  const canManageTemplates = hasFeature(profile, "meeting_templates_admin");
+  const canVerifyLogins = hasFeature(profile, "verify_logins");
+  const allTables = Object.values(ADMIN_TABLES).filter((t) => hasFeature(profile, t.requiredFeature as Feature));
   // Alphabetical, per the user's own request (2026-10-03) -- only this
   // main list; "Sacrament Meeting Content" below and "Other Admin
   // Tools" (Meeting Templates) each keep their own existing order.
@@ -89,38 +87,45 @@ export default async function AdminIndexPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="font-display text-xl">Other Admin Tools</h2>
-        <p className="mt-1 text-xs text-ink-muted">
-          Not generic-grid editors -- these have dedicated add/remove/reorder UIs of their own.
-        </p>
-        <ul className="mt-3 divide-y divide-rule rounded border border-rule bg-surface">
-          <li>
-            <Link
-              href="/admin/meeting-templates"
-              className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
-            >
-              <span className="font-medium text-ink">Meeting Templates</span>
-              <span className="ml-4 truncate text-xs text-ink-muted">
-                Default agenda elements new meetings are seeded with, by meeting type (and format,
-                for Sacrament Meeting)
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/admin/verify-logins"
-              className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
-            >
-              <span className="font-medium text-ink">Verify Logins</span>
-              <span className="ml-4 truncate text-xs text-ink-muted">
-                Match a new login to a person and set their role -- also reachable from the banner
-                at the top of the page whenever one is waiting
-              </span>
-            </Link>
-          </li>
-        </ul>
-      </section>
+      {(canManageTemplates || canVerifyLogins) && (
+        <section>
+          <h2 className="font-display text-xl">Other Admin Tools</h2>
+          <p className="mt-1 text-xs text-ink-muted">
+            Not generic-grid editors -- these have dedicated add/remove/reorder UIs of their own.
+          </p>
+          <ul className="mt-3 divide-y divide-rule rounded border border-rule bg-surface">
+            {canManageTemplates && (
+              <li>
+                <Link
+                  href="/admin/meeting-templates"
+                  className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
+                >
+                  <span className="font-medium text-ink">Meeting Templates</span>
+                  <span className="ml-4 truncate text-xs text-ink-muted">
+                    Default agenda elements new meetings are seeded with, by meeting type (and
+                    format, for Sacrament Meeting)
+                  </span>
+                </Link>
+              </li>
+            )}
+            {canVerifyLogins && (
+              <li>
+                <Link
+                  href="/admin/verify-logins"
+                  className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
+                >
+                  <span className="font-medium text-ink">Verify Logins</span>
+                  <span className="ml-4 truncate text-xs text-ink-muted">
+                    Match a new login to a person -- their access then follows automatically from
+                    whichever calling(s) that person holds. Also reachable from the banner at the
+                    top of the page whenever one is waiting.
+                  </span>
+                </Link>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

@@ -7,20 +7,25 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 type ActionResult = { success: true } | { error: string };
 
 /**
- * RABNM entries (recognitions/advancements/baptisms/new members) are
- * restricted to the Bishopric role -- ward clerk and executive secretary
- * are folded into that shared role today (see PROJECT_CONTEXT.md), so
- * this is the closest available scoping. Re-checked here rather than
- * only gating the UI, matching the enforcement-boundary pattern used by
- * every other role-gated action in this app (e.g.
- * app/admin/[table]/actions.ts). Nothing else in this file is
- * role-gated -- this restriction is specific to RABNM per the user's
- * decision, not a change to who can edit the rest of Sacrament Meeting
- * planning.
+ * RABNM entries (recognitions/advancements/baptisms/new members) get
+ * their own granular feature, `sacrament_rabnm` (2026-10-04), distinct
+ * from general Sacrament Meeting planning per the user's own
+ * breakdown. Re-checked here rather than only gating the UI, matching
+ * the enforcement-boundary pattern used by every other feature-gated
+ * action in this app (e.g. app/admin/[table]/actions.ts).
  */
-async function requireBishopric(): Promise<ActionResult | null> {
+async function requireRabnmFeature(): Promise<ActionResult | null> {
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  if (!hasFeature(profile, "sacrament_rabnm")) return { error: "Not authorized." };
+  return null;
+}
+
+/** `savePlanningInfo` below had no server-side check at all before
+ *  this -- an incidental gap found while re-gating this file for the
+ *  new feature system, fixed alongside it. */
+async function requireSacramentPlanning(): Promise<ActionResult | null> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "sacrament_planning")) return { error: "Not authorized." };
   return null;
 }
 
@@ -37,6 +42,9 @@ async function requireBishopric(): Promise<ActionResult | null> {
  * Notes or similar ever needs a home again.
  */
 export async function savePlanningInfo(meetingId: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requireSacramentPlanning();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const payload: Record<string, unknown> = {
@@ -71,7 +79,7 @@ export async function savePlanningInfo(meetingId: string, formData: FormData): P
  * than needing Table Admin's raw grid for that one case.
  */
 export async function deleteRabnmItem(rabnmId: string, meetingId: string): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireRabnmFeature();
   if (denied) return denied;
 
   const supabase = await createClient();

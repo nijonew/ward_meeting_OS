@@ -1,11 +1,8 @@
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { getWardEvents } from "@/lib/data/ward-events";
-
-const YOUTH_MANAGE_FEATURES: Feature[] = ["bishopric", "yw_presidency", "yw_advisor", "yw_specialist", "ym_advisor", "ym_specialist"];
-const WARD_MANAGE_FEATURES: Feature[] = ["bishopric", "communications_specialist"];
 
 type ViewFilter = "youth" | "ward" | "both";
 
@@ -52,8 +49,8 @@ export default async function ScheduledEventsPage({
   const view: ViewFilter = rawView === "youth" || rawView === "ward" ? rawView : "both";
 
   const { profile } = await getSessionUser();
-  const canManageYouth = YOUTH_MANAGE_FEATURES.some((f) => hasFeature(profile, f));
-  const canManageWard = WARD_MANAGE_FEATURES.some((f) => hasFeature(profile, f));
+  const canManageYouth = hasFeature(profile, "youth_activity_planning");
+  const canManageWard = hasFeature(profile, "ward_event_planning");
 
   const [youthActivities, wardEvents] = await Promise.all([
     view !== "ward" ? getYouthActivities() : Promise.resolve([]),

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import {
   addWardEventScheduleRule as addRule,
   updateWardEventScheduleRule as updateRule,
@@ -12,13 +12,11 @@ import {
 
 type ActionResult = { success: true } | { error: string };
 
-// Matches app/ward-events/page.tsx's MANAGE_FEATURES exactly -- whoever
-// can add a one-off event can also set up its recurring cadence.
-const MANAGE_FEATURES: Feature[] = ["bishopric", "communications_specialist"];
-
+// Matches app/ward-events/page.tsx's own gate exactly -- whoever can
+// add a one-off event can also set up its recurring cadence.
 async function requireManageRole(): Promise<{ error: string } | null> {
   const { profile } = await getSessionUser();
-  if (!MANAGE_FEATURES.some((f) => hasFeature(profile, f))) return { error: "Not authorized." };
+  if (!hasFeature(profile, "ward_event_planning")) return { error: "Not authorized." };
   return null;
 }
 

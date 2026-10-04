@@ -14,6 +14,7 @@ import { getCurrentHolderIdByCallingName } from "@/lib/data/callings";
 import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
 import { getEligiblePeopleByElementKey } from "@/lib/data/rotations";
 import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
@@ -82,17 +83,19 @@ export default async function PlanningViewPage({
   if (!user) {
     redirect("/login");
   }
-  const isAdmin = hasFeature(profile, "bishopric");
 
   const meeting = await getMeetingById(meetingId);
   if (!meeting) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
-  // Editing is admin-only (2026-09-08 -- this page previously had no
-  // role check at all, so any logged-in account could edit any
-  // meeting's assignments/music/speakers/free-text elements). Everyone
-  // else gets redirected to the read-only view, which enforces its own
-  // calling-based access and stage rules from there.
+  // Editing requires this specific meeting type's own planning feature
+  // (2026-10-04, replacing a single blanket "bishopric" check -- see
+  // PROJECT_CONTEXT.md's Architecture section). Before 2026-09-08 this
+  // page had no check at all, so any logged-in account could edit any
+  // meeting's assignments/music/speakers/free-text elements; everyone
+  // lacking the feature gets redirected to the read-only view, which
+  // enforces its own calling-based access and stage rules from there.
+  const isAdmin = hasFeature(profile, meetingFeature(meeting.meetingType, "planning"));
   if (!isAdmin) {
     redirect(`/meetings/${meetingId}/archived`);
   }

@@ -1,16 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import type { MeetingTypeSlug } from "@/lib/types";
 import type { Feature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
 
-/** "ward_council"/"youth_council" features (2026-10-04) grant viewing
- *  access to exactly that one meeting type, nothing more -- a
- *  feature-based alternative path to the same access
- *  meeting_type_members already grants by calling. See
- *  getVisibleMeetingTypesForUser below, which unions both sources. */
-const FEATURE_MEETING_TYPES: Partial<Record<Feature, MeetingTypeSlug>> = {
-  ward_council: "ward-council",
-  youth_council: "youth-council",
-};
+const ALL_MEETING_TYPE_SLUGS: MeetingTypeSlug[] = [
+  "sacrament-meeting",
+  "bishopric-meeting",
+  "ward-council",
+  "youth-council",
+];
 
 /**
  * Which meeting types a given logged-in account should see tiles for in
@@ -21,19 +19,30 @@ const FEATURE_MEETING_TYPES: Partial<Record<Feature, MeetingTypeSlug>> = {
  * same calling-to-meeting-type mapping already used for rotation
  * eligibility, lib/data/rotations.ts) -> meeting types.
  *
- * `features` (optional, 2026-10-04) additionally unions in whichever
- * meeting type(s) those features themselves grant (FEATURE_MEETING_TYPES)
- * -- a second, independent path to the same kind of access, for an
- * account whose Ward Council/Youth Council feature came from a calling
- * flagged directly for it rather than relying on meeting_type_members.
- * Omitting it keeps the old calling-only behavior exactly as it was.
+ * `features` (optional, 2026-10-04, rewritten for the granular-features
+ * model) additionally unions in every meeting type this account holds
+ * any of the `<type>_viewing`/`<type>_planning`/`<type>_agenda_items`
+ * features for -- a second, independent path to the same kind of
+ * access, for an account whose access to a type came from a calling's
+ * own feature grant rather than (or in addition to) meeting_type_members.
+ * Any one of the three implies inclusion here deliberately: an admin
+ * managing a meeting type should see its tile/be allowed to submit for
+ * it too, and someone granted only agenda-item access for a type (no
+ * viewing/planning at all) still counts as "attends" it for
+ * submitAgendaItem/submitAnnouncement's own checks -- without needing
+ * every feature granted separately on the same calling. `template`/
+ * `notes` are deliberately excluded -- those are sub-permissions once
+ * already involved with a type, not signals of attendance on their
+ * own. Omitting `features` keeps the old calling-only behavior exactly
+ * as it was. Replaces the old role-based "Bishopric sees every type"
+ * shortcut every caller used to special-case on top of this function --
+ * under granular features there's no single "is admin" flag, so a
+ * caller that needs "every type I can plan" should just rely on this
+ * list directly, matching every feature actually granted.
  *
  * Returns an empty list for an account with no matched `people` row and
  * no feature-granted type -- callers should treat that as "no tiles,"
- * not an error. The Bishopric feature is NOT resolved this way --
- * callers should just show every type for that feature directly, since
- * admins manage everything regardless of which calling happens to be
- * recorded against their own account.
+ * not an error.
  *
  * This only controls which tile *shows up* for "My meetings" -- for the
  * other callers (submitAgendaItem/submitAnnouncement's own access
@@ -45,8 +54,14 @@ export async function getVisibleMeetingTypesForUser(userId: string, features?: S
   const slugs = new Set<MeetingTypeSlug>();
 
   if (features) {
-    for (const [feature, slug] of Object.entries(FEATURE_MEETING_TYPES) as [Feature, MeetingTypeSlug][]) {
-      if (features.has(feature)) slugs.add(slug);
+    for (const type of ALL_MEETING_TYPE_SLUGS) {
+      if (
+        features.has(meetingFeature(type, "viewing")) ||
+        features.has(meetingFeature(type, "planning")) ||
+        features.has(meetingFeature(type, "agenda_items"))
+      ) {
+        slugs.add(type);
+      }
     }
   }
 

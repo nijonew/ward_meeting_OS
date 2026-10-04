@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import {
   addYouthActivityScheduleRule as addRule,
   updateYouthActivityScheduleRule as updateRule,
@@ -12,14 +12,11 @@ import {
 
 type ActionResult = { success: true } | { error: string };
 
-// Matches app/youth-activities/page.tsx's MANAGE_FEATURES exactly --
-// whoever can add a one-off activity can also set up its recurring
-// cadence.
-const MANAGE_FEATURES: Feature[] = ["bishopric", "yw_presidency", "yw_advisor", "yw_specialist", "ym_advisor", "ym_specialist"];
-
+// Matches app/youth-activities/page.tsx's own gate exactly -- whoever
+// can add a one-off activity can also set up its recurring cadence.
 async function requireManageRole(): Promise<{ error: string } | null> {
   const { profile } = await getSessionUser();
-  if (!MANAGE_FEATURES.some((f) => hasFeature(profile, f))) return { error: "Not authorized." };
+  if (!hasFeature(profile, "youth_activity_planning")) return { error: "Not authorized." };
   return null;
 }
 

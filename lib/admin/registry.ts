@@ -114,6 +114,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Ward Settings",
     description:
       "The ward's own display name, shown as \"<name> Ward\" in the header on every page. Keep exactly one row -- there's nowhere else this is defined, and deleting it (or adding a second row) leaves the header showing a generic fallback.",
+    requiredFeature: "table_admin_ward_settings",
     columns: [{ column: "ward_name", label: "Ward Name", type: "text", required: true }],
   },
 
@@ -122,6 +123,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Dropdown Option Lists",
     description:
       "Manage the choices shown in other tables' status dropdowns (currently Calling Planning's Calling Status and Release Status). Deleting every row for a Field Key falls back to that field's built-in default list rather than showing no choices at all.",
+    requiredFeature: "table_admin_admin_select_options",
     orderBy: { column: "field_key", ascending: true },
     columns: [
       { column: "field_key", label: "Field Key", type: "select", required: true, options: OPTION_FIELD_KEYS },
@@ -136,6 +138,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Music Reference",
     description:
       "Reference list of hymn/song numbers and titles across the three current music collections -- for looking things up while entering Sacrament Meeting Music, not tied to any specific meeting.",
+    requiredFeature: "table_admin_hymnal_songs",
     orderBy: { column: "songbook", ascending: true },
     columns: [
       { column: "songbook", label: "Songbook", type: "select", required: true, options: SONGBOOKS },
@@ -151,6 +154,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Agenda Items",
     description:
       "Submitted agenda items for bishopric/council meetings. The /submit/agenda-item form (login + calling-gated) sets Meeting and Status itself (published by default, straight onto that meeting's agenda) -- this grid is mainly for fixing a mistake or adding one directly.",
+    requiredFeature: "table_admin_agenda_items",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },
@@ -168,6 +172,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Announcements",
     description:
       "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one. Organization/Type are free text (not a fixed dropdown) since the real form's \"Other\" answers shouldn't get stranded outside a fixed list; Audience/Where Announced are comma-separated (the form's checkbox questions -- no multi-select column type yet).",
+    requiredFeature: "table_admin_announcements",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "title", label: "Title", type: "text", required: true },
@@ -192,6 +197,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   bishopric_assignments: {
     table: "bishopric_assignments",
     label: "Bishopric Meeting Assignment Rotation",
+    requiredFeature: "table_admin_bishopric_assignments",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("bishopric-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...BISHOPRIC_ASSIGNMENT_ROLES] },
@@ -203,7 +209,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "callings",
     label: "Callings",
     description:
-      "The \"feature_*\" columns are what replaced the old role system (2026-10-04): whoever holds this calling automatically gets every feature checked here, and loses it automatically the moment they no longer hold it -- no separate role to set anywhere. \"Requires Self Handoff\" restricts reassigning this one calling (to a different real person, not vacating it) to whoever currently holds it -- used for Bishop succession, but works for any calling you flag this way.",
+      "\"Requires Self Handoff\" restricts reassigning this one calling (to a different real person, not vacating it) to whoever currently holds it -- used for Bishop succession, but works for any calling you flag this way. Which features this calling actually grants is set on the separate \"Calling Features\" table below, not here (2026-10-04) -- a calling can grant many features at once, which didn't fit as individual columns once the real feature list grew past a handful.",
+    requiredFeature: "table_admin_callings",
     orderBy: { column: "sort_order", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
@@ -211,23 +218,26 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "current_holder_id", label: "Current Holder", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "sort_order", label: "Sort Order", type: "number" },
       { column: "active", label: "Active", type: "boolean" },
-      { column: "feature_bishopric", label: "Bishopric", type: "boolean" },
-      { column: "feature_music_planner", label: "Music Planner", type: "boolean" },
-      { column: "feature_communications_specialist", label: "Communications Specialist", type: "boolean" },
-      { column: "feature_ward_council", label: "Ward Council", type: "boolean" },
-      { column: "feature_youth_council", label: "Youth Council", type: "boolean" },
-      { column: "feature_yw_presidency", label: "YW Presidency", type: "boolean" },
-      { column: "feature_yw_advisor", label: "YW Advisor", type: "boolean" },
-      { column: "feature_yw_specialist", label: "YW Specialist", type: "boolean" },
-      { column: "feature_ym_advisor", label: "YM Advisor", type: "boolean" },
-      { column: "feature_ym_specialist", label: "YM Specialist", type: "boolean" },
       { column: "requires_self_handoff", label: "Requires Self Handoff", type: "boolean" },
+    ],
+  },
+
+  calling_features: {
+    table: "calling_features",
+    label: "Calling Features",
+    description:
+      "Which feature(s) each calling grants to whoever currently holds it (2026-10-04) -- one row per (calling, feature) pair. A calling with no rows here grants nothing. See /admin's own feature list for what each one does; grouped by category there (Sacrament Meeting, Bishopric Meeting, Ward Council, Youth Council, Tools, Table Admin).",
+    requiredFeature: "table_admin_callings",
+    columns: [
+      { column: "calling_id", label: "Calling", type: "foreign_key", required: true, foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
+      { column: "feature_key", label: "Feature", type: "foreign_key", required: true, foreignKey: { table: "features", valueColumn: "key", labelColumn: "label" } },
     ],
   },
 
   council_notes: {
     table: "council_notes",
     label: "Council Notes",
+    requiredFeature: "table_admin_council_notes",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
       { column: "notes", label: "Notes", type: "long_text" },
@@ -238,6 +248,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   meeting_action_items: {
     table: "meeting_action_items",
     label: "Meeting Action Items",
+    requiredFeature: "table_admin_meeting_action_items",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
@@ -253,6 +264,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Meeting Element Notes",
     description:
       "Free-text for planning-view elements with no table of their own -- e.g. Spiritual Thought and Handbook Training notes on the Bishopric Meeting side (element_key identifies which one). Most tables here have an obvious use; this one is closer to a catch-all, so it's normal not to need it often.",
+    requiredFeature: "table_admin_meeting_element_notes",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
       { column: "element_key", label: "Element Key", type: "text", required: true },
@@ -266,6 +278,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Meetings",
     description:
       "Edit meeting metadata. Stage and the agenda share link are managed by the app, not editable here. Prefer /meetings/new or /meeting-schedule to create new meetings so rotations get assigned automatically -- a row added here skips that.",
+    requiredFeature: "table_admin_meetings",
     orderBy: { column: "date", ascending: false },
     columns: [
       { column: "meeting_type_id", label: "Meeting Type", type: "foreign_key", required: true, foreignKey: { table: "meeting_types", valueColumn: "id", labelColumn: "name" } },
@@ -280,6 +293,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "People",
     description:
       "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. Calling is read-only here (edit who holds a calling via /callings or Table Admin's own Callings grid instead). Attendance Status, Active, and Notes still exist on this table -- active still controls assignment-picker visibility -- but aren't editable from this grid anymore (2026-10-03, the user's own request); edit them directly in Supabase if ever needed.",
+    requiredFeature: "table_admin_people",
     orderBy: { column: "name", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
@@ -304,6 +318,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Meeting Rotations",
     description:
       "Raw-data fallback for troubleshooting or a bulk fix -- for everyday assigning, use the applied-assignment grid at /rotations or that meeting's own Planning view instead.",
+    requiredFeature: "table_admin_sacrament_assignments",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "role", label: "Role", type: "select", required: true, options: [...ASSIGNMENT_ROLES] },
@@ -316,6 +331,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Meeting Music",
     description:
       "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. submitted_by is left out -- it's attribution for whoever (bishopric/music planner) entered the item, not something to reassign. status is left out too: every entry is now treated as approved the moment it's entered (see the live Music planning view), so there's nothing left to toggle here.",
+    requiredFeature: "table_admin_sacrament_music",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...MUSIC_TYPES] },
@@ -333,6 +349,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Meeting Planning",
     description:
       "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. Pick any upcoming Sunday, even one with no meeting yet -- it's created automatically when you save. Special Format actually changes which elements appear on that meeting's own planning view (its starting agenda is seeded from the matching default template at /admin/meeting-templates) -- changing it here after the fact doesn't re-seed elements already on the meeting.",
+    requiredFeature: "table_admin_sacrament_planning",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "special_format", label: "Special Format", type: "select", required: true, options: [...SPECIAL_FORMATS] },
@@ -348,7 +365,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_rabnm",
     label: "Recognitions / Advancements / Baptisms / New Members",
     description:
-      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday use, add these from that meeting's own Planning view instead. Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to the Bishopric role.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday use, add these from that meeting's own Planning view instead. Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to whoever holds the sacrament_rabnm feature.",
+    requiredFeature: "table_admin_sacrament_rabnm",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_TYPES] },
@@ -363,6 +381,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Meeting Speakers (Adult)",
     description:
       "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
+    requiredFeature: "table_admin_sacrament_speakers_adults",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -380,6 +399,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Sacrament Meeting Speakers (Youth)",
     description:
       "Raw-data fallback for troubleshooting or a bulk fix -- for everyday planning, use that meeting's own Planning view instead. Doubles as speaker history once a meeting is archived -- /speaker-prayer-history's \"who's due\" view only counts a Confirmed row here from an archived meeting, so editing a future meeting's speakers here doesn't affect who's counted as recently having a turn.",
+    requiredFeature: "table_admin_sacrament_speakers_youth",
     orderBy: { column: "slot", ascending: true },
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -395,6 +415,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
   ward_events: {
     table: "ward_events",
     label: "Ward Events",
+    requiredFeature: "table_admin_ward_events",
     orderBy: { column: "event_date", ascending: true },
     columns: [
       { column: "event_date", label: "Date", type: "date", required: true },
@@ -411,6 +432,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Youth Activities",
     description:
       "For a combined week, Group is the attendee scope (Combined YM/Combined YW/Combined YM/YW -- everyone in that scope attends) and Planning Group is which single class is on rotation to plan it -- editing Planning Group here is how to override the automatic rotation for one week without disturbing it going forward. Confirmed/Cancelled are independent of Status (which only controls public visibility).",
+    requiredFeature: "table_admin_youth_activities",
     orderBy: { column: "activity_date", ascending: true },
     columns: [
       { column: "activity_date", label: "Date", type: "date", required: true },
@@ -440,6 +462,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     label: "Youth Class Teachers",
     description:
       "Who may view/edit which class's schedule on Youth Teaching Planning. Bishopric and Young Women Presidency already see every (or every YW) class regardless of rows here -- this only matters for narrowing everyone else down to specific class(es) they're assigned to teach.",
+    requiredFeature: "table_admin_youth_class_teachers",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       { column: "person_id", label: "Person", type: "foreign_key", required: true, foreignKey: PERSON_FK },

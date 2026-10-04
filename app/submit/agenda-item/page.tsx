@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getMeetingTypes } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { submitAgendaItem } from "@/app/submit/actions";
@@ -11,15 +11,18 @@ import { AgendaItemForm } from "@/components/submit/AgendaItemForm";
  * and put behind login (2026-09-09) per the user's request: "make it
  * available only to those who attend meetings." Reached from the
  * landing page's "My meetings" section rather than a Tier-0 public
- * tile now -- reusing the exact same calling-based resolution
- * (getVisibleMeetingTypesForUser) that decides which meeting-type
- * tiles show up there, so "attends a meeting" means the same thing in
- * both places: Bishopric attends (and manages) every type; everyone
- * else only the type(s) their current calling maps to via
- * meeting_type_members. The <select> here is filtered to exactly that
- * list, and submitAgendaItem re-checks it server-side too -- the list
- * isn't just a UI convenience, it's the real access boundary now that
- * this isn't "anyone with the link" anymore.
+ * tile now -- reusing the exact same resolution (getVisibleMeetingTypesForUser)
+ * that decides which meeting-type tiles show up there, so "attends a
+ * meeting" means the same thing in both places: a calling mapped to a
+ * type via meeting_type_members, or a calling granted that type's own
+ * `_viewing`/`_planning` feature directly (2026-10-04, granular-features
+ * pass -- replaces the old blanket "Bishopric sees every type"
+ * shortcut; an account with a type's planning feature is already
+ * included in this same list, so no separate bypass is needed). The
+ * <select> here is filtered to exactly that list, and submitAgendaItem
+ * re-checks it server-side too -- the list isn't just a UI convenience,
+ * it's the real access boundary now that this isn't "anyone with the
+ * link" anymore.
  */
 export default async function SubmitAgendaItemPage({
   searchParams,
@@ -30,11 +33,10 @@ export default async function SubmitAgendaItemPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const isBishopric = hasFeature(profile, "bishopric");
-  const allowedTypes = isBishopric ? null : await getVisibleMeetingTypesForUser(user.id, profile?.features);
+  const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
 
   const meetingTypes = (await getMeetingTypes()).filter(
-    (t) => t.slug !== "sacrament-meeting" && (allowedTypes === null || allowedTypes.includes(t.slug))
+    (t) => t.slug !== "sacrament-meeting" && allowedTypes.includes(t.slug as (typeof allowedTypes)[number])
   );
 
   return (

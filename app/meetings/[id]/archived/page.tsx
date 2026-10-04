@@ -14,6 +14,7 @@ import { getActivePeople, type PersonOption } from "@/lib/data/people";
 import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 
 /**
@@ -102,7 +103,10 @@ export default async function ArchivedMeetingPage({
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
-  const isAdmin = hasFeature(profile, "bishopric");
+  // "isAdmin" here means "can edit this meeting," i.e. this specific
+  // meeting type's own planning feature (2026-10-04, replacing a
+  // single blanket "bishopric" check).
+  const isAdmin = hasFeature(profile, meetingFeature(meeting.meetingType, "planning"));
 
   if (meeting.meetingType === "sacrament-meeting") {
     // Deliberate difference from the other three types (Vision
@@ -170,8 +174,12 @@ export default async function ArchivedMeetingPage({
   // hidden from a non-admin viewer until the meeting is archived, per
   // the Vision workflow -- the rest of the agenda (role assignments,
   // ward business, music, speakers, RABNM) is already visible the
-  // moment a meeting goes live, so it isn't gated by this flag.
-  const showRealTimeNotes = isAdmin || meeting.stage === "archived";
+  // moment a meeting goes live, so it isn't gated by this flag. Whoever
+  // can plan the meeting can obviously also see its own notes, so this
+  // checks both features (2026-10-04) -- planning implies notes, not
+  // just the narrower `<type>_notes` feature alone.
+  const showRealTimeNotes =
+    isAdmin || hasFeature(profile, meetingFeature(meeting.meetingType, "notes")) || meeting.stage === "archived";
 
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) {

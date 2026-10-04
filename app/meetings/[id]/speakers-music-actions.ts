@@ -33,10 +33,13 @@ export type SaveActionResult = { error?: string; success?: boolean };
  * copy of that data.
  */
 
+/** Teaching Program (Speakers & Music) lives inside the Planning page,
+ *  so it shares that page's own feature -- `sacrament_planning`
+ *  (2026-10-04), not a separate one of its own. */
 async function requireBishopric(): Promise<{ userId: string } | ActionResult> {
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  if (!hasFeature(profile, "sacrament_planning")) return { error: "Not authorized." };
   return { userId: user.id };
 }
 

@@ -6,7 +6,8 @@ import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton"
 import { DeleteMeetingButton } from "@/components/dashboard/DeleteMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
+import { allMeetingFeatures, meetingFeature } from "@/lib/data/meeting-features";
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
 import { cancelMeeting, uncancelMeeting, deleteMeeting } from "@/app/dashboard/actions";
 import { MEETING_TYPE_LABELS, type Meeting, type MeetingTypeSlug } from "@/lib/types";
@@ -243,7 +244,13 @@ export default async function DashboardPage({
     .filter((m) => !typeFilter || m.meetingType === typeFilter)
     .filter((m) => showPast || m.date >= todayIso);
   const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
-  const canCreate = hasFeature(profile, "bishopric") && !isReadOnly;
+  // This list can show every meeting type at once (no ?type= filter) --
+  // "can manage" is no longer one blanket flag now that planning access
+  // is granted per meeting type, so each row below checks its own
+  // type's planning feature. canCreate here only gates the page-level
+  // controls (+ New Meeting, Meeting Schedule link, Unassigned Agenda
+  // Items) that aren't tied to any one meeting's type.
+  const canCreate = hasAnyFeature(profile, allMeetingFeatures("planning")) && !isReadOnly;
   const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
 
   return (
@@ -391,7 +398,7 @@ export default async function DashboardPage({
                     key={meeting.id}
                     meeting={meeting}
                     isBuilt={builtSlugs.has(meeting.meetingType)}
-                    canManage={canCreate}
+                    canManage={!isReadOnly && hasFeature(profile, meetingFeature(meeting.meetingType, "planning"))}
                     showType={!typeFilter}
                   />
                 ))}

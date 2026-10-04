@@ -3,6 +3,7 @@ import { getMeetingById } from "@/lib/data/meetings";
 import { getBishopricMeetingData } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
 import { BishopricLiveView } from "@/components/bishopric/BishopricLiveView";
 
 export default async function LiveViewPage({
@@ -18,7 +19,6 @@ export default async function LiveViewPage({
   // with the URL, logged in or not, could read live meeting minutes.
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
-  const isAdmin = hasFeature(profile, "bishopric");
 
   const meeting = await getMeetingById(meetingId);
 
@@ -31,6 +31,7 @@ export default async function LiveViewPage({
     redirect(`/meetings/${meetingId}/archived`);
   }
 
+  const isAdmin = hasFeature(profile, meetingFeature(meeting.meetingType, "planning"));
   if (!isAdmin) {
     // BishopricLiveView shows minutes/notes unconditionally -- it has no
     // "hidden until archived" logic of its own, so a non-admin (even one

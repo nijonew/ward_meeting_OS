@@ -3,10 +3,24 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateCombinedYouthActivities } from "@/lib/data/youth-activity-schedule";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export type ActionResult = { success: true } | { error: string };
 
+// None of these had a server-side check at all before this (2026-10-04,
+// found while converting the page's own gate to the granular-features
+// model) -- only the page's own gate kept the controls out of a
+// non-admin's view.
+async function requireYouthActivityPlanningFeature(): Promise<{ error: string } | null> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "youth_activity_planning")) return { error: "Not authorized." };
+  return null;
+}
+
 export async function addYouthActivity(formData: FormData): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const activity_date = formData.get("activity_date") as string;
@@ -48,6 +62,9 @@ export async function setYouthActivityStatus(
   id: string,
   status: "draft" | "published"
 ): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("youth_activities").update({ status }).eq("id", id);
 
@@ -60,6 +77,9 @@ export async function setYouthActivityStatus(
 }
 
 export async function deleteYouthActivity(id: string): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("youth_activities").delete().eq("id", id);
 
@@ -74,6 +94,9 @@ export async function deleteYouthActivity(id: string): Promise<ActionResult> {
 /** Tentative -> confirmed, or back. Independent of `status`
  *  (draft/published visibility) -- see PROJECT_CONTEXT.md. */
 export async function toggleYouthActivityConfirmed(id: string, confirmed: boolean): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("youth_activities").update({ confirmed }).eq("id", id);
 
@@ -91,6 +114,9 @@ export async function toggleYouthActivityConfirmed(id: string, confirmed: boolea
  *  instead of disappearing, per the workflow's "much like other
  *  meetings, show a cancelled week with a note" requirement. */
 export async function setYouthActivityCancellation(formData: FormData): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   const note = String(formData.get("cancellation_note") ?? "").trim() || null;
@@ -111,6 +137,9 @@ export async function setYouthActivityCancellation(formData: FormData): Promise<
 }
 
 export async function uncancelYouthActivity(id: string): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("youth_activities")
@@ -130,6 +159,9 @@ export async function generateYouthActivities(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ error?: string; created?: number; skippedExisting?: number }> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
   const throughDate = String(formData.get("through_date") ?? "");
   if (!throughDate) return { error: "Choose an end date." };
 

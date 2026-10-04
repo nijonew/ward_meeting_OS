@@ -3,13 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
+import { getMeetingById } from "@/lib/data/meetings";
 
 type ActionResult = { success: true } | { error: string };
 
-async function requireBishopric(): Promise<{ userId: string } | ActionResult> {
+// Each of these actions only ever touches one specific meeting, whose
+// type determines which planning feature is required -- replaces the
+// old blanket "bishopric" check (2026-10-04, granular-features pass).
+async function requireMeetingPlanningFeature(meetingId: string): Promise<{ userId: string } | ActionResult> {
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  const meeting = await getMeetingById(meetingId);
+  if (!meeting) return { error: "Could not load this meeting." };
+  if (!hasFeature(profile, meetingFeature(meeting.meetingType, "planning"))) {
+    return { error: "Not authorized." };
+  }
   return { userId: user.id };
 }
 
@@ -28,12 +37,12 @@ async function requireBishopric(): Promise<{ userId: string } | ActionResult> {
  * action in this app.
  */
 export async function cancelMeeting(formData: FormData): Promise<ActionResult> {
-  const auth = await requireBishopric();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Missing meeting id." };
+  const auth = await requireMeetingPlanningFeature(id);
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();
-  const id = String(formData.get("id") ?? "");
   const note = String(formData.get("cancellation_note") ?? "").trim() || null;
-  if (!id) return { error: "Missing meeting id." };
 
   const { error } = await supabase
     .from("meetings")
@@ -47,7 +56,7 @@ export async function cancelMeeting(formData: FormData): Promise<ActionResult> {
 }
 
 export async function uncancelMeeting(id: string): Promise<ActionResult> {
-  const auth = await requireBishopric();
+  const auth = await requireMeetingPlanningFeature(id);
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();
   const { error } = await supabase
@@ -84,7 +93,7 @@ export async function uncancelMeeting(id: string): Promise<ActionResult> {
  * calls could leave orphaned rows; one function call can't fail halfway).
  */
 export async function deleteMeeting(id: string): Promise<ActionResult> {
-  const auth = await requireBishopric();
+  const auth = await requireMeetingPlanningFeature(id);
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();
 

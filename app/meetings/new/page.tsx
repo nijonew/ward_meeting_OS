@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
+import type { MeetingTypeSlug } from "@/lib/types";
 import { getMeetingTypes } from "@/lib/data/meeting-types";
 import { CreateMeetingForm } from "@/components/meetings/CreateMeetingForm";
 
@@ -12,16 +14,22 @@ export default async function NewMeetingPage() {
     redirect("/login");
   }
 
-  if (!hasFeature(profile, "bishopric")) {
+  // Filtered to just the type(s) this account can actually plan
+  // (2026-10-04, replacing a single blanket "bishopric" check) -- the
+  // <select> itself is the real access boundary here, same pattern
+  // submitAgendaItem's own dropdown already uses; createMeeting
+  // re-checks the chosen type server-side too.
+  const allTypes = await getMeetingTypes();
+  const meetingTypes = allTypes.filter((t) => hasFeature(profile, meetingFeature(t.slug as MeetingTypeSlug, "planning")));
+
+  if (meetingTypes.length === 0) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="New Meeting" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can create meetings.</p>
+        <p className="mt-10 text-ink-muted">You don&rsquo;t have access to create any meeting type.</p>
       </main>
     );
   }
-
-  const meetingTypes = await getMeetingTypes();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">

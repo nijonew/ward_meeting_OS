@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
+import { getMeetingById } from "@/lib/data/meetings";
 
 export type ActionResult = { success: true } | { error: string };
 
@@ -13,9 +16,24 @@ export type ActionResult = { success: true } | { error: string };
  * type, used by every meeting of that type); that catalog is now only
  * edited via /admin/meeting-templates, and is what seeds a *new*
  * meeting's starting agenda (see seedPlannedElementsForMeeting).
+ *
+ * Had no server-side check at all before 2026-10-04 -- an incidental
+ * gap found while re-gating this app's other actions for the new
+ * feature system, fixed alongside it with the matching per-type
+ * `<type>_template` feature.
  */
+async function requireTemplateFeature(meetingId: string): Promise<ActionResult | null> {
+  const { profile } = await getSessionUser();
+  const meeting = await getMeetingById(meetingId);
+  if (!meeting) return { error: "Could not load this meeting." };
+  if (!hasFeature(profile, meetingFeature(meeting.meetingType, "template"))) return { error: "Not authorized." };
+  return null;
+}
 
 export async function addTemplateElement(meetingId: string, elementId: string): Promise<ActionResult> {
+  const denied = await requireTemplateFeature(meetingId);
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const { data: existing } = await supabase
@@ -50,6 +68,9 @@ export async function addTemplateElement(meetingId: string, elementId: string): 
 }
 
 export async function removeTemplateElement(meetingId: string, plannedRowId: string): Promise<ActionResult> {
+  const denied = await requireTemplateFeature(meetingId);
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("meeting_planned_elements").delete().eq("id", plannedRowId);
 
@@ -67,6 +88,9 @@ export async function setTemplateSlotCount(
   plannedRowId: string,
   slotCount: number
 ): Promise<ActionResult> {
+  const denied = await requireTemplateFeature(meetingId);
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("meeting_planned_elements")
@@ -87,6 +111,9 @@ export async function moveTemplateElement(
   plannedRowId: string,
   direction: "up" | "down"
 ): Promise<ActionResult> {
+  const denied = await requireTemplateFeature(meetingId);
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const { data: rows } = await supabase

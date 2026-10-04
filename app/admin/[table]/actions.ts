@@ -1,20 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
+import type { AdminTableConfig } from "@/lib/admin/types";
 import { insertAdminRow, updateAdminRow, deleteAdminRow } from "@/lib/admin/table-data";
 
 type ActionResult = { success: true } | { error: string };
 
 /**
- * Every generic admin action re-checks the role server-side rather than
- * trusting the page that rendered the button -- this file is the actual
- * enforcement boundary, not app/admin/[table]/page.tsx.
+ * Every generic admin action re-checks the table's own required
+ * feature server-side rather than trusting the page that rendered the
+ * button -- this file is the actual enforcement boundary, not
+ * app/admin/[table]/page.tsx. Per-table now (2026-10-04, the user's
+ * own request: "table admin for each table as a separate listing"),
+ * not one blanket feature for every table.
  */
-async function requireBishopric(): Promise<ActionResult | null> {
+async function requireTableFeature(config: AdminTableConfig): Promise<ActionResult | null> {
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  if (!hasFeature(profile, config.requiredFeature as Feature)) return { error: "Not authorized." };
   return null;
 }
 
@@ -23,11 +27,11 @@ export async function updateRow(
   id: string,
   patch: Record<string, unknown>
 ): Promise<ActionResult> {
-  const denied = await requireBishopric();
-  if (denied) return denied;
-
   const config = getAdminTableConfig(table);
   if (!config) return { error: "Unknown table." };
+
+  const denied = await requireTableFeature(config);
+  if (denied) return denied;
 
   const result = await updateAdminRow(config, id, patch);
   if ("success" in result) revalidatePath(`/admin/${table}`);
@@ -35,11 +39,11 @@ export async function updateRow(
 }
 
 export async function insertRow(table: string, patch: Record<string, unknown>): Promise<ActionResult> {
-  const denied = await requireBishopric();
-  if (denied) return denied;
-
   const config = getAdminTableConfig(table);
   if (!config) return { error: "Unknown table." };
+
+  const denied = await requireTableFeature(config);
+  if (denied) return denied;
 
   const result = await insertAdminRow(config, patch);
   if ("success" in result) revalidatePath(`/admin/${table}`);
@@ -47,11 +51,11 @@ export async function insertRow(table: string, patch: Record<string, unknown>): 
 }
 
 export async function deleteRow(table: string, id: string): Promise<ActionResult> {
-  const denied = await requireBishopric();
-  if (denied) return denied;
-
   const config = getAdminTableConfig(table);
   if (!config) return { error: "Unknown table." };
+
+  const denied = await requireTableFeature(config);
+  if (denied) return denied;
 
   const result = await deleteAdminRow(config, id);
   if ("success" in result) revalidatePath(`/admin/${table}`);

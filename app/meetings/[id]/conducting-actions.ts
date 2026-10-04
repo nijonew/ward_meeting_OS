@@ -16,7 +16,7 @@ import type { ConductingRow } from "@/lib/data/conducting-rows";
  */
 export async function refreshConductingScript(meetingId: string): Promise<ConductingRow[] | null> {
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) return null;
+  if (!hasFeature(profile, "sacrament_conducting")) return null;
 
   const script = await getConductingRows(meetingId);
   return script?.rows ?? null;

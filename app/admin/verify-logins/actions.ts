@@ -8,7 +8,7 @@ type ActionResult = { success: true } | { error: string };
 
 async function requireAdmin(): Promise<ActionResult | null> {
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  if (!hasFeature(profile, "verify_logins")) return { error: "Not authorized." };
   return null;
 }
 

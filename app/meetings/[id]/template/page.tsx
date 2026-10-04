@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
 import { getMeetingById } from "@/lib/data/meetings";
 import {
   getMeetingWithType,
@@ -35,11 +36,16 @@ export default async function TemplatePage({
   if (!user) {
     redirect("/login");
   }
-  if (!hasFeature(profile, "bishopric")) {
+
+  const meetingStage = await getMeetingById(meetingId);
+  if (!meetingStage) {
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
+  }
+  if (!hasFeature(profile, meetingFeature(meetingStage.meetingType, "template"))) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Agenda Elements" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can edit agenda elements.</p>
+        <p className="mt-10 text-ink-muted">You don&rsquo;t have access to edit agenda elements for this meeting.</p>
       </main>
     );
   }
@@ -51,8 +57,7 @@ export default async function TemplatePage({
   // Archived meetings are read-only from here on -- editing the agenda
   // after the fact would contradict "the agenda as it was finalized"
   // (see app/meetings/[id]/archived).
-  const meetingStage = await getMeetingById(meetingId);
-  if (meetingStage?.stage === "archived") {
+  if (meetingStage.stage === "archived") {
     redirect(`/meetings/${meetingId}/archived`);
   }
 

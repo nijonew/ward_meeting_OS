@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 050
+## Current migration number: 060
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -129,8 +129,13 @@ reconstructed from both:
   "ready for public consumption" checkbox gating Communications
   Specialist's early preview, see Known open items below): still
   needs to be run.
+- `060` (new `features` catalog table + `calling_features` many-to-many
+  join, seeds the full ~58-feature list, drops the ten `feature_*`
+  boolean columns migration `057` added to `callings` -- the granular-
+  features permissions rework, see Architecture above): still needs to
+  be run.
 
-Next migration should be `060_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `061_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -191,9 +196,9 @@ exclusive access.
     set to `https://ward-meeting-os.vercel.app` in Vercel if a
     password-reset *link* itself (as opposed to the email never
     arriving at all) ever misbehaves.
-- **Permissions** (`callings.feature_<name>` boolean columns) --
-  **eliminated the whole idea of a stored "role" entirely, 2026-10-04**,
-  after a rapid design arc the same day: first a single `profiles.role`
+- **Permissions** (`calling_features` many-to-many table) --
+  **eliminated the whole idea of a stored "role" entirely, in two
+  passes on 2026-10-04.** First pass: a single `profiles.role`
   (unchanged for most of this project's life) grew a same-day "bishop"
   vs "bishopric" split, then an admin screen (`/admin/verify-logins`)
   to set it, then a Postgres trigger (`calling_role_mappings`) to keep
@@ -201,96 +206,152 @@ exclusive access.
   and two more role values (`ward_council`/`youth_council`) -- until
   the user stepped back and noticed the trigger/mapping-table design
   was duplicating the exact same idea the pre-existing
-  `meeting_type_members` table already expressed differently: "Could
-  we be duplicating effort here? What if we eliminated roles and just
-  granted access by callings?" followed immediately by the concrete
-  instruction: "I want to eliminate roles. I want the calling table to
-  include a way to select the features that are available to that
-  calling."
-  - **Current design**: ten `feature_bishopric`/`feature_music_planner`/
-    `feature_communications_specialist`/`feature_ward_council`/
-    `feature_youth_council`/`feature_yw_presidency`/`feature_yw_advisor`/
-    `feature_yw_specialist`/`feature_ym_advisor`/`feature_ym_specialist`
-    boolean columns live directly on `callings`, editable right on
-    that same Table Admin grid. A person's access is the **union** of
-    every true flag across whichever *active* callings they currently
-    hold -- computed fresh on every request by `getSessionUser()`
-    (`lib/supabase/get-session-user.ts`), never cached. Holding two
-    callings that both grant a feature is harmless (flags OR together);
-    there's no priority/tie-breaking concept the way the deleted
-    `calling_role_mappings.priority` needed, since nothing has to pick
-    one winner anymore. Every one of the several dozen places in this
-    app that used to check `profile.role === "bishopric"` now calls
-    `hasFeature(profile, "bishopric")` instead (same helper, same
-    import, mechanical one-for-one swap across every file).
-  - **Verify Logins is now pure identity-matching** -- link a login to
-    a person, full stop. There's no role to pick anymore; access comes
+  `meeting_type_members` table already expressed differently ("Could
+  we be duplicating effort here?"), and replaced the whole thing with
+  ten `feature_bishopric`/`feature_music_planner`/etc. boolean columns
+  directly on `callings` (migration `057`) -- access as the union of
+  every true flag across whichever active callings someone held.
+  **That first pass turned out to be the same mistake with new names**:
+  the user's own correction, immediately after trying it: "I still
+  think features are being defined by role names. I would rather
+  define features by features," followed by a detailed worked example
+  (per-meeting-type viewing/planning/template/agenda-items/notes,
+  Sacrament Meeting's own extras, every standalone tool, and one
+  feature per Table Admin table) -- a real decomposition of
+  *capabilities*, not a one-for-one swap of role names into column
+  names. **Everything below is this second, current design** --
+  anywhere else in this file that still mentions `feature_bishopric`,
+  `profile.role`, or `hasFeature(profile, "bishopric"/"music_planner"/
+  "communications_specialist"/"ward_council"/"youth_council"/a youth
+  role name)` is describing one of the two superseded designs; treat
+  it as history, not what the code does today.
+  - **Current design: a `features` catalog table (migration `060`) +
+    `calling_features`, a real many-to-many join** (`calling_id`,
+    `feature_key`, plus a surrogate `id` since Table Admin's generic
+    grid engine needs one on every table) -- not a column per feature,
+    which doesn't scale past a handful of flags. ~58 granular feature
+    keys, grouped by category: per meeting type (Sacrament, Bishopric
+    Meeting, Ward Council, Youth Council) × 5 actions each
+    (`<type>_viewing`/`_planning`/`_template`/`_agenda_items`/`_notes`
+    -- 20 total), 4 Sacrament-only extras (`sacrament_music`,
+    `sacrament_conducting`, `sacrament_rabnm`, `sacrament_program_view`
+    -- a Communications-Specialist-style early preview of a future/past
+    program, independent of the day-of public page), 13 standalone
+    tools (`announcement_adding`, `announcement_management`,
+    `calling_planning`, `youth_teaching_planning`,
+    `youth_activity_planning`, `ward_event_planning`,
+    `meeting_schedule`, `meeting_cancellations`, `rotations`,
+    `speaker_prayer_history`, `callings_roster`, `verify_logins`,
+    `meeting_templates_admin`), and one feature per Table Admin table
+    (21 of them, `table_admin_<table>`) -- `/admin`'s own table list is
+    now filtered per-account by exactly these, and `/admin/[table]`
+    re-checks the specific table's own feature, not a blanket
+    "bishopric" gate. The full `Feature` union (the real source of
+    truth code checks against) lives in
+    `lib/supabase/get-session-user.ts`; the `features` table is that
+    same catalog made queryable for display/grouping in the
+    `calling_features` Table Admin grid, not itself editable through
+    the app.
+  - A person's access is still the **union** of every feature granted
+    by any *active* calling they currently hold -- computed fresh on
+    every request by `getSessionUser()`
+    (`lib/supabase/get-session-user.ts`), never cached. New
+    `hasFeature(profile, key)`/`hasAnyFeature(profile, keys[])` helpers
+    replace every old `profile.role === "..."` / first-pass
+    `hasFeature(profile, "bishopric")` check across the app -- a
+    meeting-type-specific check almost always goes through new
+    `meetingFeature(type, action)`/`allMeetingFeatures(action)`
+    (`lib/data/meeting-features.ts`) rather than a hardcoded per-type
+    string, so e.g. Bishopric Meeting/Ward Council/Youth Council's
+    shared agenda-grid save (`saveAgendaGrid`) can resolve the right
+    feature for whichever specific type a given meeting actually is.
+  - **No more "admin sees everything" bypass anywhere.** The first
+    pass still had one: a single `bishopric` feature flag that every
+    caller special-cased on top of its own real check ("show every
+    meeting type to Bishopric, every YW class to YW Presidency," etc.).
+    Under pure per-capability features there's no single flag to hang
+    a bypass on, so those are gone -- an admin simply holds the
+    specific feature for each thing they manage (e.g. all 20 meeting-
+    type features, `rotations`, every `table_admin_*` key), and is
+    included in every list/gate the normal way, same as anyone else.
+    **One real, user-confirmed behavior change from this**: Youth
+    Teaching Planning's old rule ("Bishopric sees every class, Young
+    Women Presidency sees every YW class, everyone else only their own
+    assigned class") had no granular-feature equivalent to fall back
+    on -- asked directly, the user chose to drop the bypass rather than
+    hardcode calling names as a substitute: every class anyone should
+    see, Bishopric and YW Presidency included, now needs a real
+    `youth_class_teachers` row, the same mechanism every individual
+    teacher already used. `getAccessibleClasses` (`lib/data/teaching-
+    assignments.ts`) is now a thin wrapper around
+    `getTaughtClassesForUser` -- seed rows for whoever should see
+    every class or every YW class as a one-time step in Supabase or
+    Table Admin.
+  - **"Attends a meeting" (My meetings tiles, Submit an Announcement/
+    Meeting Agenda Items gating) is now `<type>_viewing` OR
+    `<type>_planning` OR `<type>_agenda_items`** on a calling, unioned
+    with the pre-existing calling-based `meeting_type_members` mapping
+    -- all in `getVisibleMeetingTypesForUser`
+    (`lib/data/meeting-type-access.ts`). Any one of the three implies
+    inclusion deliberately (an admin managing a type should see its
+    tile too; someone granted only agenda-item access for a type still
+    counts as attending it) -- `template`/`notes` are deliberately
+    excluded, since those are sub-permissions once already involved
+    with a type, not signals of attendance on their own.
+  - **Verify Logins is pure identity-matching** -- link a login to a
+    person, full stop; there's no role to pick. Access comes
     automatically from whichever calling(s) the linked person holds.
-    "Needs verification" (`lib/data/profile-verification.ts`) changed
-    definition accordingly: no more `role is null` (that column doesn't
-    exist), now "no `people` row has this `profile_id`" -- the exact
-    same real-world state (zero access, matched to nobody), just
-    derived from the person-link instead of a deleted column. An
-    ordinary verified member with no feature-granting calling has an
-    empty feature set and that's a completely normal, expected state
-    (no "general" placeholder needed anymore either).
-  - **Bishop succession, the one thing a cached role made easy, is
-    preserved by `callings.requires_self_handoff`** instead: a general-
-    purpose boolean (not hardcoded to any specific calling by name --
-    this app has been burned twice already guessing a real calling
-    name wrong, see `STAKE_PRESIDENCY_CALLING_NAMES`'s own history) that
-    the admin flags themselves on whichever calling(s) need it. A
-    Postgres trigger (`enforce_calling_handoff`, migration `057`)
-    rejects *transferring* a flagged calling from one real holder to a
-    different real one unless the acting user (`auth.uid()`) already
-    holds it -- vacating it to null, or assigning a first holder when
-    currently vacant, stays open to any admin, so a flagged calling can
-    never get permanently stuck if its holder is unavailable.
-  - **`"ward_council"`/`"youth_council"` features** grant viewing
-    access to exactly that one meeting type -- a feature-based
-    alternative path to the same access the pre-existing calling-based
-    `meeting_type_members` mechanism already grants, nothing more.
-    `getVisibleMeetingTypesForUser` (`lib/data/meeting-type-access.ts`)
-    takes an optional `features: Set<Feature>` and unions in whatever
-    those two features grant on top of the calling-based query.
-  - **Migrations `057`/`058`, both confirmed run 2026-10-04**: `057`
-    (rewritten in place, reusing the number, since the original
-    `calling_role_sync` draft -- the trigger/mapping-table design --
-    was never confirmed run before being superseded) adds the ten
-    `feature_*` columns plus `requires_self_handoff` and its guard
-    trigger. `058` drops `profiles.role`/`role_source` -- needed as a
-    genuinely new migration rather than an in-place amend, since those
-    columns were added by migration `056`, which *was* already
-    confirmed run by this point.
-  - **Known deploy-ordering gotcha, hit live during this change**: the
-    user ran `057`/`058` (dropping `profiles.role`) a few minutes
-    *before* the matching code was pushed -- the still-live old code
-    kept querying a column that no longer existed, so `getSessionUser()`
-    silently returned a null profile for literally everyone, including
-    the Bishop account itself, until the new code deployed. Not a bug
-    in the new design, just a reminder that a schema-dropping migration
-    and its matching code deploy need to land together, not DB-first.
-  - **Bootstrapping after this shipped**: every calling's `feature_*`
-    columns default to `false`, including Bishop's -- meaning nobody
-    had any access at all immediately after deploy, and Table Admin
-    (where you'd normally fix that) requires the Bishopric feature to
-    open at all. The user had to set `feature_bishopric = true` and
-    `current_holder_id` directly in Supabase's Table Editor for the
-    Bishop calling (confirming their own `people.profile_id` link
-    first) as a one-time manual step before the app itself could be
-    used to do the rest. This is inherent to the design, not a bug --
-    flagging it here in case a *second* ward ever adopts this app
-    fresh and hits the same empty-flags bootstrap moment.
-  - `AppHeader` gained a "signed in as" name next to Sign out (the
-    user's own request, right after hitting the deploy-ordering
-    confusion above and wanting an easy way to confirm which account
-    is active): shows `display_name` or `email`, with a hover tooltip
-    listing current features for quick debugging.
+    "Needs verification" (`lib/data/profile-verification.ts`) means
+    "no `people` row has this `profile_id`" -- an ordinary verified
+    member with no feature-granting calling has an empty feature set,
+    and that's a completely normal, expected state.
+  - **Bishop succession is preserved by `callings.requires_self_handoff`**
+    (migration `057`, untouched by `060`): a general-purpose boolean
+    (not hardcoded to any specific calling by name -- this app has been
+    burned twice already guessing a real calling name wrong, see
+    `STAKE_PRESIDENCY_CALLING_NAMES`'s own history) that the admin
+    flags themselves on whichever calling(s) need it. A Postgres
+    trigger (`enforce_calling_handoff`) rejects *transferring* a
+    flagged calling from one real holder to a different real one
+    unless the acting user (`auth.uid()`) already holds it -- vacating
+    it to null, or assigning a first holder when currently vacant,
+    stays open to any admin, so a flagged calling can never get
+    permanently stuck if its holder is unavailable. Succession
+    protection is orthogonal to how features are catalogued, so this
+    needed no change across either refactor pass.
+  - **Migration `060`, still needs to be run**: new `features`
+    (catalog, read-only reference data) and `calling_features` (the
+    actual many-to-many assignment) tables, seeds the full ~58-feature
+    list, and drops the ten `feature_*` boolean columns migration `057`
+    added -- fully superseded by `calling_features`.
+  - **Known deploy-ordering gotcha, hit live during the FIRST pass,
+    worth repeating for the second**: running `057`/`058` (dropping
+    `profiles.role`) a few minutes *before* the matching code was
+    pushed left the still-live old code querying a column that no
+    longer existed, so `getSessionUser()` silently returned a null
+    profile for literally everyone, including the Bishop account
+    itself, until the new code deployed. The same risk applies to `060`
+    -- don't run it meaningfully before this session's matching code is
+    live in production.
+  - **Bootstrapping after `060` ships**: every calling's feature grants
+    are gone the moment `060` drops the old `feature_*` columns, and
+    nothing has `calling_features` rows yet -- nobody has any access at
+    all, including Table Admin itself (needs `table_admin_callings`).
+    The user will need to re-grant their own account's calling at least
+    `table_admin_callings` directly in Supabase's Table Editor
+    (`calling_features`, matched by `calling_id`/`feature_key`) as a
+    one-time manual step, then use Table Admin's new "Calling Features"
+    grid to assign the rest -- the same bootstrapping situation as the
+    first pass, one more time.
+  - `AppHeader`'s "signed in as" name + feature-tooltip (added during
+    the first pass, unchanged structurally) now lists whichever of the
+    ~58 granular keys the signed-in account actually holds.
   - This is still separate from `people.profile_id` (migration `030`,
     settable from `/admin/verify-logins` or Table Admin's People grid
     as "Login Account"), which links a login to a *person* record --
     without that link, a person's callings (and therefore features)
-    can never resolve for them no matter what's flagged on `callings`.
+    can never resolve for them no matter what's granted on
+    `calling_features`.
 - **Landing page** (`app/page.tsx`): one shared URL for everyone. Tiles are
   filtered in/out by login state + role. Tapping a tile navigates to that
   feature's own page — the landing page is a router, not a replacement for

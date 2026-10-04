@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
+import { allMeetingFeatures } from "@/lib/data/meeting-features";
 
 /**
  * Hub page for the landing page's "Meeting Planning" Administration
@@ -32,11 +33,20 @@ export default async function MeetingPlanningPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  // Gated on "has at least one of this hub's own tiles' features"
+  // rather than a single blanket flag (2026-10-04, granular-features
+  // pass) -- each tile below is then shown or hidden on its own feature.
+  const canPlanAnyMeeting = hasAnyFeature(profile, allMeetingFeatures("planning"));
+  const canMeetingSchedule = hasFeature(profile, "meeting_schedule");
+  const canMeetingCancellations = hasFeature(profile, "meeting_cancellations");
+  const canRotations = hasFeature(profile, "rotations");
+  const canSpeakerPrayerHistory = hasFeature(profile, "speaker_prayer_history");
+
+  if (!canPlanAnyMeeting && !canMeetingSchedule && !canMeetingCancellations && !canRotations && !canSpeakerPrayerHistory) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Planning" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can access meeting planning.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to meeting planning.</p>
       </main>
     );
   }
@@ -56,31 +66,41 @@ export default async function MeetingPlanningPage() {
 
       <div className="mt-6">
         <TileGrid>
-          <Tile
-            title="Meeting Agendas"
-            description="Create, cancel, and manage meetings, by type"
-            href="/meeting-agendas"
-          />
-          <Tile
-            title="Meeting Schedule"
-            description="Set cadence and generate meetings"
-            href="/meeting-schedule"
-          />
-          <Tile
-            title="Meeting Cancellations"
-            description="Conferences, holidays, etc. -- auto-cancels affected meetings"
-            href="/meeting-cancellations"
-          />
-          <Tile
-            title="Assignment Rotations"
-            description="Who's next for prayers, chorister, etc."
-            href="/rotations"
-          />
-          <Tile
-            title="Speaker & Prayer History"
-            description="Who's due for a turn"
-            href="/speaker-prayer-history"
-          />
+          {canPlanAnyMeeting && (
+            <Tile
+              title="Meeting Agendas"
+              description="Create, cancel, and manage meetings, by type"
+              href="/meeting-agendas"
+            />
+          )}
+          {canMeetingSchedule && (
+            <Tile
+              title="Meeting Schedule"
+              description="Set cadence and generate meetings"
+              href="/meeting-schedule"
+            />
+          )}
+          {canMeetingCancellations && (
+            <Tile
+              title="Meeting Cancellations"
+              description="Conferences, holidays, etc. -- auto-cancels affected meetings"
+              href="/meeting-cancellations"
+            />
+          )}
+          {canRotations && (
+            <Tile
+              title="Assignment Rotations"
+              description="Who's next for prayers, chorister, etc."
+              href="/rotations"
+            />
+          )}
+          {canSpeakerPrayerHistory && (
+            <Tile
+              title="Speaker & Prayer History"
+              description="Who's due for a turn"
+              href="/speaker-prayer-history"
+            />
+          )}
         </TileGrid>
       </div>
     </main>

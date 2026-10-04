@@ -34,11 +34,11 @@ export default async function MeetingTemplatesAdminPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "meeting_templates_admin")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Templates" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can edit meeting templates.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to edit meeting templates.</p>
       </main>
     );
   }

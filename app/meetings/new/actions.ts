@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
+import type { MeetingTypeSlug } from "@/lib/types";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
 import { seedSacramentProgramItemsForMeeting } from "@/lib/data/sacrament-program";
@@ -15,11 +17,6 @@ export async function createMeeting(
 ): Promise<CreateMeetingState> {
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
-  // Re-checked server-side (2026-10-03, found while adding the
-  // duplicate-date guard below) -- this action had no role check at
-  // all before, only the page's own gate, the same gap already found
-  // and fixed for several other actions this session.
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
 
   const meeting_type_id = formData.get("meeting_type_id") as string;
   const date = formData.get("date") as string;
@@ -32,6 +29,21 @@ export async function createMeeting(
   }
 
   const supabase = await createClient();
+
+  // Re-checked server-side against the SPECIFIC chosen type's planning
+  // feature (2026-10-04, granular-features pass) -- the page's own
+  // dropdown is already filtered to this, but a POST naming a type the
+  // account has no planning feature for is rejected the same way, not
+  // just hidden from the UI. Replaces the old blanket "bishopric" check
+  // (itself only added 2026-10-03 as the first fix for this same gap).
+  const { data: chosenType } = await supabase
+    .from("meeting_types")
+    .select("slug")
+    .eq("id", meeting_type_id)
+    .maybeSingle();
+  if (!chosenType || !hasFeature(profile, meetingFeature(chosenType.slug as MeetingTypeSlug, "planning"))) {
+    return { error: "Not authorized." };
+  }
 
   // Guard against accidentally creating a second meeting for a date
   // that already has one (2026-10-03, the user's own report: "I

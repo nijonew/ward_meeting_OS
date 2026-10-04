@@ -16,22 +16,21 @@ import { AnnouncementForm } from "@/components/submit/AnnouncementForm";
  * the user's explicit instruction just now.
  *
  * "Same gatekeeping" here means the same *account-level* check Agenda
- * Item submission uses (attends a meeting by calling, or is Bishopric)
- * -- there's no per-meeting-type access question for an announcement
- * the way there is for an agenda item, so this doesn't filter a
- * dropdown the way that page does; it's a single yes/no page gate.
+ * Item submission uses (attends a meeting by calling, or holds the
+ * `announcement_adding` feature) -- there's no per-meeting-type access
+ * question for an announcement the way there is for an agenda item, so
+ * this doesn't filter a dropdown the way that page does; it's a single
+ * yes/no page gate.
  *
- * **Bug found and fixed 2026-10-04** (the user's own report: the
- * Communications Specialist role "didn't give them the access I want
- * them to have which would be access to create announcements"): the
- * role was never actually wired into this check at all -- despite its
- * name, a Communications Specialist with no calling-based meeting
- * access (meeting_type_members) was blocked here exactly like anyone
- * else with no calling. Added alongside Bishopric, not folded into
- * the general `attendsMeetings` concept used elsewhere on this page
- * (which also gates unrelated features like Meeting Agenda Items) --
- * see app/page.tsx's own `canSubmitAnnouncement` for the matching
- * landing-page tile fix.
+ * **Bug found and fixed 2026-10-04**, now superseded by the granular-
+ * features rewrite: the original report was that the Communications
+ * Specialist role "didn't give them the access I want them to have
+ * which would be access to create announcements" -- that role was
+ * never wired into this check at all. Roles are gone entirely now; the
+ * replacement is the standalone `announcement_adding` feature, granted
+ * directly to whichever calling(s) should always be able to add
+ * announcements regardless of attendance -- see app/page.tsx's own
+ * `canSubmitAnnouncement` for the matching landing-page tile check.
  */
 export default async function SubmitAnnouncementPage({
   searchParams,
@@ -42,7 +41,7 @@ export default async function SubmitAnnouncementPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const canAlwaysSubmit = hasFeature(profile, "bishopric") || hasFeature(profile, "communications_specialist");
+  const canAlwaysSubmit = hasFeature(profile, "announcement_adding");
   const attendsMeetings = canAlwaysSubmit || (await getVisibleMeetingTypesForUser(user.id, profile?.features)).length > 0;
 
   return (

@@ -16,11 +16,11 @@ export default async function CallingsListPage({
   if (!user) {
     redirect("/login");
   }
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "callings_roster")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Callings" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can manage callings.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to manage callings.</p>
       </main>
     );
   }

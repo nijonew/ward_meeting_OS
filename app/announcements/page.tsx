@@ -11,11 +11,11 @@ export default async function AnnouncementsInboxPage() {
     redirect("/login");
   }
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "announcement_management")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Announcements" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can review submissions.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to review submissions.</p>
       </main>
     );
   }

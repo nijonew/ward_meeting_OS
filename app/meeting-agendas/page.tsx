@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
+import { meetingFeature } from "@/lib/data/meeting-features";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 
 const ALL_MEETING_TYPES: MeetingTypeSlug[] = [
@@ -32,11 +33,15 @@ export default async function MeetingAgendasPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "bishopric")) {
+  // Gated on "can plan at least one meeting type" rather than a single
+  // blanket flag (2026-10-04, granular-features pass) -- the tile list
+  // below is then narrowed per-type to exactly what's actually planned.
+  const plannableTypes = ALL_MEETING_TYPES.filter((slug) => hasFeature(profile, meetingFeature(slug, "planning")));
+  if (!hasAnyFeature(profile, ALL_MEETING_TYPES.map((slug) => meetingFeature(slug, "planning")))) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Agendas" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can access meeting agendas.</p>
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to any meeting agendas.</p>
       </main>
     );
   }
@@ -54,7 +59,7 @@ export default async function MeetingAgendasPage() {
 
       <div className="mt-6">
         <TileGrid>
-          {ALL_MEETING_TYPES.map((slug) => (
+          {plannableTypes.map((slug) => (
             <Tile key={slug} title={MEETING_TYPE_LABELS[slug]} href={`/dashboard?type=${slug}`} />
           ))}
         </TileGrid>

@@ -2,9 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 type ActionResult = { success: true } | { error: string };
 type SaveGridActionResult = { error?: string; success?: boolean };
+
+// None of these four actions had a server-side check at all before this
+// (2026-10-04, found while converting the page's own gate to the
+// granular-features model) -- only the page's own gate kept the grid
+// and its controls out of a non-admin's view.
+async function requireCallingPlanningFeature(): Promise<{ error: string } | null> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "calling_planning")) return { error: "Not authorized." };
+  return null;
+}
 
 /**
  * Starts a new calling-change row -- the flat grid's equivalent of the
@@ -13,6 +24,9 @@ type SaveGridActionResult = { error?: string; success?: boolean };
  * detour through that calling's own detail page first.
  */
 export async function createCallingPlanningEntry(formData: FormData): Promise<ActionResult> {
+  const denied = await requireCallingPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const callingId = String(formData.get("calling_id") ?? "");
@@ -69,6 +83,9 @@ type RowPatch = Record<string, string | null> & { candidate_person_ids?: string[
  * submitted, leave whatever was there."
  */
 export async function saveCallingPlanningGrid(_prevState: unknown, formData: FormData): Promise<SaveGridActionResult> {
+  const denied = await requireCallingPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const byRow = new Map<string, RowPatch>();
@@ -113,6 +130,9 @@ export async function saveCallingPlanningGrid(_prevState: unknown, formData: For
 }
 
 export async function deleteCallingPlanningEntry(planningId: string): Promise<ActionResult> {
+  const denied = await requireCallingPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
   const { error } = await supabase.from("calling_planning").delete().eq("id", planningId);
 
@@ -135,6 +155,9 @@ export async function pushCallingToSacramentMeeting(
   _prevState: unknown,
   formData: FormData
 ): Promise<SaveGridActionResult> {
+  const denied = await requireCallingPlanningFeature();
+  if (denied) return denied;
+
   const supabase = await createClient();
 
   const meetingId = String(formData.get("meeting_id") ?? "");

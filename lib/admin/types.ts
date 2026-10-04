@@ -96,6 +96,16 @@ export interface AdminTableConfig {
   description?: string;
   orderBy?: { column: string; ascending?: boolean };
   columns: AdminColumnConfig[];
+  /**
+   * The one feature that gates this specific table (2026-10-04, the
+   * user's own request: "table admin for each table as a separate
+   * listing") -- a string rather than importing `Feature` directly, to
+   * avoid this generic-engine file depending on the auth module;
+   * `app/admin/page.tsx`/`[table]/page.tsx`/`[table]/actions.ts` cast
+   * it to `Feature` when checking. Always `"table_admin_<table>"` by
+   * convention, matching migration `060`'s seed data exactly.
+   */
+  requiredFeature: string;
 }
 
 /**

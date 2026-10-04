@@ -6,9 +6,9 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 type ActionResult = { success: true } | { error: string };
 
-async function requireBishopric(): Promise<ActionResult | null> {
+async function requireRabnmFeature(): Promise<ActionResult | null> {
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  if (!hasFeature(profile, "sacrament_rabnm")) return { error: "Not authorized." };
   return null;
 }
 
@@ -41,7 +41,7 @@ export async function pullCallingPlanningIntoMeeting(
   planningId: string,
   kind: "calling" | "release"
 ): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireRabnmFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
@@ -118,7 +118,7 @@ export async function pullCallingPlanningIntoMeeting(
  * through this action.
  */
 export async function removeCallingPlanningFromMeeting(meetingId: string, planningId: string): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireRabnmFeature();
   if (denied) return denied;
 
   const supabase = await createClient();

@@ -25,7 +25,7 @@ export default async function MusicPage() {
     );
   }
 
-  const canEnterMusic = hasFeature(profile, "music_planner") || hasFeature(profile, "bishopric");
+  const canEnterMusic = hasFeature(profile, "sacrament_music");
 
   if (!canEnterMusic) {
     return (

@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
 import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
-import type { Feature } from "@/lib/supabase/get-session-user";
 
 /**
  * The 6 real YM/YW classes -- excludes the "Combined ..." pseudo-values
@@ -12,15 +11,6 @@ import type { Feature } from "@/lib/supabase/get-session-user";
  */
 export const TEACHING_CLASS_OPTIONS = YOUTH_ACTIVITY_GROUPS.filter((g) => !g.value.startsWith("Combined"));
 export const TEACHING_CLASSES = TEACHING_CLASS_OPTIONS.map((g) => g.value);
-
-/** The 3 YW classes, out of TEACHING_CLASSES -- Young Women Presidency
- *  sees every one of these regardless of any youth_class_teachers row
- *  (see getAccessibleClasses), per the user's own words: "young women
- *  presidency can see all young women groups." Kept as an explicit list
- *  rather than a name-based filter (e.g. "doesn't start with Deacons/
- *  Teachers/Priests") so a future class rename can't silently misclassify
- *  one. */
-export const YW_CLASSES = ["Gatherers of Light", "Messengers of Hope", "Builders of Faith"];
 
 export interface TeachingGridRow {
   classDate: string;
@@ -105,19 +95,19 @@ export async function getTaughtClassesForUser(userId: string): Promise<string[]>
 }
 
 /**
- * The real access-control entry point for Youth Teaching Planning
- * (2026-09-09, the user's own request): "authenticate the specific
- * people assigned to the youth group to see only their group unless it
- * is the bishopric or young women presidency. Bishopric can see all
- * groups. young women presidency can see all young women groups."
- * Bishopric and Young Women Presidency stay feature-based (every class /
- * every YW class, respectively, regardless of any youth_class_teachers
- * row); everyone else -- including the other 4 youth-leader features,
- * which used to get blanket access to the whole calendar -- is narrowed
- * down to exactly the class(es) they're specifically assigned to teach.
+ * The real access-control entry point for Youth Teaching Planning.
+ * Originally (2026-09-09) Bishopric and Young Women Presidency got a
+ * role-based bypass straight to every class / every YW class
+ * respectively, with no youth_class_teachers row needed. That bypass
+ * had nowhere to attach once roles were eliminated in favor of
+ * granular per-calling features (2026-10-04) -- the user's own call,
+ * when asked, was to drop it rather than hardcode a calling-name
+ * substitute: every class anyone should see, Bishopric and YW
+ * Presidency included, now needs a real youth_class_teachers row, the
+ * exact same mechanism every other class-specific teacher already
+ * uses. Seed those rows once (directly in Supabase or Table Admin) for
+ * whoever should see every class or every YW class.
  */
-export async function getAccessibleClasses(userId: string, features: Set<Feature>): Promise<string[]> {
-  if (features.has("bishopric")) return TEACHING_CLASSES;
-  if (features.has("yw_presidency")) return YW_CLASSES;
+export async function getAccessibleClasses(userId: string): Promise<string[]> {
   return getTaughtClassesForUser(userId);
 }

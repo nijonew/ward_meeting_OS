@@ -38,7 +38,7 @@ export default async function PublicViewPage({
   // preview regardless (building the program comes before it's ready);
   // everyone else still only ever sees it on the actual day.
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, "sacrament_planning")) {
     const meeting = await getMeetingById(meetingId);
     // Archived is admin-only, full stop, regardless of the "ready for
     // public" flag or who's asking -- the Vision workflow's own rule
@@ -51,7 +51,7 @@ export default async function PublicViewPage({
 
     const todayIso = new Date().toISOString().slice(0, 10);
     if (meeting.date !== todayIso) {
-      const canPreviewEarly = hasFeature(profile, "communications_specialist");
+      const canPreviewEarly = hasFeature(profile, "sacrament_program_view");
       const readyForPublic = canPreviewEarly ? (await getSacramentPlanningData(meetingId)).planning?.ready_for_public : false;
       if (!canPreviewEarly || !readyForPublic) {
         return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;

@@ -11,9 +11,9 @@ type ActionResult = { success: true } | { error: string };
  * the page that rendered the button -- same enforcement-boundary pattern
  * as app/admin/[table]/actions.ts.
  */
-async function requireBishopric(): Promise<ActionResult | null> {
+async function requireMeetingTemplatesFeature(): Promise<ActionResult | null> {
   const { profile } = await getSessionUser();
-  if (!hasFeature(profile, "bishopric")) return { error: "Not authorized." };
+  if (!hasFeature(profile, "meeting_templates_admin")) return { error: "Not authorized." };
   return null;
 }
 
@@ -22,7 +22,7 @@ export async function addDefaultTemplateElement(
   formatKey: string | null,
   elementId: string
 ): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireMeetingTemplatesFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
@@ -58,7 +58,7 @@ export async function addDefaultTemplateElement(
 }
 
 export async function removeDefaultTemplateElement(templateRowId: string): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireMeetingTemplatesFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
@@ -70,7 +70,7 @@ export async function removeDefaultTemplateElement(templateRowId: string): Promi
 }
 
 export async function setDefaultTemplateSlotCount(templateRowId: string, slotCount: number): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireMeetingTemplatesFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
@@ -87,7 +87,7 @@ export async function moveDefaultTemplateElement(
   templateRowId: string,
   direction: "up" | "down"
 ): Promise<ActionResult> {
-  const denied = await requireBishopric();
+  const denied = await requireMeetingTemplatesFeature();
   if (denied) return denied;
 
   const supabase = await createClient();

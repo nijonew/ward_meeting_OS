@@ -126,23 +126,30 @@ Collaborative planning meeting.
 
 ## 7. Permissions
 
-Current implementation:
+Current implementation (reworked 2026-10-04 — no stored "role" of any
+kind anymore; see `PROJECT_CONTEXT.md`'s Architecture section for the
+full history of how this replaced `profiles.role`):
 
--   Bishopric: full meeting editing. The Bishop has their own distinct
-    `bishop` role (2026-10-03, so a sitting Bishop is the only one who
-    can grant that same role to a successor) but it resolves to the
-    exact same access as the shared `bishopric` role (counselors,
-    executive secretary, ward clerk) everywhere else — see
-    `PROJECT_CONTEXT.md`'s Architecture section for how. The app still
-    doesn't distinguish Counselors/Exec Sec/Clerk from each other
-    individually — see `PROJECT_CONTEXT.md`'s Table Admin queue for the
-    open item tracking that narrower gap (matters most for who can add
-    Recognitions/Advancements/Baptisms/New Members records).
--   Music Planner, Communications Specialist, and the granular youth
-    roles (YW Presidency/Advisor/Specialist, YM Advisor/Specialist):
-    scoped to their own planning areas.
--   Invited Participants: Submit agenda items (not yet built — planned
-    as a share-token, no-login view).
+-   Access is granted per-**calling**, not per-role. A `calling_features`
+    many-to-many table says which of ~58 granular capabilities each
+    calling grants (one row per meeting type × action — viewing,
+    planning, template creation, agenda items, notes — plus Sacrament
+    Meeting extras like music/conducting/RABNM, every standalone tool,
+    and one feature per Table Admin table). A person's access is the
+    union of every feature granted by any *active* calling they
+    currently hold, computed fresh on every request, never cached.
+-   There is no "admin" or "Bishopric" flag that bypasses this — an
+    admin's calling simply holds every feature they need (all 20
+    meeting-type features, every `table_admin_*` key, etc.), the same
+    mechanism as anyone else. Bishop succession (reassigning a calling
+    flagged `requires_self_handoff`, restricted to whoever currently
+    holds it) is the one access rule still tied to a specific calling
+    rather than a feature grant.
+-   Invited Participants: Submit agenda items (built, 2026-09-05/09 —
+    login + calling-based, gated on that meeting type's own
+    `<type>_agenda_items` feature or the calling-based
+    `meeting_type_members` mapping; not the originally-planned
+    share-token, no-login view).
 -   Ward Members: View published meetings only, unauthenticated.
 
 ## 8. Dynamic Content

@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
 import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions, getReverseLookupValues } from "@/lib/admin/table-data";
 import { getSelectOptions } from "@/lib/data/select-options";
@@ -17,11 +17,11 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
   const config = getAdminTableConfig(table);
   if (!config) notFound();
 
-  if (!hasFeature(profile, "bishopric")) {
+  if (!hasFeature(profile, config.requiredFeature as Feature)) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Admin" />
-        <p className="mt-10 text-ink-muted">Only the Bishopric can access table admin.</p>
+        <p className="mt-10 text-ink-muted">You don&rsquo;t have access to this table.</p>
       </main>
     );
   }

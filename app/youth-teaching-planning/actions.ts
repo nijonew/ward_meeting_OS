@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses } from "@/lib/data/teaching-assignments";
 
 type SaveGridActionResult = { error?: string; success?: boolean };
@@ -37,8 +37,9 @@ function parseFieldName(name: string): { classDate: string; className: string } 
 export async function saveTeachingGrid(_prevState: unknown, formData: FormData): Promise<SaveGridActionResult> {
   const { user, profile } = await getSessionUser();
   if (!user) return { error: "You must be signed in." };
+  if (!hasFeature(profile, "youth_teaching_planning")) return { error: "Not authorized." };
 
-  const accessibleClasses = await getAccessibleClasses(user.id, profile?.features ?? new Set());
+  const accessibleClasses = await getAccessibleClasses(user.id);
 
   const supabase = await createClient();
 

@@ -36,8 +36,8 @@ import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
  */
 export async function AppHeader({ tag }: { tag?: string }) {
   const [{ user, profile }, wardName] = await Promise.all([getSessionUser(), getWardName()]);
-  const isAdmin = hasFeature(profile, "bishopric");
-  const unverifiedCount = isAdmin ? await getUnverifiedProfileCount() : 0;
+  const canVerifyLogins = hasFeature(profile, "verify_logins");
+  const unverifiedCount = canVerifyLogins ? await getUnverifiedProfileCount() : 0;
   const whoAmI = profile?.display_name || profile?.email || null;
   const featureList = profile && profile.features.size > 0 ? Array.from(profile.features).sort().join(", ") : "no features";
 

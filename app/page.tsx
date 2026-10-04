@@ -4,27 +4,9 @@ import { Tile, TileGrid } from "@/components/Tile";
 import { getWardName } from "@/lib/data/ward-settings";
 import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
-import type { Feature } from "@/lib/supabase/get-session-user";
-import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
-
-// Sacrament Meeting restored 2026-10-03 (the user's own request: "I
-// want it available to bishopric and admin members") -- reverses the
-// 2026-09-10 removal below. Still bishopric-only here, same as the
-// other three types in this list; a non-admin's own list
-// (rawVisibleTypes, calling-based) never includes it regardless, so
-// this change only affects what an admin sees.
-//
-// ~~Sacrament Meeting deliberately excluded (2026-09-10, the user's own
-// request: "remove sacrament meeting from 'my meetings'")~~ -- the
-// reasoning at the time: its own tile in the "This week" tier above
-// already covers the one thing a non-admin would want (today's public
-// program), and admins could reach it through Administration -> Meeting
-// Planning -> Meeting Agendas instead, so a third entry point here
-// seemed redundant. In practice that chain turned out to be a real
-// point of friction for the one thing that matters most (getting to a
-// meeting to plan it), so a direct entry point is back.
-const ALL_MEETING_TYPES: MeetingTypeSlug[] = ["sacrament-meeting", "bishopric-meeting", "ward-council", "youth-council"];
+import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
+import { allMeetingFeatures } from "@/lib/data/meeting-features";
+import { MEETING_TYPE_LABELS } from "@/lib/types";
 
 // Per the user's request (2026-09-09): the landing page's browser tab
 // now reads "Dashboard" and /dashboard's reads "Meeting Dashboard" (see
@@ -36,56 +18,57 @@ export const metadata: Metadata = {
 
 /**
  * The single landing page for everyone -- ward members, meeting
- * participants, youth leaders, music coordinators, and the bishopric all
- * land here. Tiles are filtered in or out below based on login state and
- * role; tapping a tile navigates to that feature's own existing page.
- * See /areas/ward-meeting-os.md for the full tile/role matrix this
- * implements.
+ * participants, youth leaders, music coordinators, and admins all land
+ * here. Tiles are filtered in or out below based on login state and
+ * whichever granular features the signed-in account's callings grant
+ * (2026-10-04, replacing the old role-based gating entirely -- see
+ * PROJECT_CONTEXT.md's Architecture section); tapping a tile navigates
+ * to that feature's own existing page.
  */
-
-const YOUTH_LEADER_FEATURES: Feature[] = [
-  "yw_presidency",
-  "yw_advisor",
-  "yw_specialist",
-  "ym_advisor",
-  "ym_specialist",
-];
-
 export default async function HomePage() {
   const { user, profile } = await getSessionUser();
   const wardName = await getWardName();
 
-  const isBishopric = hasFeature(profile, "bishopric");
-  const isMusicPlanner = hasFeature(profile, "music_planner") || isBishopric;
-  const isYouthLeader = YOUTH_LEADER_FEATURES.some((f) => hasFeature(profile, f)) || isBishopric;
+  const isMusicPlanner = hasFeature(profile, "sacrament_music");
+  const isYouthLeader = hasFeature(profile, "youth_teaching_planning") || hasFeature(profile, "youth_activity_planning");
 
   const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
 
-  // Admins manage every meeting type regardless of which calling happens
-  // to be recorded against their own account; everyone else only sees a
-  // tile for a type their calling actually maps to (meeting_type_members)
-  // -- per the user's own request (2026-09-06): "only show the meetings
-  // that apply to the person by nature of their calling." Sacrament
-  // Meeting no longer gets a tile here at all (2026-09-10) -- see
-  // ALL_MEETING_TYPES's own comment above.
-  const rawVisibleTypes = user && !isBishopric ? await getVisibleMeetingTypesForUser(user.id, profile?.features) : [];
-  const visibleMeetingTypes = isBishopric ? ALL_MEETING_TYPES : rawVisibleTypes;
-  // This is the same list as visibleMeetingTypes for a non-admin now
-  // that Sacrament Meeting isn't unconditionally folded in -- kept as
-  // its own named check anyway, since it's a real, distinct concept
-  // (attends *some* meeting by calling, or is Bishopric) that the
-  // Meeting Agenda Items tile below is gated on (2026-09-09, the
-  // user's own request).
-  const attendsMeetings = isBishopric || rawVisibleTypes.length > 0;
-  // Submit an Announcement shares that same gate, PLUS Communications
-  // Specialist outright (2026-10-04 bug fix -- the role's name promised
-  // exactly this and nothing had ever actually wired it in; see
-  // app/submit/announcement/page.tsx's own comment). Kept separate from
+  // Resolves every meeting type this account should see a "My meetings"
+  // tile for -- calling-based (meeting_type_members) unioned with
+  // whichever types' own viewing/planning/agenda_items features any of
+  // this account's callings grant (2026-10-04, see
+  // getVisibleMeetingTypesForUser's own doc comment) -- no more
+  // role-based "admin sees every type" bypass layered on top; an admin
+  // simply holds every type's planning feature and so is already
+  // included here like anyone else.
+  const visibleMeetingTypes = user ? await getVisibleMeetingTypesForUser(user.id, profile?.features) : [];
+  // "Attends *some* meeting" -- gates Meeting Agenda Items below.
+  const attendsMeetings = visibleMeetingTypes.length > 0;
+  // Submit an Announcement shares that same gate, PLUS the standalone
+  // `announcement_adding` feature outright -- for a calling that should
+  // always be able to add announcements regardless of meeting
+  // attendance (2026-10-04, replacing the old
+  // "communications_specialist" role check). Kept separate from
   // attendsMeetings itself rather than folding the feature into that
   // broader check, since attendsMeetings also gates Meeting Agenda
-  // Items, which Communications Specialist has no business reason to
-  // need.
-  const canSubmitAnnouncement = attendsMeetings || hasFeature(profile, "communications_specialist");
+  // Items, which this feature has no business reason to need.
+  const canSubmitAnnouncement = attendsMeetings || hasFeature(profile, "announcement_adding");
+
+  const canPlanAnyMeeting = hasAnyFeature(profile, allMeetingFeatures("planning"));
+  const canMeetingSchedule = hasFeature(profile, "meeting_schedule");
+  const canMeetingCancellations = hasFeature(profile, "meeting_cancellations");
+  const canRotations = hasFeature(profile, "rotations");
+  const canSpeakerPrayerHistory = hasFeature(profile, "speaker_prayer_history");
+  const canMeetingPlanningHub =
+    canPlanAnyMeeting || canMeetingSchedule || canMeetingCancellations || canRotations || canSpeakerPrayerHistory;
+  const canCallingPlanning = hasFeature(profile, "calling_planning");
+  const canAnnouncementManagement = hasFeature(profile, "announcement_management");
+  const canTableAdmin =
+    hasFeature(profile, "meeting_templates_admin") ||
+    hasFeature(profile, "verify_logins") ||
+    Array.from(profile?.features ?? []).some((f) => f.startsWith("table_admin_"));
+  const showAdministration = canMeetingPlanningHub || canCallingPlanning || canAnnouncementManagement || canTableAdmin;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -168,7 +151,7 @@ export default async function HomePage() {
                 href="/submit/announcement"
               />
             )}
-            {hasFeature(profile, "communications_specialist") && (
+            {hasFeature(profile, "sacrament_program_view") && (
               <Tile
                 title="Sacrament Meeting Programs"
                 description="Preview upcoming and past programs, not just today's"
@@ -201,55 +184,66 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 3 -- youth leaders + bishopric. Was youth-leader-only
-          (excluding bishopric) back when this was just a "Coming soon"
-          placeholder -- Teaching Calendar itself is meant for "youth
-          leaders and admins" per the user (2026-09-08), so the guard
-          dropped the !isBishopric exclusion once it had a real
-          destination. Renamed to "Youth Teaching Planning" (2026-09-09,
-          the user's own request) once it became a per-class hub --
-          which class(es) a given account actually sees inside it is a
-          separate, narrower question than this role-based tile gate;
-          see getAccessibleClasses in lib/data/teaching-assignments.ts. */}
+      {/* Tier 3 -- shown when either youth-program feature is held
+          (2026-10-04, granular-features pass); each tile below is then
+          gated on its own specific feature. Which class(es) a given
+          account actually sees inside Youth Teaching Planning is a
+          separate, narrower question handled by getAccessibleClasses
+          in lib/data/teaching-assignments.ts. */}
       {isYouthLeader && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Youth program</p>
           <TileGrid>
-            <Tile
-              title="Youth Teaching Planning"
-              description="Sunday teaching assignments for your class"
-              href="/youth-teaching-planning"
-            />
-            <Tile
-              title="Youth Activity Planning"
-              description="Plan and manage upcoming youth activities"
-              comingSoon
-            />
+            {hasFeature(profile, "youth_teaching_planning") && (
+              <Tile
+                title="Youth Teaching Planning"
+                description="Sunday teaching assignments for your class"
+                href="/youth-teaching-planning"
+              />
+            )}
+            {hasFeature(profile, "youth_activity_planning") && (
+              <Tile
+                title="Youth Activity Planning"
+                description="Plan and manage upcoming youth activities"
+                comingSoon
+              />
+            )}
           </TileGrid>
         </section>
       )}
 
-      {/* Tier 4 -- bishopric only */}
-      {isBishopric && (
+      {/* Tier 4 -- shown only when at least one of its own tiles is
+          accessible (2026-10-04, granular-features pass) -- no more
+          single "bishopric" role gating the whole section; each tile
+          below is shown on its own feature. */}
+      {showAdministration && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Administration</p>
           <TileGrid>
-            <Tile
-              title="Meeting Planning"
-              description="Meeting agendas, schedule, cancellations, and rotations"
-              href="/meeting-planning"
-            />
-            <Tile
-              title="Calling Planning"
-              description="One row per calling change: candidates, status, release, and readiness to announce"
-              href="/calling-planning"
-            />
-            <Tile
-              title="Manage Announcements"
-              description="Review and publish submissions"
-              href="/announcements"
-            />
-            <Tile title="Table Admin" description="Direct edit access to raw data tables" href="/admin" />
+            {canMeetingPlanningHub && (
+              <Tile
+                title="Meeting Planning"
+                description="Meeting agendas, schedule, cancellations, and rotations"
+                href="/meeting-planning"
+              />
+            )}
+            {canCallingPlanning && (
+              <Tile
+                title="Calling Planning"
+                description="One row per calling change: candidates, status, release, and readiness to announce"
+                href="/calling-planning"
+              />
+            )}
+            {canAnnouncementManagement && (
+              <Tile
+                title="Manage Announcements"
+                description="Review and publish submissions"
+                href="/announcements"
+              />
+            )}
+            {canTableAdmin && (
+              <Tile title="Table Admin" description="Direct edit access to raw data tables" href="/admin" />
+            )}
           </TileGrid>
         </section>
       )}
