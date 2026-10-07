@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 062
+## Current migration number: 063
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -135,12 +135,16 @@ reconstructed from both:
   features permissions rework, see Architecture above): confirmed run.
 - `061` (removes `sacrament_notes`/`sacrament_agenda_items` from the
   `features` catalog -- the user's own call, not needed for Sacrament
-  Meeting, see Architecture above): still needs to be run.
+  Meeting, see Architecture above): confirmed run.
 - `062` (new `meetings_with_real_activity` Postgres function -- the
   dashboard auto-archive sweep's performance fix, see Known open items
-  below): still needs to be run.
+  below): confirmed run.
+- `063` (drops three stale RLS policies plus an orphaned function on
+  `agenda_items` -- the "column c.backup_holder_id does not exist"
+  bug hit while deleting a meeting, see Known open items below): still
+  needs to be run.
 
-Next migration should be `063_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `064_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1905,6 +1909,49 @@ Activities + Ward Events public listing) still shows youth activities
 to anyone with no login at all, which is now a loophole around this
 same gate -- tied up with the Ward Events removal question below,
 since the fix depends on what `/events` even is once that's decided.
+
+**Bug found and fixed 2026-10-07: "column c.backup_holder_id does not
+exist" when deleting a meeting.** Third time this repo has hit an
+undocumented RLS object created directly in the Supabase SQL editor
+before this file's migration history started (migrations `038` and
+`041` were the first two). This assistant has no live database access,
+so diagnosing it took several rounds of the user running diagnostic
+queries directly and pasting back the results -- `delete_meeting_cascade`
+(migration `054`, what Delete actually calls) itself has zero
+references to `callings`/`backup_holder_id`, which is what pointed
+this at an RLS policy instead of the function everyone would first
+suspect.
+
+Root cause: `agenda_items` carried five overlapping policies, three of
+them stale leftovers from designs this app has already moved past.
+"meeting participants can submit"/"can view" called an undocumented
+`is_meeting_participant(meeting_id)` function joining to `callings c`
+and reading `c.backup_holder_id` (dropped by migration `034`) and
+`(select person_id from profiles where id = auth.uid())` --
+`profiles.person_id` genuinely exists as a live column but was never
+created by any tracked migration and matches none of this app's
+documented person-link direction (`people.profile_id`, migration `030`);
+it's an orphaned artifact of whatever pre-history design produced this
+function. "public submit pending" (anon INSERT) was a leftover from
+before agenda-item submission required login at all (2026-09-09) --
+since `submitAgendaItem` has required a signed-in account ever since,
+this policy was a real, live gap letting an anonymous API call insert
+directly into `agenda_items` with `status = 'pending'`, bypassing the
+app's own login check entirely; found and closed incidentally while
+chasing the delete bug. "bishopric manage" called `app_role()`, almost
+certainly still reading the long-dropped `profiles.role` (migration
+`058`) -- hadn't visibly errored yet (likely luck in how Postgres
+happened to combine it with the other permissive policies), and was
+redundant regardless: `"authenticated access"` (`ALL`, `true`/`true`,
+left completely untouched) already grants everything to any
+authenticated user, matching this app's own RLS philosophy of doing
+the real authorization in application code.
+
+Migration `063` drops all three stale policies and the now-orphaned
+function. **`app_role()` itself was deliberately left alone** -- other
+tables may still reference it correctly or incorrectly, and auditing
+every one of those is a separate task, flagged here rather than
+attempted as a drive-by fix.
 
 **"My meetings" is a real control surface again, 2026-10-07** -- a
 direct reversal of the 2026-09-09 decision to make it read-only
