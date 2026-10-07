@@ -99,10 +99,18 @@ export default async function HomePage() {
               <Tile title="Sacrament Meeting Program" description="Published on meeting day" comingSoon />
             )}
           <Tile title="Announcements" description="Ward-wide announcements" href="/announcements/public" />
+          {/* Requires login (2026-10-07, the user's own request) --
+              unlike the rest of this tier, grayed out with a specific
+              reason rather than "Coming soon" for a logged-out
+              visitor, since the feature exists and works, it's just
+              gated. The page itself (app/youth-activities/page.tsx)
+              enforces the same login requirement server-side; this
+              tile alone wouldn't stop someone from typing the URL. */}
           <Tile
             title="Youth Activities"
             description="Planned activities for YW and YM"
-            href="/youth-activities"
+            href={user ? "/youth-activities" : undefined}
+            disabledLabel={user ? undefined : "Please log in to see youth activities"}
           />
           <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
         </TileGrid>

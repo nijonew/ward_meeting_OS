@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
@@ -31,9 +32,15 @@ function formatDate(iso: string) {
 }
 
 export default async function YouthActivitiesPage() {
-  // No login required to view -- RLS on youth_activities already limits
-  // anonymous/other-role visitors to published rows only.
-  const { profile } = await getSessionUser();
+  // Now requires login (2026-10-07, the user's own request -- the
+  // landing page's own tile shows "Please log in to see youth
+  // activities" when logged out, and must actually mean it). Used to
+  // be open with no login at all, relying on RLS to limit anonymous
+  // visitors to published rows -- that RLS policy is unaffected and
+  // still correct for a logged-in-but-otherwise-unprivileged viewer,
+  // this just adds the login requirement on top of it.
+  const { user, profile } = await getSessionUser();
+  if (!user) redirect("/login");
   const canManage = hasFeature(profile, "youth_activity_planning");
 
   const activities = await getYouthActivities();

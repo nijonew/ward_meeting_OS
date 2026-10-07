@@ -6,6 +6,12 @@ interface TileProps {
   description?: string;
   href?: string;
   comingSoon?: boolean;
+  /** Overrides the disabled-state caption, normally "Coming soon"
+   *  (2026-10-07, for a tile that's disabled for a *reason* someone
+   *  can act on -- e.g. "Please log in to see youth activities" --
+   *  rather than "not built yet"). Only shown while the tile is
+   *  disabled. */
+  disabledLabel?: string;
 }
 
 /**
@@ -14,7 +20,7 @@ interface TileProps {
  * instead of a link -- same visual language the old dashboard used for
  * not-yet-built meeting types.
  */
-export function Tile({ title, description, href, comingSoon }: TileProps) {
+export function Tile({ title, description, href, comingSoon, disabledLabel }: TileProps) {
   const isDisabled = comingSoon || !href;
 
   const card = (
@@ -34,7 +40,7 @@ export function Tile({ title, description, href, comingSoon }: TileProps) {
       )}
       {isDisabled && (
         <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-          Coming soon
+          {disabledLabel ?? "Coming soon"}
         </span>
       )}
     </div>

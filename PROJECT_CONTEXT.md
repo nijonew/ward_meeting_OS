@@ -1883,6 +1883,29 @@ and fixed three real N+1/duplicate-fetch problems, in order of impact:
   live -- that would be the next thing worth measuring, with real
   `EXPLAIN ANALYZE` output rather than a guess.
 
+**Youth Activities now requires login, 2026-10-07** (the user's own
+request): "I want the youth activities tile grayed out unless they are
+logged in, and when grayed out it should read 'please log in to see
+youth activities'." `Tile` (`components/Tile.tsx`) gained an optional
+`disabledLabel` prop -- the existing disabled/grayed rendering
+(previously always captioned "Coming soon", for a not-yet-built
+feature) now takes custom text, since this tile is disabled for a
+different reason (a real, working feature gated behind login, not
+something unbuilt). The landing page's Youth Activities tile passes
+`href={user ? "/youth-activities" : undefined}` and the login-prompt
+caption when logged out. `app/youth-activities/page.tsx` itself now
+redirects to `/login` when logged out too -- gating the tile alone
+would've been cosmetic, since the page was still reachable by typing
+the URL directly; the existing RLS policy limiting anonymous rows to
+`status = 'published'` is unaffected and still correct underneath this
+new login requirement, it just no longer matters for a logged-out
+visitor since they can't reach the page at all now. **Not yet
+addressed**: `/events` ("Scheduled Events," the merged Youth
+Activities + Ward Events public listing) still shows youth activities
+to anyone with no login at all, which is now a loophole around this
+same gate -- tied up with the Ward Events removal question below,
+since the fix depends on what `/events` even is once that's decided.
+
 **Cancelled Sacrament Meetings hide Planning/Conducting/Public, and a
 public-only viewer sees no workflow chrome at all, 2026-10-04** (the
 user's own request): "when a sacrament meeting is cancelled please
