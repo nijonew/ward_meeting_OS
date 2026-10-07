@@ -62,45 +62,6 @@ function mapMeetingRow(row: {
 }
 
 /**
- * Tables that only ever gain a row for a given meeting_id through real
- * human action -- never auto-seeded at meeting-creation time. Used by
- * the auto-archive sweep below to tell "nothing happened here yet"
- * apart from "the meeting was actually run."
- *
- * Deliberately EXCLUDES sacrament_assignments/bishopric_assignments and
- * sacrament_planning: applyRotationsToNewMeeting/applyFixedSacramentRoles
- * (lib/data/rotations.ts) write rotation-assigned roles (Presiding,
- * Conducting, Chorister, Organist, prayers, etc.) into the assignments
- * tables the moment a meeting is *created*, and app/meetings/new/actions.ts
- * inserts a sacrament_planning row at creation too -- so those tables
- * having rows proves nothing about whether anyone actually did anything
- * with the meeting. meeting_planned_elements is excluded for the same
- * reason (seeded from the template at creation, migration 033).
- */
-const REAL_ACTIVITY_TABLES = [
-  "meeting_element_notes",
-  "sacrament_music",
-  "sacrament_speakers_adults",
-  "sacrament_speakers_youth",
-  "sacrament_rabnm",
-  "agenda_items",
-  "meeting_action_items",
-  "council_notes",
-  "bishopric_minutes",
-] as const;
-
-async function meetingHasRealActivity(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  meetingId: string
-): Promise<boolean> {
-  for (const table of REAL_ACTIVITY_TABLES) {
-    const { data } = await supabase.from(table).select("meeting_id").eq("meeting_id", meetingId).limit(1);
-    if (data && data.length > 0) return true;
-  }
-  return false;
-}
-
-/**
  * No scheduled-job infrastructure exists in this app (no Vercel Cron /
  * Supabase pg_cron wired up), so "automatic at end of day" is
  * implemented as a lazy sweep run on every dashboard load instead --
@@ -114,6 +75,20 @@ async function meetingHasRealActivity(
  * reported back as "no activity" so the dashboard can badge it
  * distinctly from a meeting that was actually run, per the
  * "Auto-archive past meetings" open item in PROJECT_CONTEXT.md.
+ *
+ * **Performance fix, 2026-10-07** (the user's own report: "the app is
+ * extremely slow"): this used to check each past meeting against 9
+ * tables one at a time, sequentially -- up to 9 round trips per
+ * meeting, times however many past meetings hadn't been archived yet,
+ * on every single /dashboard or /calling-planning load. A meeting with
+ * genuinely no activity never got skipped on a later run either -- it
+ * was rechecked from scratch every time, forever, so this only got
+ * worse as more unarchived meetings piled up. Migration `062`'s
+ * `meetings_with_real_activity` Postgres function does the same "does
+ * any of these 9 tables have a row for this meeting" check entirely in
+ * the database, for every candidate meeting at once -- down to exactly
+ * 3 round trips total (fetch candidates, one RPC call, one bulk
+ * update), regardless of how many past meetings exist.
  */
 async function autoArchivePastMeetings(): Promise<Set<string>> {
   const supabase = await createClient();
@@ -126,15 +101,25 @@ async function autoArchivePastMeetings(): Promise<Set<string>> {
     .neq("stage", "archived");
 
   const noActivityIds = new Set<string>();
-  if (!pastMeetings) return noActivityIds;
+  if (!pastMeetings || pastMeetings.length === 0) return noActivityIds;
 
-  for (const m of pastMeetings as { id: string; cancelled: boolean | null }[]) {
-    const shouldArchive = m.cancelled || (await meetingHasRealActivity(supabase, m.id));
-    if (shouldArchive) {
-      await supabase.from("meetings").update({ stage: "archived" }).eq("id", m.id);
+  const candidates = pastMeetings as { id: string; cancelled: boolean | null }[];
+  const { data: activityRows } = await supabase.rpc("meetings_with_real_activity", {
+    p_meeting_ids: candidates.map((m) => m.id),
+  });
+  const hasActivity = new Set(((activityRows ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+
+  const toArchive: string[] = [];
+  for (const m of candidates) {
+    if (m.cancelled || hasActivity.has(m.id)) {
+      toArchive.push(m.id);
     } else {
       noActivityIds.add(m.id);
     }
+  }
+
+  if (toArchive.length > 0) {
+    await supabase.from("meetings").update({ stage: "archived" }).in("id", toArchive);
   }
 
   return noActivityIds;

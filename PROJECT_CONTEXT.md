@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 061
+## Current migration number: 062
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -136,8 +136,11 @@ reconstructed from both:
 - `061` (removes `sacrament_notes`/`sacrament_agenda_items` from the
   `features` catalog -- the user's own call, not needed for Sacrament
   Meeting, see Architecture above): still needs to be run.
+- `062` (new `meetings_with_real_activity` Postgres function -- the
+  dashboard auto-archive sweep's performance fix, see Known open items
+  below): still needs to be run.
 
-Next migration should be `062_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `063_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1832,6 +1835,53 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Performance pass, 2026-10-07: "the app is extremely slow."** Found
+and fixed three real N+1/duplicate-fetch problems, in order of impact:
+- **`autoArchivePastMeetings` (`lib/data/meetings.ts`), by far the
+  worst one.** Runs on every single `/dashboard` and `/calling-planning`
+  load (via `getUpcomingMeetings`) -- the two most-visited admin pages.
+  It used to check each past, not-yet-archived meeting against 9
+  tables one at a time, sequentially: up to 9 round trips per meeting,
+  times however many past meetings hadn't been archived yet. A meeting
+  with genuinely no activity (common for meeting types where notes/
+  minutes aren't always filled in) never got skipped on a later run
+  either -- it was rechecked from scratch every single time, forever,
+  so this only got worse as more unarchived meetings piled up week
+  over week; by now, likely dozens of meetings times up to 9 round
+  trips each, on every dashboard load. New `meetings_with_real_activity`
+  Postgres function (migration `062`) does the same check for every
+  candidate meeting at once, inside the database -- the TypeScript
+  side is now exactly 3 round trips total (fetch candidates, one RPC
+  call, one bulk update) regardless of how many past meetings exist.
+- **`sweepMeetingCancellations` (`lib/data/meeting-cancellations.ts`).**
+  Smaller in scale (bounded by the number of `meeting_cancellations`
+  rows, typically just a handful like General/Stake Conference), but
+  ran on the same two pages plus `/youth-activities`, and updated each
+  row's meetings/youth-activities sequentially even though every row's
+  update is fully independent. Now runs all of them via `Promise.all`.
+- **`getEligiblePeopleByElementKey` (`lib/data/rotations.ts`).** Called
+  once per Planning-page load for every `person_role` element on that
+  meeting's agenda, but resolved each element key's eligible-people
+  list one at a time -- on a standard Sacrament Meeting agenda (8
+  `person_role` elements), that's roughly 16 sequential round trips on
+  every single Planning page load. Now resolves all of them via
+  `Promise.all` too, same fix, same reasoning.
+- Also wrapped `getWardName()` (`lib/data/ward-settings.ts`) in React's
+  `cache()`, same treatment as `getSessionUser`/`getMeetingById`
+  (2026-10-04, found chasing a narrower "very very slow on meeting
+  pages" report that turned out to be the first sighting of this same
+  class of bug) -- `AppHeader` calls it on nearly every page already,
+  and the landing page and `/login` also call it directly for their
+  own heading, duplicating the same query within one request.
+- **Not changed, and not believed to be a real factor at this scale**:
+  database indexes. The tables involved here (`people`, `callings`,
+  `meetings`) are small for a single ward (tens to low hundreds of
+  rows), so an unindexed filter column is unlikely to be the dominant
+  cost next to the round-trip count fixed above. Flag this again if
+  the app is still slow after `062` ships and these other fixes are
+  live -- that would be the next thing worth measuring, with real
+  `EXPLAIN ANALYZE` output rather than a guess.
 
 **Cancelled Sacrament Meetings hide Planning/Conducting/Public, and a
 public-only viewer sees no workflow chrome at all, 2026-10-04** (the

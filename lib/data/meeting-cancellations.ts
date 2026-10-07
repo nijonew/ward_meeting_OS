@@ -79,6 +79,14 @@ export async function deleteMeetingCancellation(id: string): Promise<ActionResul
  * (a conference's "week leading up" included), is now entirely up to
  * what the admin entered on this row -- nothing about conferences is
  * hardcoded in this function at all.
+ *
+ * Every row's update(s) run in parallel (2026-10-07, found alongside
+ * the much larger auto-archive fix while chasing a general "app is
+ * extremely slow" report) -- each one is independent (a different
+ * cancellation row, scoped by its own date range), so there's no
+ * reason to pay for them one at a time; `getMeetingCancellations` and
+ * the `meeting_types` lookup were already the only two round trips
+ * before any of them even start.
  */
 export async function sweepMeetingCancellations(): Promise<void> {
   const supabase = await createClient();
@@ -88,27 +96,37 @@ export async function sweepMeetingCancellations(): Promise<void> {
   const { data: typeRows } = await supabase.from("meeting_types").select("id, slug");
   const typeIdBySlug = new Map(((typeRows ?? []) as { id: string; slug: string }[]).map((t) => [t.slug, t.id]));
 
-  for (const c of cancellations) {
-    if (c.meeting_type_slugs.length > 0) {
-      const typeIds = c.meeting_type_slugs.map((slug) => typeIdBySlug.get(slug)).filter((id): id is string => Boolean(id));
-      if (typeIds.length > 0) {
-        await supabase
-          .from("meetings")
-          .update({ cancelled: true, cancellation_note: c.reason })
-          .gte("date", c.start_date)
-          .lte("date", c.end_date)
-          .in("meeting_type_id", typeIds)
-          .eq("cancelled", false);
-      }
-    }
+  await Promise.all(
+    cancellations.flatMap((c) => {
+      const updates: PromiseLike<unknown>[] = [];
 
-    if (c.cancel_youth_activities) {
-      await supabase
-        .from("youth_activities")
-        .update({ cancelled: true, cancellation_note: c.reason })
-        .gte("activity_date", c.start_date)
-        .lte("activity_date", c.end_date)
-        .eq("cancelled", false);
-    }
-  }
+      if (c.meeting_type_slugs.length > 0) {
+        const typeIds = c.meeting_type_slugs.map((slug) => typeIdBySlug.get(slug)).filter((id): id is string => Boolean(id));
+        if (typeIds.length > 0) {
+          updates.push(
+            supabase
+              .from("meetings")
+              .update({ cancelled: true, cancellation_note: c.reason })
+              .gte("date", c.start_date)
+              .lte("date", c.end_date)
+              .in("meeting_type_id", typeIds)
+              .eq("cancelled", false)
+          );
+        }
+      }
+
+      if (c.cancel_youth_activities) {
+        updates.push(
+          supabase
+            .from("youth_activities")
+            .update({ cancelled: true, cancellation_note: c.reason })
+            .gte("activity_date", c.start_date)
+            .lte("activity_date", c.end_date)
+            .eq("cancelled", false)
+        );
+      }
+
+      return updates;
+    })
+  );
 }

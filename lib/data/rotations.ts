@@ -445,6 +445,15 @@ export async function getEligiblePeopleForElement(
  * Batched version of getEligiblePeopleForElement for a whole agenda's
  * worth of person_role elements at once -- one `rotations` query instead
  * of one per element key.
+ *
+ * Both key groups resolve in parallel (2026-10-07, found while chasing
+ * a general "app is extremely slow" report) -- each key's own lookup
+ * is independent (a different fixed calling, or a different
+ * `rotations` row), so running them one at a time sequentially, as
+ * before, paid for roughly 2 round trips per element key for no
+ * reason -- on a standard Sacrament Meeting agenda (8 person_role
+ * elements) that's some 16 sequential round trips on every single
+ * Planning page load.
  */
 export async function getEligiblePeopleByElementKey(
   meetingTypeSlug: MeetingTypeSlug,
@@ -455,11 +464,14 @@ export async function getEligiblePeopleByElementKey(
   const result: Record<string, PersonOption[] | null> = {};
 
   const fixedKeys = elementKeys.filter((k) => fixedCallingNamesForKey(meetingTypeSlug, k) !== null);
-  for (const key of fixedKeys) {
-    const names = fixedCallingNamesForKey(meetingTypeSlug, key)!;
-    const ids = await computeEligiblePersonIdsForFixedCalling(supabase, names.exact, names.prefixes);
-    result[key] = await personOptionsByIds(supabase, ids);
-  }
+  const fixedResults = await Promise.all(
+    fixedKeys.map(async (key) => {
+      const names = fixedCallingNamesForKey(meetingTypeSlug, key)!;
+      const ids = await computeEligiblePersonIdsForFixedCalling(supabase, names.exact, names.prefixes);
+      return [key, await personOptionsByIds(supabase, ids)] as const;
+    })
+  );
+  for (const [key, options] of fixedResults) result[key] = options;
 
   const remaining = elementKeys.filter((k) => !fixedKeys.includes(k));
   if (remaining.length > 0) {
@@ -478,15 +490,15 @@ export async function getEligiblePeopleByElementKey(
       ).map((r) => [r.element_key, r])
     );
 
-    for (const key of remaining) {
-      const rotation = byKey.get(key);
-      if (!rotation || rotation.eligibility_source === "manual") {
-        result[key] = null;
-        continue;
-      }
-      const ids = await computeEligiblePersonIds(supabase, rotation.eligibility_source, rotation.eligibility_calling_names, meetingTypeId);
-      result[key] = await personOptionsByIds(supabase, ids);
-    }
+    const remainingResults = await Promise.all(
+      remaining.map(async (key) => {
+        const rotation = byKey.get(key);
+        if (!rotation || rotation.eligibility_source === "manual") return [key, null] as const;
+        const ids = await computeEligiblePersonIds(supabase, rotation.eligibility_source, rotation.eligibility_calling_names, meetingTypeId);
+        return [key, await personOptionsByIds(supabase, ids)] as const;
+      })
+    );
+    for (const [key, options] of remainingResults) result[key] = options;
   }
 
   return result;
