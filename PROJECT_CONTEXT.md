@@ -1906,6 +1906,41 @@ to anyone with no login at all, which is now a loophole around this
 same gate -- tied up with the Ward Events removal question below,
 since the fix depends on what `/events` even is once that's decided.
 
+**"My meetings" is a real control surface again, 2026-10-07** -- a
+direct reversal of the 2026-09-09 decision to make it read-only
+("make my meetings section for read only views of meetings"), per the
+user's own follow-up after repeatedly needing Delete from exactly that
+entry point: asked directly whether to keep it read-only or make it
+manage-capable too, the answer was "make it a real control surface
+too." The per-type "My meetings" tiles on the landing page no longer
+append `&readonly=1` to their `/dashboard?type=<slug>` links -- an
+account with a real planning feature for that type now sees the full
+New Meeting/Cancel/Delete/Unassigned-Agenda-Items surface from here,
+same as from Administration -> Meeting Planning -> Meeting Agendas.
+A non-admin is completely unaffected either way, since `/dashboard`'s
+own `canCreate` already requires holding a real planning feature
+regardless of this flag. The "Sacrament Meeting Programs" tile
+(Communications-Specialist-style early preview) still passes
+`readonly=1` deliberately -- that feature is about previewing/
+printing, not managing, so it keeps the narrower view.
+
+**"Scheduled Events" removed from the landing page, 2026-10-07**
+(the user's own request: Ward Events "overlap[s] ... with
+announcements and youth activities... it seems like ward events can
+go. They will be captured by announcements or youth activities").
+Given the choice between removing the feature outright or just hiding
+it from the landing page, the user chose the latter -- scoped to
+exactly that: the "Scheduled Events" tile (the merged Youth Activities
++ Ward Events public listing at `/events`) is gone from the landing
+page's "This week" tier. `/events` and `/ward-events` themselves,
+`ward_event_planning`, and all of Ward Events' admin tooling are
+completely untouched and still reachable directly -- nothing here
+stops anyone with the URL (or a future landing-page change) from using
+any of it; this is purely "don't surface it as a tile," not a feature
+removal. There was no separate standalone "Ward Events" tile to
+remove -- "Scheduled Events" was the only landing-page entry point
+that ever referenced it.
+
 **Cancelled Sacrament Meetings hide Planning/Conducting/Public, and a
 public-only viewer sees no workflow chrome at all, 2026-10-04** (the
 user's own request): "when a sacrament meeting is cancelled please

@@ -112,7 +112,14 @@ export default async function HomePage() {
             href={user ? "/youth-activities" : undefined}
             disabledLabel={user ? undefined : "Please log in to see youth activities"}
           />
-          <Tile title="Scheduled Events" description="Youth and ward events" href="/events" />
+          {/* "Scheduled Events" (the merged Youth Activities + Ward
+              Events listing, /events) removed from the landing page
+              2026-10-07 per the user's own request -- Ward Events
+              overlapped with Announcements/Youth Activities and
+              "can go." Scoped to just this tile for now: /events and
+              /ward-events themselves, and all of Ward Events' admin
+              tooling, are untouched and still reachable directly, in
+              case this needs to come back without rebuilding anything. */}
         </TileGrid>
       </section>
 
@@ -127,13 +134,15 @@ export default async function HomePage() {
           calling (attendsMeetings), not to every logged-in account the
           way the rest of this section's tiles are (those always
           include Sacrament Meeting regardless of calling -- see the
-          comment above attendsMeetings). Per-type tiles link with
-          `readonly=1` (2026-09-09, the user's own request: "make my
-          meetings section for read only views of meetings") -- without
-          it, a Bishopric account would land on /dashboard's full New
-          Meeting/Cancel/Unassigned-Agenda-Items control surface even
-          from here; that surface now lives only behind the
-          Administration section's own Meeting Planning tile below. */}
+          comment above attendsMeetings).
+          ~~Per-type tiles link with `readonly=1`~~ -- true only until
+          2026-10-07. Reversed per the user's own follow-up request,
+          after repeatedly needing Delete from exactly this entry
+          point: "make it a real control surface too." A non-admin is
+          completely unaffected either way -- `canCreate` on /dashboard
+          already requires a real planning feature regardless of this
+          flag, so dropping it only changes anything for an account
+          that actually holds one. */}
       {user && (visibleMeetingTypes.length > 0 || canSubmitAnnouncement) && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">My meetings</p>
@@ -142,7 +151,7 @@ export default async function HomePage() {
               <Tile
                 key={slug}
                 title={MEETING_TYPE_LABELS[slug]}
-                href={`/dashboard?type=${slug}&readonly=1`}
+                href={`/dashboard?type=${slug}`}
               />
             ))}
             {attendsMeetings && (

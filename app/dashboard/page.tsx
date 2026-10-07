@@ -208,13 +208,17 @@ export default async function DashboardPage({
 }) {
   const { type: rawType, readonly: rawReadOnly, past: rawPast } = await searchParams;
   const typeFilter: MeetingTypeSlug | null = rawType && MEETING_TYPE_SLUGS.has(rawType) ? (rawType as MeetingTypeSlug) : null;
-  // Reached with ?readonly=1 from the landing page's "My meetings"
-  // section (2026-09-09, the user's own request: "make my meetings
-  // section for read only views of meetings") -- forces canCreate off
-  // even for a Bishopric account, which otherwise sees the full New
-  // Meeting/Cancel/Unassigned-Agenda-Items control surface below. The
-  // new "Meeting Planning" Administration tile links to this same page
-  // with no readonly flag, for exactly that full control surface.
+  // Originally reached with ?readonly=1 from the landing page's "My
+  // meetings" section (2026-09-09, "make my meetings section for read
+  // only views of meetings") -- forced canCreate off even for an
+  // account that could otherwise manage meetings. Dropped from "My
+  // meetings" 2026-10-07 per the user's own reversal ("make it a real
+  // control surface too"), after repeatedly needing Delete from
+  // exactly that entry point -- the flag itself still works exactly
+  // as before, it's just no longer linked to from there. The
+  // "Sacrament Meeting Programs" tile (Communications-Specialist-style
+  // early preview) still links here with `readonly=1`, since that
+  // feature is specifically about previewing/printing, not managing.
   const isReadOnly = rawReadOnly === "1";
   // getUpcomingMeetings() returns literally every meeting ever, despite
   // its name -- auto-archiving only changes a past meeting's *stage*,
