@@ -41,6 +41,20 @@ const STAGE_LABELS: Record<MeetingLifecycleStage, string> = {
  * not decoration repeated down the whole track. 4px radius (`rounded`),
  * matching every other chip/card in the app rather than this
  * component's own one-off `rounded-full`.
+ *
+ * **Compact mode dropped the accent fill, 2026-10-07** (the user's own
+ * report: on `/dashboard`'s single-line rows, the stage pill and the
+ * date button next to it -- the actual "click here to enter the
+ * meeting" control -- both rendered as solid accent-filled pills,
+ * making it unclear which one was actually clickable). The full,
+ * multi-stage track above is unaffected -- there, filling only the
+ * *current* stage among several already reads as "this one is
+ * highlighted," not "this is a button," since it's visibly one chip
+ * among a row of others. Compact mode shows just that one chip alone,
+ * which is exactly what made it look like a second button next to the
+ * date link -- now styled as a plain neutral label (the same
+ * border-rule/text-ink-muted treatment the full track already uses
+ * for a *past* stage), so only the date button keeps the accent fill.
  */
 export function LifecycleBadge({
   stage,
@@ -56,7 +70,7 @@ export function LifecycleBadge({
       <span
         role="img"
         aria-label={`Meeting stage: ${STAGE_LABELS[stage]}`}
-        className="flex h-7 w-max items-center whitespace-nowrap rounded border border-accent bg-accent px-3 font-mono text-[11px] uppercase tracking-wider text-surface"
+        className="flex h-7 w-max items-center whitespace-nowrap rounded border border-rule bg-surface px-3 font-mono text-[11px] uppercase tracking-wider text-ink-muted"
       >
         {STAGE_LABELS[stage]}
       </span>

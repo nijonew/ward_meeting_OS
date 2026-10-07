@@ -1910,6 +1910,23 @@ to anyone with no login at all, which is now a loophole around this
 same gate -- tied up with the Ward Events removal question below,
 since the fix depends on what `/events` even is once that's decided.
 
+**Bug found and fixed 2026-10-07: the dashboard's stage badge looked
+like a second button next to the date button.** The user's own
+report: "the date button that can be clicked to enter the meeting is
+too similar to the stage indicator. It is confusing as to which one
+should be clicked." `LifecycleBadge`'s `compact` mode (used only on
+`/dashboard`'s single-line rows) rendered the current stage as a solid
+`bg-accent` pill -- the exact same fill the date button next to it
+uses for its own real "click here" styling. Changed compact mode to
+the plain neutral chip (`border-rule`/`text-ink-muted`) the full
+multi-stage track already uses for a *past* stage, so only the date
+button keeps the accent fill. The full track elsewhere (a meeting's
+own header) is unchanged -- there, highlighting just the current stage
+among several already reads as emphasis, not as a second button,
+since it's visibly one chip among a row of others; compact mode's
+problem was showing that one chip alone, with nothing to contrast it
+against.
+
 **Bug found and fixed 2026-10-07: "column c.backup_holder_id does not
 exist" when deleting a meeting.** Third time this repo has hit an
 undocumented RLS object created directly in the Supabase SQL editor
