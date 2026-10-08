@@ -1913,6 +1913,40 @@ to anyone with no login at all, which is now a loophole around this
 same gate -- tied up with the Ward Events removal question below,
 since the fix depends on what `/events` even is once that's decided.
 
+**Bug found and fixed 2026-10-07: a freshly-added speaker (or musical
+number, or intermediate hymn) didn't stay populated after its first
+save -- a recurrence of the 2026-10-03 fix.** The user's own report:
+"the recently-added speaker is not staying in the form again. it
+worked for a while and has now stopped working again." The 2026-10-03
+fix (binding each item's save through `useActionState` instead of a
+bare async function) solved one half of the problem -- React's
+auto-reset of uncontrolled fields after a form action completes -- but
+left the other half standing: every field in `SacramentProgramSection.tsx`'s
+`ItemRow` is still `defaultValue`-based (uncontrolled), and `ItemRow`
+itself keeps the exact same React instance across a save (keyed on
+`item.id`, which never changes). React only ever *applies*
+`defaultValue` once, at first mount. A freshly-added item mounts with
+nothing picked; after its first real save, the newly revalidated
+`item.personId`/`guestName` arrives as a new prop that an
+already-mounted uncontrolled field simply never syncs to -- editing an
+*existing* speaker often looked fine only because its original
+mount-time default already happened to match what got saved. Fixed by
+keying each of the three per-item forms (speaker, musical number,
+intermediate hymn) on their own current saved values
+(e.g. `key={`${item.personId}::${item.guestName}`}`), forcing a clean
+remount with fresh defaults whenever the saved value actually changes,
+rather than reusing a stale instance. Applied the identical fix to the
+Chorister/Organist fields added earlier this same day (same
+`SpeakerPersonOrGuestField` component, same `defaultValue`-across-a-
+stable-row-id risk) before it could ever surface there too. **Not
+audited**: every other `defaultValue`-based field in the main agenda
+grid (Presiding, Conducting, prayers, Visiting Authorities) shares the
+same theoretical risk and hasn't been individually checked -- flagged
+here rather than silently assumed safe, since this class of bug is
+timing-dependent (visible only when a field's value actually changes
+*and* the revalidation/reset timing lines up a certain way), which is
+exactly why it looked intermittent rather than consistently broken.
+
 **Guest Chorister and Organist, 2026-10-07** (the user's own request:
 "add a way to have a guest organist and chorister"). Same person-or-
 guest shape already used for Speaker/Youth Speaker and Visiting

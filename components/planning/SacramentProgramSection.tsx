@@ -56,6 +56,24 @@ function ItemRow({
   // worked fine (resolveProgramItems/Conducting both showed the real
   // saved value -- only this form's own display was wrong). A
   // useActionState-bound action doesn't get that auto-reset.
+  //
+  // **Recurred 2026-10-07** ("the recently-added speaker is not
+  // staying in the form again... worked for a while and has now
+  // stopped working again"). useActionState prevents the reset, but it
+  // never fixed the other half of the same underlying problem: every
+  // field here is still `defaultValue`-based (uncontrolled), and
+  // `ItemRow` keeps the exact same React instance across a save (keyed
+  // on `item.id`, which never changes). React only ever applies
+  // `defaultValue` once, at first mount -- a freshly-added item mounts
+  // with nothing picked, and after the first real save, the newly
+  // revalidated `item.personId`/`guestName` arrives as a new prop that
+  // an already-mounted uncontrolled field simply never syncs to.
+  // Editing an *existing* speaker often looked fine only because its
+  // original mount-time default already matched. `personFieldKey`
+  // forces `SpeakerPersonOrGuestField` to remount (fresh defaults,
+  // freshly recomputed `showGuest`) whenever the saved value actually
+  // changes, instead of reusing a stale instance.
+  const personFieldKey = `${item.personId}::${item.guestName}`;
   const speakerTable = item.kind === "youth_speaker" ? "sacrament_speakers_youth" : "sacrament_speakers_adults";
   const [speakerState, saveSpeakerAction, speakerPending] = useActionState(
     saveProgramSpeaker.bind(null, meetingId, speakerTable, item.itemKey),
@@ -85,7 +103,12 @@ function ItemRow({
 
       {(item.kind === "speaker" || item.kind === "youth_speaker") && (
         <form action={saveSpeakerAction} className="mt-2 flex flex-wrap items-center gap-2">
-          <SpeakerPersonOrGuestField people={people} defaultPersonId={item.personId} defaultGuestName={item.guestName} />
+          <SpeakerPersonOrGuestField
+            key={personFieldKey}
+            people={people}
+            defaultPersonId={item.personId}
+            defaultGuestName={item.guestName}
+          />
           <button
             type="submit"
             disabled={speakerPending}
@@ -99,7 +122,14 @@ function ItemRow({
       )}
 
       {item.kind === "musical_number" && (
-        <form action={saveMusicAction} className="mt-2 flex flex-wrap items-center gap-2">
+        // Keyed on its own saved fields -- same remount-on-change fix as
+        // the speaker form above, same underlying risk (uncontrolled
+        // defaultValue inputs on a React instance that survives a save).
+        <form
+          key={`${item.title}::${item.performer}::${item.accompanistId}`}
+          action={saveMusicAction}
+          className="mt-2 flex flex-wrap items-center gap-2"
+        >
           <input type="text" name="piece_name" defaultValue={item.title} placeholder="Title" className={INPUT} />
           <input type="text" name="performer" defaultValue={item.performer} placeholder="Individual or group name" className={INPUT} />
           <select name="accompanist_id" defaultValue={item.accompanistId} className={INPUT}>
@@ -123,7 +153,13 @@ function ItemRow({
       )}
 
       {item.kind === "intermediate_hymn" && (
-        <form action={saveMusicAction} className="mt-2 flex flex-wrap items-center gap-2">
+        // Same remount-on-change fix as the speaker/musical-number forms
+        // above.
+        <form
+          key={`${item.hymnNumber}::${item.title}`}
+          action={saveMusicAction}
+          className="mt-2 flex flex-wrap items-center gap-2"
+        >
           <input
             type="text"
             name="hymn_number"

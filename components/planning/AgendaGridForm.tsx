@@ -410,6 +410,7 @@ export function AgendaGridForm({
                             Chorister
                           </label>
                           <SpeakerPersonOrGuestField
+                            key={`${row.choristerValue}::${row.choristerGuestValue}`}
                             people={row.choristerEligible}
                             defaultPersonId={row.choristerValue}
                             defaultGuestName={row.choristerGuestValue}
@@ -425,6 +426,7 @@ export function AgendaGridForm({
                             Organist
                           </label>
                           <SpeakerPersonOrGuestField
+                            key={`${row.organistValue}::${row.organistGuestValue}`}
                             people={row.organistEligible}
                             defaultPersonId={row.organistValue}
                             defaultGuestName={row.organistGuestValue}
