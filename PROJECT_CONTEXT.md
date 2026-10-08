@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 063
+## Current migration number: 064
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -141,10 +141,13 @@ reconstructed from both:
   below): confirmed run.
 - `063` (drops three stale RLS policies plus an orphaned function on
   `agenda_items` -- the "column c.backup_holder_id does not exist"
-  bug hit while deleting a meeting, see Known open items below): still
-  needs to be run.
+  bug hit while deleting a meeting, see Known open items below):
+  confirmed run.
+- `064` (new `sacrament_assignments.guest_name` column -- the guest
+  Chorister/Organist option, see Known open items below): still needs
+  to be run.
 
-Next migration should be `064_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `065_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1909,6 +1912,57 @@ Activities + Ward Events public listing) still shows youth activities
 to anyone with no login at all, which is now a loophole around this
 same gate -- tied up with the Ward Events removal question below,
 since the fix depends on what `/events` even is once that's decided.
+
+**Guest Chorister and Organist, 2026-10-07** (the user's own request:
+"add a way to have a guest organist and chorister"). Same person-or-
+guest shape already used for Speaker/Youth Speaker and Visiting
+Authorities, now on Recognize Music's two inline fields too -- new
+`sacrament_assignments.guest_name` column (migration `064`, named to
+match the newer `sacrament_visiting_authorities` convention rather
+than the older per-table `guest_speaker_name`, since `assigned_to_id`
+is generic across every rotation role here, not speaker-specific).
+Deliberately only on `sacrament_assignments`, not `bishopric_assignments`
+-- Chorister/Organist only ever exist as Sacrament Meeting roles.
+- **Field encoding**: every other `person_role` element still writes
+  through the bare `role::<elementKey>` field `saveAgendaGrid`
+  (`app/meetings/[id]/agenda-actions.ts`) has always parsed. Chorister
+  and Organist specifically now use a two-part
+  `role::<elementKey>::person_id`/`::guest_name` pair instead -- the
+  exact same shape `speaker::...`/`visiting_authority::...` already
+  use -- so `saveAgendaGrid` had to learn both shapes side by side
+  rather than replacing the old one (every other role keeps working
+  unchanged).
+- **Rendering**: `AgendaGridForm.tsx`'s Recognize Music row swaps its
+  two plain `PersonSelect`s for `SpeakerPersonOrGuestField` (the same
+  component Speaker/Youth Speaker/Visiting Authorities already use),
+  with its own copy ("Choose chorister"/"Guest chorister instead",
+  etc.) via that component's existing label-override props -- no
+  component changes needed, just new callers.
+- **Read-only display**: `getRoleAssignments` (`lib/data/meeting-elements.ts`)
+  now selects `guest_name` too, but only when reading
+  `sacrament_assignments` (conditionally built column list) --
+  `bishopric_assignments` has no such column and would error if asked
+  for it. `conducting-rows.ts`'s Recognize Music wording and
+  `public-view.ts`'s Chorister/Organist public-program lines both fall
+  back to the guest name when no real person is assigned.
+  `archived/page.tsx`'s read-only "agenda as it was finalized" view
+  needed a new special case for `recognize_music` entirely -- it had
+  never resolved this element at all before (it's catalogued as
+  `resolution_kind: 'none'`, so the generic switch there just rendered
+  the bare label with nothing underneath, a real pre-existing gap
+  found while tracing every place Chorister/Organist render). Now
+  mirrors Planning/Conducting's own "Chorister (Name), Organist (Name)"
+  resolution, guest names included.
+- **Left alone, on purpose**: the `/rotations` applied-assignment grid
+  still only ever reads/writes `assigned_to_id` for these two columns
+  -- a guest entry made via Planning shows as a blank cell there,
+  matching how Speaker/Youth Speaker guests already don't appear in
+  that grid either (it's for the rotation-driven *default* assignment,
+  not one-off overrides). `getSacramentPlanningData`'s own
+  `assignments`/`AssignmentRow` field (`lib/data/sacrament-planning.ts`)
+  was confirmed, while tracing this, to be fetched but never actually
+  read by any caller -- pre-existing dead code, left untouched since
+  fixing it serves nothing real right now.
 
 **Bug found and fixed 2026-10-07: the dashboard's stage badge looked
 like a second button next to the date button.** The user's own

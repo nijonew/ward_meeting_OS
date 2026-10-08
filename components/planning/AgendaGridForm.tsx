@@ -409,20 +409,30 @@ export function AgendaGridForm({
                           <label className="block text-[10px] uppercase tracking-wider text-ink-muted/60">
                             Chorister
                           </label>
-                          <PersonSelect
-                            name={row.choristerField}
+                          <SpeakerPersonOrGuestField
                             people={row.choristerEligible}
-                            defaultValue={row.choristerValue}
+                            defaultPersonId={row.choristerValue}
+                            defaultGuestName={row.choristerGuestValue}
+                            personFieldName={row.choristerPersonField}
+                            guestFieldName={row.choristerGuestField}
+                            personPlaceholder="Choose chorister"
+                            guestPlaceholder="Guest chorister name"
+                            guestToggleLabel="Guest chorister instead"
                           />
                         </div>
                         <div className="sm:w-1/2">
                           <label className="block text-[10px] uppercase tracking-wider text-ink-muted/60">
                             Organist
                           </label>
-                          <PersonSelect
-                            name={row.organistField}
+                          <SpeakerPersonOrGuestField
                             people={row.organistEligible}
-                            defaultValue={row.organistValue}
+                            defaultPersonId={row.organistValue}
+                            defaultGuestName={row.organistGuestValue}
+                            personFieldName={row.organistPersonField}
+                            guestFieldName={row.organistGuestField}
+                            personPlaceholder="Choose organist"
+                            guestPlaceholder="Guest organist name"
+                            guestToggleLabel="Guest organist instead"
                           />
                         </div>
                       </div>

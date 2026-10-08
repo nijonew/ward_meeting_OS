@@ -1,0 +1,24 @@
+-- 064_sacrament_assignments_guest_name.sql
+--
+-- Adds a guest option for Chorister and Organist (the user's own
+-- request, 2026-10-07: "add a way to have a guest organist and
+-- chorister") -- same person-or-guest shape already used for Speaker/
+-- Youth Speaker (sacrament_speakers_adults/youth.guest_speaker_name)
+-- and Visiting Authorities (sacrament_visiting_authorities.guest_name),
+-- now on sacrament_assignments itself.
+--
+-- Named `guest_name` (not `guest_speaker_name`) to match the newer,
+-- simpler convention sacrament_visiting_authorities already
+-- established, since `sacrament_assignments.assigned_to_id` is generic
+-- across every rotation role, not speaker-specific.
+--
+-- Deliberately only on `sacrament_assignments`, not
+-- `bishopric_assignments` -- Chorister/Organist only ever exist as
+-- Sacrament Meeting roles (bishopric_assignments only ever configures
+-- opening_prayer/closing_prayer/spiritual_thought/handbook_training,
+-- see migration 038's own BISHOPRIC_ASSIGNMENT_ROLES), so a guest_name
+-- column there would never be used by anything.
+--
+-- Idempotent: safe to re-run.
+
+alter table sacrament_assignments add column if not exists guest_name text;

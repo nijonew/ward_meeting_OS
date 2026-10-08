@@ -216,6 +216,34 @@ export default async function ArchivedMeetingPage({
   const renderedNoneKinds = new Set<string>();
 
   function renderElement(el: TemplateElementRow) {
+    // Recognize Music: Chorister + Organist together on one line, same
+    // as Planning/Conducting render it -- catalogued as resolution_kind
+    // 'none', so the generic switch below would otherwise just show the
+    // bare label with nothing resolved. Falls back to each role's guest
+    // name (migration 064, 2026-10-07) when no real person was assigned.
+    // Checked before the switch for the same reason ward_business/
+    // stake_business are (isSacrament && key === "recognize_music" in
+    // lib/data/agenda-rows.ts).
+    if (isSacrament && el.key === "recognize_music") {
+      const choristerAssignment = roleAssignments["chorister"];
+      const organistAssignment = roleAssignments["organist"];
+      const chorister = personName(people, choristerAssignment?.assigned_to_id) ?? choristerAssignment?.guest_name ?? null;
+      const organist = personName(people, organistAssignment?.assigned_to_id) ?? organistAssignment?.guest_name ?? null;
+      return (
+        <Row key={el.id} label={el.label}>
+          {chorister || organist ? (
+            <Plain>
+              {chorister ? `${chorister} (Chorister)` : null}
+              {chorister && organist ? ", " : null}
+              {organist ? `${organist} (Organist)` : null}
+            </Plain>
+          ) : (
+            <Empty />
+          )}
+        </Row>
+      );
+    }
+
     switch (el.resolution_kind) {
       case "person_role": {
         const name = personName(people, roleAssignments[el.key]?.assigned_to_id);

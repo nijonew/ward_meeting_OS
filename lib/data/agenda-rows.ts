@@ -100,17 +100,31 @@ export type AgendaRow =
    *  (2026-09-09, the user's own request: "remove organist and
    *  chorister as their own lines, but put both in-line on the
    *  recognize music line"). Still writes straight to
-   *  sacrament_assignments via the same "role::<key>" field encoding
-   *  every other person_role row uses -- only the *rendering* groups
-   *  them, storage is unchanged. */
+   *  sacrament_assignments -- storage is unchanged. Each one got its
+   *  own guest option (2026-10-07, "a way to have a guest organist and
+   *  chorister"), so these two use the two-part "role::<key>::person_id"/
+   *  "::guest_name" encoding (same shape Speaker/Youth Speaker and
+   *  Visiting Authorities already use) instead of the bare "role::<key>"
+   *  every other person_role row still uses -- saveAgendaGrid parses
+   *  both shapes. */
   | {
       kind: "recognize_music";
       id: string;
       label: string;
-      choristerField: string;
-      organistField: string;
+      /** `::person_id`/`::guest_name` pair per role (2026-10-07, "a way
+       *  to have a guest organist and chorister") -- same person-or-
+       *  guest shape as Speaker/Youth Speaker and Visiting Authorities,
+       *  rendered via the same SpeakerPersonOrGuestField component.
+       *  saveAgendaGrid parses both the old bare `role::<key>` shape
+       *  (every other person_role element) and this two-part one. */
+      choristerPersonField: string;
+      choristerGuestField: string;
+      organistPersonField: string;
+      organistGuestField: string;
       choristerValue: string;
       organistValue: string;
+      choristerGuestValue: string;
+      organistGuestValue: string;
       choristerEligible: PersonOption[];
       organistEligible: PersonOption[];
     }
@@ -329,10 +343,14 @@ export function buildAgendaRows({
         kind: "recognize_music",
         id: el.id,
         label: el.label,
-        choristerField: `role${FIELD_SEPARATOR}chorister`,
-        organistField: `role${FIELD_SEPARATOR}organist`,
+        choristerPersonField: `role${FIELD_SEPARATOR}chorister${FIELD_SEPARATOR}person_id`,
+        choristerGuestField: `role${FIELD_SEPARATOR}chorister${FIELD_SEPARATOR}guest_name`,
+        organistPersonField: `role${FIELD_SEPARATOR}organist${FIELD_SEPARATOR}person_id`,
+        organistGuestField: `role${FIELD_SEPARATOR}organist${FIELD_SEPARATOR}guest_name`,
         choristerValue: roleAssignments["chorister"]?.assigned_to_id ?? "",
         organistValue: roleAssignments["organist"]?.assigned_to_id ?? "",
+        choristerGuestValue: roleAssignments["chorister"]?.guest_name ?? "",
+        organistGuestValue: roleAssignments["organist"]?.guest_name ?? "",
         choristerEligible: eligibleFor("chorister"),
         organistEligible: eligibleFor("organist"),
       });

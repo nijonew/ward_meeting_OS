@@ -18,6 +18,8 @@ export interface PublicSacramentView {
 interface RawAssignment {
   role: string;
   assigned_to_id: string | null;
+  /** Chorister/Organist's guest option, migration 064. */
+  guest_name: string | null;
 }
 interface RawSpeaker {
   slot: string;
@@ -57,7 +59,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     supabase.rpc("get_meeting_special_format", { p_meeting_id: meetingId }),
     supabase
       .from("sacrament_assignments")
-      .select("role, assigned_to_id")
+      .select("role, assigned_to_id, guest_name")
       .eq("meeting_id", meetingId),
     supabase
       .from("sacrament_speakers_adults")
@@ -118,7 +120,9 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
   const nameById = new Map(((peopleRows ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
   const roleName = (role: string) => {
     const a = assignments.find((x) => x.role === role);
-    return a?.assigned_to_id ? (nameById.get(a.assigned_to_id) ?? null) : null;
+    if (!a) return null;
+    if (a.assigned_to_id) return nameById.get(a.assigned_to_id) ?? null;
+    return a.guest_name ?? null;
   };
   const speakerName = (s: RawSpeaker) =>
     s.speaker_id ? (nameById.get(s.speaker_id) ?? null) : (s.guest_speaker_name ?? null);

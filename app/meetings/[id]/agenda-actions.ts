@@ -51,9 +51,12 @@ interface SpeakerPatch {
  *
  * Each field name encodes where its value belongs (see
  * lib/data/agenda-rows.ts, which builds them):
- *   role::<elementKey>                       -> sacrament/bishopric_assignments
- *     (chorister/organist included -- Recognize Music renders both
- *     inline, but they still write through this exact same path)
+ *   role::<elementKey>                        -> sacrament/bishopric_assignments
+ *   role::<elementKey>::person_id|guest_name  -> sacrament_assignments
+ *     (chorister/organist specifically -- Recognize Music renders both
+ *     inline with their own guest option, 2026-10-07, same two-part
+ *     shape as speaker::.../visiting_authority::... below. Every other
+ *     person_role element still uses the bare one-part form above.)
  *   note::<elementKey>::person|text          -> meeting_element_notes
  *   planning::stake_business|recognitions    -> sacrament_planning (text)
  *   planning::has_stake_business|ready_for_public -> sacrament_planning (boolean)
@@ -90,7 +93,7 @@ export async function saveAgendaGrid(
 
   const supabase = await createClient();
 
-  const roles = new Map<string, string>();
+  const roles = new Map<string, { personId: string; guestName: string }>();
   const notes = new Map<string, { person?: string; text?: string }>();
   const planning = new Map<string, string>();
   const music = new Map<string, MusicPatch>();
@@ -103,7 +106,17 @@ export async function saveAgendaGrid(
 
     switch (parts[0]) {
       case "role":
-        if (parts.length === 2) roles.set(parts[1], value);
+        if (parts.length === 2) {
+          const entry = roles.get(parts[1]) ?? { personId: "", guestName: "" };
+          entry.personId = value;
+          roles.set(parts[1], entry);
+        } else if (parts.length === 3) {
+          const [, key, field] = parts;
+          const entry = roles.get(key) ?? { personId: "", guestName: "" };
+          if (field === "person_id") entry.personId = value;
+          if (field === "guest_name") entry.guestName = value;
+          roles.set(key, entry);
+        }
         break;
 
       case "note": {
@@ -165,7 +178,7 @@ export async function saveAgendaGrid(
   }
 
   // --- person_role elements -------------------------------------------
-  for (const [role, personId] of roles) {
+  for (const [role, entry] of roles) {
     const { error: deleteError } = await supabase
       .from(roleTable)
       .delete()
@@ -173,10 +186,17 @@ export async function saveAgendaGrid(
       .eq("role", role);
     if (deleteError) return { error: deleteError.message };
 
-    if (personId) {
-      const { error } = await supabase
-        .from(roleTable)
-        .insert({ meeting_id: meetingId, role, assigned_to_id: personId });
+    if (entry.personId || entry.guestName) {
+      const insertPayload: Record<string, unknown> = {
+        meeting_id: meetingId,
+        role,
+        assigned_to_id: entry.personId || null,
+      };
+      // guest_name only exists on sacrament_assignments (migration 064,
+      // Chorister/Organist's guest option) -- never send it to
+      // bishopric_assignments, which has no such column.
+      if (roleTable === "sacrament_assignments") insertPayload.guest_name = entry.guestName || null;
+      const { error } = await supabase.from(roleTable).insert(insertPayload);
       if (error) return { error: error.message };
     }
   }

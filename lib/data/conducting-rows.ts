@@ -111,6 +111,14 @@ export function buildConductingRows({
 
   const personName = (id: string | null | undefined): string => (id ? peopleById.get(id) ?? BLANK : BLANK);
   const roleAssignedId = (role: string): string | null => roleAssignments[role]?.assigned_to_id ?? null;
+  // Falls back to the role's guest name (Chorister/Organist's guest
+  // option, migration 064, 2026-10-07) when no real person is assigned.
+  const roleDisplayName = (role: string): string => {
+    const entry = roleAssignments[role];
+    if (entry?.assigned_to_id) return personName(entry.assigned_to_id);
+    if (entry?.guest_name) return entry.guest_name;
+    return BLANK;
+  };
 
   for (const el of elements) {
     const key = el.key;
@@ -154,8 +162,8 @@ export function buildConductingRows({
     }
 
     if (key === "recognize_music") {
-      const chorister = personName(roleAssignedId("chorister"));
-      const organist = personName(roleAssignedId("organist"));
+      const chorister = roleDisplayName("chorister");
+      const organist = roleDisplayName("organist");
       rows.push({
         id: el.id,
         kind: "field",

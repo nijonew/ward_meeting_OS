@@ -176,6 +176,10 @@ export async function seedPlannedElementsForMeeting(
 
 export interface RoleAssignmentValue {
   assigned_to_id: string | null;
+  /** Only ever populated for sacrament_assignments (Chorister/Organist's
+   *  guest option, migration 064) -- bishopric_assignments has no such
+   *  column, since none of its roles ever need a guest. */
+  guest_name?: string | null;
 }
 
 /**
@@ -187,19 +191,22 @@ export interface RoleAssignmentValue {
  * sacrament_assignments.confirmed was dropped (migration 041, 2026-09-08)
  * -- an assignment is treated as ready the moment it's filled, same as
  * bishopric_assignments always worked; the meeting's own stage is what
- * gates the public program, not a per-row flag.
+ * gates the public program, not a per-row flag. `guest_name` (migration
+ * 064) is the one exception to "same shape" -- selected only for
+ * sacrament_assignments, since bishopric_assignments has no such column.
  */
 export async function getRoleAssignments(
   meetingId: string,
   table: "sacrament_assignments" | "bishopric_assignments"
 ): Promise<Record<string, RoleAssignmentValue>> {
   const supabase = await createClient();
+  const columns = table === "sacrament_assignments" ? "role, assigned_to_id, guest_name" : "role, assigned_to_id";
 
-  const { data } = await supabase.from(table).select("role, assigned_to_id").eq("meeting_id", meetingId);
+  const { data } = await supabase.from(table).select(columns).eq("meeting_id", meetingId);
 
   const result: Record<string, RoleAssignmentValue> = {};
-  for (const row of (data ?? []) as { role: string; assigned_to_id: string | null }[]) {
-    result[row.role] = { assigned_to_id: row.assigned_to_id };
+  for (const row of (data ?? []) as unknown as { role: string; assigned_to_id: string | null; guest_name?: string | null }[]) {
+    result[row.role] = { assigned_to_id: row.assigned_to_id, guest_name: row.guest_name ?? null };
   }
   return result;
 }
