@@ -21,10 +21,12 @@ export async function signInWithPassword(_prevState: unknown, formData: FormData
   redirect("/");
 }
 
-/** Backs both /auth/new-user and /auth/reset-password (split into two
- *  pages 2026-10-03, different copy only) -- Supabase's own "send a
- *  password-set link" flow doesn't distinguish a first-time sign-in
- *  from a forgotten password, so one action serves both. */
+/** Backs /auth/reset-password -- "I already have an account and
+ *  forgot my password." Used to also back /auth/new-user ("signing in
+ *  for the first time," for an admin-invited account), split into two
+ *  pages with different copy 2026-10-03, but that page is deleted as
+ *  of 2026-10-10 -- see /auth/request-access's own comment for why --
+ *  so this action now has exactly one caller. */
 export async function requestPasswordReset(_prevState: unknown, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) {
@@ -46,12 +48,11 @@ export async function requestPasswordReset(_prevState: unknown, formData: FormDa
 /**
  * Self-serve "Request Access" (2026-10-03, the user's own question:
  * "Can the user create an account without the ward admin setting that
- * up first?"), reached from /auth/new-user for anyone who isn't
- * already set up. Creates a real `auth.users` row via Supabase's own
- * sign-up, same as `/auth/new-user`'s existing flow would end up
- * producing anyway -- the difference is just who creates it (the
- * person themselves, not an admin invite through the Supabase
- * dashboard).
+ * up first?"). As of 2026-10-10, this is the one and only way anyone
+ * without access gets an account -- the admin-invites-via-dashboard
+ * alternative (and its matching "/auth/new-user" page) is gone, per
+ * the user's own request to collapse this down to a single path.
+ * Creates a real `auth.users` row via Supabase's own sign-up.
  *
  * No separate "pending request" table or approval queue needed: the
  * resulting `profiles` row comes in with `role = null` (confirmed

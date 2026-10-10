@@ -14,12 +14,14 @@ const initialState: { error?: string; success?: boolean } = {};
  * step; /auth/update-password is the "type your new password" step
  * reached from that email.
  *
- * Split 2026-10-03 from a single combined link that used to cover
- * both this and a first-time sign-in -- see /auth/new-user, its own
- * exact counterpart, for that case's copy. Still calls the same
- * requestPasswordReset action -- Supabase's own "send a password-set
- * link" mechanism doesn't distinguish the two cases at all, so nothing
- * below the copy actually changed.
+ * Split 2026-10-03 from a single combined link that used to also cover
+ * a first-time sign-in via a separate /auth/new-user page -- that page
+ * is deleted as of 2026-10-10 (the user's own request to collapse the
+ * no-account case down to a single "Request Access" path, see
+ * /auth/request-access), so this page's own "I already have an
+ * account, I just forgot my password" case is the only survivor of
+ * that original split. Still calls the same requestPasswordReset
+ * action it always has.
  */
 export default function ResetPasswordPage() {
   const [state, formAction, pending] = useActionState(requestPasswordReset, initialState);

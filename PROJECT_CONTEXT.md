@@ -161,38 +161,58 @@ exclusive access.
 ## Architecture
 
 - **Auth:** email/password (not magic link — that was broken and replaced).
-  First-time users must visit `/auth/new-user` once to set a password --
-  split from `/auth/reset-password` into its own page 2026-10-03 (the
-  user's own report: "There is not distinction between new user and
-  lost password. I would like to have separate links and pages for
-  that"). Both pages call the exact same `requestPasswordReset` action
-  under the hood (`app/auth/actions.ts`) -- there's no separate
-  mechanism to call instead, since an account that reaches `/auth/new-user`
-  this way was already invited directly through the Supabase dashboard,
-  so "first time signing in" and "forgot my password" are the exact
-  same question as far as Supabase's own password-reset-email flow is
-  concerned. Only the page copy differs; `LoginForm.tsx`'s single
-  combined link became two.
-  - **Self-serve sign-up added the same day** (the user's own
-    follow-up question, after reading `/auth/new-user`'s "ask your
-    ward's admin to add you first" line: "Can the user create an
-    account without the ward admin setting that up first?"). New
-    `/auth/request-access`, linked from `/auth/new-user`, calls a new
-    `requestAccess` action -- plain `supabase.auth.signUp()`. No
-    separate "pending request" table or approval queue was needed: the
-    resulting login has no `people` row linking to it yet (same as any
-    admin-invited-but-unverified account), which is exactly what
-    `/admin/verify-logins` already treats as "needs verification" --
-    see that feature's own entry below (now driven by the person-link
-    itself rather than a since-deleted `role is null` check, per the
-    "Permissions" rework later in this section). This is a real,
-    deliberate extension of the "Adding new people" policy's
+  ~~First-time users must visit `/auth/new-user` once to set a
+  password~~ -- true only through 2026-10-09. That page existed for an
+  account an admin had already created directly through the Supabase
+  dashboard (split from `/auth/reset-password` into its own page
+  2026-10-03, the user's own report: "There is not distinction between
+  new user and lost password. I would like to have separate links and
+  pages for that"), and called the exact same `requestPasswordReset`
+  action `/auth/reset-password` does (`app/auth/actions.ts`) --
+  Supabase's own "send a password-set link" flow can't distinguish "a
+  real admin-created account" from "no account at all," so the page
+  showed the same false "check your email" success message either way.
+  **Deleted outright 2026-10-10**, per the user's own request (see
+  below) to collapse the no-account case down to one path -- see Known
+  open items for the bug report that led here.
+  - **Self-serve sign-up (`/auth/request-access`, calling a new
+    `requestAccess` action -- plain `supabase.auth.signUp()`) added
+    2026-10-03** (the user's own follow-up question, after reading the
+    old `/auth/new-user` page's "ask your ward's admin to add you
+    first" line: "Can the user create an account without the ward
+    admin setting that up first?"). No separate "pending request"
+    table or approval queue was needed: the resulting login has no
+    `people` row linking to it yet (same as any
+    admin-invited-but-unverified account used to look), which is
+    exactly what `/admin/verify-logins` already treats as "needs
+    verification" -- see that feature's own entry below (now driven by
+    the person-link itself rather than a since-deleted `role is null`
+    check, per the "Permissions" rework later in this section). This
+    is a real, deliberate extension of the "Adding new people" policy's
     identity-confirmation step, not a loosening of it -- see that
     section's own note. The landing page (`app/page.tsx`) gained a
     small inline notice for a logged-in, not-yet-linked account
     ("you're signed in, but an admin still needs to verify your
     account"), so a freshly self-signed-up person isn't left looking at
     a confusingly bare page with no explanation.
+  - **Made the single, only no-account path, 2026-10-10** (the user's
+    own words, immediately after the escape-hatch-visibility fix
+    below: "I would prefer that there not be two options - login with
+    previous access granted by email, or request access. I really only
+    want request access as the only option. Someone puts in their
+    email, they click the request access button, they are told to
+    verify their email and that once their email is verified an admin
+    will review their access request."). `/auth/new-user` and the
+    admin-dashboard-invite path it served are gone from the app
+    entirely -- `LoginForm.tsx` now links to exactly two places,
+    `/auth/reset-password` ("I already have an account, forgot my
+    password") and `/auth/request-access` ("I don't have access yet"),
+    with nothing in between for the "maybe I was already invited"
+    ambiguity that caused the bug this same day. `/auth/request-access`
+    already asked for a password (required for `signUp()` to create
+    the account at all) -- unchanged by this, still the same email +
+    password + confirm form, just now reached directly from `/login`
+    rather than through the deleted intermediate page.
   - **Email delivery issue, reported 2026-10-03, resolved 2026-10-04:**
     the user tried `/auth/reset-password` while testing a new account
     and got no email after 10 minutes; a later `/auth/request-access`
@@ -1842,6 +1862,44 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Collapsed to a single "Request Access" path, 2026-10-10 -- minutes
+after the two-option escape-hatch fix just below.** The previous fix
+kept both "Signing in for the first time?" (-> `/auth/new-user`, for an
+admin-dashboard-invited account) and "Don't have an account yet?"
+(-> `/auth/request-access`, self-serve) as separate links, just made
+the second one easier to find. The user's own follow-up asked to go
+further: "I would prefer that there not be two options - login with
+previous access granted by email, or request access. I really only
+want request access as the only option. Someone puts in their email,
+they click the request access button, they are told to verify their
+email and that once their email is verified an admin will review their
+access request." That's a real, deliberate simplification of this
+app's own onboarding model, not just more copy tweaking -- the
+admin-invites-through-the-Supabase-dashboard path (the other half of
+the "Adding new people" policy's step 3, see that section above) is no
+longer surfaced anywhere in the app's own UI at all.
+- `app/auth/new-user/page.tsx` is deleted outright, not left unlinked
+  -- nothing else in the app referenced it once `LoginForm.tsx`'s link
+  to it was removed (confirmed by grep before deleting).
+- `LoginForm.tsx` now links to exactly two places: `/auth/reset-password`
+  (forgot password -- genuinely different from what's being collapsed
+  here, an existing account that can't sign in, not a no-account case)
+  and `/auth/request-access`, relabeled "Don't have access yet?".
+- `/auth/request-access` is now reached directly from `/login` (its own
+  back-link changed from the deleted page to `/login`) and its copy
+  matches the user's own description of the flow exactly: enter email
+  + password, click Request Access, verify your email, then an admin
+  reviews the request. **The password fields were already on this
+  form** (`signUp()` needs a real password at account-creation time,
+  unlike the deleted page's admin-already-set-one-up assumption) -- no
+  structural change needed there, only confirmed in passing after the
+  user asked that password entry stay "somewhere appropriate" in the
+  flow.
+- `requestPasswordReset` (`app/auth/actions.ts`) now has exactly one
+  caller (`/auth/reset-password`) instead of two -- left completely
+  unchanged otherwise, still the right action for "I have an account,
+  I forgot my password."
 
 **Bug found and fixed 2026-10-10: a new sign-up never got an account,
 root-caused by the user's own correct diagnosis.** The user's report:

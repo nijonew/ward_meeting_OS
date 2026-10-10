@@ -9,7 +9,20 @@ const initialState: { error?: string } = {};
 /** Split out of app/login/page.tsx (2026-10-03) so that page could
  *  become an async Server Component (needed to fetch the ward name for
  *  its heading) while this part -- the only part that actually needs
- *  client state -- stays a Client Component. */
+ *  client state -- stays a Client Component.
+ *
+ *  **Simplified to one no-account path, 2026-10-10** -- the user's own
+ *  words, right after the /auth/new-user escape-hatch fix above: "I
+ *  would prefer that there not be two options - login with previous
+ *  access granted by email, or request access. I really only want
+ *  request access as the only option." The "Signing in for the first
+ *  time?" link (-> /auth/new-user, for an account an admin had already
+ *  created directly through the Supabase dashboard) is gone -- that
+ *  whole page is deleted, not just unlinked, since nothing else in the
+ *  app still needs it. "Don't have an account yet?" is now the one and
+ *  only path for anyone without access; "Forgot your password?" is
+ *  untouched, a genuinely different case (an existing account that
+ *  can't sign in), not part of what the user was asking to collapse. */
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(signInWithPassword, initialState);
 
@@ -41,25 +54,11 @@ export function LoginForm() {
       </form>
 
       <div className="mt-4 flex flex-col gap-1.5">
-        <Link href="/auth/new-user" className="text-xs text-ink-muted underline">
-          Signing in for the first time?
-        </Link>
         <Link href="/auth/reset-password" className="text-xs text-ink-muted underline">
           Forgot your password?
         </Link>
-        {/* Added 2026-10-10 (the user's own diagnosis of a real
-            confusion a brand-new sign-up ran into): "Signing in for the
-            first time?" reads, to someone who's never been added at
-            all, like it should apply to them -- but that page's main
-            form only works for an account an admin already created,
-            and quietly shows a false "check your email" success message
-            otherwise (Supabase's own password-reset call never reveals
-            whether an email has an account). This gives a genuinely new
-            person a direct path straight from /login, instead of
-            requiring them to land on /auth/new-user first and then find
-            its own small escape-hatch link at the bottom of that page. */}
         <Link href="/auth/request-access" className="text-xs text-ink-muted underline">
-          Don&rsquo;t have an account yet?
+          Don&rsquo;t have access yet?
         </Link>
       </div>
     </>
