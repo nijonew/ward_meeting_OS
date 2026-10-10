@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 064
+## Current migration number: 065
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -146,8 +146,12 @@ reconstructed from both:
 - `064` (new `sacrament_assignments.guest_name` column -- the guest
   Chorister/Organist option, see Known open items below): still needs
   to be run.
+- `065` (one-time bulk import: 6 real announcements the ward had
+  already collected on its old Google Form, pasted directly by the
+  user 2026-10-10 -- see that migration file's own header comment for
+  the full column mapping): still needs to be run.
 
-Next migration should be `065_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `066_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
