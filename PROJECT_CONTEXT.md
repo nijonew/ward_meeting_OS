@@ -180,11 +180,11 @@ reconstructed from both:
   for why: `admin_select_options` is this app's own documented single
   source of truth for these two fields, and a hardcoded CHECK
   constraint duplicating that list is exactly what just broke).
-  `067` itself needs no further changes -- still needs to be run, after
-  `068`.
+  `067` itself needed no further changes once `068` ran first --
+  confirmed run.
 - `068` (drops the undocumented `calling_planning_calling_status_check`/
   `calling_planning_release_status_check` constraints that blocked
-  `067` above): still needs to be run, before `067`.
+  `067` above): confirmed run.
 
 Next migration should be `069_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
