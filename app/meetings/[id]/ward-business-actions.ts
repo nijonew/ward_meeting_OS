@@ -71,7 +71,11 @@ export async function pullCallingPlanningIntoMeeting(
     personId = candidateIds[0];
     type = "new_calling";
     statusColumn = "calling_status";
-    nextStatus = "to_be_set_apart";
+    // "to_be_set_apart" doesn't exist in the redesigned calling_status
+    // vocabulary (2026-10-10, see lib/data/calling-planning.ts's own
+    // comment) -- "To Record" sits immediately after "To be Announced"
+    // in the user's own ordered list, with nothing in between.
+    nextStatus = "to_record";
   } else {
     if (!planning.release_person_id) {
       return { error: "No one is set to be released on this row." };
@@ -79,7 +83,10 @@ export async function pullCallingPlanningIntoMeeting(
     personId = planning.release_person_id;
     type = "release";
     statusColumn = "release_status";
-    nextStatus = "to_record";
+    // "to_record" doesn't exist in the redesigned release_status
+    // vocabulary either -- "Complete" sits immediately after "To be
+    // Announced" there, with no intermediate recording stage anymore.
+    nextStatus = "complete";
   }
 
   const { data: rabnm, error: rabnmError } = await supabase
@@ -109,7 +116,7 @@ export async function pullCallingPlanningIntoMeeting(
  * sacrament_rabnm row this meeting's Ward Business created (and its
  * sacrament_rabnm_people rows, explicitly, same reasoning as
  * delete_meeting_cascade: don't assume a cascade exists) and resets the
- * Calling Planning row back to "To Announce in Sacrament"
+ * Calling Planning row back to "To be Announced"
  * (announced_meeting_id cleared) so it can be pulled into a different
  * meeting, or this one again, without manual database cleanup. Only
  * ever touches a row this mechanism itself created

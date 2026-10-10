@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 065
+## Current migration number: 067
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -150,8 +150,19 @@ reconstructed from both:
   already collected on its old Google Form, pasted directly by the
   user 2026-10-10 -- see that migration file's own header comment for
   the full column mapping): still needs to be run.
+- `066` (replaces calling_planning's calling_status/release_status
+  option lists in `admin_select_options` with the user's own
+  redesigned 12-item/6-item vocabulary -- see Known open items below
+  for the full mapping): still needs to be run.
+- `067` (one-time bulk import: 123 calling_planning rows from the
+  ward's real calling-tracker spreadsheet, pasted directly by the user
+  2026-10-10, plus whatever `callings`/`people` rows it needed that
+  didn't already exist -- depends on `066` having already run first.
+  See that migration file's own header comment for the full
+  status-word mapping and the handful of source-data fixes made along
+  the way): still needs to be run.
 
-Next migration should be `066_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `068_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1866,6 +1877,72 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Calling Planning status vocabulary redesigned, and 123 real calling-
+tracker rows imported, 2026-10-10.** The user asked to bulk-migrate
+their real ward calling-tracker spreadsheet ("Sort, Date Initiated,
+Calling, Full Name, Status, Date Set Apart, Notes, Full Name2, Status2"
+-- New Callings and To Be Released side by side) into `calling_planning`.
+Before writing anything, this assistant (no live database access)
+asked what the sheet's free-text status words should map onto this
+app's real `calling_status`/`release_status` values -- the user instead
+answered with a complete replacement vocabulary: Calling status
+**Needed, In review, Approved, Interview Set, Accepted, Declined, To be
+Announced, To Record, Complete, For Stake, Future, Hold**; Release
+status **Previously Vacant, To be released, Interview Set, Release
+Extended, To be Announced, Complete**. This is a real redesign of the
+whole workflow, not just a mapping question -- it drops "To Be Set
+Apart" entirely and adds six brand-new stages across both lists.
+- **`lib/data/calling-planning.ts`'s `DEFAULT_CALLING_STATUSES`/
+  `DEFAULT_RELEASE_STATUSES` rewritten to the new ordered lists.**
+  Value *keys* are reused (not renamed) for every stage real
+  application code branches on by value -- `discussing` (now labeled
+  "In Review"), `to_announce` ("To be Announced"), `to_record`,
+  `complete`, `future`, `declined`, `previously_vacant` -- so no
+  existing row or code path needed migrating just because a label
+  changed. Genuinely new stages (Needed, Approved, Interview Set,
+  Accepted, For Stake, Hold, To be Released, Release Extended) got
+  brand new keys.
+- **Migration `066`** replaces (delete + insert, `on conflict do
+  update` for a safe re-run) the two field_keys' rows in
+  `admin_select_options` -- a deliberate full replacement, not
+  migration `022`'s original `on conflict do nothing` (that approach
+  was for preserving an admin's own later edits; this one is an
+  intentional wholesale redesign).
+- **Auto-advance logic updated in two places** that used to set
+  `calling_status = "to_be_set_apart"` / `release_status = "to_record"`
+  once a row got pulled into a meeting's Ward Business or narrowed to
+  one candidate (`app/meetings/[id]/ward-business-actions.ts`'s
+  `pullCallingPlanningIntoMeeting`, `app/calling-planning/actions.ts`'s
+  `pushCallingToSacramentMeeting`): neither target value exists in the
+  new vocabulary. Calling now advances straight to `to_record` (the
+  stage immediately after "To be Announced" in the new ordered list,
+  same as the old flow minus the now-gone set-apart step); release now
+  advances straight to `complete` (nothing sits between "To be
+  Announced" and "Complete" in the new release list at all, unlike the
+  old one's intermediate recording step). "To Announce in Sacrament"
+  UI text (`app/calling-planning/page.tsx`, both action files' error/
+  comment text) updated to "To be Announced" throughout.
+- **Migration `067`**, the actual data import, depends on `066` having
+  already run. Built via a small one-off Node script
+  (`scratchpad/calling-import/generate.js`, not committed -- the raw
+  TSV was saved to a scratchpad file and parsed mechanically rather
+  than hand-transcribing 119 rows of free text, to avoid transcription
+  errors at that volume) that resolved every status word against the
+  mapping above, split comma-separated values where the schema can't
+  hold more than one, and emitted the final SQL. Three real
+  source-data issues were caught and fixed before finalizing, not
+  silently reproduced: rows 20 and 113 each name two distinct callings
+  in one cell (split into two calling_planning rows); rows 68 and 95
+  each name two people being released together in one cell (split the
+  same way, since `release_person_id` is a single FK unlike
+  `candidate_person_ids`); and row 47's own release-name cell held
+  "called to CTR 4&5 class" -- not a person, a copy/paste slip from a
+  neighboring row's Notes text -- treated as blank rather than
+  inserted as a fabricated person. 79 distinct callings and 141
+  distinct people get created automatically if missing (same
+  case-insensitive exact-name pattern as migration `049`'s bulk people
+  import) before the 123 final calling_planning rows are inserted.
 
 **Youth Activities given its own tile grid, read-only activity views
 built, 2026-10-10 -- same day as the hub scaffold just below, right

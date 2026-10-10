@@ -11,24 +11,51 @@ export interface CallingDetail {
 }
 
 /** Fallback options if admin_select_options has no rows yet for these
- *  fields -- see lib/data/select-options.ts. Also what the migration
- *  022_admin_select_options.sql seeds the table with, so switching over
- *  to the DB-backed list is a no-op until someone actually edits it. */
+ *  fields -- see lib/data/select-options.ts. Also what migration
+ *  066_calling_planning_status_vocabulary.sql replaces the table's own
+ *  rows with, so switching over to the DB-backed list is a no-op until
+ *  someone actually edits it.
+ *
+ *  **Redesigned 2026-10-10**, the user's own ordered list, replacing
+ *  the original 022-seeded vocabulary entirely -- "Needed, In review,
+ *  Approved, Interview Set, Accepted, Declined, To be Announced, To
+ *  Record, Complete, For Stake, Future, Hold" /
+ *  "Previously Vacant, To be released, interview set, release
+ *  extended, to be announced, Complete". `discussing` keeps its old
+ *  value key (now labeled "In Review") and `to_announce`/`to_record`/
+ *  `complete`/`future`/`declined`/`previously_vacant` keep theirs too
+ *  -- those five are the ones real application code branches on by
+ *  value (see app/calling-planning/actions.ts and
+ *  app/meetings/[id]/ward-business-actions.ts), so reusing the same
+ *  keys means every existing row and every piece of app logic that
+ *  reads/writes them keeps working without a data migration of its
+ *  own. Genuinely new stages (Needed, Approved, Interview Set,
+ *  Accepted, For Stake, Hold, To be Released, Release Extended) get
+ *  brand new value keys. "To Be Set Apart" is dropped entirely -- it
+ *  has no equivalent in the new vocabulary; see the same two action
+ *  files' comments for how the auto-advance logic that used to target
+ *  it was adjusted. */
 export const DEFAULT_CALLING_STATUSES = [
-  { value: "discussing", label: "Discussing" },
-  { value: "future", label: "Future" },
+  { value: "needed", label: "Needed" },
+  { value: "discussing", label: "In Review" },
+  { value: "approved", label: "Approved" },
+  { value: "interview_set", label: "Interview Set" },
+  { value: "accepted", label: "Accepted" },
   { value: "declined", label: "Declined" },
-  { value: "to_announce", label: "To Announce in Sacrament" },
-  { value: "to_be_set_apart", label: "To Be Set Apart" },
+  { value: "to_announce", label: "To be Announced" },
   { value: "to_record", label: "To Record" },
   { value: "complete", label: "Complete" },
+  { value: "for_stake", label: "For Stake" },
+  { value: "future", label: "Future" },
+  { value: "hold", label: "Hold" },
 ];
 
 export const DEFAULT_RELEASE_STATUSES = [
   { value: "previously_vacant", label: "Previously Vacant" },
-  { value: "discussing", label: "Discussing" },
-  { value: "to_announce", label: "To Announce in Sacrament" },
-  { value: "to_record", label: "To Record" },
+  { value: "to_be_released", label: "To be Released" },
+  { value: "interview_set", label: "Interview Set" },
+  { value: "release_extended", label: "Release Extended" },
+  { value: "to_announce", label: "To be Announced" },
   { value: "complete", label: "Complete" },
 ];
 

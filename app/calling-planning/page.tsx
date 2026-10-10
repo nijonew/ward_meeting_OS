@@ -140,8 +140,8 @@ export default async function CallingPlanningPage({
         <section className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Ready to Announce</h2>
           <p className="mt-1 text-xs text-ink-muted">
-            Calling Status or Release Status is &ldquo;To Announce in Sacrament.&rdquo; Add
-            each to an upcoming meeting&rsquo;s Ward Business.
+            Calling Status or Release Status is &ldquo;To be Announced.&rdquo; Add each to an
+            upcoming meeting&rsquo;s Ward Business.
           </p>
           <ul className="mt-4 flex flex-col gap-4">
             {readyToAnnounce.map((r) => {
