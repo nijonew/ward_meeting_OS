@@ -47,6 +47,20 @@ export function LoginForm() {
         <Link href="/auth/reset-password" className="text-xs text-ink-muted underline">
           Forgot your password?
         </Link>
+        {/* Added 2026-10-10 (the user's own diagnosis of a real
+            confusion a brand-new sign-up ran into): "Signing in for the
+            first time?" reads, to someone who's never been added at
+            all, like it should apply to them -- but that page's main
+            form only works for an account an admin already created,
+            and quietly shows a false "check your email" success message
+            otherwise (Supabase's own password-reset call never reveals
+            whether an email has an account). This gives a genuinely new
+            person a direct path straight from /login, instead of
+            requiring them to land on /auth/new-user first and then find
+            its own small escape-hatch link at the bottom of that page. */}
+        <Link href="/auth/request-access" className="text-xs text-ink-muted underline">
+          Don&rsquo;t have an account yet?
+        </Link>
       </div>
     </>
   );

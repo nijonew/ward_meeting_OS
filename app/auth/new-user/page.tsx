@@ -26,9 +26,25 @@ const initialState: { error?: string; success?: boolean } = {};
  *
  * Gained a second path the same day, once the user asked "can the
  * user create an account without the ward admin setting that up
- * first?" -- the "ask your admin" line below became a real link to
+ * first?" -- the "ask your admin" line became a real link to
  * /auth/request-access, self-serve account creation, instead of a
  * dead end.
+ *
+ * **Reworked 2026-10-10** after a real confusion the user diagnosed
+ * directly: a brand-new person who was never set up by an admin still
+ * sees this page's main form (it's the one reached from /login's
+ * "Signing in for the first time?" link, which reads like it should
+ * apply to them too), submits it, and gets back a "Check your email"
+ * success message -- Supabase's own `resetPasswordForEmail` never
+ * reveals whether an account actually exists for that email, so it
+ * reports success either way, and nothing ever arrives because there
+ * was no account to send a link to. The real way out, "Request access
+ * instead," used to be a single small muted line at the very bottom of
+ * the page -- easy to miss, especially right after seeing what looked
+ * like success above it. Now asked as an explicit question before the
+ * form at all, so a genuinely new person self-selects onto
+ * /auth/request-access before ever submitting the form that can't work
+ * for them.
  */
 export default function NewUserPage() {
   const [state, formAction, pending] = useActionState(requestPasswordReset, initialState);
@@ -39,12 +55,25 @@ export default function NewUserPage() {
         &larr; Sign in
       </Link>
       <h1 className="mt-2 font-display text-2xl">Signing in for the first time</h1>
-      <p className="mt-2 text-sm text-ink-muted">
+
+      <div className="mt-4 rounded border border-rule bg-surface p-4">
+        <p className="text-sm text-ink">Has an admin already added you to Ward Meeting OS?</p>
+        <p className="mt-2 text-xs text-ink-muted">
+          If you&rsquo;re not sure, or if this is the first time you&rsquo;ve ever used this ward&rsquo;s
+          app at all,{" "}
+          <Link href="/auth/request-access" className="font-medium text-ink underline">
+            request access
+          </Link>{" "}
+          instead of using the form below.
+        </p>
+      </div>
+
+      <p className="mt-6 text-sm text-ink-muted">
         If an admin has already set up your account, enter your email below and we&rsquo;ll send
         you a link to set your password.
       </p>
 
-      <form action={formAction} className="mt-6 flex flex-col gap-3">
+      <form action={formAction} className="mt-3 flex flex-col gap-3">
         <input
           type="email"
           name="email"
@@ -60,16 +89,17 @@ export default function NewUserPage() {
           {pending ? "Sending..." : "Send me a link"}
         </button>
         {state.error && <p className="text-sm text-danger">{state.error}</p>}
-        {state.success && <p className="text-sm text-ink">Check your email for a link to set your password.</p>}
+        {state.success && (
+          <p className="text-sm text-ink">
+            Check your email for a link to set your password. If nothing arrives after a few
+            minutes, an admin probably hasn&rsquo;t set up your account yet --{" "}
+            <Link href="/auth/request-access" className="underline">
+              request access
+            </Link>{" "}
+            instead.
+          </p>
+        )}
       </form>
-
-      <p className="mt-4 text-xs text-ink-muted">
-        Haven&rsquo;t been set up yet?{" "}
-        <Link href="/auth/request-access" className="underline">
-          Request access
-        </Link>{" "}
-        instead.
-      </p>
     </main>
   );
 }

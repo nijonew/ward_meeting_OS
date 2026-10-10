@@ -1843,6 +1843,55 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-10: a new sign-up never got an account,
+root-caused by the user's own correct diagnosis.** The user's report:
+"I had someone try to sign up. they didn't get an email for
+verification. I checked the authentication table and they are not
+listed as a user." The missing-row symptom ruled out a bug in
+`requestAccess` itself (`app/auth/actions.ts`) -- it already calls
+`supabase.auth.signUp()` and surfaces `error.message` correctly, and
+`signUp()` creates an auth-table row immediately regardless of email
+delivery, so if no row exists, `signUp()` was never actually called.
+Before this assistant could get through its own diagnostic questions
+(Supabase dashboard settings, rate limits, SMTP), the user proposed
+the real answer directly: "I wonder if the issue is that the email
+entry is for people that have requested access already... so someone
+puts in their email, but if they haven't requested access then it does
+nothing? They probably don't see the little link below that says to
+request access." Confirmed exactly right. `/login`'s "Signing in for
+the first time?" link leads to `/auth/new-user`, whose main form calls
+`requestPasswordReset` -- the same `resetPasswordForEmail()`-backed
+action `/auth/reset-password` uses, which only works for an email that
+already has an account. Supabase deliberately never reveals whether an
+email has an account (anti-enumeration), so that form shows the exact
+same "Check your email for a link to set your password" success
+message whether or not anything was actually sent -- a brand-new
+person, who reasonably read "signing in for the first time" as meaning
+them, got false confidence and no email, while the real way out,
+"Request access instead," sat as one small muted line at the very
+bottom of the page, easy to miss directly below what looked like
+success.
+
+Two-part fix, both navigation/copy changes, no logic bug to fix in
+either server action:
+- `components/auth/LoginForm.tsx` gained a third link alongside the
+  two existing ones, "Don't have an account yet?" -> `/auth/request-access`
+  -- a genuinely new person no longer has to land on `/auth/new-user`
+  at all to find the real self-serve path.
+- `app/auth/new-user/page.tsx` reordered to ask the real question
+  before the form: a highlighted box ("Has an admin already added
+  you...? If you're not sure... request access instead of using the
+  form below") now sits above the password-reset form rather than
+  being a single muted afterthought underneath it. The success message
+  itself was also hedged -- it now adds "If nothing arrives after a few
+  minutes, an admin probably hasn't set up your account yet -- request
+  access instead" rather than leaving a false-positive "check your
+  email" as the last word.
+- `/auth/reset-password` (the narrower "I already have an account,
+  forgot my password" case) was deliberately left unchanged -- its own
+  premise doesn't carry the same "might not actually have an account"
+  ambiguity `/auth/new-user` does, so it didn't need the same fix.
+
 **Performance pass, 2026-10-07: "the app is extremely slow."** Found
 and fixed three real N+1/duplicate-fetch problems, in order of impact:
 - **`autoArchivePastMeetings` (`lib/data/meetings.ts`), by far the
