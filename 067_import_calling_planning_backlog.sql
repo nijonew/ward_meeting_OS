@@ -9,6 +9,17 @@
 -- migration writes calling_status/release_status values from that
 -- same new vocabulary.
 --
+-- **First attempt failed**: `operator does not exist: date = text` on
+-- the final insert's WHERE NOT EXISTS clause. The inner VALUES list's
+-- date_initiated/date_set_apart entries are plain quoted string
+-- literals (no `date '...'` cast, unlike migration 065's own VALUES
+-- list) -- Postgres infers an untyped VALUES column as text unless
+-- something forces otherwise, so comparing it against
+-- calling_planning's real `date` columns failed. Fixed by wrapping the
+-- raw VALUES block in an inner SELECT that casts both columns to
+-- `::date` once, rather than hunting down every downstream reference.
+--
+
 -- Three steps, matching this app's own existing conventions:
 --   1. Create any `calling` not already in the roster (case-insensitive
 --      exact-name match) -- 79 distinct calling names in this sheet.
@@ -330,7 +341,18 @@ select
   (select p2.id from people p2 where lower(trim(p2.name)) = lower(trim(v.release_name))),
   v.release_status,
   v.notes
-from (values
+-- The inner VALUES list's date columns are plain string literals, so
+-- Postgres infers them as text, not date -- without this explicit
+-- cast, comparing v.date_initiated against calling_planning's real
+-- `date` column below (and in the WHERE NOT EXISTS clause) fails with
+-- "operator does not exist: date = text". Casting once here, rather
+-- than at every reference, is what actually fixes it everywhere.
+from (
+  select
+    calling_name, date_initiated::date as date_initiated, candidate_names,
+    calling_status, date_set_apart::date as date_set_apart, release_name,
+    release_status, notes
+  from (values
   ('Primary President', '2025-11-23', array['Kathy Smith']::text[], 'complete', null, 'Lorie Newbold', 'complete', 'Set apart by Bishop 12/28/2025'),
   ('Primary First Counselor', '2025-11-23', array['Holly Dawn Lund']::text[], 'complete', null, 'Kathy Smith', 'complete', 'Set apart by Bishopric 12/28/2025'),
   ('Primary Second Counselor', '2025-11-23', array['Heidi Merritt']::text[], 'complete', null, 'Emily Adams', 'complete', 'Set apart by Bishopric 12/28/2025'),
@@ -454,7 +476,8 @@ from (values
   ('Music Coordinator', '2026-09-13', array['Denise Krauss']::text[], 'discussing', null, 'Dean Kreger', 'release_extended', null),
   ('Primary Teacher - Sunbeam Class', '2026-09-13', array['Amber King']::text[], 'interview_set', null, 'Colten Jared Bingham', 'release_extended', null),
   ('Primary Teacher - Sunbeam Class', '2026-09-13', array['Lauren Reay Solomon']::text[], 'needed', null, 'Shayne Bingham', 'release_extended', null)
-) as v(calling_name, date_initiated, candidate_names, calling_status, date_set_apart, release_name, release_status, notes)
+  ) as raw(calling_name, date_initiated, candidate_names, calling_status, date_set_apart, release_name, release_status, notes)
+) as v
 join callings c on lower(trim(c.name)) = lower(trim(v.calling_name))
 where not exists (
   select 1 from calling_planning cp

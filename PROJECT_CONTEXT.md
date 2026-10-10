@@ -153,14 +153,21 @@ reconstructed from both:
 - `066` (replaces calling_planning's calling_status/release_status
   option lists in `admin_select_options` with the user's own
   redesigned 12-item/6-item vocabulary -- see Known open items below
-  for the full mapping): still needs to be run.
+  for the full mapping): confirmed run.
 - `067` (one-time bulk import: 123 calling_planning rows from the
   ward's real calling-tracker spreadsheet, pasted directly by the user
   2026-10-10, plus whatever `callings`/`people` rows it needed that
   didn't already exist -- depends on `066` having already run first.
   See that migration file's own header comment for the full
   status-word mapping and the handful of source-data fixes made along
-  the way): still needs to be run.
+  the way). **First attempt failed in production** --
+  `operator does not exist: date = text` on the final insert's own
+  WHERE NOT EXISTS clause, since the VALUES block's date literals were
+  plain uncast strings (Postgres infers those as `text`, not `date`,
+  unlike migration 065's own VALUES list which used `date '...'`
+  literal syntax throughout). File updated to cast both date columns
+  once via a wrapping SELECT rather than at every downstream
+  reference -- still needs to be re-run with the corrected version.
 
 Next migration should be `068_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
