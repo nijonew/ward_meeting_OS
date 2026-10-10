@@ -8,11 +8,36 @@
 -- location, link, attached file) that app/submit/actions.ts /
 -- AnnouncementForm.tsx were themselves built from (2026-09-05, see
 -- PROJECT_CONTEXT.md). Six rows: an ice cream activity, Super
--- Saturday, a Senior Missionary Devotional, Youth Choir (kept as
--- typed in the source, "Youth Chior"), the Fall self-reliance
--- classes, and Tithing Declaration. None had already ended as of
--- 2026-10-10, so all are inserted `status = 'published'`, matching
--- what submitting each live through the app would have set.
+-- Saturday, a Senior Missionary Devotional, a youth choir performance,
+-- the Fall self-reliance classes, and Tithing Declaration. None had
+-- already ended as of 2026-10-10, so all are inserted
+-- `status = 'published'`, matching what submitting each live through
+-- the app would have set.
+--
+-- **Amended in place, same day, before this migration was ever run**
+-- (the user's own two follow-ups, so no new migration number needed --
+-- same precedent as migration 047's own in-place amendment):
+--   - The youth choir row's title/body/dates were rewritten from the
+--     real flyer the user shared (a "Walk With Me" Stake Conference
+--     Youth Choir Performance flyer): the earlier placeholder title,
+--     "Youth Chior" (the typo, kept verbatim from the original tracking
+--     form's own short title field), is corrected to "Youth Choir
+--     Performance" now that there's an authoritative source for it, not
+--     an unrequested copy-edit -- the body gained both real practice
+--     dates (Oct 25 and Nov 1, 2:15 PM, Stake Center) and the actual
+--     Nov 8 performance date (Stake Conference's general session),
+--     which the original tracking-form row never had at all.
+--   - Super Saturday's body lost its own "Attached file: <url>" line --
+--     see the public announcements page's own comment (app/announcements/
+--     public/page.tsx) for why: the user asked that page to stop
+--     showing a literal "attached file" reference, and there's nowhere
+--     else in this schema to put a second link alongside the real
+--     link_url (the crafts sign-up sheet) already carries.
+--   - Tithing Declaration's `link_url` is now a real Google Calendar
+--     appointment-scheduling link, decoded from a QR code image the
+--     user shared directly (the Google Form export itself had no link
+--     for this row at all) -- matches the body's own existing "Sign up
+--     digitally" line, which previously had nothing to point to.
 --
 -- Column mapping, straight off the form's own fields:
 --   organization/audience/where_announced/announcement_type -- copied
@@ -41,11 +66,12 @@
 --
 -- This app has no "attach a file" column at all (deliberately skipped
 -- when the richer announcement fields were first built, see migration
--- 031's own comment) -- where the export's own attached-file link has
--- a value, it's folded into link_url when that field was otherwise
--- empty (4 of 6 rows), or appended as its own line in the body when
--- link_url already held a different, real link (Super Saturday had
--- both a sign-up spreadsheet link and a separate attached flyer).
+-- 031's own comment) -- where the export's own attached-file link had
+-- a value and link_url was otherwise empty, it's folded into link_url
+-- directly (3 of 6 rows); where link_url already held a different,
+-- real link (Super Saturday had both a sign-up spreadsheet link and a
+-- separate attached flyer), the attachment link is simply dropped --
+-- see the amendment note above.
 --
 -- Idempotent: guarded by title + start_date, so re-running this after
 -- it already succeeded adds nothing a second time.
@@ -79,9 +105,7 @@ from (
 
 Here is the link for the crafts sign up so we can prep the materials a head of time. Sign up on the link or text me or Kimberly Packer which crafts you want to do and we’ll mark you down! My number is (480) 550-1524 (for any and all questions)
 
-Craft info and sign up:
-
-Attached file: https://drive.google.com/open?id=17l8Kd9yr0eSkc4Rjc9P_ShheophB0Y9N',
+Craft info and sign up:',
       'travjstew19@gmail.com',
       'Relief Society', 'Single Event', 'Relief Society', 'Relief Society Class',
       date '2026-10-24', time '10:00', date '2026-10-24', time '14:00',
@@ -100,13 +124,22 @@ Attached file: https://drive.google.com/open?id=17l8Kd9yr0eSkc4Rjc9P_ShheophB0Y9
       timestamp '2026-08-09 18:59:40'
     ),
     (
-      'Youth Chior',
-      'Youth choir practices and participation for stake conference',
+      'Youth Choir Performance',
+      'The Stake Presidency has asked that we have a youth choir performance for the general session of Stake Conference. Stake Conference is November 8. We will be singing the 2026 Youth Theme, "Walk With Me."
+
+Practice dates:
+Saturday, October 25th, 2:15 PM
+Saturday, November 1st, 2:15 PM
+Stake Center
+
+All youth who are interested in singing are invited to come to these practices! If you can only make one practice, we would still love for you to come, even though being at both is ideal.
+
+We’d love to get as many youth as possible, so please spread the word and reminders!',
       'travjstew19@gmail.com',
       'Stake', 'Single Event', 'All Youth', 'Bishopric Meeting, All YM, All YW',
-      date '2026-10-25', time '14:15', date '2026-10-25', time '15:15',
+      date '2026-10-25', time '14:15', date '2026-11-08', null::time,
       'Stake Center',
-      'https://drive.google.com/open?id=1ACV9JHu1W6TCABg0VSpmD9vpGgCBrVMI',
+      null,
       timestamp '2026-10-06 16:05:12'
     ),
     (
@@ -127,7 +160,8 @@ Attached file: https://drive.google.com/open?id=17l8Kd9yr0eSkc4Rjc9P_ShheophB0Y9
       'Bishopric', 'Ongoing Event', 'Whole Ward',
       'Ward Communications (Printed, Weekly Email, Social Media, etc.)',
       date '2026-09-20', null::time, date '2026-12-06', null::time,
-      null, null,
+      null,
+      'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0HkXFGpjqSOVTunLkpNj-95d09rx6afXFzGqXy5Q8tMku0rLT7JPb1L7QjmZT9DDCxkpK3UcnC',
       timestamp '2026-08-30 08:46:51'
     )
 ) as v (

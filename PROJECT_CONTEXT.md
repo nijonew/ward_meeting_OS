@@ -1867,6 +1867,58 @@ avoid confusing the two.
 
 ## Known open items
 
+**Public Announcements page cleaned up and migration 065 corrected,
+2026-10-10**, right after that migration was first written -- the user
+reviewed the real content it would insert and asked for several
+follow-on changes, none of which required a new migration number since
+`065` hadn't been run yet (same "amend in place" precedent as migration
+047's own in-place rewrite):
+- **Time display, user's own words: "update the time reporting in the
+  announcements page to am/pm rather than military time. Make it user
+  friendly."** `app/announcements/public/page.tsx` was showing
+  `start_time`/`end_time` as the raw 24-hour string Postgres returns
+  (`"19:00:00"`) with no formatting at all. New `formatTime()` renders
+  it as plain AM/PM ("7:00 PM"), handling midnight/noon correctly
+  (`"00:00:00"` -> "12:00 AM", `"12:00:00"` -> "12:00 PM").
+- **Simplified what the public page shows, user's own words: "don't
+  show more info, announcement type, attached file. If there is an
+  included link please include that with a hyperlink on the page."**
+  Three changes: the meta line under each title no longer appends
+  `announcement_type` (organization alone remains -- the admin inbox
+  and Table Admin still show the full type, this was scoped to the
+  public page only); the separate "More info" link line is gone,
+  replaced by hyperlinking the announcement's own title when
+  `link_url` is set (no generic label text at all); and the literal
+  "Attached file: `<url>`" line migration 065 had put inline in one
+  announcement's body (there's no real attachment column in this
+  schema, see migration 031) was removed from that migration's source
+  data entirely rather than ever rendered -- see migration 065's own
+  amendment note for where that changed.
+- **Youth Choir row corrected from a real flyer.** The user shared an
+  actual "Walk With Me" Stake Conference Youth Choir Performance flyer
+  image after seeing the placeholder content migration 065 had pulled
+  from the old tracking form's own thin row (just "Youth choir
+  practices and participation for stake conference," one practice
+  date). Rewritten with the flyer's real content: both practice dates
+  (Oct 25 and Nov 1, 2:15 PM, Stake Center) and the actual Nov 8
+  performance date (Stake Conference's general session), plus the
+  title typo ("Youth Chior," kept verbatim from the original tracking
+  form in the first pass) corrected to "Youth Choir Performance" now
+  that there's an authoritative source to correct it against.
+- **Tithing Declaration's link, decoded from a QR code image.** The
+  user shared a photo of the flyer's QR code and asked for it as this
+  announcement's `link_url` -- its own Google Form row never had one.
+  This assistant has no direct QR-decoding tool; tried `jsQR`,
+  `@zxing/library`, and OpenCV's `QRCodeDetector` (all installed
+  one-off into this machine's global node/Python environments, not the
+  project) against the image, all of which located the code's finder
+  pattern but failed to actually decode it -- consistent with a
+  stylized/AI-generated "QR art" image that a phone camera's live
+  scanner tolerates but a byte-exact library decoder doesn't. Asked the
+  user directly rather than guessing further; they pasted the real
+  URL (a Google Calendar appointment-scheduling link) in chat, which
+  migration 065 now uses.
+
 **Collapsed to a single "Request Access" path, 2026-10-10 -- minutes
 after the two-option escape-hatch fix just below.** The previous fix
 kept both "Signing in for the first time?" (-> `/auth/new-user`, for an
