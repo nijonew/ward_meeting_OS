@@ -1,0 +1,32 @@
+-- 068_drop_calling_planning_status_checks.sql
+--
+-- Migration 067 failed in production: "new row for relation
+-- "calling_planning" violates check constraint
+-- "calling_planning_release_status_check"" trying to insert
+-- release_status = 'to_be_released'. Same situation this repo has now
+-- hit three times before (migrations 038, 041, 063's own write-ups) --
+-- an undocumented DB object created directly in the Supabase SQL
+-- editor before this repo's migration history started. Here it's a
+-- pair of CHECK constraints on calling_planning (calling_status and,
+-- confirmed by the error, release_status) that were never captured in
+-- any migration file, presumably hardcoded against migration 022's
+-- original 5/7-value vocabulary and never revisited once
+-- admin_select_options made these fields admin-editable.
+--
+-- Dropped outright rather than recreated against the new vocabulary
+-- from migration 066 -- this app's own documented design for these
+-- two fields is that admin_select_options is the single source of
+-- truth for what's allowed (editable from /admin without a code or
+-- schema change), exactly the same reasoning already applied to
+-- announcements.organization/announcement_type ("stored as plain
+-- text... so a submitter's free-text answer isn't stranded outside a
+-- fixed list," migration 031's own comment). A hardcoded CHECK
+-- constraint duplicates that list in a second place that can drift out
+-- of sync the next time an admin adds or renames an option through the
+-- "Calling Features"-style admin UI -- it should never have been
+-- there verifying ad hoc edits, which is exactly what just happened.
+--
+-- Idempotent: `drop constraint if exists` is safe to re-run.
+
+alter table calling_planning drop constraint if exists calling_planning_calling_status_check;
+alter table calling_planning drop constraint if exists calling_planning_release_status_check;

@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 067
+## Current migration number: 068
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -167,9 +167,26 @@ reconstructed from both:
   unlike migration 065's own VALUES list which used `date '...'`
   literal syntax throughout). File updated to cast both date columns
   once via a wrapping SELECT rather than at every downstream
-  reference -- still needs to be re-run with the corrected version.
+  reference. **Second attempt also failed in production** -- `new row
+  for relation "calling_planning" violates check constraint
+  "calling_planning_release_status_check"` trying to insert
+  `release_status = 'to_be_released'`. Same class of problem as
+  migrations 038/041/063 before it: an undocumented CHECK constraint on
+  `calling_status`/`release_status`, created directly in the Supabase
+  SQL editor before this repo's migration history started, hardcoded
+  against migration 022's original vocabulary and never updated when
+  `066` replaced it. Migration `068` drops both constraints outright
+  (not recreated against the new list -- see that file's own comment
+  for why: `admin_select_options` is this app's own documented single
+  source of truth for these two fields, and a hardcoded CHECK
+  constraint duplicating that list is exactly what just broke).
+  `067` itself needs no further changes -- still needs to be run, after
+  `068`.
+- `068` (drops the undocumented `calling_planning_calling_status_check`/
+  `calling_planning_release_status_check` constraints that blocked
+  `067` above): still needs to be run, before `067`.
 
-Next migration should be `068_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `069_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
