@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
 
 type SortDirection = "asc" | "desc";
@@ -43,14 +44,16 @@ function compareText(a: string, b: string): number {
  * (2026-10-10, the user's own request for Upcoming Activities and the
  * three Combined-group views: "table/matrix format similar to other
  * table pages... filterable for specific classes/quorums"). Reuses the
- * exact same click-to-sort + per-column text-filter interaction
- * CallingPlanningGridForm already established, rather than inventing a
- * separate checkbox-based group picker -- typing into the Group
- * column's own filter box (e.g. "Combined" or a specific class name)
- * already satisfies "filterable by specific classes/quorums" with no
- * new UI pattern to learn. No save/edit affordances at all -- these
- * pages are deliberately read-only, all adding/editing/generating
- * stays on the Youth Activities Management page.
+ * exact same click-to-sort interaction CallingPlanningGridForm already
+ * established. Filtering is ColumnFilterDropdown -- an Excel/Sheets-
+ * style checklist of a column's own distinct values -- rather than a
+ * free-text box (2026-10-10, the user's own follow-up: "I want it
+ * everywhere we have a filter"), which handles "filterable by specific
+ * classes/quorums" directly: the Group column's dropdown just lists
+ * every class/quorum/Combined-group actually present. No save/edit
+ * affordances at all -- these pages are deliberately read-only, all
+ * adding/editing/generating stays on the Youth Activities Management
+ * page.
  *
  * `showGroupColumn` is false on the three Combined-group pages, which
  * already pre-filter to one group server-side -- showing a column
@@ -64,7 +67,9 @@ export function ActivitiesTable({
   showGroupColumn?: boolean;
 }) {
   const [sort, setSort] = useState<{ key: ColumnKey; direction: SortDirection } | null>(null);
-  const [filters, setFilters] = useState<Partial<Record<ColumnKey, string>>>({});
+  // null (or unset) = every value showing -- see ColumnFilterDropdown's
+  // own doc comment for the full semantics.
+  const [filters, setFilters] = useState<Partial<Record<ColumnKey, Set<string> | null>>>({});
 
   const columns = showGroupColumn ? ALL_COLUMNS : ALL_COLUMNS.filter((c) => c.key !== "group");
 
@@ -98,10 +103,20 @@ export function ActivitiesTable({
     return result;
   }, [activities, sort]);
 
-  const activeFilters = Object.entries(filters).filter(([, v]) => v && v.trim() !== "") as [ColumnKey, string][];
+  const columnValues = useMemo(() => {
+    const result = {} as Record<ColumnKey, string[]>;
+    for (const c of columns) {
+      result[c.key] = [...new Set(activities.map((r) => cellText(r, c.key)))];
+    }
+    return result;
+  }, [activities, columns]);
+
   const matchesFilters = (row: YouthActivityRow) =>
-    activeFilters.every(([key, needle]) => cellText(row, key).toLowerCase().includes(needle.trim().toLowerCase()));
-  const visibleCount = activeFilters.length === 0 ? sortedRows.length : sortedRows.filter(matchesFilters).length;
+    columns.every((c) => {
+      const selected = filters[c.key];
+      return selected == null || selected.has(cellText(row, c.key));
+    });
+  const visibleCount = sortedRows.filter(matchesFilters).length;
 
   if (activities.length === 0) {
     return <p className="text-sm text-ink-muted">Nothing scheduled yet.</p>;
@@ -114,24 +129,24 @@ export function ActivitiesTable({
           <tr>
             {columns.map((c) => (
               <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                <button
-                  type="button"
-                  onClick={() => toggleSort(c.key)}
-                  className="flex items-center gap-1 hover:text-ink"
-                  title="Sort by this column"
-                >
-                  {c.label}
-                  <span className="w-2.5 text-[9px]">
-                    {sort?.key === c.key ? (sort.direction === "asc" ? "▲" : "▼") : ""}
-                  </span>
-                </button>
-                <input
-                  type="text"
-                  value={filters[c.key] ?? ""}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, [c.key]: e.target.value }))}
-                  placeholder={c.key === "group" ? "Filter by class/quorum…" : "Filter…"}
-                  className="mt-1 w-full rounded border border-rule/60 bg-paper px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink"
-                />
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(c.key)}
+                    className="flex items-center gap-1 hover:text-ink"
+                    title="Sort by this column"
+                  >
+                    {c.label}
+                    <span className="w-2.5 text-[9px]">
+                      {sort?.key === c.key ? (sort.direction === "asc" ? "▲" : "▼") : ""}
+                    </span>
+                  </button>
+                  <ColumnFilterDropdown
+                    values={columnValues[c.key]}
+                    selected={filters[c.key] ?? null}
+                    onChange={(next) => setFilters((prev) => ({ ...prev, [c.key]: next }))}
+                  />
+                </div>
               </th>
             ))}
           </tr>

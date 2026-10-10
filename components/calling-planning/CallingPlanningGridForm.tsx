@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition, useActionState } from "react";
 import { saveCallingPlanningGrid, deleteCallingPlanningEntry } from "@/app/calling-planning/actions";
 import { MultiPersonSelect } from "@/components/calling-planning/MultiPersonSelect";
+import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import type { CallingPlanningRow, CallingOption } from "@/lib/data/calling-planning";
 import type { PersonOption } from "@/lib/data/people";
 import type { SelectOption } from "@/lib/data/select-options";
@@ -67,7 +68,9 @@ export function CallingPlanningGridForm({
   const [dirty, setDirty] = useState(false);
   const [deleting, startDeleteTransition] = useTransition();
   const [sort, setSort] = useState<{ key: ColumnKey; direction: SortDirection } | null>(null);
-  const [filters, setFilters] = useState<Partial<Record<ColumnKey, string>>>({});
+  // null (or unset) = every value showing, matching ColumnFilterDropdown's
+  // own Excel-style semantics -- see that component's doc comment.
+  const [filters, setFilters] = useState<Partial<Record<ColumnKey, Set<string> | null>>>({});
 
   const [lastHandledState, setLastHandledState] = useState(state);
   if (state !== lastHandledState) {
@@ -132,10 +135,25 @@ export function CallingPlanningGridForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cellText closes over people/status-label maps already in deps below
   }, [rows, sort, peopleById, callingStatusLabels, releaseStatusLabels]);
 
-  const activeFilters = Object.entries(filters).filter(([, v]) => v && v.trim() !== "") as [ColumnKey, string][];
+  // Every distinct value per column, across the whole (unsorted,
+  // unfiltered) dataset -- what each column's own filter dropdown
+  // offers to pick from. Independent per column, matching Excel's own
+  // AutoFilter (not re-narrowed by other columns' active filters).
+  const columnValues = useMemo(() => {
+    const result = {} as Record<ColumnKey, string[]>;
+    for (const c of COLUMNS) {
+      result[c.key] = [...new Set(rows.map((r) => cellText(r, c.key)))];
+    }
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cellText closes over people/status-label maps already in deps below
+  }, [rows, peopleById, callingStatusLabels, releaseStatusLabels]);
+
   const matchesFilters = (row: CallingPlanningRow) =>
-    activeFilters.every(([key, needle]) => cellText(row, key).toLowerCase().includes(needle.trim().toLowerCase()));
-  const visibleCount = activeFilters.length === 0 ? sortedRows.length : sortedRows.filter(matchesFilters).length;
+    COLUMNS.every((c) => {
+      const selected = filters[c.key];
+      return selected == null || selected.has(cellText(row, c.key));
+    });
+  const visibleCount = sortedRows.filter(matchesFilters).length;
 
   return (
     <form action={formAction} onChange={() => setDirty(true)}>
@@ -145,24 +163,24 @@ export function CallingPlanningGridForm({
             <tr>
               {COLUMNS.map((c) => (
                 <th key={c.key} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort(c.key)}
-                    className="flex items-center gap-1 hover:text-ink"
-                    title="Sort by this column"
-                  >
-                    {c.label}
-                    <span className="w-2.5 text-[9px]">
-                      {sort?.key === c.key ? (sort.direction === "asc" ? "▲" : "▼") : ""}
-                    </span>
-                  </button>
-                  <input
-                    type="text"
-                    value={filters[c.key] ?? ""}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, [c.key]: e.target.value }))}
-                    placeholder="Filter…"
-                    className="mt-1 w-full rounded border border-rule/60 bg-paper px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink"
-                  />
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(c.key)}
+                      className="flex items-center gap-1 hover:text-ink"
+                      title="Sort by this column"
+                    >
+                      {c.label}
+                      <span className="w-2.5 text-[9px]">
+                        {sort?.key === c.key ? (sort.direction === "asc" ? "▲" : "▼") : ""}
+                      </span>
+                    </button>
+                    <ColumnFilterDropdown
+                      values={columnValues[c.key]}
+                      selected={filters[c.key] ?? null}
+                      onChange={(next) => setFilters((prev) => ({ ...prev, [c.key]: next }))}
+                    />
+                  </div>
                 </th>
               ))}
               <th className="px-2 py-2" />

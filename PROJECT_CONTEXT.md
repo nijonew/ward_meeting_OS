@@ -1902,6 +1902,38 @@ avoid confusing the two.
 
 ## Known open items
 
+**Column filters changed to Excel/Sheets-style checklists everywhere
+they exist, 2026-10-10** (the user's own request: "update the filters
+to act more like an excel or google sheets filter where values can be
+selected/deselected," then, asked which grid(s): "I want it everywhere
+we have a filter"). Searched the whole app first rather than assuming
+-- only two components actually had a per-column filter at all
+(`CallingPlanningGridForm.tsx` and the new `ActivitiesTable.tsx`;
+Table Admin's `AdminTableEditor.tsx` has sortable headers but never
+grew a filter of its own), so "everywhere" meant exactly those two.
+- **New `components/ColumnFilterDropdown.tsx`**, a small reusable
+  client component: a `&#9660;` trigger next to each column's existing
+  sort button opens a checklist of that column's own distinct values
+  (computed across the whole dataset, not re-narrowed by other active
+  filters, matching Excel's own per-column-independent behavior), each
+  with a checkbox, plus a search box to narrow the list and Select
+  all/Clear shortcuts. `selected` is `null` when every value is
+  showing (the default, and what collapsing back to "everything
+  checked" returns to) or a real `Set<string>` once at least one value
+  is unchecked -- an *empty* `Set` is its own valid state (every row
+  hidden for that column), not coalesced back to `null`, matching
+  Excel's own "uncheck everything" behavior. Closes on an outside
+  click via a plain `mousedown` listener -- this app had no existing
+  click-outside pattern to reuse, so this is the first one.
+- Both grids now compute a `columnValues` map (one distinct-value list
+  per column, from the already-fetched rows) and pass it down per
+  column; the old free-text `filters` state (`Partial<Record<Key,
+  string>>`, matched via substring `includes()`) became `Partial<Record<Key,
+  Set<string> | null>>`, matched via `Set.has()`. Sorting, the
+  `hidden`-attribute-not-removed-from-DOM row-rendering (so an
+  in-progress edit in a filtered-out `CallingPlanningGridForm` row
+  still saves), and every other part of both grids are unchanged.
+
 **Calling Planning status vocabulary redesigned, and 123 real calling-
 tracker rows imported, 2026-10-10.** The user asked to bulk-migrate
 their real ward calling-tracker spreadsheet ("Sort, Date Initiated,
