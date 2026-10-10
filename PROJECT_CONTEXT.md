@@ -1867,6 +1867,67 @@ avoid confusing the two.
 
 ## Known open items
 
+**Youth Activities given its own tile grid, read-only activity views
+built, 2026-10-10 -- same day as the hub scaffold just below, right
+after shipping it.** The user's report after trying the new hub's
+"Youth Activities Management" tile: "the youth activities page right
+now shows no tiles and just has all of the content on the page. Please
+update with the suggested tiles which will then direct the user to the
+requested page." This restructured where the four activity-specific
+tiles (Upcoming Activities, Combined YM & YW, Combined YM, Combined YW)
+actually live -- moved off the top-level hub (where they'd have been a
+second, duplicate path to the same destinations once built) and onto
+`/youth-activities` itself, which now opens with a `TileGrid` of those
+four before its existing content.
+- **No new tables needed, confirmed before building anything**:
+  `youth_activities.group_name`'s own option list
+  (`YOUTH_ACTIVITY_GROUPS`) already spans all six individual classes/
+  quorums (Deacons, Teachers, Priests, Gatherers of Light, Messengers
+  of Hope, Builders of Faith) *and* the three Combined pseudo-groups --
+  one real table, not nine. "Combined YM & YW Activities table,"
+  "Combined YM Activities table," etc. in the user's own spec are all
+  just `group_name`-filtered views over it.
+- **Two design questions asked and answered before writing any code**
+  (`AskUserQuestion`): the spec's "Description" column maps onto the
+  existing short `title` field rather than a new column (the user's
+  own choice, "reuse the existing Title field"); and all four new
+  views are read-only -- all adding/editing/generating stays on
+  `/youth-activities`' own existing `canManage`-gated section, renamed
+  from "Upcoming Activities" to "All Activities" since that name now
+  belongs to the new read-only tile/page instead.
+- **New `components/youth-activities/ActivitiesTable.tsx`** -- the
+  shared read-only grid behind all four new pages, reusing
+  `CallingPlanningGridForm`'s exact click-to-sort + per-column
+  text-filter interaction (same ▲/▼ header buttons, same filter-box-
+  under-each-heading layout) rather than a new UI pattern. "Filterable
+  for specific classes/quorums" turned out not to need its own
+  checkbox picker at all -- typing into the Group column's own filter
+  box already does it, and matches a class name or "Combined" as a
+  prefix match. `showGroupColumn` is false on the three Combined pages
+  (pre-filtered server-side to one group, so every row would show the
+  same value) and true on Upcoming Activities (all groups at once).
+  Each of the four pages filters to `activity_date >= today` before
+  rendering -- "upcoming" is enforced in the page, not the shared
+  `getYouthActivities()` query, which the existing Management section
+  still needs unfiltered (it manages past activities too).
+- **New routes**: `/youth-activities/upcoming`,
+  `/youth-activities/combined-ym-yw`, `/youth-activities/combined-ym`,
+  `/youth-activities/combined-yw` -- nested under `/youth-activities`
+  rather than flat top-level routes, matching where their own tiles
+  now live. All four require login only (same as `/youth-activities`
+  itself), not a specific feature -- viewing was never the thing that
+  needed gating, only the management actions already gated by
+  `canManage` were.
+- **`/youth-activity-planning` simplified back down from 7 tiles to 3**,
+  minutes after first shipping it (see that page's own comment) -- the
+  four activity tiles that had been `comingSoon` placeholders there are
+  gone now that they have a real home on `/youth-activities` instead;
+  duplicating them in both places would have meant two different
+  navigation paths to the same four destinations. The hub's own "Youth
+  Activities" tile is now ungated (any logged-in account), matching
+  `/youth-activities`' own policy -- only Youth Teaching Calendar and
+  Youth Teaching Management stay gated on `youth_teaching_planning`.
+
 **Youth Activity Planning hub scaffolded, 2026-10-10** (the user's own
 request to "start putting the youth activity planning page(s)
 together," listing a specific tile set: Upcoming Activities, Combined

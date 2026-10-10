@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { getYouthActivityScheduleRules } from "@/lib/data/youth-activity-cadence-rules";
@@ -55,8 +57,48 @@ export default async function YouthActivitiesPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
       <AppHeader tag="Youth Activities" />
 
+      <div>
+        <Link href="/youth-activity-planning" className="text-xs text-ink-muted hover:text-ink">
+          &larr; Youth Activity Planning
+        </Link>
+      </div>
+
+      {/* Added 2026-10-10 (the user's own report, right after this page
+          got a new sibling entry point from the Youth Activity Planning
+          hub: "the youth activities page right now shows no tiles and
+          just has all of the content on the page. Please update with
+          the suggested tiles which will then direct the user to the
+          requested page.") -- these four were the activity-specific
+          tiles from that earlier spec; the two teaching tiles stayed on
+          the top-level hub since they're a different domain. Each links
+          to a read-only, filtered ActivitiesTable view (see that
+          component's own comment) -- open to anyone who can reach this
+          page at all, not feature-gated, matching this page's own
+          existing "any logged-in account can view" policy; only the
+          All Activities section and its edit controls below stay
+          canManage-gated. */}
+      <TileGrid>
+        <Tile title="Upcoming Activities" description="Every activity, all groups" href="/youth-activities/upcoming" />
+        <Tile
+          title="Combined Young Men & Young Women Activities"
+          description="Combined YM/YW schedule"
+          href="/youth-activities/combined-ym-yw"
+        />
+        <Tile title="Combined Young Men Activities" description="Combined YM schedule" href="/youth-activities/combined-ym" />
+        <Tile
+          title="Combined Young Women Activities"
+          description="Combined YW schedule"
+          href="/youth-activities/combined-yw"
+        />
+      </TileGrid>
+
       <div className="rounded border border-rule bg-surface p-6">
-        <h2 className="font-display text-xl">Upcoming Activities</h2>
+        {/* Renamed from "Upcoming Activities" (2026-10-10) -- that name
+            now belongs to the new read-only tile/page above instead.
+            This section shows every activity regardless of date, plus
+            (for canManage) the actual edit controls, so "All Activities"
+            describes it more accurately than "Upcoming" ever did. */}
+        <h2 className="font-display text-xl">All Activities</h2>
 
         {activities.length === 0 ? (
           <p className="mt-4 text-sm text-ink-muted">Nothing scheduled yet.</p>
