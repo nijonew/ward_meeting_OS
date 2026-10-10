@@ -46,10 +46,32 @@ function compareText(a: string, b: string): number {
  * Sort/filter (2026-09-08, the user's own follow-up) are purely
  * client-side over the already-fetched `rows` prop, same principle as
  * AdminTableEditor's sortable headers -- they reorder/hide which rows
- * render, they never touch what gets saved. Both compare against each
- * column's *committed* (last-saved) value, not an in-progress edit
- * still sitting in an uncontrolled input -- editing a cell doesn't
- * live-resort the table out from under you mid-edit.
+ * render, they never touch what gets saved.
+ *
+ * **Filter reacts live to in-progress edits, 2026-10-10** (the user's
+ * own request: "if I have complete filtered out and not shown, and
+ * then I move something to complete I would like for that row to
+ * disappear"). Every field's own `name` attribute already doubles as
+ * its row/column address (`"<rowId>::<column>"`), so the form's
+ * existing single delegated `onChange` -- already there to flip the
+ * dirty flag -- also now records that field's live raw value into
+ * `liveValues`, keyed by that same name. `liveCellText` prefers a raw
+ * live value over the row's committed one when present, resolving it
+ * through the same label-lookup maps `cellText` itself uses (a
+ * `<select>`'s DOM value is the option's *value*, e.g. "complete" or a
+ * calling/person uuid -- not the label text filters actually compare
+ * against) -- `matchesFilters` uses this, so unchecking a status in
+ * that column's filter immediately hides a row the moment its own
+ * dropdown is changed to that status, not only after a save completes.
+ * **Sort still deliberately stays on committed values only**
+ * (`cellText`, not `liveCellText`) -- the original reasoning holds
+ * there: live-resorting the table out from under an in-progress edit
+ * is a worse experience than a row simply disappearing when filtered
+ * out, which is exactly the behavior being asked for here. Candidates
+ * (`MultiPersonSelect`) isn't live-tracked -- it manages its own hidden
+ * inputs outside the native change-event path (see that component's
+ * own comment), so there's no single DOM value to capture here either;
+ * filtering that column still reacts only once a save completes.
  */
 export function CallingPlanningGridForm({
   rows,
@@ -71,6 +93,11 @@ export function CallingPlanningGridForm({
   // null (or unset) = every value showing, matching ColumnFilterDropdown's
   // own Excel-style semantics -- see that component's doc comment.
   const [filters, setFilters] = useState<Partial<Record<ColumnKey, Set<string> | null>>>({});
+  // Raw, in-progress field values, keyed by that field's own `name`
+  // attribute ("<rowId>::<column>") -- captured by the form's onChange
+  // below, read back by liveCellText for live filtering. See this
+  // component's own doc comment for the full reasoning.
+  const [liveValues, setLiveValues] = useState<Record<string, string>>({});
 
   const [lastHandledState, setLastHandledState] = useState(state);
   if (state !== lastHandledState) {
@@ -86,6 +113,7 @@ export function CallingPlanningGridForm({
   };
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p.name])), [people]);
+  const callingNameById = useMemo(() => new Map(callingOptions.map((c) => [c.id, c.name])), [callingOptions]);
   const callingStatusLabels = useMemo(() => new Map(callingStatusOptions.map((s) => [s.value, s.label])), [callingStatusOptions]);
   const releaseStatusLabels = useMemo(() => new Map(releaseStatusOptions.map((s) => [s.value, s.label])), [releaseStatusOptions]);
 
@@ -111,6 +139,56 @@ export function CallingPlanningGridForm({
       case "release_status":
         return releaseStatusLabels.get(row.release_status) ?? row.release_status;
     }
+  };
+
+  // Which field name (if any) a column's live value would be captured
+  // under -- "candidates" has none, see this component's own doc comment.
+  const fieldNameFor = (rowId: string, key: ColumnKey): string | null => {
+    switch (key) {
+      case "calling":
+        return `${rowId}::calling_id`;
+      case "date_initiated":
+        return `${rowId}::date_initiated`;
+      case "candidates":
+        return null;
+      case "status":
+        return `${rowId}::calling_status`;
+      case "date_set_apart":
+        return `${rowId}::date_set_apart`;
+      case "notes":
+        return `${rowId}::notes`;
+      case "release_person":
+        return `${rowId}::release_person_id`;
+      case "release_status":
+        return `${rowId}::release_status`;
+    }
+  };
+
+  // A <select>'s raw DOM value is the option's value (a status key or
+  // a calling/person uuid), not the label text filters compare
+  // against -- resolve it through the same maps cellText itself uses.
+  // date/notes fields' raw value already *is* display text.
+  const resolveLiveRaw = (key: ColumnKey, raw: string): string => {
+    switch (key) {
+      case "calling":
+        return callingNameById.get(raw) ?? raw;
+      case "status":
+        return callingStatusLabels.get(raw) ?? raw;
+      case "release_person":
+        return raw ? (peopleById.get(raw) ?? raw) : "";
+      case "release_status":
+        return releaseStatusLabels.get(raw) ?? raw;
+      default:
+        return raw;
+    }
+  };
+
+  const liveCellText = (row: CallingPlanningRow, key: ColumnKey): string => {
+    const fieldName = fieldNameFor(row.id, key);
+    if (fieldName && fieldName in liveValues) {
+      return resolveLiveRaw(key, liveValues[fieldName]);
+    }
+    return cellText(row, key);
   };
 
   const toggleSort = (key: ColumnKey) => {
@@ -151,12 +229,24 @@ export function CallingPlanningGridForm({
   const matchesFilters = (row: CallingPlanningRow) =>
     COLUMNS.every((c) => {
       const selected = filters[c.key];
-      return selected == null || selected.has(cellText(row, c.key));
+      return selected == null || selected.has(liveCellText(row, c.key));
     });
   const visibleCount = sortedRows.filter(matchesFilters).length;
 
   return (
-    <form action={formAction} onChange={() => setDirty(true)}>
+    <form
+      action={formAction}
+      onChange={(e) => {
+        setDirty(true);
+        // React types a <form>'s own onChange target as the form itself
+        // (incorrect at runtime -- it's whichever field inside actually
+        // changed, via native bubbling), hence the cast through unknown.
+        const target = e.target as unknown as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+        if (target.name) {
+          setLiveValues((prev) => ({ ...prev, [target.name]: target.value }));
+        }
+      }}
+    >
       <div className="mt-4 overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>

@@ -1902,6 +1902,42 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calling Planning's filter now reacts to in-progress edits, not just
+saved ones, 2026-10-10.** The user's own request, right after the
+filter itself started working: "if I have complete filtered out and
+not shown, and then I move something to complete I would like for
+that row to disappear." Before this, both sort and filter deliberately
+only ever compared each column's *committed* (last-saved) value --
+real, intentional behavior for sort (so editing a cell never
+live-resorts the table out from under you mid-edit), but not what the
+user wants for filter specifically. `CallingPlanningGridForm.tsx`
+(the only editable grid of the two that got the Excel-style filter --
+`ActivitiesTable.tsx`'s pages are read-only, nothing to react to)
+gained:
+- A `liveValues` map, keyed by each field's own existing `name`
+  attribute (`"<rowId>::<column>"`) -- captured by the form's single
+  existing delegated `onChange` (already there to flip the dirty flag),
+  which now also records whichever field just changed.
+- New `liveCellText(row, key)`: prefers a field's live raw value over
+  the row's committed one when present, resolved through the exact
+  same label-lookup maps `cellText` already uses -- a `<select>`'s raw
+  DOM value is the option's *value* (a status key or a calling/person
+  uuid), not the label text filters actually compare against.
+  `matchesFilters` now calls this instead of `cellText`, so unchecking
+  a status from that column's filter hides a matching row the instant
+  its own dropdown changes to that status.
+- **Sort deliberately still uses `cellText` (committed-only),
+  unchanged** -- the original reasoning for that choice still holds; it
+  was never what this request was about.
+- **Candidates (`MultiPersonSelect`) isn't live-tracked** -- it manages
+  its own hidden inputs outside the native change-event path (adding/
+  removing DOM nodes doesn't fire a bubbling `change` event, which is
+  exactly why that component already needed its own explicit `onDirty`
+  callback), so there's no single DOM value for the form's delegated
+  listener to capture there. Filtering that one column still only
+  reacts once a save completes -- a known, narrow gap, not silently
+  pretended away.
+
 **Bug found and fixed 2026-10-10, right after the Excel-style filter
 above first shipped: the filter dropdown was invisible.** The user's
 own report: "a sort was added to each column but not an excel style
