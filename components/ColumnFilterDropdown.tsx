@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const EMPTY_LABEL = "(Blanks)";
 
@@ -26,6 +27,23 @@ const EMPTY_LABEL = "(Blanks)";
  * per-column-independent behavior) and for actually filtering rows
  * against it; this component only renders the picker and reports
  * back what's checked.
+ *
+ * **Rendered through a portal, 2026-10-10** -- the first version
+ * positioned its panel `absolute` inside the trigger button's own
+ * `relative` wrapper, which both grids this is used in sit inside an
+ * `overflow-x-auto` div (needed so a wide table can scroll
+ * horizontally on a narrow screen). An ancestor with `overflow-x:
+ * auto` also clips the *other* axis, so the panel was opening but
+ * rendering invisibly, clipped to nothing -- the user's own report:
+ * "a sort was added to each column but not an excel style filter...
+ * I also need the filter," i.e. the filter looked entirely absent.
+ * Now rendered into `document.body` via `createPortal`, positioned
+ * `fixed` at the trigger's own on-screen coordinates (computed with
+ * `getBoundingClientRect()` when it opens) -- no ancestor's overflow
+ * can clip it. Closes on scroll rather than tracking a live position,
+ * since the table itself can scroll horizontally while this is open
+ * and a stale-positioned panel floating away from its trigger would be
+ * its own bug.
  */
 export function ColumnFilterDropdown({
   values,
@@ -38,17 +56,30 @@ export function ColumnFilterDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) setPosition({ top: rect.bottom + 4, left: rect.left });
+
+    function handleScroll() {
+      setOpen(false);
     }
+    function handlePointerDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    window.addEventListener("scroll", handleScroll, true);
     document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("scroll", handleScroll, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
   }, [open]);
 
   const sortedValues = useMemo(
@@ -70,8 +101,9 @@ export function ColumnFilterDropdown({
   }
 
   return (
-    <div className="relative inline-block" ref={containerRef}>
+    <>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={["ml-1 px-0.5 text-[9px] leading-none", isFiltered ? "text-accent" : "text-ink-muted/50 hover:text-ink"].join(" ")}
@@ -79,34 +111,41 @@ export function ColumnFilterDropdown({
       >
         &#9660;
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded border border-rule bg-surface p-2 text-xs normal-case tracking-normal text-ink shadow-lg">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
-            className="mb-2 w-full rounded border border-rule/60 bg-paper px-1.5 py-1 text-[11px] text-ink"
-          />
-          <div className="mb-1 flex items-center justify-between text-[10px]">
-            <button type="button" onClick={() => onChange(null)} className="text-ink-muted underline hover:text-ink">
-              Select all
-            </button>
-            <button type="button" onClick={() => onChange(new Set())} className="text-ink-muted underline hover:text-ink">
-              Clear
-            </button>
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {visibleValues.length === 0 && <p className="text-ink-muted/60">No matches</p>}
-            {visibleValues.map((v) => (
-              <label key={v || "__blank__"} className="flex items-center gap-1.5 py-0.5">
-                <input type="checkbox" checked={isChecked(v)} onChange={() => toggleValue(v)} />
-                <span className="truncate">{v || EMPTY_LABEL}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      {open &&
+        position &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={{ position: "fixed", top: position.top, left: position.left }}
+            className="z-50 w-48 rounded border border-rule bg-surface p-2 text-xs normal-case tracking-normal text-ink shadow-lg"
+          >
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search…"
+              className="mb-2 w-full rounded border border-rule/60 bg-paper px-1.5 py-1 text-[11px] text-ink"
+            />
+            <div className="mb-1 flex items-center justify-between text-[10px]">
+              <button type="button" onClick={() => onChange(null)} className="text-ink-muted underline hover:text-ink">
+                Select all
+              </button>
+              <button type="button" onClick={() => onChange(new Set())} className="text-ink-muted underline hover:text-ink">
+                Clear
+              </button>
+            </div>
+            <div className="max-h-48 overflow-y-auto">
+              {visibleValues.length === 0 && <p className="text-ink-muted/60">No matches</p>}
+              {visibleValues.map((v) => (
+                <label key={v || "__blank__"} className="flex items-center gap-1.5 py-0.5">
+                  <input type="checkbox" checked={isChecked(v)} onChange={() => toggleValue(v)} />
+                  <span className="truncate">{v || EMPTY_LABEL}</span>
+                </label>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }

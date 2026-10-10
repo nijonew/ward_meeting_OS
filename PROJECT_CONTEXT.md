@@ -1902,6 +1902,27 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-10, right after the Excel-style filter
+above first shipped: the filter dropdown was invisible.** The user's
+own report: "a sort was added to each column but not an excel style
+filter. I like the sort and want to keep it. I also need the filter."
+Root cause: `ColumnFilterDropdown`'s panel was `position: absolute`
+inside a `relative` wrapper around its own trigger button -- both
+grids that use it wrap their `<table>` in an `overflow-x-auto` div (so
+a wide table can scroll horizontally on a narrow screen), and an
+ancestor with `overflow-x: auto` also clips the *other* axis per the
+CSS spec. The panel was opening (state flipped correctly) but
+rendering clipped to nothing, which looked identical to "the filter
+was never added" from the outside. Fixed by rendering the panel
+through `createPortal` into `document.body`, positioned `fixed` at the
+trigger button's own on-screen coordinates (`getBoundingClientRect()`,
+computed when it opens) -- no ancestor's overflow can clip it now.
+Closes on scroll (rather than tracking a live position) since the
+table itself can still scroll horizontally while the panel is open,
+and outside-click detection now checks both the trigger and the
+portaled panel explicitly, since the panel is no longer a DOM
+descendant of the trigger's own wrapper once portaled.
+
 **Column filters changed to Excel/Sheets-style checklists everywhere
 they exist, 2026-10-10** (the user's own request: "update the filters
 to act more like an excel or google sheets filter where values can be
