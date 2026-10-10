@@ -207,24 +207,23 @@ export default async function HomePage() {
           account actually sees inside Youth Teaching Planning is a
           separate, narrower question handled by getAccessibleClasses
           in lib/data/teaching-assignments.ts. */}
+      {/* Consolidated to one tile, 2026-10-10 (the user's own request
+          to start building out "the youth activity planning page(s)")
+          -- used to be two separate tiles here (a direct link to
+          Youth Teaching Planning, plus a comingSoon placeholder for
+          Youth Activity Planning). Both now live as sub-tiles inside
+          the new /youth-activity-planning hub instead, each still
+          gated on its own specific feature exactly as before -- see
+          that page's own comment for the full tile-by-tile breakdown. */}
       {isYouthLeader && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Youth program</p>
           <TileGrid>
-            {hasFeature(profile, "youth_teaching_planning") && (
-              <Tile
-                title="Youth Teaching Planning"
-                description="Sunday teaching assignments for your class"
-                href="/youth-teaching-planning"
-              />
-            )}
-            {hasFeature(profile, "youth_activity_planning") && (
-              <Tile
-                title="Youth Activity Planning"
-                description="Plan and manage upcoming youth activities"
-                comingSoon
-              />
-            )}
+            <Tile
+              title="Youth Activity Planning"
+              description="Activities, teaching calendar, and management tools"
+              href="/youth-activity-planning"
+            />
           </TileGrid>
         </section>
       )}

@@ -1867,6 +1867,58 @@ avoid confusing the two.
 
 ## Known open items
 
+**Youth Activity Planning hub scaffolded, 2026-10-10** (the user's own
+request to "start putting the youth activity planning page(s)
+together," listing a specific tile set: Upcoming Activities, Combined
+Young Men & Young Women Activities, Combined Young Men Activities,
+Combined Young Women Activities, Youth Activities Management
+(feature-gated), Youth Teaching Calendar, and Youth Teaching Management
+(feature-gated) -- "We will then discuss each tile/page and what I
+want to see there."). This is deliberately scaffolding, not the
+finished design -- new `/youth-activity-planning` (same
+`/meeting-planning`/`/meeting-agendas` hub pattern, per-tile feature
+gating) replaces the landing page's old two-tile "Youth program"
+section (a direct `/youth-teaching-planning` link plus a `comingSoon`
+placeholder) with one consolidated tile; both of those now live as
+sub-tiles inside the new hub instead, gated on the exact same features
+they already required (`youth_teaching_planning`/`youth_activity_planning`).
+- **Four brand-new tiles are `comingSoon` stubs on purpose**: Upcoming
+  Activities and the three Combined-group views. The user explicitly
+  wants every one of these in this app's "favorite grid format" (table/
+  matrix, same as Assignment Rotations/Teaching Calendar/Calling
+  Planning) -- a real design pass still to come, one tile at a time, not
+  something to improvise ahead of that discussion.
+- **Youth Activities Management** reuses the existing `/youth-activities`
+  page as-is (gated on `youth_activity_planning`) -- that page already
+  *is* today's management surface (Generate Combined Activities,
+  Confirm/Cancel, add/edit), and also currently renders its own
+  "Upcoming Activities" list inline. Splitting that list out into the
+  new standalone matrix-format tile is part of the still-to-come
+  per-tile discussion, not done here -- for now both the hub's
+  Management tile and the landing page's separate, still-unchanged
+  "Youth Activities" tile (public-facing, any logged-in account, "This
+  week" tier) point at the same real page.
+- **Youth Teaching Calendar** reuses `/youth-teaching-planning` as-is
+  (gated on `youth_teaching_planning`, unchanged from what the old
+  direct landing-page tile already required) -- that page's own "&larr;
+  Home" back link was updated to "&larr; Youth Activity Planning" since
+  it's now reached one level deeper.
+- **Youth Teaching Management** has no existing page to reuse -- Table
+  Admin's raw `youth_class_teachers` grid is gated on its own separate
+  `table_admin_youth_class_teachers` feature, not `youth_teaching_planning`,
+  so linking to it here would let someone see the tile but then hit a
+  different, confusing access wall on click. Left as a `comingSoon`
+  stub, gated on `youth_teaching_planning` so it's at least invisible to
+  accounts that could never use it either way.
+- **Not verified in a live browser**: this working copy has no
+  `.env.local` (confirmed -- no Supabase URL/key locally), so `next dev`
+  500s on every route including `/login`, before any of this session's
+  own code ever runs -- a pre-existing environment gap, not something
+  this change caused. Matches this project's own established
+  verification routine (`tsc`/`eslint`/`next build` only, see Working
+  Conventions below) rather than a live walkthrough; ask the user to
+  click through `/youth-activity-planning` on production once deployed.
+
 **Public Announcements page cleaned up and migration 065 corrected,
 2026-10-10**, right after that migration was first written -- the user
 reviewed the real content it would insert and asked for several

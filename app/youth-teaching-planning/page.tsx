@@ -25,6 +25,12 @@ function defaultThroughDate(): string {
  * The hub view gained an explicit "&larr; Home" back link (2026-09-09)
  * per the user's own request; the single-class view already had its
  * own "&larr; Youth Teaching Planning" link back to this hub.
+ *
+ * **Back link updated to the new /youth-activity-planning hub,
+ * 2026-10-10** -- this page is now reached one level deeper than
+ * before (Home -> Youth Activity Planning -> Youth Teaching Calendar
+ * -> this hub), since the landing page's direct tile into this page
+ * was folded into that new hub -- see its own comment.
  */
 export default async function YouthTeachingPlanningPage({
   searchParams,
@@ -53,8 +59,8 @@ export default async function YouthTeachingPlanningPage({
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Youth Teaching Planning" />
 
-        <Link href="/" className="mt-6 text-xs text-ink-muted hover:text-ink">
-          &larr; Home
+        <Link href="/youth-activity-planning" className="mt-6 text-xs text-ink-muted hover:text-ink">
+          &larr; Youth Activity Planning
         </Link>
 
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
