@@ -87,6 +87,24 @@
 -- `(Not yet planned)` instead of `null` -- distinguishable from a real
 -- title, and an admin can simply overwrite it once that week's
 -- activity is actually decided.
+--
+-- **Second attempt also failed in production**: `new row ... violates
+-- check constraint "youth_activities_group_name_check"` inserting
+-- `group_name = 'Gatherers of Light'`. Same class of problem as
+-- migrations 038/041/063/067/068 before it -- an undocumented CHECK
+-- constraint, created directly in the Supabase SQL editor before this
+-- repo's migration history started, still hardcoded against the
+-- pre-rename group names (`YW 12/13`/`14/15`/`16/17` etc., see
+-- `YOUTH_ACTIVITY_GROUPS`' own history) and never updated when those
+-- three classes were renamed. No individual-class row for a YW class
+-- had ever actually been inserted before this migration, which is why
+-- this never surfaced sooner. Dropped outright below, same reasoning
+-- as migration 068's identical fix for `calling_planning` -- this
+-- app's own `YOUTH_ACTIVITY_GROUPS` constant is the real source of
+-- truth for valid group names, not a hardcoded CHECK constraint
+-- duplicating (and silently drifting from) that same list.
+
+alter table youth_activities drop constraint if exists youth_activities_group_name_check;
 
 -- Corrections to migration 032's own seed data, where the newly
 -- received detailed per-class calendars disagree with the older

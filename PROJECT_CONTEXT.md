@@ -197,8 +197,20 @@ reconstructed from both:
   `youth_activities.title` has always been `not null`, but a blank/
   unplanned week in a source calendar legitimately has nothing to put
   there. File updated to use the literal placeholder text
-  `(Not yet planned)` instead of `null` for every such row -- still
-  needs to be run with the corrected file.
+  `(Not yet planned)` instead of `null` for every such row. **Second
+  attempt also failed in production** -- `violates check constraint
+  "youth_activities_group_name_check"` inserting `'Gatherers of
+  Light'`. Same class of problem as migrations 038/041/063/067/068: an
+  undocumented CHECK constraint, created directly in the Supabase SQL
+  editor before this repo's migration history started, still hardcoded
+  against the pre-rename group names and never updated when Gatherers
+  of Light/Messengers of Hope/Builders of Faith replaced the old
+  age-based YW class names -- no individual-class row for a YW class
+  had ever actually been inserted before this migration, so it never
+  surfaced sooner. File updated to drop that constraint outright (not
+  recreated against the current list, same reasoning as migration
+  068's identical fix) -- still needs to be run with the corrected
+  file.
 - `070` (new `youth_activity_cancellations` table -- the Activity
   Cancellations page, see Known open items below): still needs to be
   run.
