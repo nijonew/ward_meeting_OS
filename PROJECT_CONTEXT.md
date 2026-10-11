@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 072
+## Current migration number: 073
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -221,8 +221,25 @@ reconstructed from both:
   that has both, across `meeting_templates` and already-seeded
   non-archived meetings -- see Known open items below): still needs to
   be run.
+- `073` (one-time bulk import: real member-cycle order + `next_index`
+  into 10 of this app's existing generic rotations -- Bishopric
+  Meeting/Ward Council/Youth Council's opening prayer, closing prayer,
+  spiritual thought, and handbook training -- derived from the ward's
+  real "2026 Syracuse Heritage Ward Master Meeting Schedule &
+  Assignments" spreadsheet, pasted directly by the user 2026-10-11; see
+  Known open items below for the other 6 columns this did NOT resolve
+  and why): still needs to be run, **and name-resolution needs the
+  user's own verification before it is** -- this migration resolves
+  informal Bishopric Meeting/Ward Council names ("Bro Nemrow," "Pres
+  Smith") by SURNAME-only `ilike` match (only when exactly one `people`
+  row matches), which the file's own header comment flags as a real
+  risk given this app's prior history of wrong-name guesses
+  (`STAKE_PRESIDENCY_CALLING_NAMES`, Visiting Authorities' High
+  Councilor naming). Run the verification SELECT in the file's own
+  header comment first and confirm every surname resolves to the right
+  person before running the rest of it.
 
-Next migration should be `073_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `074_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1937,6 +1954,59 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Real rotation-cycle data imported from the ward's actual 2026 master
+schedule, migration `073` -- but only 10 of the spreadsheet's 16
+columns, 2026-10-11.** The user pasted a full 52-week spreadsheet
+("2026 - Syracuse Heritage Ward - Master Meeting Schedule &
+Assignments") with "Please migrate this data into rotations." Analyzed
+with a one-off Node script (scratchpad, not committed, same convention
+as every other bulk-import script this session) that extracts each
+column's real repeating member-cycle order and derives `next_index`
+from the LAST real occurrence (not a naive total-count, which breaks
+the moment a real meeting gets skipped -- confirmed several General
+Conference/Stake Conference weeks do exactly that). 10 columns mapped
+cleanly onto rotations this app already has (migration 034's own 10
+generic rotations): Bishopric Meeting's ST/Handbook/OP/CP, Ward
+Council's OP/CP/ST, Youth Council's OP/Thought/CP.
+
+**The other 6 columns do NOT have a real destination yet and were
+deliberately left out of migration `073` -- flagging rather than
+guessing:**
+- **Sacrament Meeting Conducting/Speaker columns ("Sacr Cond"/"Sacr
+  Speak")**: Conducting is fixed-by-calling in this app
+  (`applyFixedSacramentRoles`, cycles Bishop -> 1st Counselor -> 2nd
+  Counselor by calendar month, reading each calling's *current*
+  holder, not a stored rotation list) -- there's no `rotation_members`
+  table for it to import into at all. Speaker/Youth Speaker have
+  always been deliberately NOT auto-assigned in this app
+  (`/speaker-prayer-history` is the existing manual tool for exactly
+  this). Analysis also found "Sacr Cond" and "Sacr Speak" are identical
+  in every row that has both -- the spreadsheet appears to use one
+  column to track two different things, or this ward's real practice
+  has the conductor always be the speaker-finder. Recommend: skip
+  entirely, nothing to build here unless you want this ward's real
+  Conducting cycle checked against what `applyFixedSacramentRoles`
+  already computes.
+- **"WYC Comb Act"**: unclear what this column is tracking -- not
+  self-evident from the data alone. Need you to say what it means
+  before anything can be built for it.
+- **"YM Combined"/"YW Combined"**: these use the OLD age-based class
+  naming (pre-dating this session's own youth-activity-rotation
+  reconciliation work, migration 069, built from 6 detailed per-class
+  calendars the same day). Potential real conflict: if this
+  spreadsheet's combined-activity assignments disagree with what's
+  already seeded from that reconciliation, one of the two is wrong.
+  Flagging rather than silently overwriting either.
+- **"BLDG Assignment"** (building assignment/cleaning, presumably): no
+  existing table in this schema holds anything like this at all --
+  would need a genuinely new table, not an import into something that
+  exists.
+
+Ask before building any of these four -- this mirrors the user's own
+established pattern elsewhere in this app (e.g. the Calling dropdown's
+missing-vacant-callings fix, the Candidates-field redesign) of wanting
+to be asked rather than guessed at when something's ambiguous.
 
 **Zebra striping fixed to key off visible row position, not DOM
 position, 2026-10-11** (the user's own report, right after noticing it
