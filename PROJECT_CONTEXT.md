@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 068
+## Current migration number: 070
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -185,8 +185,18 @@ reconstructed from both:
 - `068` (drops the undocumented `calling_planning_calling_status_check`/
   `calling_planning_release_status_check` constraints that blocked
   `067` above): confirmed run.
+- `069` (one-time bulk import: the ward's real 2026 youth activity
+  history from six per-class calendars pasted directly by the user
+  2026-10-10/11, reconciled against each other and against migration
+  032's own earlier seed data -- see that migration file's own header
+  comment for the full reconciliation rules and the Known open items
+  entry below for how the two "individual calendars vs. rotation"
+  conflicts were resolved): still needs to be run.
+- `070` (new `youth_activity_cancellations` table -- the Activity
+  Cancellations page, see Known open items below): still needs to be
+  run.
 
-Next migration should be `069_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `071_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1901,6 +1911,86 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Youth Activities 2026 backlog imported, and a new Activity
+Cancellations page built, 2026-10-10/11.** The user pasted six
+per-class "2026 Heritage Ward Youth Activity Calendar" exports
+(Priests, Teachers, Deacons, Gatherers of Light, Messengers of Hope,
+Builders of Faith -- every Wednesday of 2026, one row per class) on top
+of the three simpler rotation lists already pasted earlier the same
+session. Cross-referencing all six against each other surfaced two
+real conflicts with the simpler lists (March 18 and April 1, both
+already flagged once Teachers/Deacons confirmed them independently),
+plus a third kind of conflict nobody had anticipated: migration `032`
+(confirmed run back on 2026-09-06) had already seeded Sept 2026 -- Feb
+2027 directly from those same simpler lists, and three of its own rows
+(2026-09-16, 2026-09-23, 2026-10-14) disagree with what the detailed
+calendars say actually happened.
+
+Asked the user how to resolve all of this at once rather than
+guessing; the answer, in the user's own words: "In general the
+rotations stay per the rotations listed. I am not interested in
+rewriting the history of each class/quorum because of the rotations.
+The individual class/quorum tables govern in the past. the rotations
+govern after october of this year." Migration `069` implements exactly
+this split:
+- **Jan 1 -- Oct 31, 2026**: the six detailed calendars are the source
+  of truth. Three `UPDATE`s correct migration `032`'s own already-run
+  rows where the calendars disagree (title and/or `planning_group`);
+  everything else in this window -- every combined-week activity not
+  already seeded, plus every individual non-combined class week, none
+  of which any prior migration had ever touched -- is a fresh
+  `INSERT ... WHERE NOT EXISTS`.
+- **Nov 1, 2026 onward**: left completely untouched, even though the
+  same six calendars also contain tentative Nov/Dec planning --
+  migration `032`'s rotation-seeded rows stand as the real plan, and
+  the `youth_activity_rotations` engine continues to govern beyond
+  what's already seeded, exactly as before this import.
+- Two genuine ambiguities surfaced during reconciliation (not silently
+  resolved): 2026-01-07 Combined YW has three different classes each
+  claiming it as their own planning week (likely each class actually
+  ran its own kickoff session despite the shared "Combined YW" tag) --
+  left with `planning_group` null rather than guessing one. 2026-10-07
+  Combined YM has no calendar confirming migration `032`'s seeded
+  "Tour MTC"/Priests at all (all three YM calendars show it
+  blank/unplanned) -- left as-is, since an unconfirmed newer source
+  isn't the same as an actual conflict.
+- Built via a one-off parsing script
+  (`scratchpad/youth-activities-2026/parse.js`, not committed -- the
+  six raw TSV exports were saved to scratchpad files and
+  cross-referenced mechanically, same reasoning as migration `067`'s
+  own script) rather than hand-reconciling ~300 rows across six
+  calendars by eye. See [069_youth_activities_2026_backlog.sql](069_youth_activities_2026_backlog.sql)'s
+  own header for the full mapping. Still needs to be run.
+
+**"We probably also need an activity cancellation page much like the
+meeting cancellation page"** (the user's own words, immediately after
+settling the above) -- a real, separate feature request, not part of
+the reconciliation itself. `meeting_cancellations` (migration `039`)
+already has a `cancel_youth_activities` flag, but that's tied to a
+meeting-cancelling reason (General/Stake Conference) -- most of the
+real youth-activity-only holiday weeks in the 2026 backlog (Family
+Week, Pioneer Day, Thanksgiving, Christmas, New Year's Eve) cancel no
+ward meeting at all, so bundling them in there would mean rows with an
+empty `meeting_type_slugs` purely to carry an unrelated reason. New
+migration `070`: `youth_activity_cancellations` table, same shape as
+`meeting_cancellations` but scoped to activities -- a date range, a
+reason, and a `group_names text[]` list (empty means every group, the
+common case for a ward-wide holiday week; non-empty scopes it to just
+those classes/quorums). New `lib/data/youth-activity-cancellations.ts`
+(`getYouthActivityCancellations`/`addYouthActivityCancellation`/
+`deleteYouthActivityCancellation`/`sweepYouthActivityCancellations` --
+same lazy-sweep-on-read pattern as `sweepMeetingCancellations`, run
+alongside it from `getYouthActivities()`), new
+`/youth-activity-cancellations` page + actions file mirroring
+`/meeting-cancellations`' own UI almost exactly. Gated on the existing
+`youth_activity_planning` feature (the same one that already gates
+every other management control on `/youth-activities`) rather than a
+new dedicated feature -- unlike `meeting_cancellations`, which has its
+own feature, this didn't seem to need a finer-grained permission tier
+of its own; revisit if that turns out wrong in practice. Reached from a
+new tile on `/youth-activity-planning`, gated the same way. Still
+needs migration `070` to be run before the page will work.
 
 **Sort/filter now persists across page refreshes, 2026-10-10** (the
 user's own request, right after the row-contrast pass: "is there a way

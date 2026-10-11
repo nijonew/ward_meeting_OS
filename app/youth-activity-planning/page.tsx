@@ -57,6 +57,7 @@ export default async function YouthActivityPlanningPage() {
   // /youth-activities' own policy), so there's always at least one
   // real tile to show. Only the two teaching tiles stay feature-gated.
   const canTeachingPlanning = hasFeature(profile, "youth_teaching_planning");
+  const canManageActivities = hasFeature(profile, "youth_activity_planning");
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -76,6 +77,13 @@ export default async function YouthActivityPlanningPage() {
             description="Browse, generate, and manage activities"
             href="/youth-activities"
           />
+          {canManageActivities && (
+            <Tile
+              title="Activity Cancellations"
+              description="Cancel activities for a date range, e.g. holidays"
+              href="/youth-activity-cancellations"
+            />
+          )}
           {canTeachingPlanning && (
             <Tile
               title="Youth Teaching Calendar"

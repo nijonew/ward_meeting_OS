@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
+import { sweepYouthActivityCancellations } from "@/lib/data/youth-activity-cancellations";
 
 export interface YouthActivityRow {
   id: string;
@@ -23,7 +24,7 @@ export interface YouthActivityRow {
 // only published rows to anonymous/other-role requests, and everything to
 // bishopric + youth leader roles. Same query works for every visitor.
 export async function getYouthActivities(): Promise<YouthActivityRow[]> {
-  await sweepMeetingCancellations();
+  await Promise.all([sweepMeetingCancellations(), sweepYouthActivityCancellations()]);
   const supabase = await createClient();
   const { data } = await supabase
     .from("youth_activities")
