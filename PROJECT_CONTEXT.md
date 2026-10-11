@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 073
+## Current migration number: 075
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -244,8 +244,15 @@ reconstructed from both:
   lets a meeting have more than one Announcements block, each
   independently scoped, see Known open items below): still needs to
   be run.
+- `075` (replaces `sacrament_assignments`' stale anon-facing RLS
+  policy -- gated on `stage in ('ready', 'live')`, which Sacrament
+  Meeting stopped reaching entirely once its lifecycle was simplified
+  2026-09-10 -- with one gated on `stage <> 'archived'` instead; root
+  cause of Presiding/Conducting/every prayer being invisible to a
+  logged-out public viewer, see Known open items below): still needs
+  to be run.
 
-Next migration should be `075_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `076_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2005,37 +2012,71 @@ this to "combined activities."
   wrapping `<form>` like this one, even though no such form existed
   yet when it was built.
 
-**Still open, corrected 2026-10-11: the public Sacrament Meeting
-program's missing speakers.** The user's own report: "People are able
-to see today's sacrament meeting once they have requested access, but
-could only see the music in the meeting before then." First
-hypothesis (`saveProgramSpeaker` never setting `confirmed = true`
-until its own 2026-10-03 fix, plus migration `050`'s matching one-time
-backfill for rows saved before that fix) turned out to be only half
-right -- the user's immediate correction: "I had already run 50 and I
-just ran it again." Migration `050` was confirmed already run once
-before this session ever flagged it as outstanding (this file's own
-migration-status tracking had drifted from reality -- the user runs
-migrations directly in Supabase and doesn't always report back, so
-"still needs to be run" here should be read as "last confirmed state
-this file knew about," not a live guarantee) and has now been run
-again besides. **Both halves of the original fix (the code path and
-the backfill) are confirmed in place, so if speakers are still missing
-from the public program, the real cause is something else** -- not
-yet re-diagnosed. Candidates worth checking before guessing further:
-a speaker added/edited directly through Table Admin's raw
-`sacrament_speakers_adults`/`_youth` grid (which exposes `confirmed`
-as a plain checkbox, unforced) rather than through the Speakers &
-Music UI that now sets it automatically; or a genuine mismatch between
-a `sacrament_program_items.item_key` and the matching row's own `slot`
-(both `public-view.ts` and `conducting-rows.ts` silently skip an item
-whose key doesn't resolve to a row at all, `if (!speaker) continue`) --
-the latter would also hide it from Conducting, though, which the
-user's original before-compaction report ("music is there, speakers,
-conducting, prayers are not") suggests wasn't the case. Needs the
-user to confirm whether this latest migration-050 re-run actually
-fixed what they were seeing, or whether speakers are still missing
-from today's public program -- don't assume either way.
+**Root-caused and fixed, migration `075`: the public Sacrament Meeting
+program was missing Presiding/Conducting/every prayer for a logged-out
+viewer.** The user's own report: "People are able to see today's
+sacrament meeting once they have requested access, but could only see
+the music in the meeting before then... a person who enters the
+dashboard should have access to see the full program starting at
+6:00 am." First hypothesis (`saveProgramSpeaker` never setting
+`confirmed = true` until its own 2026-10-03 fix, plus migration `050`'s
+matching one-time backfill) was a real bug once, already fixed, but
+not THIS one -- the user's correction ("I had already run 50 and I
+just ran it again") ruled it out, and a pasted screenshot of the actual
+anonymous-viewer page nailed the real shape: every heading that needed
+a resolved *person* (Presiding, Conducting, Opening/Closing Prayer)
+rendered with no value at all, while Opening/Sacrament/Closing Hymn
+(self-contained text, no person lookup) came through fine -- a
+narrower, more specific symptom than "speakers are missing."
+
+Confirmed directly with a `pg_policies` query (this assistant has no
+live database access, so the user ran it and pasted the results):
+`sacrament_assignments` carried an anon-facing SELECT policy, "public
+read ready sacrament assignments," gated on `meetings.stage in
+('ready', 'live')`. Same class of problem as migrations 038, 041, 063,
+067, 068, 069 before it -- an undocumented RLS object, created
+directly in the Supabase SQL editor before this repo's migration
+history started, left pointing at stage values Sacrament Meeting
+stopped reaching entirely once its lifecycle was simplified down to
+`template -> planning -> archived` (2026-09-10). Since a real
+Sacrament Meeting's stage can never be `ready`/`live`, this policy
+could never match -- an anonymous visitor's query against
+`sacrament_assignments` always returned zero rows, while an admin saw
+it fine via the separate "authenticated access" policy (`ALL`/`true`,
+any logged-in account regardless of role) -- explaining "once they
+have requested access" too: the user had likely been testing as an
+authenticated account by then, which was never actually blocked.
+Music's own anon policy is gated on `status = 'published'`, not
+meeting stage, which is why it alone came through.
+
+**Migration `075`** replaces the policy's condition with
+`meetings.stage <> 'archived'`, matching this app's own Vision
+workflow wording for this table's real visibility ("public with no
+login... editable at all times until archived") -- deliberately
+coarser than the application-level gate in
+`app/meetings/[id]/public/page.tsx` (which still separately enforces
+the real date and the 6 AM Mountain floor), matching how every other
+narrow anon policy in this app already works. The 6 AM floor itself
+(`isSacramentMeetingPubliclyVisible`, built earlier this same session)
+was never the problem -- it was already working as designed; the
+user's own closing request ("the full program starting at 6:00 am")
+is satisfied once this RLS fix ships, with no further change to that
+gate needed.
+
+**Not yet verified, flagged rather than assumed fixed**: the pasted
+screenshot's Teaching Program section (Speakers & Music) was entirely
+absent -- no Speaker/Musical Number/Testimony line at all, not even a
+blank one. `sacrament_program_items` (the table that determines which
+items are in that list and in what order, migration 046) was never
+checked for its own anon RLS policy -- if it has none, an anonymous
+query against it returns nothing and the whole Teaching Program loop
+in `getPublicSacramentView` never executes, regardless of whether the
+underlying speaker/music rows are `confirmed`/`published` correctly.
+`sacrament_rabnm_people` (queried directly for Baby Blessing names)
+wasn't checked either. Ask the user to re-check the public page once
+migration `075` ships -- if Presiding/Conducting/prayers now show but
+Teaching Program is still empty, that confirms a second, separate RLS
+gap on `sacrament_program_items` needing the same treatment.
 
 **Second Announcements block before Closing Hymn/Prayer, built
 2026-10-11.** Right after being told migration `072` is on hold (see
