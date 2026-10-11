@@ -1938,6 +1938,39 @@ avoid confusing the two.
 
 ## Known open items
 
+**Zebra striping fixed to key off visible row position, not DOM
+position, 2026-10-11** (the user's own report, right after noticing it
+in practice on one of the two grids that actually filter: "when we
+sort and filter can we then redo the zebra striping so we don't end up
+with several of the same color stacked on top of each other?"). The
+2026-10-10 row-contrast entry above had explicitly flagged this exact
+failure mode as a known, accepted cosmetic limitation on
+`CallingPlanningGridForm.tsx`/`ActivitiesTable.tsx` (the only two grids
+with a real per-column filter) and decided it wasn't worth fixing --
+"accepted" didn't survive the user actually hitting it. Root cause
+unchanged from that original writeup: a filtered-out row stays mounted
+in the DOM (`hidden` attribute, not removed, so an in-progress edit on
+it isn't dropped from the next Save All Changes), and the old
+`even:bg-accent-soft` is a pure CSS `:nth-child` selector that counts
+those hidden siblings toward its own parity -- after a filter changes
+which rows show, two consecutive *visible* rows could land on the same
+shade instead of strictly alternating. Fixed in both files by
+replacing the CSS selector with a plain JS-computed `stripeByRowId`
+map: walk the sorted rows in order, skip any that fail `matchesFilters`,
+and assign alternating stripes only to the ones left -- striping now
+always strictly alternates across whatever's actually on screen,
+regardless of how many hidden rows sit between them in the DOM.
+Recomputed on every render rather than memoized, since
+`CallingPlanningGridForm`'s own filtering already has to react live to
+in-progress edits (see that file's own 2026-10-10 entry) and a memoized
+map would need the exact same dependency list anyway. The other three
+"favorite grid format" pages with zebra striping
+(`AssignmentGridForm.tsx`, `TeachingGridForm.tsx`,
+`ClassActivityGridForm.tsx`, and the Dashboard meeting list) have no
+filter at all -- confirmed by checking each for a `hidden`-row pattern
+before assuming they needed the same fix -- so plain CSS `even:`
+striping there was never actually broken and was left unchanged.
+
 **Announcements moved to right before Closing Hymn/Prayer, 2026-10-11**
 (the user's own follow-up, right after it became real: "Can we add an
 announcement section before the closing hymn and prayer?"). It had

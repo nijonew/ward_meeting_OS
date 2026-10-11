@@ -88,14 +88,25 @@ function compareText(a: string, b: string): number {
  * until now. Zebra striping is `even:bg-accent-soft`; hover is
  * `hover:bg-accent/15`, a stronger step in the same warm hue so the
  * row under the pointer reads as clearly more emphasized than the
- * zebra tint alone, not just a different shade of gray. One known, accepted
- * cosmetic quirk here specifically: filtered-out rows stay in the DOM
- * (`hidden`, not removed -- see this file's own reasoning above), so
- * `even:` (a pure CSS `:nth-child` selector) counts hidden rows toward
- * its parity too -- after filtering, two consecutive *visible* rows can
- * occasionally land on the same shade instead of strictly alternating.
- * Still a real improvement over no striping at all, and not worth a
- * JS-computed visible-index to fix.
+ * zebra tint alone, not just a different shade of gray.
+ *
+ * **Striping fixed to key off visible position, not DOM position,
+ * 2026-10-11** (the user's own report: "when we sort and filter can we
+ * then redo the zebra striping so we don't end up with several of the
+ * same color stacked on top of each other?"). The original `even:`
+ * (a pure CSS `:nth-child` selector) was flagged above as a known,
+ * accepted quirk -- filtered-out rows stay mounted in the DOM (`hidden`,
+ * not removed, so an in-progress edit on one isn't dropped from the
+ * next Save All Changes), and `:nth-child` counts those hidden rows
+ * toward its own parity, so two consecutive *visible* rows could land
+ * on the same shade right after a filter changed which rows show.
+ * "Accepted" turned out not to hold once it actually happened in
+ * practice. `stripeByRowId` (below, computed fresh each render since it
+ * has to track live in-progress filtering too) walks `sortedRows` in
+ * order and assigns alternating stripes only to rows that pass
+ * `matchesFilters`, skipping hidden ones entirely -- striping now
+ * always strictly alternates across whatever's actually on screen,
+ * regardless of how many hidden rows sit between them in the DOM.
  *
  * **Sort/filter persisted across page refreshes, 2026-10-10** (the
  * user's own request: "is there a way to remember the sorts and
@@ -267,6 +278,21 @@ export function CallingPlanningGridForm({
     });
   const visibleCount = sortedRows.filter(matchesFilters).length;
 
+  // Which stripe (if any) each VISIBLE row gets, keyed by row id --
+  // see this component's own doc comment for why this replaced plain
+  // CSS `even:` striping. Recomputed every render (cheap, and has to
+  // track live in-progress filtering via matchesFilters/liveCellText
+  // anyway), not memoized.
+  const stripeByRowId = new Map<string, boolean>();
+  {
+    let visibleIndex = 0;
+    for (const row of sortedRows) {
+      if (!matchesFilters(row)) continue;
+      stripeByRowId.set(row.id, visibleIndex % 2 === 1);
+      visibleIndex++;
+    }
+  }
+
   return (
     <form
       action={formAction}
@@ -314,8 +340,11 @@ export function CallingPlanningGridForm({
             {sortedRows.map((row) => (
               <tr
                 key={row.id}
-                hidden={!matchesFilters(row)}
-                className="border-t border-rule/60 align-top even:bg-accent-soft hover:bg-accent/15"
+                hidden={!stripeByRowId.has(row.id)}
+                className={[
+                  "border-t border-rule/60 align-top hover:bg-accent/15",
+                  stripeByRowId.get(row.id) ? "bg-accent-soft" : "",
+                ].join(" ")}
               >
                 <td className="px-2 py-1.5">
                   <select name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>

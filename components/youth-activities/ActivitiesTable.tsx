@@ -61,13 +61,19 @@ function compareText(a: string, b: string): number {
  * where every row has the same value would be redundant there.
  *
  * **Row contrast, 2026-10-10** (the user's own report: "rows blend
- * together quite a bit") -- `even:bg-accent-soft` zebra striping
- * (skipped in favor of the existing `bg-danger/5` tint on a cancelled
- * row, so the two never compete) plus `hover:bg-accent/15`, applied
- * identically across every "favorite grid format" page in this app --
- * see CallingPlanningGridForm's own comment for the full reasoning
- * (including why gray striping was revised to this warm accent tint)
- * and one known filtered-view cosmetic quirk shared by both.
+ * together quite a bit") -- zebra striping (skipped in favor of the
+ * existing `bg-danger/5` tint on a cancelled row, so the two never
+ * compete) plus `hover:bg-accent/15`, applied identically across every
+ * "favorite grid format" page in this app -- see CallingPlanningGridForm's
+ * own comment for the full reasoning (including why gray striping was
+ * revised to this warm accent tint).
+ *
+ * **Striping keyed off visible position, not DOM position, 2026-10-11**
+ * -- originally plain CSS `even:bg-accent-soft`, which (like
+ * CallingPlanningGridForm, see that file's own comment for the full
+ * writeup) counted hidden filtered-out rows toward its `:nth-child`
+ * parity, so two consecutive visible rows could land on the same shade
+ * after filtering. `stripeByRowId` below fixes that the same way.
  *
  * **Sort/filter persisted across page refreshes, 2026-10-10** (the
  * user's own request: "is there a way to remember the sorts and
@@ -149,6 +155,18 @@ export function ActivitiesTable({
     });
   const visibleCount = sortedRows.filter(matchesFilters).length;
 
+  // Which stripe (if any) each VISIBLE row gets, keyed by row id --
+  // see this component's own doc comment. Recomputed every render.
+  const stripeByRowId = new Map<string, boolean>();
+  {
+    let visibleIndex = 0;
+    for (const row of sortedRows) {
+      if (!matchesFilters(row)) continue;
+      stripeByRowId.set(row.id, visibleIndex % 2 === 1);
+      visibleIndex++;
+    }
+  }
+
   if (activities.length === 0) {
     return <p className="text-sm text-ink-muted">Nothing scheduled yet.</p>;
   }
@@ -191,10 +209,10 @@ export function ActivitiesTable({
           {sortedRows.map((row) => (
             <tr
               key={row.id}
-              hidden={!matchesFilters(row)}
+              hidden={!stripeByRowId.has(row.id)}
               className={[
                 "border-t border-rule/60 align-top hover:bg-accent/15",
-                row.cancelled ? "bg-danger/5" : "even:bg-accent-soft",
+                row.cancelled ? "bg-danger/5" : stripeByRowId.get(row.id) ? "bg-accent-soft" : "",
               ].join(" ")}
             >
               <td className="px-2 py-1.5 text-xs text-ink">{formatDate(row.activity_date)}</td>
