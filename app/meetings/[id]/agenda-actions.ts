@@ -23,8 +23,8 @@ const PLANNING_TEXT_COLUMNS = new Set(["stake_business", "recognitions"]);
 /** Checkbox columns need boolean parsing, not the text allowlist's
  *  trim-or-null handling -- has_stake_business (2026-09-09) was the
  *  first of these; ready_for_public (2026-10-04, the "ready for
- *  public consumption" checkbox at the bottom of the closing grid
- *  half) is the second. */
+ *  public viewing" checkbox at the bottom of the closing grid half,
+ *  reworded from "public consumption" 2026-10-11) is the second. */
 const PLANNING_BOOLEAN_COLUMNS = new Set(["has_stake_business", "ready_for_public"]);
 
 interface MusicPatch {

@@ -295,7 +295,7 @@ export default async function PlanningViewPage({
                       name="planning::ready_for_public"
                       defaultChecked={sacramentData?.planning?.ready_for_public ?? false}
                     />
-                    This meeting is complete and ready for public consumption
+                    This meeting is complete and ready for public viewing
                   </label>
                 }
               >
