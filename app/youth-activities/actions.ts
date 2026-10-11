@@ -173,3 +173,67 @@ export async function pushCombinedActivityToClasses(activityId: string): Promise
   revalidatePath("/youth-activities/manage/classes");
   return { success: true };
 }
+
+/**
+ * Inline edit for the Combined-group pages' own grid (2026-10-11, the
+ * user's own request: "I want to be able to modify combined
+ * activities. I also want to see which group is in charge of the
+ * activity") -- the second half of that request (seeing `planning_group`)
+ * is a plain new column on `ActivitiesTable` itself, no action needed;
+ * this is the "modify" half. Field names are "<id>::<column>", same
+ * convention as every other grid's own save action, but simpler than
+ * `saveClassActivityGrid`'s (date, group_name) keying -- every row
+ * rendered on a Combined-group page is already a real `youth_activities`
+ * row with a real id (unlike the per-class grid, which can render a
+ * synthetic/fallback line for an unplanned week), so there's no lookup
+ * step needed before updating.
+ */
+export async function saveActivityGrid(
+  _prevState: { error?: string; success?: boolean },
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+
+  type Fields = { activity_time: string; title: string; planning_group: string; notes: string };
+  const COLUMNS = ["activity_time", "title", "planning_group", "notes"];
+  const byId = new Map<string, Fields>();
+
+  for (const [name, value] of formData.entries()) {
+    const parts = name.split("::");
+    if (parts.length !== 2) continue;
+    const [id, column] = parts;
+    if (!COLUMNS.includes(column)) continue;
+    const fields = byId.get(id) ?? { activity_time: "", title: "", planning_group: "", notes: "" };
+    fields[column as keyof Fields] = String(value).trim();
+    byId.set(id, fields);
+  }
+
+  if (byId.size === 0) return { success: true };
+
+  for (const [, fields] of byId.entries()) {
+    if (!fields.title) return { error: "Title cannot be blank." };
+  }
+
+  const results = await Promise.all(
+    Array.from(byId.entries()).map(([id, fields]) =>
+      supabase
+        .from("youth_activities")
+        .update({
+          activity_time: fields.activity_time || null,
+          title: fields.title,
+          planning_group: fields.planning_group || null,
+          notes: fields.notes || null,
+        })
+        .eq("id", id)
+    )
+  );
+
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { error: failed.error.message };
+
+  revalidateActivityListings();
+  return { success: true };
+}

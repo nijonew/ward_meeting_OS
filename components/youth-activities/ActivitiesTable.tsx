@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import { PushToClassesButton } from "@/components/youth-activities/PushToClassesButton";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import { classesForCombinedGroup } from "@/lib/data/class-activities-shared";
+import { saveActivityGrid } from "@/app/youth-activities/actions";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
 
 const ALL_COLUMNS = [
@@ -12,9 +13,13 @@ const ALL_COLUMNS = [
   { key: "time", label: "Time" },
   { key: "group", label: "Group" },
   { key: "description", label: "Description" },
+  { key: "planning_group", label: "In Charge" },
   { key: "notes", label: "Notes" },
 ] as const;
 type ColumnKey = (typeof ALL_COLUMNS)[number]["key"];
+
+const INPUT_CLASS = "w-full min-w-[8rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
+const initialSaveState: { error?: string; success?: boolean } = {};
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -94,21 +99,60 @@ function compareText(a: string, b: string): number {
  * non-Combined row occasionally mixed into one of those three pages
  * (shouldn't happen today, but nothing guarantees it never will)
  * simply renders no button rather than erroring.
+ *
+ * **No longer read-only everywhere, 2026-10-11** (the user's own
+ * follow-up request: "I want to be able to modify combined activities.
+ * I also want to see which group is in charge of the activity") --
+ * this component's own doc comment above still describes the original
+ * design, which this extends rather than replaces:
+ * - **`showPlanningGroupColumn`**: a new "In Charge" column showing
+ *   `planning_group` (which class is on the hook to plan a combined
+ *   week -- see youth_activity_rotations' own architecture entry) --
+ *   `false` by default (Upcoming Activities leaves it off, since most
+ *   of its rows are individual-class activities with no
+ *   `planning_group` at all), passed `true` on the three Combined-group
+ *   pages.
+ * - **`editable`**: Time/Description/In Charge/Notes become real
+ *   inputs, same "favorite grid format" dirty-tracking/Save-All-Changes
+ *   pattern as every other editable grid in this app
+ *   (`useActionState` + `saveActivityGrid`,
+ *   `app/youth-activities/actions.ts`) -- `false` by default (Upcoming
+ *   Activities stays purely read-only, matching the original design),
+ *   passed `true` on the three Combined-group pages gated the same way
+ *   their existing Add Activity/Overwrite controls already are
+ *   (`youth_activity_planning`). Date and Group stay read-only even
+ *   when editable -- Date is the row's own key, and Group is fixed to
+ *   whichever page it's rendered on; changing either would move the
+ *   row off this page entirely, a bigger operation than "modify this
+ *   activity" asked for.
  */
 export function ActivitiesTable({
   activities,
   showGroupColumn = true,
+  showPlanningGroupColumn = false,
   showOverwriteColumn = false,
+  editable = false,
   storageKey,
 }: {
   activities: YouthActivityRow[];
   showGroupColumn?: boolean;
+  showPlanningGroupColumn?: boolean;
   showOverwriteColumn?: boolean;
+  editable?: boolean;
   storageKey: string;
 }) {
   const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(storageKey);
+  const [state, formAction, pending] = useActionState(saveActivityGrid, initialSaveState);
+  const [dirty, setDirty] = useState(false);
+  const [lastHandledState, setLastHandledState] = useState(state);
+  if (state !== lastHandledState) {
+    setLastHandledState(state);
+    if (state.success && dirty) setDirty(false);
+  }
 
-  const columns = showGroupColumn ? ALL_COLUMNS : ALL_COLUMNS.filter((c) => c.key !== "group");
+  const columns = ALL_COLUMNS.filter(
+    (c) => (c.key !== "group" || showGroupColumn) && (c.key !== "planning_group" || showPlanningGroupColumn)
+  );
 
   const cellText = (row: YouthActivityRow, key: ColumnKey): string => {
     switch (key) {
@@ -120,6 +164,8 @@ export function ActivitiesTable({
         return row.group_name;
       case "description":
         return row.title;
+      case "planning_group":
+        return row.planning_group ?? "";
       case "notes":
         return row.notes ?? "";
     }
@@ -171,7 +217,7 @@ export function ActivitiesTable({
     return <p className="text-sm text-ink-muted">Nothing scheduled yet.</p>;
   }
 
-  return (
+  const table = (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
@@ -216,10 +262,22 @@ export function ActivitiesTable({
               ].join(" ")}
             >
               <td className="px-2 py-1.5 text-xs text-ink">{formatDate(row.activity_date)}</td>
-              <td className="px-2 py-1.5 text-xs text-ink">{row.activity_time ? formatTime(row.activity_time) : "—"}</td>
+              <td className="px-2 py-1.5 text-xs text-ink">
+                {editable ? (
+                  <input type="time" name={`${row.id}::activity_time`} defaultValue={row.activity_time ?? ""} className={INPUT_CLASS} />
+                ) : row.activity_time ? (
+                  formatTime(row.activity_time)
+                ) : (
+                  "—"
+                )}
+              </td>
               {showGroupColumn && <td className="px-2 py-1.5 text-xs text-ink">{row.group_name}</td>}
               <td className="px-2 py-1.5 text-xs text-ink">
-                {row.title}
+                {editable ? (
+                  <input type="text" name={`${row.id}::title`} defaultValue={row.title} className={INPUT_CLASS} />
+                ) : (
+                  row.title
+                )}
                 {row.cancelled && (
                   <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">Cancelled</span>
                 )}
@@ -227,8 +285,27 @@ export function ActivitiesTable({
                   <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">Tentative</span>
                 )}
               </td>
+              {showPlanningGroupColumn && (
+                <td className="px-2 py-1.5 text-xs text-ink">
+                  {editable ? (
+                    <input
+                      type="text"
+                      name={`${row.id}::planning_group`}
+                      defaultValue={row.planning_group ?? ""}
+                      placeholder="Which class is planning this"
+                      className={INPUT_CLASS}
+                    />
+                  ) : (
+                    row.planning_group ?? "—"
+                  )}
+                </td>
+              )}
               <td className="px-2 py-1.5 text-xs text-ink-muted">
-                {row.notes}
+                {editable ? (
+                  <textarea name={`${row.id}::notes`} defaultValue={row.notes ?? ""} rows={2} className={INPUT_CLASS} />
+                ) : (
+                  row.notes
+                )}
                 {row.cancelled && row.cancellation_note && (
                   <div className="mt-1 text-danger">Cancelled: {row.cancellation_note}</div>
                 )}
@@ -249,5 +326,24 @@ export function ActivitiesTable({
 
       {visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No activities match the current filters.</p>}
     </div>
+  );
+
+  if (!editable) return table;
+
+  return (
+    <form action={formAction} onChange={() => setDirty(true)}>
+      {table}
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={!dirty || pending}
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? "Saving..." : "Save All Changes"}
+        </button>
+        {state.error && <p className="text-sm text-danger">{state.error}</p>}
+        {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
+      </div>
+    </form>
   );
 }

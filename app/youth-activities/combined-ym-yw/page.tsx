@@ -14,9 +14,10 @@ function todayISO(): string {
  *  see /youth-activities/upcoming's own comment for the shared design
  *  (same ActivitiesTable component, same one real `youth_activities`
  *  table, no Group column since every row here already shares one).
- *  Gained an Add Activity form and a per-row Overwrite button
- *  (2026-10-11, the user's own request), both `youth_activity_planning`-
- *  gated -- see ActivitiesTable's own comment on the latter. */
+ *  Gained an Add Activity form, a per-row Overwrite button, inline
+ *  editing, and an "In Charge" (planning_group) column (2026-10-11,
+ *  the user's own requests), all `youth_activity_planning`-gated --
+ *  see ActivitiesTable's own comment for the latter two. */
 export default async function CombinedYmYwActivitiesPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
@@ -45,7 +46,9 @@ export default async function CombinedYmYwActivitiesPage() {
         <ActivitiesTable
           activities={activities}
           showGroupColumn={false}
+          showPlanningGroupColumn
           showOverwriteColumn={canManage}
+          editable={canManage}
           storageKey="activities-combined-ym-yw"
         />
       </div>

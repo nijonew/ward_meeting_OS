@@ -1955,6 +1955,82 @@ avoid confusing the two.
 
 ## Known open items
 
+**Combined-group activities made editable, and a "which group is in
+charge" column added, 2026-10-11** (the user's own request: "I want to
+be able to modify combined activities. I also want to see which group
+is in charge of the activity"). The three Combined-group pages
+(`/youth-activities/combined-ym`, `combined-ym-yw`, `combined-yw`)
+were deliberately read-only when first built (2026-10-10) -- "all
+adding/editing/generating stays on the Youth Activities Management
+page." This is a real reversal of that scoping decision for these
+three pages specifically, not a bug fix -- `/youth-activities/upcoming`
+is untouched, still purely read-only, per the user's own words scoping
+this to "combined activities."
+- **`ActivitiesTable.tsx` gained two new props**: `showPlanningGroupColumn`
+  (a new "In Charge" column showing `planning_group` -- which class is
+  on the hook to plan that combined week, see the
+  `youth_activity_rotations` architecture entry) and `editable` (Time/
+  Description/In Charge/Notes become real inputs, same dirty-tracking/
+  Save-All-Changes pattern as every other "favorite grid format" page,
+  via `useActionState` + a new `saveActivityGrid` action). Both
+  default `false` (Upcoming Activities' own three call sites are
+  unchanged) and are passed `true`/`canManage` on the three
+  Combined-group pages' own `ActivitiesTable` calls.
+- **Date and Group stay read-only even in edit mode** -- Date is the
+  row's own key, and Group is fixed to whichever page it's rendered on
+  (every row already shares the same value there); changing either
+  would move the row off the page entirely, a bigger operation than
+  "modify this activity" asked for.
+- **New `saveActivityGrid`** (`app/youth-activities/actions.ts`),
+  field names `"<id>::<column>"` -- simpler than the per-class grid's
+  own `saveClassActivityGrid` (which keys by `(activity_date,
+  group_name)` since it can render a synthetic/fallback line for an
+  unplanned week): every row on a Combined-group page is already a
+  real `youth_activities` row with a real id, so there's no lookup
+  step before updating. Rejects the whole batch with "Title cannot be
+  blank" rather than silently saving an empty title, since `title` is
+  `not null` on this table (the exact constraint migration 069 had to
+  work around) and a blank title read back as "nothing scheduled"
+  would be a worse failure mode than refusing the save.
+- **No nested-`<form>` conflict with the existing per-row Overwrite
+  button** (`PushToClassesButton`) -- confirmed that component was
+  already a plain `type="button"` + `useTransition`, never a real
+  `<form>`, specifically so it would never conflict with a future
+  wrapping `<form>` like this one, even though no such form existed
+  yet when it was built.
+
+**Clarified, not a new bug: the public Sacrament Meeting program's
+missing speakers, 2026-10-11.** The user's own report: "People are
+able to see today's sacrament meeting once they have requested
+access, but could only see the music in the meeting before then." The
+root cause this points to was already found and fixed in code on
+2026-10-03 (see `saveProgramSpeaker`'s own comment,
+`app/meetings/[id]/speakers-music-actions.ts`) -- Speaker/Youth
+Speaker rows saved through the Speakers & Music UI never had
+`confirmed` set to `true`, and `lib/data/public-view.ts` still filters
+both `sacrament_speakers_adults`/`_youth` on `confirmed = true` (a
+deliberate, kept-on-purpose distinction, per the Table Admin queue's
+own decision, for the separate "who's due for a turn" history) --
+`saveProgramSpeaker` now always sets it on both insert and update,
+"filled in = ready," the same rule already applied everywhere else a
+confirm step was removed from this app. **What's still actually
+missing is migration `050`'s own one-time backfill, still not run** --
+it sets `confirmed = true` on every existing speaker row that already
+has a real speaker, i.e. every row saved *before* the 2026-10-03 code
+fix shipped. Any meeting whose speakers were entered before that date
+(today's meeting, most likely) still has them stuck at `confirmed =
+false` in the database, invisible to the public program, even though
+the code path that would keep this from recurring has been fixed for
+weeks. Running migration `050` is the one remaining action -- nothing
+else to fix here. The 6 AM Mountain floor itself
+(`isSacramentMeetingPubliclyVisible`, built earlier this same session)
+is unrelated and working as designed; "once they have requested
+access" most likely just describes when the user happened to retest
+this, not a real behavioral difference tied to account status --
+`/meetings/[id]/public`'s own content function
+(`getPublicSacramentView`) returns identical data regardless of
+whether the viewer is logged in, logged out, or freshly signed up.
+
 **Second Announcements block before Closing Hymn/Prayer, built
 2026-10-11.** Right after being told migration `072` is on hold (see
 migration history above), the user clarified the actual want: "I just
