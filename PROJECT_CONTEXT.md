@@ -1933,6 +1933,59 @@ avoid confusing the two.
 
 ## Known open items
 
+**New: per-class activity management, 2026-10-11** (the user's own
+request: "I need somewhere to manage each individual class's
+activities. it should draw from the combined activity pages as
+appropriate and then have the ability to fill in the rest, while all
+lines should ultimately be editable even if they are prefilled by a
+combined activity table."). New `/youth-activities/manage/classes`
+(hub + per-class grid, reached from a new tile on
+`/youth-activities/manage` -- same `youth_activity_planning` gate as
+everything else in that domain, not the Teaching domain's per-person
+`youth_class_teachers` model) -- same hub-then-`?class=<name>`
+pattern already established by `/youth-teaching-planning`.
+- **New `lib/data/class-activities.ts`** (`getClassActivityGrid`): one
+  row per upcoming Wednesday for a single class, resolved with a clear
+  precedence -- this class's own individual `youth_activities` row for
+  that date, else the shared Combined row it attends that week (its
+  own single-gender Combined type first, then `Combined YM/YW`), else
+  a genuinely blank line. `ACTIVITY_CLASSES` is the same 6-class
+  derivation as `TEACHING_CLASSES` (`lib/data/teaching-assignments.ts`)
+  but kept as its own copy rather than imported from that module,
+  since that one is about the Teaching domain specifically.
+- **Every line is a real, writable field regardless of source** -- the
+  user's own explicit point. A row's starting values are read from
+  whichever `youth_activities` row applies, but the field names
+  (`<date>::<sourceGroupName>::<column>`) encode exactly which row a
+  save should write back to -- editing a Combined-sourced line (shown
+  with a small accent-colored label naming which Combined type it
+  came from) updates that one real, shared row, visible to every other
+  class that attends it too, since it genuinely is one event, not a
+  per-class fork of it. `saveClassActivityGrid`
+  (`app/youth-activities/manage/classes/actions.ts`) re-checks which
+  of those (date, group) pairs already has a row (one batched query,
+  not one per line) and updates it in place, or inserts a new
+  individual row for this class if none exists -- there's no way to
+  decide "this blank week should actually be Combined" from a single
+  class's own page, so a brand-new line can only ever become that
+  class's own activity.
+- **Columns deliberately kept to Title/Location/Category/Planning
+  Group** -- the content fields a class's own leader would actually
+  fill in week to week. Youth Lead/Advisor Lead/Notes and the
+  status/confirmed/cancelled toggles stay off this grid (same
+  "don't touch what the grid doesn't show" principle used throughout
+  this app) -- Table Admin's existing "Youth Activities" grid or the
+  Manage page's own Add Activity form remain available for those.
+  A line with a blank Title is skipped entirely on save -- matches
+  Teaching Calendar's own "blank cell = nothing yet" sparse
+  convention, and avoids ever violating `youth_activities.title`'s
+  NOT NULL constraint (the exact thing migration 069 had to work
+  around) by trying to save an empty one.
+- **Same "today + 2 months, overridable" date-range convention as
+  `/youth-teaching-planning`** (`defaultThroughDate()` + a `?through=`
+  query param and its own small form) -- not re-litigated, just
+  matched directly from that page.
+
 **Bug found and fixed 2026-10-11: the next day's Sacrament Meeting
 public program went visible several hours early.** The user's own
 report: "tomorrow's sacrament meeting is now visible. I think it

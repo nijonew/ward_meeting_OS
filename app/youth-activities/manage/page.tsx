@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivityScheduleRules } from "@/lib/data/youth-activity-cadence-rules";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
@@ -57,6 +58,14 @@ export default async function YouthActivitiesManagePage() {
           &larr; Youth Activities
         </Link>
       </div>
+
+      <TileGrid>
+        <Tile
+          title="Class Activities"
+          description="Each class's own weekly schedule, drawn from Combined where it applies"
+          href="/youth-activities/manage/classes"
+        />
+      </TileGrid>
 
       <GenerateYouthActivitiesForm />
 
