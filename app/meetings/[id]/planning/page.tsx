@@ -185,8 +185,26 @@ export default async function PlanningViewPage({
   // add/review section of their own (this page and /meetings/[id]/ward-
   // business, respectively) -- a grid row for either would just be a
   // label with nothing to type into.
+  //
+  // **Agenda Items now renders at its own real template position,
+  // 2026-10-11** (the user's own report, going into a Bishopric
+  // Meeting/Ward Council/Youth Council meeting: "the agenda items
+  // come in at the end of the meeting... it didn't follow the
+  // template"). It used to be unconditionally filtered out of the grid
+  // and bolted on as a fixed section after Bishopric Minutes/Action
+  // Items regardless of where it actually sits in the template's own
+  // sort_order -- the non-Sacrament equivalent of the exact bug
+  // Announcements/Teaching Program already needed a real split to fix
+  // above. `agendaItemsIndex` is computed against the FULL
+  // `templateElements` list, before agenda_items is filtered out of
+  // the grid, so the split lands exactly where the template says.
   const hasAgendaItemsElement = templateElements.some((el) => el.key === "agenda_items");
+  const agendaItemsIndex = templateElements.findIndex((el) => el.key === "agenda_items");
   const elementsForGrid: TemplateElementRow[] = templateElements.filter((el) => el.key !== "agenda_items");
+  const beforeAgendaItemsElements =
+    !isSacrament && agendaItemsIndex !== -1 ? templateElements.slice(0, agendaItemsIndex) : elementsForGrid;
+  const afterAgendaItemsElements =
+    !isSacrament && agendaItemsIndex !== -1 ? templateElements.slice(agendaItemsIndex + 1) : [];
 
   // Split the agenda in two around Teaching Program (Sacrament Meeting
   // only) -- everything before Closing Hymn/Prayer, then Closing
@@ -205,11 +223,19 @@ export default async function PlanningViewPage({
   // Hymn, so whichever of the two comes first in a given format's
   // template is what actually anchors this split -- normally
   // Announcements itself.
-  const closingIndex = elementsForGrid.findIndex(
+  //
+  // For non-Sacrament types, this operates over `beforeAgendaItemsElements`
+  // rather than the full `elementsForGrid` -- those types never have
+  // Closing Hymn/Prayer/Announcements at all, so `closingIndex` is
+  // always -1 there regardless, and `beforeAgendaItemsElements` is
+  // already the right (possibly agenda_items-truncated) list to hand
+  // to the grid either way.
+  const closingIndex = beforeAgendaItemsElements.findIndex(
     (el) => el.key === "closing_hymn" || el.key === "closing_prayer" || el.key === "announcements"
   );
-  const openingElements = isSacrament && closingIndex !== -1 ? elementsForGrid.slice(0, closingIndex) : elementsForGrid;
-  const closingElements = isSacrament && closingIndex !== -1 ? elementsForGrid.slice(closingIndex) : [];
+  const openingElements =
+    isSacrament && closingIndex !== -1 ? beforeAgendaItemsElements.slice(0, closingIndex) : beforeAgendaItemsElements;
+  const closingElements = isSacrament && closingIndex !== -1 ? beforeAgendaItemsElements.slice(closingIndex) : [];
 
   // Calling-restricted dropdowns (2026-09-09: "all dropdowns should
   // follow the rules for the field by calling") -- one batched lookup
@@ -249,6 +275,10 @@ export default async function PlanningViewPage({
     ? [{ kind: "section", id: "opening-section", label: "Opening" }, ...buildAgendaRows({ elements: openingElements, ...rowInputs })]
     : buildAgendaRows({ elements: openingElements, ...rowInputs });
   const closingRows = buildAgendaRows({ elements: closingElements, ...rowInputs });
+  // Whatever the template placed after Agenda Items (non-Sacrament
+  // only, see above) -- rendered as its own grid below the Agenda
+  // Items section itself, only when there's actually anything there.
+  const afterAgendaItemsRows: AgendaRow[] = buildAgendaRows({ elements: afterAgendaItemsElements, ...rowInputs });
 
   const resolvedProgramItems = isSacrament
     ? resolveProgramItems(programItems, sacramentData?.music ?? [], sacramentData?.speakersAdults ?? [], sacramentData?.speakersYouth ?? [])
@@ -336,13 +366,31 @@ export default async function PlanningViewPage({
                 </div>
               </CombinedAgendaGrids>
             ) : (
-              <AgendaGridForm
-                meetingId={meetingId}
-                roleTable={roleTable}
-                rows={openingRows}
-                people={people}
-                hymnalIndex={hymnalIndex}
-              />
+              <>
+                <AgendaGridForm
+                  meetingId={meetingId}
+                  roleTable={roleTable}
+                  rows={openingRows}
+                  people={people}
+                  hymnalIndex={hymnalIndex}
+                />
+                {hasAgendaItemsElement && (
+                  <div className="mt-4 border-t border-rule/60 pt-4">
+                    <AgendaItemsSection meetingId={meetingId} items={agendaItems} />
+                  </div>
+                )}
+                {afterAgendaItemsElements.length > 0 && (
+                  <div className="mt-4 border-t border-rule/60 pt-4">
+                    <AgendaGridForm
+                      meetingId={meetingId}
+                      roleTable={roleTable}
+                      rows={afterAgendaItemsRows}
+                      people={people}
+                      hymnalIndex={hymnalIndex}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -354,8 +402,6 @@ export default async function PlanningViewPage({
           <ActionItemsSection meetingId={meetingId} items={bishopricData.actionItems} people={people} />
         </>
       )}
-
-      {hasAgendaItemsElement && <AgendaItemsSection meetingId={meetingId} items={agendaItems} />}
 
       {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
     </div>

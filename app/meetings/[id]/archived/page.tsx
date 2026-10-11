@@ -215,7 +215,6 @@ export default async function ArchivedMeetingPage({
 
   const renderedMusicKinds = new Set<string>();
   const renderedSlotKinds = new Set<string>();
-  const renderedNoneKinds = new Set<string>();
 
   function renderElement(el: TemplateElementRow) {
     // Recognize Music: Chorister + Organist together on one line, same
@@ -305,9 +304,37 @@ export default async function ArchivedMeetingPage({
 
       case "none":
       default: {
+        // Agenda Items now renders at its own real template position,
+        // 2026-10-11 (the user's own report, going into a live
+        // Bishopric/Ward Council/Youth Council meeting: "the agenda
+        // items come in at the end of the meeting... it didn't follow
+        // the template") -- the matching read-only-view version of the
+        // same bug just fixed on the live Planning page. This used to
+        // return null here and defer to a fixed section at the very
+        // bottom of the page regardless of where agenda_items actually
+        // sits in the template; now it renders inline, in place, same
+        // as every other element. No nested-<form> concern here at
+        // all (unlike Planning) -- this whole page is read-only.
         if (el.key === "agenda_items") {
-          renderedNoneKinds.add(el.key);
-          return null;
+          return (
+            <div key={el.id} className={ROW}>
+              <p className={LABEL}>{el.label}</p>
+              {agendaItems.length > 0 ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  {agendaItems.map((item) => (
+                    <div key={item.id}>
+                      <p className="text-sm text-ink">
+                        {item.title} &middot; {item.submitted_by_name}
+                      </p>
+                      {item.body && <Note>{item.body}</Note>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty />
+              )}
+            </div>
+          );
         }
         return (
           <div key={el.id} className={ROW}>
@@ -469,19 +496,6 @@ export default async function ArchivedMeetingPage({
         </div>
       )}
 
-      {renderedNoneKinds.has("agenda_items") && agendaItems.length > 0 && (
-        <div className="rounded border border-rule bg-surface p-6">
-          <h2 className="font-display text-xl">Agenda Items</h2>
-          <div className="mt-4 flex flex-col gap-2">
-            {agendaItems.map((item) => (
-              <div key={item.id} className={ROW}>
-                <p className={LABEL}>{item.title} &middot; {item.submitted_by_name}</p>
-                {item.body && <Note>{item.body}</Note>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

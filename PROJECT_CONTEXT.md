@@ -219,8 +219,12 @@ reconstructed from both:
 - `072` (moves the `announcements` element's `sort_order` to
   immediately before Closing Hymn in every Sacrament Meeting format
   that has both, across `meeting_templates` and already-seeded
-  non-archived meetings -- see Known open items below): still needs to
-  be run.
+  non-archived meetings -- see Known open items below): **on hold, per
+  the user's own request 2026-10-11** ("I will hold off on 72. 72 may
+  be more related to templating. I just want the ability to add a
+  second announcement block before the closing hymn/prayer") -- see
+  that same Known open items entry for the real need this surfaced and
+  why it isn't simply "run 072."
 - `073` (one-time bulk import: real member-cycle order + `next_index`
   into 10 of this app's existing generic rotations -- Bishopric
   Meeting/Ward Council/Youth Council's opening prayer, closing prayer,
@@ -228,16 +232,7 @@ reconstructed from both:
   real "2026 Syracuse Heritage Ward Master Meeting Schedule &
   Assignments" spreadsheet, pasted directly by the user 2026-10-11; see
   Known open items below for the other 6 columns this did NOT resolve
-  and why): still needs to be run, **and name-resolution needs the
-  user's own verification before it is** -- this migration resolves
-  informal Bishopric Meeting/Ward Council names ("Bro Nemrow," "Pres
-  Smith") by SURNAME-only `ilike` match (only when exactly one `people`
-  row matches), which the file's own header comment flags as a real
-  risk given this app's prior history of wrong-name guesses
-  (`STAKE_PRESIDENCY_CALLING_NAMES`, Visiting Authorities' High
-  Councilor naming). Run the verification SELECT in the file's own
-  header comment first and confirm every surname resolves to the right
-  person before running the rest of it.
+  and why): confirmed run.
 
 Next migration should be `074_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -1954,6 +1949,88 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Second Announcements block before Closing Hymn/Prayer -- real need
+surfaced, design not yet settled, 2026-10-11.** Right after being told
+migration `072` is on hold (see migration history above), the user
+clarified the actual want: "I just want the ability to add a second
+announcement block before the closing hymn/prayer." Checked the schema
+before assuming this is simple: `meeting_planned_elements` has
+`unique (meeting_id, element_id)` (migration `033`) -- a meeting
+cannot have two rows for the same catalog element at all today, so
+"add a second Announcements block" isn't reachable just by adding the
+existing `announcements` element a second time via the Agenda
+Elements editor; it needs a real schema/code decision, not a config
+change. Also, `sacrament_announcements`' pull mechanism
+(`pullAnnouncementIntoMeeting`) only ever keys on the meeting's own
+`announcements.meeting_id` -- there's no second dimension (a slot,
+like `musical_number`/`speaker` already have via `slot_count`) to say
+which of two blocks a given pulled announcement belongs to, so even if
+the unique constraint were lifted, both blocks would show the exact
+same pulled list today. Two real designs this could become, not yet
+chosen: (a) make `announcements` genuinely repeatable (new slot
+concept, each block independently scoped -- same shape as Speaker/
+Musical Number), or (b) a single global announcements list with a
+per-item "which position" flag (before Visiting Authorities vs. before
+Closing Hymn) rather than two truly separate pools. Ask before building
+either -- this needs scoping, not a guess.
+
+**Agenda Items now renders at its own real template position instead
+of always being pinned to the end, 2026-10-11** (the user's own
+report, going into a Bishopric Meeting/Ward Council/Youth Council
+meeting: "the agenda items come in at the end of the meeting. That is
+probably the biggest thing. It didn't follow the template"). This
+surfaced while scoping the user's larger "make every meeting look like
+Sacrament Meeting" request (Ward Council named as the first target) --
+asked what the real gap was; the user picked "dynamic add/remove
+picker elements" as the answer, then this specific report is the
+concrete first instance of it.
+- **Root cause**: Agenda Items (a real cataloged `meeting_elements`
+  row with its own `sort_order` in the template, same as every other
+  element) has always been unconditionally filtered out of the main
+  agenda grid and bolted on as its own fixed section below Bishopric
+  Minutes/Action Items, regardless of where it actually sits in the
+  template -- the exact same class of bug Announcements/Teaching
+  Program needed a real split to fix (migration `072`'s own Known-open-
+  items entry, now on hold above, but the *code* fix that shipped
+  alongside it -- the `closingIndex` split -- is unrelated and
+  unaffected). The read-only Archived view (`app/meetings/[id]/archived/page.tsx`)
+  had the identical bug, found and fixed the same way while in here --
+  it deferred `agenda_items` to a fixed section at the very bottom of
+  the page instead of rendering it inline at its real position; fixed
+  more simply there since that page is read-only (no nested-`<form>`
+  concern at all), so the inline branch just renders real content
+  directly instead of returning `null` and flagging a Set for a
+  fixed-position section to check later.
+- **Fix, Planning page** (`app/meetings/[id]/planning/page.tsx`):
+  generalizes the Sacrament-only opening/closing grid split to also
+  split around wherever `agenda_items` sits in a non-Sacrament
+  template's own order -- `agendaItemsIndex` computed against the
+  FULL `templateElements` list (before agenda_items is filtered out of
+  the grid for its own display reasons), producing
+  `beforeAgendaItemsElements`/`afterAgendaItemsElements`. Renders:
+  grid (before) -> Agenda Items section (now positioned correctly,
+  moved up from its old fixed spot) -> a second grid (after), the
+  latter only rendered at all when the template actually has something
+  after Agenda Items. Two independent `AgendaGridForm`s with their own
+  Save buttons, not combined into one via `CombinedAgendaGrids`
+  (Sacrament-only machinery, built for a different explicit request --
+  "one combined button for both halves" -- never asked for here, and
+  this page already shows multiple independent save buttons for
+  Bishopric Minutes/Action Items/Council Notes, so a second "Save All
+  Changes" isn't a new pattern on this page). Sacrament Meeting's own
+  split (around Closing Hymn/Prayer/Announcements) is completely
+  unaffected -- Sacrament Meeting never has an `agenda_items` element
+  in its template at all (confirmed: agenda-item submission has always
+  excluded Sacrament Meeting), so `agendaItemsIndex` is always -1
+  there and every new variable just aliases the existing
+  `elementsForGrid`/`[]` values, unchanged behavior.
+- **Bishopric Minutes/Action Items/Council Notes deliberately left at
+  their existing fixed position**, at the very bottom -- unlike Agenda
+  Items, none of those three is a real cataloged template element with
+  a `sort_order` of its own to violate; they've always been bespoke,
+  meeting-type-specific sections with no "correct" template position to
+  restore. Only Agenda Items moved.
 
 **Real rotation-cycle data imported from the ward's actual 2026 master
 schedule, migration `073` -- but only 10 of the spreadsheet's 16
