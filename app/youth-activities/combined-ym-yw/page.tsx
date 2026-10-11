@@ -35,7 +35,7 @@ export default async function CombinedYmYwActivitiesPage() {
       </section>
 
       <div className="rounded border border-rule bg-surface p-6">
-        <ActivitiesTable activities={activities} showGroupColumn={false} />
+        <ActivitiesTable activities={activities} showGroupColumn={false} storageKey="activities-combined-ym-yw" />
       </div>
     </main>
   );

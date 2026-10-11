@@ -1902,6 +1902,44 @@ avoid confusing the two.
 
 ## Known open items
 
+**Sort/filter now persists across page refreshes, 2026-10-10** (the
+user's own request, right after the row-contrast pass: "is there a way
+to remember the sorts and filters so they don't reset every time the
+page is refreshed"). Scoped to the only two grids that actually have
+sort/filter at all -- `CallingPlanningGridForm.tsx` and
+`ActivitiesTable.tsx` (Assignment Rotations, Teaching Planning, and the
+Dashboard meeting list only ever got the row-contrast treatment, never
+sort or filter, so there was nothing to persist there).
+- **New `lib/hooks/use-persisted-sort-filter.ts`** -- a localStorage-
+  backed drop-in replacement for the plain `useState` both grids used
+  for `sort`/`filters`. React state always starts empty/unsorted on
+  both the server and the client's own first render (localStorage
+  doesn't exist server-side, and reading it in a lazy `useState`
+  initializer would make the client's first render disagree with the
+  server-rendered HTML, a real hydration-mismatch risk) -- a mount-only
+  effect restores the saved state right after that first commit instead,
+  so there's a one-frame flash from default to restored on load, an
+  accepted tradeoff for any localStorage-backed UI state in a
+  server-rendered app. A second effect persists every change from then
+  on, gated on a `hasHydrated` flag that only flips true once the
+  restore effect finishes, specifically so it can never fire with the
+  pre-restoration defaults and silently overwrite a real saved state
+  before it's even been read back. The restore effect's own
+  `setState` calls needed a targeted
+  `/* eslint-disable react-hooks/set-state-in-effect */` block --
+  syncing an external system (localStorage) into React state on mount
+  is exactly the legitimate `useEffect` case React's own docs describe,
+  not the "derive state from a render" anti-pattern that rule otherwise
+  warns about.
+- **`storageKey` is required on `ActivitiesTable`, not defaulted** --
+  that one component renders on four different pages (Upcoming
+  Activities, Combined YM & YW, Combined YM, Combined YW), each needing
+  its own independent remembered state (`"activities-upcoming"`,
+  `"activities-combined-ym-yw"`, etc.) rather than all four clobbering
+  a single shared localStorage entry. `CallingPlanningGridForm` only
+  has one instance in the app, so its key is a plain module-level
+  constant instead.
+
 **Row contrast added to every "favorite grid format" page, 2026-10-10,
 then revised minutes later to a warm accent tint instead of gray**
 (the user's own reports: "rows blend together quite a bit," asked

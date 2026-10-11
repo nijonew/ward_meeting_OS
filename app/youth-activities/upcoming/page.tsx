@@ -49,7 +49,7 @@ export default async function UpcomingActivitiesPage() {
       </section>
 
       <div className="rounded border border-rule bg-surface p-6">
-        <ActivitiesTable activities={upcoming} />
+        <ActivitiesTable activities={upcoming} storageKey="activities-upcoming" />
       </div>
     </main>
   );

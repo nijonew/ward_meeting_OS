@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
+import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
-
-type SortDirection = "asc" | "desc";
 
 const ALL_COLUMNS = [
   { key: "date", label: "Date" },
@@ -67,18 +66,26 @@ function compareText(a: string, b: string): number {
  * see CallingPlanningGridForm's own comment for the full reasoning
  * (including why gray striping was revised to this warm accent tint)
  * and one known filtered-view cosmetic quirk shared by both.
+ *
+ * **Sort/filter persisted across page refreshes, 2026-10-10** (the
+ * user's own request: "is there a way to remember the sorts and
+ * filters so they don't reset every time the page is refreshed") --
+ * via `usePersistedSortFilter` (`lib/hooks/use-persisted-sort-filter.ts`).
+ * `storageKey` is required, not defaulted, specifically because this
+ * one component renders on four different pages (Upcoming Activities,
+ * Combined YM & YW, Combined YM, Combined YW) that each need their own
+ * independent remembered state -- see that hook's own comment.
  */
 export function ActivitiesTable({
   activities,
   showGroupColumn = true,
+  storageKey,
 }: {
   activities: YouthActivityRow[];
   showGroupColumn?: boolean;
+  storageKey: string;
 }) {
-  const [sort, setSort] = useState<{ key: ColumnKey; direction: SortDirection } | null>(null);
-  // null (or unset) = every value showing -- see ColumnFilterDropdown's
-  // own doc comment for the full semantics.
-  const [filters, setFilters] = useState<Partial<Record<ColumnKey, Set<string> | null>>>({});
+  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(storageKey);
 
   const columns = showGroupColumn ? ALL_COLUMNS : ALL_COLUMNS.filter((c) => c.key !== "group");
 

@@ -4,13 +4,14 @@ import { useMemo, useState, useTransition, useActionState } from "react";
 import { saveCallingPlanningGrid, deleteCallingPlanningEntry } from "@/app/calling-planning/actions";
 import { MultiPersonSelect } from "@/components/calling-planning/MultiPersonSelect";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
+import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import type { CallingPlanningRow, CallingOption } from "@/lib/data/calling-planning";
 import type { PersonOption } from "@/lib/data/people";
 import type { SelectOption } from "@/lib/data/select-options";
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT_CLASS = "w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
-type SortDirection = "asc" | "desc";
+const STORAGE_KEY = "calling-planning-grid-sort-filter";
 
 const COLUMNS = [
   { key: "calling", label: "Calling" },
@@ -95,6 +96,15 @@ function compareText(a: string, b: string): number {
  * occasionally land on the same shade instead of strictly alternating.
  * Still a real improvement over no striping at all, and not worth a
  * JS-computed visible-index to fix.
+ *
+ * **Sort/filter persisted across page refreshes, 2026-10-10** (the
+ * user's own request: "is there a way to remember the sorts and
+ * filters so they don't reset every time the page is refreshed") --
+ * `sort`/`filters` now come from `usePersistedSortFilter`
+ * (`lib/hooks/use-persisted-sort-filter.ts`), a localStorage-backed
+ * drop-in replacement for the plain `useState` these used to be. See
+ * that hook's own comment for the full reasoning (including why it
+ * doesn't risk a hydration mismatch).
  */
 export function CallingPlanningGridForm({
   rows,
@@ -112,10 +122,11 @@ export function CallingPlanningGridForm({
   const [state, formAction, pending] = useActionState(saveCallingPlanningGrid, initialState);
   const [dirty, setDirty] = useState(false);
   const [deleting, startDeleteTransition] = useTransition();
-  const [sort, setSort] = useState<{ key: ColumnKey; direction: SortDirection } | null>(null);
-  // null (or unset) = every value showing, matching ColumnFilterDropdown's
-  // own Excel-style semantics -- see that component's doc comment.
-  const [filters, setFilters] = useState<Partial<Record<ColumnKey, Set<string> | null>>>({});
+  // Persisted to localStorage across page refreshes -- see
+  // usePersistedSortFilter's own doc comment. null (or an unset column
+  // key) means every value showing, matching ColumnFilterDropdown's own
+  // Excel-style semantics -- see that component's doc comment.
+  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(STORAGE_KEY);
   // Raw, in-progress field values, keyed by that field's own `name`
   // attribute ("<rowId>::<column>") -- captured by the form's onChange
   // below, read back by liveCellText for live filtering. See this
