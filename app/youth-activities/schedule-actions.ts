@@ -12,8 +12,8 @@ import {
 
 type ActionResult = { success: true } | { error: string };
 
-// Matches app/youth-activities/page.tsx's own gate exactly -- whoever
-// can add a one-off activity can also set up its recurring cadence.
+// Matches app/youth-activities/manage/page.tsx's own gate exactly --
+// whoever can add a one-off activity can also set up its recurring cadence.
 async function requireManageRole(): Promise<{ error: string } | null> {
   const { profile } = await getSessionUser();
   if (!hasFeature(profile, "youth_activity_planning")) return { error: "Not authorized." };
@@ -24,7 +24,7 @@ export async function addScheduleRule(formData: FormData): Promise<ActionResult>
   const denied = await requireManageRole();
   if (denied) return denied;
   const result = await addRule(formData);
-  if ("success" in result) revalidatePath("/youth-activities");
+  if ("success" in result) revalidatePath("/youth-activities/manage");
   return result;
 }
 
@@ -32,7 +32,7 @@ export async function updateScheduleRule(id: string, formData: FormData): Promis
   const denied = await requireManageRole();
   if (denied) return denied;
   const result = await updateRule(id, formData);
-  if ("success" in result) revalidatePath("/youth-activities");
+  if ("success" in result) revalidatePath("/youth-activities/manage");
   return result;
 }
 
@@ -40,7 +40,7 @@ export async function deleteScheduleRule(id: string): Promise<ActionResult> {
   const denied = await requireManageRole();
   if (denied) return denied;
   const result = await deleteRule(id);
-  if ("success" in result) revalidatePath("/youth-activities");
+  if ("success" in result) revalidatePath("/youth-activities/manage");
   return result;
 }
 
@@ -48,7 +48,7 @@ export async function toggleScheduleRuleActive(id: string, active: boolean): Pro
   const denied = await requireManageRole();
   if (denied) return denied;
   const result = await toggleRule(id, active);
-  if ("success" in result) revalidatePath("/youth-activities");
+  if ("success" in result) revalidatePath("/youth-activities/manage");
   return result;
 }
 
@@ -65,7 +65,13 @@ export async function generateActivities(
   const result = await generateYouthActivitiesFromRules(throughDate);
   if ("error" in result) return { error: result.error };
 
-  revalidatePath("/youth-activities");
+  // Unlike the rule CRUD above, this creates real activity rows -- the
+  // pages that actually list them, not the Manage page itself (which
+  // shows no activity list, only the rule manager + this form).
+  revalidatePath("/youth-activities/upcoming");
+  revalidatePath("/youth-activities/combined-ym");
+  revalidatePath("/youth-activities/combined-ym-yw");
+  revalidatePath("/youth-activities/combined-yw");
   revalidatePath("/events");
   return { created: result.created, skippedExisting: result.skippedExisting };
 }

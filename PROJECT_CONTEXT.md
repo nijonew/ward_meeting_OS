@@ -1933,6 +1933,53 @@ avoid confusing the two.
 
 ## Known open items
 
+**Youth Activities split into browsing vs. a gated Manage page,
+2026-10-11** (the user's own request: "remove 'All Activities' table
+and add activity and cadence and generate activities. Those last
+three should be seen only when clicking on the manage tile which
+should only be visible to those with access."). `/youth-activities`
+itself is now just the `TileGrid` -- the four existing read-only
+browsing tiles (Upcoming Activities, Combined YM & YW, Combined YM,
+Combined YW), plus a new **Manage** tile shown only when
+`hasFeature(profile, "youth_activity_planning")`.
+- **"All Activities" removed outright, not moved anywhere** -- its
+  per-row controls (publish/unpublish, confirm/mark tentative, cancel
+  with a note/un-cancel, delete) are gone from this app's own UI.
+  Table Admin's existing "Youth Activities" grid already exposes the
+  same columns (status, confirmed, cancelled, cancellation_note) and
+  becomes the fallback for that kind of edit, same "bespoke page for
+  everyday work, Table Admin for the rest" split this app already uses
+  for Sacrament Meeting Content and several other tables. The five
+  server actions that only existed to back that list
+  (`setYouthActivityStatus`, `deleteYouthActivity`,
+  `toggleYouthActivityConfirmed`, `setYouthActivityCancellation`,
+  `uncancelYouthActivity`) are deleted outright from
+  `app/youth-activities/actions.ts`, not left unlinked -- confirmed via
+  grep that nothing else in the app called any of them.
+- **New `/youth-activities/manage`**, gated the same way
+  `/youth-activity-cancellations` already is (redirect to `/login` if
+  signed out, a plain "doesn't have access" message if not
+  `youth_activity_planning`). Holds everything that used to sit inline
+  below the browsing tiles: Generate Combined Activities
+  (`GenerateYouthActivitiesForm`), Add Activity, the cadence-rule
+  manager (`YouthActivityScheduleManager`), and its own Generate
+  Activities form -- none of these moved pages' own gate logic, since
+  all four were already checking the same `youth_activity_planning`
+  feature, just inline on the old page instead of behind a dedicated
+  route.
+- **Revalidation targets updated to match where content actually
+  moved**: `addYouthActivity`/`generateYouthActivities`
+  (`app/youth-activities/actions.ts`) and `generateActivities`
+  (`app/youth-activities/schedule-actions.ts`) now revalidate the four
+  browsing pages + `/events` directly (a new `revalidateActivityListings()`
+  helper in the first file) instead of the now content-free
+  `/youth-activities`, which would otherwise have left the browsing
+  tiles' client-side router cache stale after an edit on the new Manage
+  page. The four rule-CRUD actions in `schedule-actions.ts`
+  (add/update/delete/toggle) revalidate `/youth-activities/manage`
+  instead, matching where the rule list they actually affect now
+  renders.
+
 **Bug found and fixed 2026-10-11: "submitted by" showed an email
 address instead of a name.** The user's own report, right after
 testing the new Feedback Widget: "names show up as emails and not the

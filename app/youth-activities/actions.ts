@@ -7,6 +7,18 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export type ActionResult = { success: true } | { error: string };
 
+/** Every page that actually lists activities -- revalidated together
+ *  since both actions below can add a row of any group. Moved here
+ *  (2026-10-11) once Add Activity/Generate relocated to their own
+ *  Manage page, which shows none of this data itself. */
+function revalidateActivityListings() {
+  revalidatePath("/youth-activities/upcoming");
+  revalidatePath("/youth-activities/combined-ym");
+  revalidatePath("/youth-activities/combined-ym-yw");
+  revalidatePath("/youth-activities/combined-yw");
+  revalidatePath("/events");
+}
+
 // None of these had a server-side check at all before this (2026-10-04,
 // found while converting the page's own gate to the granular-features
 // model) -- only the page's own gate kept the controls out of a
@@ -54,104 +66,7 @@ export async function addYouthActivity(formData: FormData): Promise<ActionResult
     return { error: error.message };
   }
 
-  revalidatePath("/youth-activities");
-  return { success: true };
-}
-
-export async function setYouthActivityStatus(
-  id: string,
-  status: "draft" | "published"
-): Promise<ActionResult> {
-  const denied = await requireYouthActivityPlanningFeature();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("youth_activities").update({ status }).eq("id", id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/youth-activities");
-  return { success: true };
-}
-
-export async function deleteYouthActivity(id: string): Promise<ActionResult> {
-  const denied = await requireYouthActivityPlanningFeature();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("youth_activities").delete().eq("id", id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/youth-activities");
-  return { success: true };
-}
-
-/** Tentative -> confirmed, or back. Independent of `status`
- *  (draft/published visibility) -- see PROJECT_CONTEXT.md. */
-export async function toggleYouthActivityConfirmed(id: string, confirmed: boolean): Promise<ActionResult> {
-  const denied = await requireYouthActivityPlanningFeature();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("youth_activities").update({ confirmed }).eq("id", id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/youth-activities");
-  revalidatePath("/events");
-  return { success: true };
-}
-
-/** Marks a week cancelled (with an optional note) or un-cancels it.
- *  Cancelled weeks stay visible everywhere -- shown with the note
- *  instead of disappearing, per the workflow's "much like other
- *  meetings, show a cancelled week with a note" requirement. */
-export async function setYouthActivityCancellation(formData: FormData): Promise<ActionResult> {
-  const denied = await requireYouthActivityPlanningFeature();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-  const id = String(formData.get("id") ?? "");
-  const note = String(formData.get("cancellation_note") ?? "").trim() || null;
-  if (!id) return { error: "Missing activity id." };
-
-  const { error } = await supabase
-    .from("youth_activities")
-    .update({ cancelled: true, cancellation_note: note })
-    .eq("id", id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/youth-activities");
-  revalidatePath("/events");
-  return { success: true };
-}
-
-export async function uncancelYouthActivity(id: string): Promise<ActionResult> {
-  const denied = await requireYouthActivityPlanningFeature();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("youth_activities")
-    .update({ cancelled: false, cancellation_note: null })
-    .eq("id", id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/youth-activities");
-  revalidatePath("/events");
+  revalidateActivityListings();
   return { success: true };
 }
 
@@ -168,7 +83,6 @@ export async function generateYouthActivities(
   const result = await generateCombinedYouthActivities(throughDate);
   if ("error" in result) return { error: result.error };
 
-  revalidatePath("/youth-activities");
-  revalidatePath("/events");
+  revalidateActivityListings();
   return { created: result.created, skippedExisting: result.skippedExisting };
 }
