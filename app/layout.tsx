@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Archivo, Public_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
 
 // Type pairing from design.md ("The Ledger"): Archivo (display), Public
 // Sans (body), JetBrains Mono (utility -- dates, stage text, ledger
@@ -31,15 +33,23 @@ export const metadata: Metadata = {
   description: "Plan, conduct, and publish ward meetings from one source of truth.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // getSessionUser is wrapped in React's cache(), so this adds zero
+  // extra Supabase round trips alongside AppHeader's own call within
+  // the same request -- the widget mounts only on pages reached after
+  // signing in; the fully public, no-login pages render with no user
+  // and simply never get it.
+  const { user } = await getSessionUser();
+
   return (
     <html lang="en">
       <body className={`${archivo.variable} ${publicSans.variable} ${jetbrainsMono.variable} antialiased`}>
         {children}
+        {user && <FeedbackWidget />}
       </body>
     </html>
   );

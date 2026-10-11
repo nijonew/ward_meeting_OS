@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 070
+## Current migration number: 071
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -209,13 +209,15 @@ reconstructed from both:
   had ever actually been inserted before this migration, so it never
   surfaced sooner. File updated to drop that constraint outright (not
   recreated against the current list, same reasoning as migration
-  068's identical fix) -- still needs to be run with the corrected
-  file.
+  068's identical fix) -- confirmed run (with the twice-corrected
+  file).
 - `070` (new `youth_activity_cancellations` table -- the Activity
-  Cancellations page, see Known open items below): still needs to be
-  run.
+  Cancellations page, see Known open items below): confirmed run.
+- `071` (new `feedback` table + `table_admin_feedback` feature catalog
+  row -- the persistent Feedback Widget, see Known open items below):
+  confirmed run.
 
-Next migration should be `071_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `072_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1931,6 +1933,61 @@ avoid confusing the two.
 
 ## Known open items
 
+**Persistent Feedback Widget built, 2026-10-11** (the user's own
+request, approved via a formal plan first: "can we add a feature that
+suggest a fix or an upgrade? those can be stored in a [...] table and
+reviewed by claude when in a coding session. suggested become
+background work by my approval. bugs/fixes become priorities"). A
+slim bar fixed to the bottom-right of the viewport, collapsed by
+default -- expands into a short form (Bug/Fix vs. Suggestion/Upgrade,
+one text field), captures the current page via `usePathname()`
+automatically, and collapses back to a blank form on Close (not a
+stale success message, even though the widget stays mounted across
+client-side navigations -- `showThanks` resets alongside `expanded`).
+- **New `feedback` table (migration `071`)** -- `type`/`body`/
+  `page_path`/`submitted_by_name`/`submitted_by_email`/`status`, no
+  CHECK constraint on `type`/`status` (deliberately, after this
+  session's own `calling_planning`/`youth_activities` CHECK-constraint
+  incidents -- Table Admin's `select` column type constrains the UI
+  dropdown instead). Also seeds one new `table_admin_feedback` catalog
+  row -- nobody gets it automatically, same one-time bootstrapping
+  step every new feature needs (grant it via `/admin/calling-features`
+  to whichever calling(s) should triage feedback). Confirmed run.
+- **`submitFeedback`** (`app/feedback-actions.ts`) requires a signed-in
+  user (re-checked server-side, same defense-in-depth convention as
+  `submitAnnouncement`/`submitAgendaItem`) and attributes
+  `submitted_by_name`/`submitted_by_email` from the session -- no
+  self-reported name/email field on the widget itself.
+- **`components/FeedbackWidget.tsx`** mounts only when `app/layout.tsx`
+  (now an async Server Component) finds a signed-in user via
+  `getSessionUser()` (already wrapped in React's `cache()`, so this
+  adds zero extra Supabase round trips alongside `AppHeader`'s own call
+  within the same request) -- the fully public, no-login pages (public
+  Sacrament Meeting program, public announcements) render with no user
+  and never get the widget, per the user's own confirmed scoping.
+  "Approval" is a manual Status change only (`new -> approved ->
+  declined/in_progress/done`) -- nothing in this app can trigger a
+  Claude session automatically when a row changes; "approved" just
+  means fair game to start on the next time Claude checks the queue.
+- **Real, incidental consequence found during the build's own
+  `next build`**: making `app/layout.tsx` async (it now calls
+  `getSessionUser()`, which reads cookies) switched several previously
+  statically-prerendered routes (`/`, `/auth/request-access`,
+  `/auth/reset-password`, `/auth/update-password`, `/submit`,
+  `/teaching-calendar`) to server-rendered-on-demand instead. Accepted
+  as the real cost of checking session state in the layout itself --
+  every other page in this app was already dynamic for the same reason
+  (its own page component calls `getSessionUser()`), so this only
+  affects the handful of pages that happened to need no session check
+  of their own before now.
+- **Not verified in a live browser** -- this working copy has no
+  `.env.local` (confirmed earlier this session), so `next dev` 500s on
+  every route before any of this session's own code runs, same
+  pre-existing environment gap as every other feature built this way.
+  Migration `071` is confirmed run -- ask the user to grant themselves
+  `table_admin_feedback`, submit one test item from any logged-in
+  page, and confirm it shows up in `/admin/feedback` once deployed.
+
 **Youth Activities 2026 backlog imported, and a new Activity
 Cancellations page built, 2026-10-10/11.** The user pasted six
 per-class "2026 Heritage Ward Youth Activity Calendar" exports
@@ -1980,7 +2037,9 @@ this split:
   cross-referenced mechanically, same reasoning as migration `067`'s
   own script) rather than hand-reconciling ~300 rows across six
   calendars by eye. See [069_youth_activities_2026_backlog.sql](069_youth_activities_2026_backlog.sql)'s
-  own header for the full mapping. Still needs to be run.
+  own header for the full mapping (now including two in-production
+  fixes -- a NOT NULL `title` violation and a stale, undocumented
+  `group_name` CHECK constraint). Confirmed run.
 
 **"We probably also need an activity cancellation page much like the
 meeting cancellation page"** (the user's own words, immediately after
@@ -2008,8 +2067,8 @@ every other management control on `/youth-activities`) rather than a
 new dedicated feature -- unlike `meeting_cancellations`, which has its
 own feature, this didn't seem to need a finer-grained permission tier
 of its own; revisit if that turns out wrong in practice. Reached from a
-new tile on `/youth-activity-planning`, gated the same way. Still
-needs migration `070` to be run before the page will work.
+new tile on `/youth-activity-planning`, gated the same way. Migration
+`070` confirmed run.
 
 **Sort/filter now persists across page refreshes, 2026-10-10** (the
 user's own request, right after the row-contrast pass: "is there a way

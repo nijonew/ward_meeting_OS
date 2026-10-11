@@ -48,6 +48,19 @@ const SUBMISSION_STATUSES = [
   { value: "archived", label: "Archived" },
 ];
 
+const FEEDBACK_TYPES = [
+  { value: "bug", label: "Bug / Fix" },
+  { value: "suggestion", label: "Suggestion / Upgrade" },
+];
+
+const FEEDBACK_STATUSES = [
+  { value: "new", label: "New" },
+  { value: "approved", label: "Approved" },
+  { value: "declined", label: "Declined" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "done", label: "Done" },
+];
+
 /**
  * meetingTypeSlug narrows the Meeting calendar picker to just that
  * type's dates -- pass none for tables that can reference any meeting
@@ -242,6 +255,23 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK() },
       { column: "notes", label: "Notes", type: "long_text" },
       { column: "next_meeting_date", label: "Next Meeting Date", type: "date" },
+    ],
+  },
+
+  feedback: {
+    table: "feedback",
+    label: "Feedback",
+    description:
+      "Suggestions and bug reports submitted from the persistent feedback widget. Bug/Fix reports are priorities as soon as they're filed; a Suggestion needs Status set to Approved before it's fair game to build.",
+    requiredFeature: "table_admin_feedback",
+    orderBy: { column: "created_at", ascending: false },
+    columns: [
+      { column: "type", label: "Type", type: "select", required: true, options: FEEDBACK_TYPES },
+      { column: "body", label: "Body", type: "long_text", required: true },
+      { column: "page_path", label: "Page", type: "text" },
+      { column: "submitted_by_name", label: "Submitted By", type: "text" },
+      { column: "submitted_by_email", label: "Email", type: "text" },
+      { column: "status", label: "Status", type: "select", required: true, options: FEEDBACK_STATUSES },
     ],
   },
 
