@@ -76,6 +76,17 @@
 -- Idempotent: the UPDATEs always converge to the same end state on a
 -- re-run; the INSERTs are guarded by WHERE NOT EXISTS on
 -- (activity_date, group_name), matching migration 032's own pattern.
+--
+-- **First attempt failed in production**: `null value in column
+-- "title" of relation "youth_activities" violates not-null
+-- constraint`, on the 2026-07-29 Combined YM row (and 20 others like
+-- it) -- `youth_activities.title` has always been `not null`
+-- (predates this repo's migration history), but a blank/unplanned
+-- week in a source calendar legitimately has no title to give it.
+-- Every such row's `title` is now the literal placeholder text
+-- `(Not yet planned)` instead of `null` -- distinguishable from a real
+-- title, and an admin can simply overwrite it once that week's
+-- activity is actually decided.
 
 -- Corrections to migration 032's own seed data, where the newly
 -- received detailed per-class calendars disagree with the older
@@ -97,14 +108,14 @@ update youth_activities set title = 'Ward party/Halloween?', planning_group = 'M
 insert into youth_activities (activity_date, activity_time, title, group_name, planning_group, location, development_category, status, confirmed)
 select v.activity_date::date, '19:00'::time, v.title, v.group_name, v.planning_group, v.location, v.development_category, 'draft', true
 from (values
-  ('2026-01-07', null, 'Combined YM', 'Priests', null, null),
+  ('2026-01-07', '(Not yet planned)', 'Combined YM', 'Priests', null, null),
   ('2026-01-07', 'Get to know you and plan activities for the yr', 'Combined YW', null, null, null),
   ('2026-01-14', 'Vision Boards', 'Combined YW', 'Builders of Faith', '700 S. Church', null),
   ('2026-01-21', 'Games and Prizes', 'Combined YM/YW', 'Deacons', '700 S. Church', null),
   ('2026-01-28', 'Making Temple Bags', 'Combined YW', 'Messengers of Hope', '700 S. Church', 'Spiritual'),
-  ('2026-02-04', null, 'Combined YM', 'Teachers', '700 S. Church', null),
+  ('2026-02-04', '(Not yet planned)', 'Combined YM', 'Teachers', '700 S. Church', null),
   ('2026-02-11', 'Baptisms Syracuse 7:30', 'Combined YW', null, '700 S. Church', null),
-  ('2026-02-18', null, 'Combined YM/YW', 'Priests', '700 S. Church', 'Intellectual'),
+  ('2026-02-18', '(Not yet planned)', 'Combined YM/YW', 'Priests', '700 S. Church', 'Intellectual'),
   ('2026-02-25', 'Heart attack', 'Combined YW', 'Gatherers of Light', '700 S. Church', null),
   ('2026-03-04', 'Weight Lifting??', 'Combined YM', null, '700 S. Church', null),
   ('2026-03-11', 'Slots', 'Combined YW', 'Messengers of Hope', '700 S. Church', null),
@@ -123,7 +134,7 @@ from (values
   ('2026-06-24', 'Cultural Day', 'Combined YW', 'Builders of Faith', '700 S. Church', null),
   ('2026-07-08', 'Car Care', 'Combined YW', 'Messengers of Hope', '700 S. Church', null),
   ('2026-07-15', 'Dodgeball', 'Combined YM/YW', 'Deacons', '700 S. Church', null),
-  ('2026-07-29', null, 'Combined YM', null, null, null),
+  ('2026-07-29', '(Not yet planned)', 'Combined YM', null, null, null),
   ('2026-08-05', 'Grayson activity?', 'Combined YM', null, '700 S. Church', null),
   ('2026-08-12', 'Pool Day/Swimming', 'Combined YW', 'Gatherers of Light', '700 S. Church', null),
   ('2026-08-19', 'Water Kickball', 'Combined YM/YW', 'Priests', '700 S. Church', null),
@@ -138,16 +149,16 @@ where not exists (
 insert into youth_activities (activity_date, activity_time, title, group_name, location, development_category, status, confirmed)
 select v.activity_date::date, '19:00'::time, v.title, v.group_name, v.location, v.development_category, 'draft', true
 from (values
-  ('2026-01-14', null, 'Deacons', '700 S. Church', null),
-  ('2026-01-14', null, 'Priests', '700 S. Church', null),
-  ('2026-01-14', null, 'Teachers', '700 S. Church', null),
-  ('2026-01-28', null, 'Deacons', '700 S. Church', null),
-  ('2026-01-28', null, 'Priests', '700 S. Church', null),
-  ('2026-01-28', null, 'Teachers', '700 S. Church', null),
+  ('2026-01-14', '(Not yet planned)', 'Deacons', '700 S. Church', null),
+  ('2026-01-14', '(Not yet planned)', 'Priests', '700 S. Church', null),
+  ('2026-01-14', '(Not yet planned)', 'Teachers', '700 S. Church', null),
+  ('2026-01-28', '(Not yet planned)', 'Deacons', '700 S. Church', null),
+  ('2026-01-28', '(Not yet planned)', 'Priests', '700 S. Church', null),
+  ('2026-01-28', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-02-04', 'History Center', 'Gatherers of Light', '700 S. Church', null),
-  ('2026-02-11', null, 'Deacons', '700 S. Church', null),
-  ('2026-02-11', null, 'Priests', '700 S. Church', null),
-  ('2026-02-11', null, 'Teachers', '700 S. Church', null),
+  ('2026-02-11', '(Not yet planned)', 'Deacons', '700 S. Church', null),
+  ('2026-02-11', '(Not yet planned)', 'Priests', '700 S. Church', null),
+  ('2026-02-11', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-02-25', 'Fishing and cooking over fire', 'Deacons', '700 S. Church', null),
   ('2026-02-25', 'Missionaries church/nates', 'Priests', '700 S. Church', null),
   ('2026-03-04', 'ST. Patricks day craft', 'Builders of Faith', 'Joyce''s house', null),
@@ -161,7 +172,7 @@ from (values
   ('2026-03-25', 'home maintenance life skills activity', 'Teachers', '700 S. Church', null),
   ('2026-04-08', 'Wood working', 'Deacons', '700 S. Church', null),
   ('2026-04-08', 'Career Night - Haulin'' Assets', 'Priests', '700 S. Church', null),
-  ('2026-04-08', null, 'Teachers', '700 S. Church', null),
+  ('2026-04-08', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-04-22', 'Farm animal tour', 'Deacons', '700 S. Church', null),
   ('2026-04-22', 'Weber State tour', 'Priests', '700 S. Church', null),
   ('2026-04-22', 'Car Life Skills Activity', 'Teachers', '700 S. Church', null),
@@ -178,7 +189,7 @@ from (values
   ('2026-05-27', 'Make Tie dye shirts/hats for camp', 'Deacons', '700 S. Church', null),
   ('2026-05-27', 'Powell planning combined with Teachers', 'Priests', '700 S. Church', null),
   ('2026-05-27', 'Prepare for Lake Powell Trip with the Priests', 'Teachers', '700 S. Church', null),
-  ('2026-06-03', null, 'Builders of Faith', '700 S. Church', null),
+  ('2026-06-03', '(Not yet planned)', 'Builders of Faith', '700 S. Church', null),
   ('2026-06-03', 'Bike Ride -pizza', 'Gatherers of Light', '700 S. Church', null),
   ('2026-06-03', 'Hike in the morning', 'Messengers of Hope', '700 S. Church', null),
   ('2026-06-10', 'Camp this week', 'Deacons', '700 S. Church', null),
@@ -195,27 +206,27 @@ from (values
   ('2026-08-05', 'Temple square visitors center', 'Messengers of Hope', '700 S. Church', null),
   ('2026-08-12', 'Service activity', 'Deacons', '700 S. Church', null),
   ('2026-08-12', 'Rock climbing/Rush Funplex', 'Priests', '700 S. Church', null),
-  ('2026-08-12', null, 'Teachers', '700 S. Church', null),
+  ('2026-08-12', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-08-26', 'Bow and arrow/Wood working?', 'Deacons', '700 S. Church', null),
   ('2026-08-26', 'Oil/tire change night. Mechanical night', 'Priests', '700 S. Church', null),
-  ('2026-08-26', null, 'Teachers', '700 S. Church', null),
+  ('2026-08-26', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-09-02', 'Decorating journals', 'Builders of Faith', '700 S. Church', null),
   ('2026-09-02', 'Planning meeting with class', 'Gatherers of Light', '700 S. Church', null),
   ('2026-09-02', 'Resume/Job Interview', 'Messengers of Hope', '700 S. Church', null),
   ('2026-09-09', 'One match fire challenge', 'Deacons', '700 S. Church', null),
   ('2026-09-09', 'Smoking, bbq, taco, soup night', 'Priests', '700 S. Church', null),
   ('2026-09-09', 'Yard games and smores', 'Teachers', '700 S. Church', null),
-  ('2026-09-23', null, 'Deacons', '700 S. Church', null),
+  ('2026-09-23', '(Not yet planned)', 'Deacons', '700 S. Church', null),
   ('2026-09-23', 'Gun/Knife safety night', 'Priests', '700 S. Church', null),
-  ('2026-09-23', null, 'Teachers', '700 S. Church', null),
+  ('2026-09-23', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-10-07', 'Make treat , deliver as ministering activity', 'Gatherers of Light', '700 S. Church', null),
   ('2026-10-07', 'Attend Orchestra Concert to support Brynna', 'Messengers of Hope', '700 S. Church', null),
   ('2026-10-14', 'Mountian biking', 'Deacons', '700 S. Church', null),
   ('2026-10-14', 'Religious diversity night, tour other religious churches', 'Priests', '700 S. Church', null),
-  ('2026-10-14', null, 'Teachers', '700 S. Church', null),
+  ('2026-10-14', '(Not yet planned)', 'Teachers', '700 S. Church', null),
   ('2026-10-28', 'Ward Halloween party', 'Deacons', '700 S. Church', null),
   ('2026-10-28', 'Halloween party???-game night backup plan', 'Priests', '700 S. Church', null),
-  ('2026-10-28', null, 'Teachers', '700 S. Church', null)
+  ('2026-10-28', '(Not yet planned)', 'Teachers', '700 S. Church', null)
 ) as v(activity_date, title, group_name, location, development_category)
 where not exists (
   select 1 from youth_activities y

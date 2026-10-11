@@ -191,7 +191,14 @@ reconstructed from both:
   032's own earlier seed data -- see that migration file's own header
   comment for the full reconciliation rules and the Known open items
   entry below for how the two "individual calendars vs. rotation"
-  conflicts were resolved): still needs to be run.
+  conflicts were resolved). **First attempt failed in production** --
+  `null value in column "title" ... violates not-null constraint` on
+  the 2026-07-29 Combined YM row (and 20 others like it):
+  `youth_activities.title` has always been `not null`, but a blank/
+  unplanned week in a source calendar legitimately has nothing to put
+  there. File updated to use the literal placeholder text
+  `(Not yet planned)` instead of `null` for every such row -- still
+  needs to be run with the corrected file.
 - `070` (new `youth_activity_cancellations` table -- the Activity
   Cancellations page, see Known open items below): still needs to be
   run.
