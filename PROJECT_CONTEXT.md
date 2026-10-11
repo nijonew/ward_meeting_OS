@@ -253,7 +253,7 @@ reconstructed from both:
   being run, to add a matching brand-new anon policy on
   `sacrament_program_items` -- which had none at all, hiding the
   entire Teaching Program section the same way -- see Known open
-  items below): still needs to be run.
+  items below): confirmed run.
 
 Next migration should be `076_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
