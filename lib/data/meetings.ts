@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 import type { Meeting, MeetingLifecycleStage, MeetingType, MeetingTypeSlug } from "@/lib/types";
 
 // NOTE: no generated Database types are wired up yet (would need the
@@ -173,15 +174,25 @@ export async function getUpcomingMeeting(): Promise<Meeting | null> {
  * day only... editable at all times until archived"), so this is really
  * a bugfix as much as a simplification: today + not archived is the
  * actual, working rule.
+ *
+ * "Today" is Mountain Time, not the server's own UTC clock, and this
+ * only returns a meeting from 6 AM Mountain onward (2026-10-11 bugfix,
+ * matching the identical fix in app/meetings/[id]/public/page.tsx's
+ * own gate -- see isSacramentMeetingPubliclyVisible's comment for why:
+ * a plain UTC date comparison here made this landing-page tile point
+ * at the *next* day's meeting several hours before it actually arrived
+ * in Mountain Time).
  */
 export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | null> {
+  const { dateIso, hour } = getMountainTimeNow();
+  if (hour < 6) return null;
+
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
 
   const { data, error } = await supabase
     .from("meetings")
     .select(MEETING_SELECT_COLUMNS)
-    .eq("date", today)
+    .eq("date", dateIso)
     .neq("stage", "archived");
 
   if (error || !data) {

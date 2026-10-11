@@ -1,6 +1,7 @@
 import { getPublicSacramentView } from "@/lib/data/public-view";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
+import { isSacramentMeetingPubliclyVisible } from "@/lib/data/timezone";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export default async function PublicViewPage({
@@ -66,8 +67,11 @@ export default async function PublicViewPage({
       return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
     }
 
-    const todayIso = new Date().toISOString().slice(0, 10);
-    if (meeting.date !== todayIso) {
+    // Mountain Time, not the server's own UTC clock, and not available
+    // until 6 AM on the day -- see isSacramentMeetingPubliclyVisible's
+    // own comment for why (2026-10-11 bugfix: the next day's meeting
+    // was going public a few hours early every evening).
+    if (!isSacramentMeetingPubliclyVisible(meeting.date)) {
       const canPreviewEarly = hasFeature(profile, "sacrament_program_view");
       const readyForPublic = canPreviewEarly ? (await getSacramentPlanningData(meetingId)).planning?.ready_for_public : false;
       if (!canPreviewEarly || !readyForPublic) {

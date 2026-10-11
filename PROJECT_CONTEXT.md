@@ -1933,6 +1933,49 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-11: the next day's Sacrament Meeting
+public program went visible several hours early.** The user's own
+report: "tomorrow's sacrament meeting is now visible. I think it
+might be a timezone thing." Confirmed: both places that gate the
+public page on "is this today's meeting" (`app/meetings/[id]/public/page.tsx`'s
+own check and `getTodaysPublishedSacramentMeeting` in
+`lib/data/meetings.ts`, used for the landing page's own tile) compared
+against a plain `new Date().toISOString().slice(0, 10)` -- the
+server's UTC date, which rolls over to the next calendar day 6-7 hours
+before midnight actually arrives in Mountain Time (depending on
+daylight saving) -- so the next day's meeting started showing publicly
+around 5-6pm Mountain the evening before.
+- New `lib/data/timezone.ts` (`getMountainTimeNow()`,
+  `isSacramentMeetingPubliclyVisible(dateIso)`) -- computes the current
+  date/hour via the real IANA `America/Denver` zone (`Intl.DateTimeFormat`
+  with `timeZone`), not a fixed UTC offset that would silently drift
+  wrong twice a year across the MST/MDT transition. Verified directly
+  against both a UTC-rollover case and a January (MST) case before
+  wiring it in.
+- **Also adds the 6 AM Mountain floor the user asked for on top of the
+  timezone fix itself**: "Can we have that show up no earlier than
+  6:00 am mtn time for those who see only the public view?" -- the
+  program isn't available to a public/no-login viewer until 6 AM
+  Mountain on its own date, not right at midnight. Scoped exactly to
+  what was asked: the admin/Communications-Specialist early-preview
+  branches in `public/page.tsx` are checked first and are completely
+  unaffected -- this only delays when an ordinary public viewer (or the
+  landing page's own convenience tile, which has no role bypass of its
+  own) can see it.
+- **Not touched, flagged instead**: a broader grep turned up the same
+  plain `new Date().toISOString().slice(0, 10)` pattern in several
+  other, lower-stakes places (`app/dashboard/page.tsx`,
+  `app/calling-planning/page.tsx`'s date-picker default,
+  `app/youth-activities/{combined-ym,combined-ym-yw,combined-yw,upcoming}/page.tsx`,
+  `lib/data/music-list.ts`, `lib/data/rotations.ts`,
+  `components/admin/MeetingDatePicker.tsx`). None of these gate
+  genuinely public, no-login content the way the Sacrament Meeting
+  public page does -- being off by a few hours around midnight on an
+  admin-facing "upcoming" filter or a date-picker default is a minor
+  annoyance, not the kind of early-exposure bug this report was about
+  -- so none were changed. Revisit with `getMountainTimeNow()` if any
+  of these turn out to matter in practice.
+
 **Youth Activities split into browsing vs. a gated Manage page,
 2026-10-11** (the user's own request: "remove 'All Activities' table
 and add activity and cadence and generate activities. Those last
