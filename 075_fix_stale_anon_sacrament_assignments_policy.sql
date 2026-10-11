@@ -40,6 +40,32 @@
 -- dropped first so this stays safe to re-run regardless of which one
 -- currently exists.
 --
+-- **Amended in place, same day, before this migration was ever run**
+-- (same "amend rather than renumber" precedent as migrations 047/065):
+-- a second, matching gap confirmed via the same `pg_policies` query,
+-- against `sacrament_program_items` -- the table determining WHICH
+-- items are in the Teaching Program (Speakers & Music) list and in
+-- what order (migration 046). It had only `authenticated` policies, no
+-- `anon` row at all -- not a stale condition this time, just one never
+-- written in the first place. With RLS enabled and no matching policy,
+-- Postgres denies by default, so `getSacramentProgramItems` returned
+-- an empty list for every anonymous visitor regardless of whether the
+-- underlying speaker/music rows were confirmed or published correctly
+-- -- the whole Teaching Program loop in `getPublicSacramentView` never
+-- executed, which is why the pasted public-page screenshot that
+-- surfaced the `sacrament_assignments` bug above also showed zero
+-- Speaker/Musical Number/Testimony lines, not even blank ones.
+--
+-- This table itself holds no sensitive content -- just an `item_key`
+-- and `sort_order` per meeting, no names or free text -- the real
+-- content stays protected by the underlying tables' own anon policies
+-- (`confirmed = true` for speakers, `status = 'published'` for music).
+-- Still scoped to "not archived," matching `sacrament_assignments`'
+-- own fix just above and this app's Vision workflow's "no public
+-- access at all once archived" rule, rather than an unconditional
+-- `true` -- cheap to include and keeps every meeting-scoped anon
+-- policy in this app following the same one rule.
+--
 -- Idempotent: safe to re-run.
 
 drop policy if exists "public read ready sacrament assignments" on sacrament_assignments;
@@ -52,6 +78,19 @@ create policy "public read sacrament assignments"
     exists (
       select 1 from meetings
       where meetings.id = sacrament_assignments.meeting_id
+        and meetings.stage <> 'archived'
+    )
+  );
+
+drop policy if exists "public read sacrament program items" on sacrament_program_items;
+
+create policy "public read sacrament program items"
+  on sacrament_program_items for select
+  to anon
+  using (
+    exists (
+      select 1 from meetings
+      where meetings.id = sacrament_program_items.meeting_id
         and meetings.stage <> 'archived'
     )
   );

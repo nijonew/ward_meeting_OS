@@ -249,8 +249,11 @@ reconstructed from both:
   Meeting stopped reaching entirely once its lifecycle was simplified
   2026-09-10 -- with one gated on `stage <> 'archived'` instead; root
   cause of Presiding/Conducting/every prayer being invisible to a
-  logged-out public viewer, see Known open items below): still needs
-  to be run.
+  logged-out public viewer. Amended in place the same day, before ever
+  being run, to add a matching brand-new anon policy on
+  `sacrament_program_items` -- which had none at all, hiding the
+  entire Teaching Program section the same way -- see Known open
+  items below): still needs to be run.
 
 Next migration should be `076_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -2063,20 +2066,27 @@ user's own closing request ("the full program starting at 6:00 am")
 is satisfied once this RLS fix ships, with no further change to that
 gate needed.
 
-**Not yet verified, flagged rather than assumed fixed**: the pasted
-screenshot's Teaching Program section (Speakers & Music) was entirely
-absent -- no Speaker/Musical Number/Testimony line at all, not even a
-blank one. `sacrament_program_items` (the table that determines which
-items are in that list and in what order, migration 046) was never
-checked for its own anon RLS policy -- if it has none, an anonymous
-query against it returns nothing and the whole Teaching Program loop
-in `getPublicSacramentView` never executes, regardless of whether the
-underlying speaker/music rows are `confirmed`/`published` correctly.
+**Confirmed, and folded into migration `075` the same day**: the
+pasted screenshot's Teaching Program section (Speakers & Music) was
+entirely absent -- no Speaker/Musical Number/Testimony line at all,
+not even a blank one. A second `pg_policies` query confirmed why:
+`sacrament_program_items` (the table that determines which items are
+in that list and in what order, migration 046) had only
+`authenticated` policies -- no `anon` row at all, not a stale
+condition this time, just one never written. With RLS enabled and no
+matching policy, Postgres denies by default, so `getSacramentProgramItems`
+returned an empty list for every anonymous visitor regardless of
+whether the underlying speaker/music rows were `confirmed`/`published`
+correctly -- the whole Teaching Program loop in
+`getPublicSacramentView` never executed. Migration `075` (amended in
+place, not yet run) adds a matching anon SELECT policy, scoped the
+same "not archived" way as the `sacrament_assignments` fix above --
+this table itself holds no sensitive content (just `item_key`/
+`sort_order`, no names), so the real content stays protected by the
+underlying tables' own existing anon filters either way.
 `sacrament_rabnm_people` (queried directly for Baby Blessing names)
-wasn't checked either. Ask the user to re-check the public page once
-migration `075` ships -- if Presiding/Conducting/prayers now show but
-Teaching Program is still empty, that confirms a second, separate RLS
-gap on `sacrament_program_items` needing the same treatment.
+was checked in the same pass and already has a correct anon policy,
+scoped to `type = 'baby_blessing'` -- no fix needed there.
 
 **Second Announcements block before Closing Hymn/Prayer, built
 2026-10-11.** Right after being told migration `072` is on hold (see
