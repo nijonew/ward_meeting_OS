@@ -1933,6 +1933,51 @@ avoid confusing the two.
 
 ## Known open items
 
+**Seasonal accent color, matching churchofjesuschrist.org's own
+rotation, 2026-10-11** (the user's own "side quest": "the church's
+website uses a blue general color scheme, the reddish color scheme we
+are using now for christmastime, and a purpleish scheme for easter
+time... Can you determine what those are, when they are used, and
+apply that same coloration change to this app?"). Verified directly
+against the real site (its live CSS, plus several Wayback Machine
+snapshots) rather than guessing -- confirmed blue is the real default
+(checked an Oct 2025 General Conference weekend, July 2025 Pioneer
+Day, and today's live site, none special), red really is Christmas
+(active Nov 27 and Dec 24, 2025; not active Nov 1), and purple really
+is Easter (active Good Friday 2025). **No fourth, green season was
+found** despite checking several more candidate dates -- only three
+real states exist as far as this could verify.
+- **New `lib/data/season-theme.ts`** (`getSeasonTheme()`) -- pure,
+  Mountain-Time-based (same `getMountainTimeNow()` this app already
+  uses for the Sacrament Meeting visibility fix, for the same
+  "server's UTC clock would drift" reason, even though the stakes here
+  are much lower). Christmas = Dec 1 -- Jan 6 (Christmastide's own
+  traditional bounds, since the real site's exact switch day wasn't
+  pinned down between the two confirmed data points). Easter = the 14
+  days before Easter Sunday through Easter Sunday itself, computed via
+  the real Computus algorithm (Anonymous Gregorian/Meeus-Jones-Butcher)
+  -- verified against six real years (2023-2028) before trusting it,
+  not a hardcoded date table.
+- **Rotates only the existing `--color-accent`/`-deep`/`-soft` tokens'
+  hue** (`app/globals.css`), via a `data-season` attribute
+  `app/layout.tsx` now sets on `<html>`, keeping their lightness/
+  chroma exactly as `design.md` already specified -- a real, measured
+  finding made this unusually clean: this app's own pre-existing
+  accent hue (20) already matches the church site's own red (measured
+  hue 19-21 across its three shades) almost exactly, strongly
+  suggesting that's exactly where this app's current permanent color
+  came from in the first place. "Christmas" keeps that hue completely
+  unchanged; "default" and "easter" rotate to the church site's own
+  measured blue (hue ~231, from `#006184`/`#007da5`/`#005175`) and
+  purple (hue ~317, from `#592569`/`#84389e`/`#421c4f`) respectively --
+  every hex-to-OKLCH conversion done directly (a small one-off script,
+  not committed), not estimated by eye.
+- **Not verified in a live browser** -- same pre-existing environment
+  gap as everything else this session (no `.env.local`, `next dev`
+  500s before any app code runs); today (Oct 11) renders "default"
+  (blue) per `getSeasonTheme()`'s own logic, confirmed by direct
+  calculation, not by looking at a running page.
+
 **Confirmed checkbox added to the per-class grid, 2026-10-11** (the
 user's own question after the old inline toggle was removed along
 with "All Activities": "how do we change when an activity is

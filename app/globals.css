@@ -17,15 +17,42 @@
   --color-ink-muted: oklch(46% 0.015 255);
   --color-rule: oklch(87% 0.008 250);
   --color-rule-strong: oklch(65% 0.02 255);
-  --color-accent: oklch(38% 0.11 20);
-  --color-accent-deep: oklch(29% 0.1 20);
-  --color-accent-soft: oklch(93% 0.025 20);
+  /* Blue -- the default most of the year, matching
+     churchofjesuschrist.org's own default scheme (measured hue ~231
+     from its real #006184/#007da5/#005175). See the "christmas" and
+     "easter" overrides below, and lib/data/season-theme.ts for when
+     each one applies -- all three rotate this hue only, same
+     lightness/chroma throughout. */
+  --color-accent: oklch(38% 0.11 231);
+  --color-accent-deep: oklch(29% 0.1 231);
+  --color-accent-soft: oklch(93% 0.025 231);
   --color-success: oklch(44% 0.08 150);
   --color-danger: oklch(47% 0.14 38);
 
   --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/*
+ * Seasonal accent, 2026-10-11 (the user's own request to mirror
+ * churchofjesuschrist.org's own seasonal rotation) -- `data-season` is
+ * set on <html> by app/layout.tsx via getSeasonTheme(). "christmas"
+ * keeps this app's own original accent hue (20) -- it already matched
+ * the church site's measured red (hue 19-21) almost exactly, which is
+ * presumably exactly why it was picked originally. "easter" rotates to
+ * the church site's measured purple (hue ~317).
+ */
+:root[data-season="christmas"] {
+  --color-accent: oklch(38% 0.11 20);
+  --color-accent-deep: oklch(29% 0.1 20);
+  --color-accent-soft: oklch(93% 0.025 20);
+}
+
+:root[data-season="easter"] {
+  --color-accent: oklch(38% 0.11 317);
+  --color-accent-deep: oklch(29% 0.1 317);
+  --color-accent-soft: oklch(93% 0.025 317);
 }
 
 @layer base {

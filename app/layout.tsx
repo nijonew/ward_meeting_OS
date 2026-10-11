@@ -3,6 +3,7 @@ import { Archivo, Public_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSeasonTheme } from "@/lib/data/season-theme";
 
 // Type pairing from design.md ("The Ledger"): Archivo (display), Public
 // Sans (body), JetBrains Mono (utility -- dates, stage text, ledger
@@ -44,9 +45,10 @@ export default async function RootLayout({
   // signing in; the fully public, no-login pages render with no user
   // and simply never get it.
   const { user } = await getSessionUser();
+  const season = getSeasonTheme();
 
   return (
-    <html lang="en">
+    <html lang="en" data-season={season}>
       <body className={`${archivo.variable} ${publicSans.variable} ${jetbrainsMono.variable} antialiased`}>
         {children}
         {user && <FeedbackWidget />}
