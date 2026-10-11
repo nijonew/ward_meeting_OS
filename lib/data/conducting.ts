@@ -5,6 +5,7 @@ import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getSacramentProgramItems, resolveProgramItems, type ResolvedProgramItem } from "@/lib/data/sacrament-program";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
+import { getAnnouncementsForMeeting } from "@/lib/data/sacrament-announcements";
 import { buildConductingRows, type ConductingRow } from "@/lib/data/conducting-rows";
 
 export interface ConductingScript {
@@ -79,15 +80,17 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) return null;
 
-  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities] = await Promise.all([
-    getPlannedElements(meetingId),
-    getRoleAssignments(meetingId, "sacrament_assignments"),
-    getElementNotes(meetingId),
-    getSacramentPlanningData(meetingId),
-    getActivePeople(),
-    getSacramentProgramItems(meetingId),
-    getVisitingAuthorities(meetingId),
-  ]);
+  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcements] =
+    await Promise.all([
+      getPlannedElements(meetingId),
+      getRoleAssignments(meetingId, "sacrament_assignments"),
+      getElementNotes(meetingId),
+      getSacramentPlanningData(meetingId),
+      getActivePeople(),
+      getSacramentProgramItems(meetingId),
+      getVisitingAuthorities(meetingId),
+      getAnnouncementsForMeeting(meetingId),
+    ]);
 
   const templateElements =
     plannedElements.length > 0
@@ -112,6 +115,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
     music: data.music,
     rabnm: data.rabnm,
     visitingAuthorities,
+    announcements,
     peopleById,
   };
 

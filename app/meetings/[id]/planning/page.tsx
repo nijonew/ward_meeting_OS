@@ -21,6 +21,7 @@ import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacram
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { getCallableCallingPlanningItems } from "@/lib/data/calling-planning";
+import { getAnnouncementsForMeeting, getPullableAnnouncements } from "@/lib/data/sacrament-announcements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
@@ -136,6 +137,8 @@ export default async function PlanningViewPage({
     hymnalIndex,
     visitingAuthorities,
     callablePlanningItems,
+    announcementsForMeeting,
+    pullableAnnouncements,
   ] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
@@ -156,6 +159,10 @@ export default async function PlanningViewPage({
     isSacrament
       ? getCallableCallingPlanningItems()
       : Promise.resolve({ callings: [], releases: [] }),
+    // Announcements' own inline picker (2026-10-11) -- same reasoning
+    // as Ward Business's, just for the `announcements` table instead.
+    isSacrament ? getAnnouncementsForMeeting(meetingId) : Promise.resolve([]),
+    isSacrament ? getPullableAnnouncements() : Promise.resolve([]),
   ]);
 
   // Meetings created before the per-meeting agenda existed have zero
@@ -216,6 +223,8 @@ export default async function PlanningViewPage({
     rabnm: sacramentData?.rabnm ?? [],
     callableCallings: callablePlanningItems.callings,
     callableReleases: callablePlanningItems.releases,
+    announcementsForMeeting,
+    pullableAnnouncements,
     eligibilityByKey,
     allPeople: people,
     defaultPresidingId,

@@ -5,6 +5,7 @@ import type { MusicRow, SpeakerRow, PlanningInfo, RabnmRow } from "@/lib/data/sa
 import type { PersonOption } from "@/lib/data/people";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
+import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { slotLabel } from "@/lib/data/sacrament-constants";
 
 /**
@@ -178,6 +179,21 @@ export type AgendaRow =
       items: RabnmRow[];
       callableCallings: CallableCallingItem[];
       callableReleases: CallableCallingItem[];
+    }
+  /** Announcements, inline (2026-10-11, the user's own request: "I want
+   *  to be able to select the announcements that need to be included in
+   *  sacrament meeting... then I want the details of the announcement
+   *  to appear in the planning and conducting view"). Same shape as
+   *  `ward_business` -- a pull action with a real side effect on the
+   *  `announcements` table itself, so this carries data only, no field
+   *  names of its own. Replaces the old plain `banner` cue this element
+   *  fell through to (resolution_kind 'none', no real wiring at all). */
+  | {
+      kind: "announcements";
+      id: string;
+      label: string;
+      items: PulledAnnouncement[];
+      pullable: PulledAnnouncement[];
     };
 
 /** Music types that only ever have one per meeting -- rendered as a
@@ -211,6 +227,11 @@ export interface AgendaRowInputs {
   rabnm: RabnmRow[];
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
+  /** Already pulled into this meeting, and the general pool still
+   *  available to pull in -- see the `announcements` row kind's own
+   *  comment above. */
+  announcementsForMeeting: PulledAnnouncement[];
+  pullableAnnouncements: PulledAnnouncement[];
   /** Calling-restricted eligible-people list per person_role element key
    *  -- null means no calling-based rule is configured, fall back to
    *  `allPeople`. See getEligiblePeopleByElementKey (lib/data/rotations.ts). */
@@ -246,6 +267,8 @@ export function buildAgendaRows({
   rabnm,
   callableCallings,
   callableReleases,
+  announcementsForMeeting,
+  pullableAnnouncements,
   eligibilityByKey,
   allPeople,
   defaultPresidingId,
@@ -286,6 +309,21 @@ export function buildAgendaRows({
         items: rabnm,
         callableCallings,
         callableReleases,
+      });
+      continue;
+    }
+
+    // Announcements, inline (2026-10-11) -- see this row kind's own
+    // comment above. Checked before the generic switch since it's
+    // still catalogued as resolution_kind 'none' but now carries real
+    // data instead of falling through to a plain banner.
+    if (isSacrament && key === "announcements") {
+      rows.push({
+        kind: "announcements",
+        id: el.id,
+        label: el.label,
+        items: announcementsForMeeting,
+        pullable: pullableAnnouncements,
       });
       continue;
     }

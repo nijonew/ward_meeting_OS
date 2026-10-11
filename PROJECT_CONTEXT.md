@@ -1933,6 +1933,64 @@ avoid confusing the two.
 
 ## Known open items
 
+**Announcements became a real, pullable element of the Sacrament
+Meeting agenda, 2026-10-11** (the user's own request: "can we make the
+announcement portion of sacrament meeting more than just a
+placeholder? I want to be able to select the announcements that need
+to be included in sacrament meeting from the list of announcements by
+title... then I want the details of the announcement to appear in the
+planning and conducting view for announcement at the pulpit"). Before
+this, `announcements` was cataloged (migration 033) but never actually
+wired to anything -- resolution_kind `'none'` fell through to a plain
+`banner` row with no data, the same "deliberately deferred" state this
+file already documented.
+- **No new column needed.** `announcements.meeting_id` already existed
+  (migration 031) and was already load-bearing: `getPublishedAnnouncements`/
+  `getGeneralSubmissions` (`lib/data/general-submissions.ts`) both
+  already exclude any row with `meeting_id` set -- nothing had ever
+  actually *written* it, though. New `lib/data/sacrament-announcements.ts`
+  (`getPullableAnnouncements`/`getAnnouncementsForMeeting`) and
+  `app/meetings/[id]/announcements-actions.ts`
+  (`pullAnnouncementIntoMeeting`/`removeAnnouncementFromMeeting`, gated
+  on `sacrament_planning` -- the same feature `saveAgendaGrid` already
+  checks) are the first real reader/writer of it. Pulling one in
+  removes it from the public announcements page and the admin inbox
+  automatically (same `meeting_id` filter, already in place); removing
+  it puts it back.
+- **New `announcements` `AgendaRow`/`ConductingRow` kind** -- same
+  "pull action with a real side effect, no field names of its own"
+  shape as `ward_business` (`components/planning/AnnouncementsField.tsx`
+  mirrors `WardBusinessField.tsx`'s own Calling-Planning picker almost
+  exactly: a compact list of what's pulled in, Remove per row, one
+  dropdown of everything still in the general pool, committing
+  immediately via a direct server-action call rather than waiting for
+  the grid's own Save All Changes). Conducting
+  (`lib/data/conducting-rows.ts`'s new `announcementWording()`) gives
+  each pulled announcement its own spoken line (the body, plus
+  location/date-time if filled in -- deliberately leaves out `link_url`,
+  nothing to read aloud) -- skipped entirely when none are pulled in,
+  same as Visiting Authorities' own "nothing to say if nothing's
+  there" rule.
+- **Archived view extended too**, not just asked for but a real,
+  matching gap -- `app/meetings/[id]/archived/page.tsx` had the exact
+  same `recognize_music`-style hole (resolution_kind `'none'`, no
+  special case, so the generic switch would've shown the bare label
+  forever even with real pulled announcements). Now lists their titles
+  in the finalized-agenda view, same as it already does for every
+  other real element.
+- **Deliberately left out of the public program** -- the user's own
+  wording scoped this to "the planning and conducting view" only;
+  matches Ward Business's own precedent of staying out of
+  `lib/data/public-view.ts` without being asked to add it there too.
+- **Noticed in passing, not fixed**: `archived/page.tsx`'s own
+  `ward_business`/`stake_business` free-text branch still reads
+  `sacrament_planning.ward_business`/`stake_business` directly -- the
+  columns Ward Business stopped writing to back on 2026-10-03 once it
+  became fully Calling-Planning-sourced. Looks like a real, separate
+  staleness bug in the archived view specifically (Planning/Conducting
+  were both already fixed for this exact drift), but it's out of scope
+  for what was asked here -- flagged rather than fixed as a drive-by.
+
 **Seasonal accent color, matching churchofjesuschrist.org's own
 rotation, 2026-10-11** (the user's own "side quest": "the church's
 website uses a blue general color scheme, the reddish color scheme we

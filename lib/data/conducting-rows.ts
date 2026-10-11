@@ -2,6 +2,7 @@ import type { TemplateElementRow, RoleAssignmentValue } from "@/lib/data/meeting
 import type { ElementNoteValue } from "@/lib/data/meeting-element-notes";
 import type { MusicRow, PlanningInfo, RabnmRow } from "@/lib/data/sacrament-planning";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
+import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 
 /**
  * The Conducting view's read-only row model, built 2026-09-10 as the
@@ -42,7 +43,21 @@ export interface ConductingRowInputs {
   music: MusicRow[];
   rabnm: RabnmRow[];
   visitingAuthorities: VisitingAuthorityRow[];
+  announcements: PulledAnnouncement[];
   peopleById: Map<string, string>;
+}
+
+/** The spoken line for one announcement -- the core text, plus
+ *  whichever of location/date/time are actually filled in. Deliberately
+ *  leaves out `link_url` -- not something to read aloud at the pulpit. */
+export function announcementWording(a: PulledAnnouncement): string {
+  const parts = [a.body];
+  if (a.location) parts.push(`Location: ${a.location}.`);
+  if (a.start_date) {
+    const time = a.start_time ? ` at ${a.start_time}` : "";
+    parts.push(`Date: ${a.start_date}${time}.`);
+  }
+  return parts.filter(Boolean).join(" ");
 }
 
 const SINGLETON_MUSIC_TYPES = ["opening_hymn", "sacrament_hymn", "closing_hymn"];
@@ -100,6 +115,7 @@ export function buildConductingRows({
   music,
   rabnm,
   visitingAuthorities,
+  announcements,
   peopleById,
 }: ConductingRowInputs): ConductingRow[] {
   const rows: ConductingRow[] = [];
@@ -127,6 +143,20 @@ export function buildConductingRows({
       rows.push({ id: el.id, kind: "banner", label: el.label, value: null, wording: null });
       for (const item of rabnm) {
         rows.push({ id: `rabnm-${item.id}`, kind: "field", label: item.type.replace(/_/g, " "), value: null, wording: rabnmPrompt(item) });
+      }
+      continue;
+    }
+
+    // Announcements (2026-10-11) -- one field row per pulled
+    // announcement, same "banner for the section, one field per item"
+    // shape as Ward Business/RABNM above. Skipped entirely when none
+    // are pulled in, same as Visiting Authorities below -- nothing to
+    // say if nothing's been selected.
+    if (key === "announcements") {
+      if (announcements.length === 0) continue;
+      rows.push({ id: el.id, kind: "banner", label: el.label, value: null, wording: null });
+      for (const item of announcements) {
+        rows.push({ id: `announcement-${item.id}`, kind: "field", label: item.title, value: item.title, wording: announcementWording(item) });
       }
       continue;
     }

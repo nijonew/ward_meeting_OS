@@ -9,6 +9,7 @@ import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
 import { WardBusinessField } from "@/components/planning/WardBusinessField";
+import { AnnouncementsField } from "@/components/planning/AnnouncementsField";
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
@@ -328,6 +329,19 @@ export function AgendaGridForm({
                         callableCallings={row.callableCallings}
                         callableReleases={row.callableReleases}
                       />
+                    </td>
+                  </tr>
+                );
+              }
+
+              if (row.kind === "announcements") {
+                return (
+                  <tr key={row.id} className="border-t border-rule/60 align-top">
+                    <th scope="row" className="w-40 px-2 py-2 text-left align-top font-display text-sm font-normal text-ink sm:w-48">
+                      {row.label}
+                    </th>
+                    <td className="px-2 py-1.5">
+                      <AnnouncementsField meetingId={meetingId} items={row.items} pullable={row.pullable} />
                     </td>
                   </tr>
                 );
