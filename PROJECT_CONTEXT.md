@@ -89,7 +89,13 @@ reconstructed from both:
   `sacrament_speakers_adults/youth` row that already has a real speaker
   -- fixes a real bug where speakers added through the Speakers & Music
   list never showed in the public program, see Known open items below):
-  still needs to be run.
+  confirmed run -- the user had already run it once before this
+  session's own "still needs to be run" note was written, and
+  confirmed again by re-running it 2026-10-11 once the missing-speakers
+  report below surfaced. This file's own tracking had drifted from
+  reality here -- the user runs migrations directly and doesn't always
+  report back, so "still needs to be run" should be read as "last
+  confirmed state this file knew about," not a live guarantee.
 - `051` (`sacrament_music.hymn_number` integer -> text -- live hymn-title
   pre-fill + the "C" prefix for Children's Songbook numbers, see Known
   open items below): still needs to be run.
@@ -1999,37 +2005,37 @@ this to "combined activities."
   wrapping `<form>` like this one, even though no such form existed
   yet when it was built.
 
-**Clarified, not a new bug: the public Sacrament Meeting program's
-missing speakers, 2026-10-11.** The user's own report: "People are
-able to see today's sacrament meeting once they have requested
-access, but could only see the music in the meeting before then." The
-root cause this points to was already found and fixed in code on
-2026-10-03 (see `saveProgramSpeaker`'s own comment,
-`app/meetings/[id]/speakers-music-actions.ts`) -- Speaker/Youth
-Speaker rows saved through the Speakers & Music UI never had
-`confirmed` set to `true`, and `lib/data/public-view.ts` still filters
-both `sacrament_speakers_adults`/`_youth` on `confirmed = true` (a
-deliberate, kept-on-purpose distinction, per the Table Admin queue's
-own decision, for the separate "who's due for a turn" history) --
-`saveProgramSpeaker` now always sets it on both insert and update,
-"filled in = ready," the same rule already applied everywhere else a
-confirm step was removed from this app. **What's still actually
-missing is migration `050`'s own one-time backfill, still not run** --
-it sets `confirmed = true` on every existing speaker row that already
-has a real speaker, i.e. every row saved *before* the 2026-10-03 code
-fix shipped. Any meeting whose speakers were entered before that date
-(today's meeting, most likely) still has them stuck at `confirmed =
-false` in the database, invisible to the public program, even though
-the code path that would keep this from recurring has been fixed for
-weeks. Running migration `050` is the one remaining action -- nothing
-else to fix here. The 6 AM Mountain floor itself
-(`isSacramentMeetingPubliclyVisible`, built earlier this same session)
-is unrelated and working as designed; "once they have requested
-access" most likely just describes when the user happened to retest
-this, not a real behavioral difference tied to account status --
-`/meetings/[id]/public`'s own content function
-(`getPublicSacramentView`) returns identical data regardless of
-whether the viewer is logged in, logged out, or freshly signed up.
+**Still open, corrected 2026-10-11: the public Sacrament Meeting
+program's missing speakers.** The user's own report: "People are able
+to see today's sacrament meeting once they have requested access, but
+could only see the music in the meeting before then." First
+hypothesis (`saveProgramSpeaker` never setting `confirmed = true`
+until its own 2026-10-03 fix, plus migration `050`'s matching one-time
+backfill for rows saved before that fix) turned out to be only half
+right -- the user's immediate correction: "I had already run 50 and I
+just ran it again." Migration `050` was confirmed already run once
+before this session ever flagged it as outstanding (this file's own
+migration-status tracking had drifted from reality -- the user runs
+migrations directly in Supabase and doesn't always report back, so
+"still needs to be run" here should be read as "last confirmed state
+this file knew about," not a live guarantee) and has now been run
+again besides. **Both halves of the original fix (the code path and
+the backfill) are confirmed in place, so if speakers are still missing
+from the public program, the real cause is something else** -- not
+yet re-diagnosed. Candidates worth checking before guessing further:
+a speaker added/edited directly through Table Admin's raw
+`sacrament_speakers_adults`/`_youth` grid (which exposes `confirmed`
+as a plain checkbox, unforced) rather than through the Speakers &
+Music UI that now sets it automatically; or a genuine mismatch between
+a `sacrament_program_items.item_key` and the matching row's own `slot`
+(both `public-view.ts` and `conducting-rows.ts` silently skip an item
+whose key doesn't resolve to a row at all, `if (!speaker) continue`) --
+the latter would also hide it from Conducting, though, which the
+user's original before-compaction report ("music is there, speakers,
+conducting, prayers are not") suggests wasn't the case. Needs the
+user to confirm whether this latest migration-050 re-run actually
+fixed what they were seeing, or whether speakers are still missing
+from today's public program -- don't assume either way.
 
 **Second Announcements block before Closing Hymn/Prayer, built
 2026-10-11.** Right after being told migration `072` is on hold (see
