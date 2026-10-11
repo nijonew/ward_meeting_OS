@@ -1933,6 +1933,43 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-11: "submitted by" showed an email
+address instead of a name.** The user's own report, right after
+testing the new Feedback Widget: "names show up as emails and not the
+name of the individual. i saw this earlier when we were reviewing the
+announcement sheet. We ultimately removed the submitted by
+information, but the name showed up as the user's email address
+rather than their name." Root cause, confirmed by a full-codebase
+search before touching anything: `profiles.display_name` has **no
+producer anywhere in this app** -- `requestAccess`'s `signUp()` call
+never sets it, no code anywhere inserts/updates it, and no
+`handle_new_user`-style trigger exists in any tracked migration to
+populate it from Supabase Auth either. It's always been null by
+construction for every account, with every reader (`AppHeader`'s
+"signed in as," the Verify Logins list, `submitAnnouncement` before it
+was removed, and now `submitFeedback`) silently falling back to the
+account's email the same way. This was a real, previously-undiagnosed
+bug, not a one-off -- the announcement workflow's earlier "remove the
+field" response treated the symptom rather than the cause, since
+nobody had traced it back to `display_name` specifically being dead
+data until this report.
+
+Fixed at the one shared source instead of patching each call site:
+`getSessionUser()` (`lib/supabase/get-session-user.ts`) now also
+selects `people.name` for the account's linked person row (it already
+fetched `people.id` for calling-feature resolution) and prefers that
+real name over the always-null `profiles.display_name` when building
+`SessionProfile.display_name` -- the `people` row a Verify-Logins
+admin links to a login is the actual source of truth for a signed-in
+account's human name, not a `profiles` column nothing ever writes.
+Falls back to the old (always-empty) column, then to nothing, so an
+unlinked account (still in the Verify Logins queue) is unaffected --
+it has no `people` row yet either way. This one change fixes the
+symptom everywhere `profile.display_name` is read, not just
+`submitFeedback`: `AppHeader`'s header text and the Verify Logins
+admin list both show a real name now too, for any account already
+linked to a person.
+
 **Persistent Feedback Widget built, 2026-10-11** (the user's own
 request, approved via a formal plan first: "can we add a feature that
 suggest a fix or an upgrade? those can be stored in a [...] table and

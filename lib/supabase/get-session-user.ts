@@ -146,10 +146,11 @@ export const getSessionUser = cache(async () => {
     return { user: null, profile: null as SessionProfile | null };
   }
 
-  const [{ data: profileRow }, { data: person }] = await Promise.all([
+  const [{ data: profileRow }, { data: personRow }] = await Promise.all([
     supabase.from("profiles").select("display_name, email").eq("id", user.id).maybeSingle(),
-    supabase.from("people").select("id").eq("profile_id", user.id).maybeSingle(),
+    supabase.from("people").select("id, name").eq("profile_id", user.id).maybeSingle(),
   ]);
+  const person = personRow as { id: string; name: string | null } | null;
 
   const features = new Set<Feature>();
   if (person) {
@@ -170,10 +171,21 @@ export const getSessionUser = cache(async () => {
     }
   }
 
+  // `profiles.display_name` has no producer anywhere in this app --
+  // nothing ever writes it at signup or afterward, so it's always been
+  // null by construction, with every reader silently falling back to
+  // the account's email instead (found 2026-10-11 via a feedback-widget
+  // test submission showing an email where a name belonged -- the same
+  // symptom the user had already hit once on announcement submissions
+  // and worked around by dropping the field there rather than fixing
+  // it). The real source of truth for a signed-in account's human name
+  // is the `people` row it's linked to, once an admin has made that
+  // link via Verify Logins -- prefer that over the dead `profiles`
+  // column here, in the one place every caller already reads through.
   const profile: SessionProfile = {
     features,
     isLinked: Boolean(person),
-    display_name: (profileRow?.display_name as string | null) ?? null,
+    display_name: person?.name ?? (profileRow?.display_name as string | null) ?? null,
     email: (profileRow?.email as string | null) ?? null,
   };
   return { user, profile };
