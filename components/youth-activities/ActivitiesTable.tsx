@@ -60,12 +60,13 @@ function compareText(a: string, b: string): number {
  * where every row has the same value would be redundant there.
  *
  * **Row contrast, 2026-10-10** (the user's own report: "rows blend
- * together quite a bit") -- `even:bg-ink/5` zebra striping (skipped in
- * favor of the existing `bg-danger/5` tint on a cancelled row, so the
- * two never compete) plus `hover:bg-ink/[0.08]`, applied identically
- * across every "favorite grid format" page in this app -- see
- * CallingPlanningGridForm's own comment for the full reasoning and one
- * known filtered-view cosmetic quirk shared by both.
+ * together quite a bit") -- `even:bg-accent-soft` zebra striping
+ * (skipped in favor of the existing `bg-danger/5` tint on a cancelled
+ * row, so the two never compete) plus `hover:bg-accent/15`, applied
+ * identically across every "favorite grid format" page in this app --
+ * see CallingPlanningGridForm's own comment for the full reasoning
+ * (including why gray striping was revised to this warm accent tint)
+ * and one known filtered-view cosmetic quirk shared by both.
  */
 export function ActivitiesTable({
   activities,
@@ -165,8 +166,8 @@ export function ActivitiesTable({
               key={row.id}
               hidden={!matchesFilters(row)}
               className={[
-                "border-t border-rule/60 align-top hover:bg-ink/[0.08]",
-                row.cancelled ? "bg-danger/5" : "even:bg-ink/5",
+                "border-t border-rule/60 align-top hover:bg-accent/15",
+                row.cancelled ? "bg-danger/5" : "even:bg-accent-soft",
               ].join(" ")}
             >
               <td className="px-2 py-1.5 text-xs text-ink">{formatDate(row.activity_date)}</td>

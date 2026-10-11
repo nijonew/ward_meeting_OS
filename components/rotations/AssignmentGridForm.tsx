@@ -51,11 +51,12 @@ function PersonCell({ name, people, value }: { name: string; people: PersonOptio
  * 2026-09-06/08.
  *
  * **Row contrast, 2026-10-10** (the user's own report: "rows blend
- * together quite a bit") -- `even:bg-ink/5` zebra striping plus
- * `hover:bg-ink/[0.08]`, applied identically across every "favorite
+ * together quite a bit") -- `even:bg-accent-soft` zebra striping plus
+ * `hover:bg-accent/15`, applied identically across every "favorite
  * grid format" page in this app (also CallingPlanningGridForm,
  * ActivitiesTable, TeachingGridForm, and the Dashboard meeting list) --
- * see CallingPlanningGridForm's own comment for the full reasoning.
+ * see CallingPlanningGridForm's own comment for the full reasoning
+ * (including why gray striping was revised to this warm accent tint).
  */
 export function AssignmentGridForm({
   meetingTypeSlug,
@@ -105,7 +106,7 @@ export function AssignmentGridForm({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.meetingId} className="border-t border-rule-strong/40 even:bg-ink/5 hover:bg-ink/[0.08]">
+              <tr key={row.meetingId} className="border-t border-rule-strong/40 even:bg-accent-soft hover:bg-accent/15">
                 <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.date)}</td>
                 {columns.map((c) => {
                   const cell = row.cells[c.key];

@@ -77,10 +77,17 @@ function compareText(a: string, b: string): number {
  * together quite a bit"), applied identically across every "favorite
  * grid format" page -- this one, ActivitiesTable, AssignmentGridForm,
  * TeachingGridForm, and the Dashboard meeting list -- for a consistent
- * look: `even:bg-ink/5` zebra striping (same 5% opacity this app
- * already uses for a cancelled row's `bg-danger/5` tint, just neutral)
- * plus `hover:bg-ink/[0.08]` so the row under the pointer stands out
- * further while you're actively editing it. One known, accepted
+ * look. **Revised same day** -- neutral gray striping wasn't distinct
+ * enough either ("I think the zebra stripe needs to be more distinct.
+ * perhaps in the color scheme with the red but very light"): this
+ * app's own `accent` color is actually a warm brick-red hue
+ * (`oklch(38% 0.11 20)`, see design.md), with a dedicated
+ * `accent-soft` token already defined for exactly this
+ * ("current-item row highlight") but never actually used anywhere
+ * until now. Zebra striping is `even:bg-accent-soft`; hover is
+ * `hover:bg-accent/15`, a stronger step in the same warm hue so the
+ * row under the pointer reads as clearly more emphasized than the
+ * zebra tint alone, not just a different shade of gray. One known, accepted
  * cosmetic quirk here specifically: filtered-out rows stay in the DOM
  * (`hidden`, not removed -- see this file's own reasoning above), so
  * `even:` (a pure CSS `:nth-child` selector) counts hidden rows toward
@@ -297,7 +304,7 @@ export function CallingPlanningGridForm({
               <tr
                 key={row.id}
                 hidden={!matchesFilters(row)}
-                className="border-t border-rule/60 align-top even:bg-ink/5 hover:bg-ink/[0.08]"
+                className="border-t border-rule/60 align-top even:bg-accent-soft hover:bg-accent/15"
               >
                 <td className="px-2 py-1.5">
                   <select name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>

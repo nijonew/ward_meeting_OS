@@ -1902,20 +1902,35 @@ avoid confusing the two.
 
 ## Known open items
 
-**Row contrast added to every "favorite grid format" page, 2026-10-10**
-(the user's own report: "rows blend together quite a bit," asked which
-grid(s) -- "Every 'favorite grid format' page"). Applied identically
-to five places: `CallingPlanningGridForm.tsx`, `ActivitiesTable.tsx`
-(Youth Activities' four views), `AssignmentGridForm.tsx` (Assignment
+**Row contrast added to every "favorite grid format" page, 2026-10-10,
+then revised minutes later to a warm accent tint instead of gray**
+(the user's own reports: "rows blend together quite a bit," asked
+which grid(s) -- "Every 'favorite grid format' page" -- then "I think
+the zebra stripe needs to be more distinct. perhaps in the color
+scheme with the red but very light"). Applied identically to five
+places: `CallingPlanningGridForm.tsx`, `ActivitiesTable.tsx` (Youth
+Activities' four views), `AssignmentGridForm.tsx` (Assignment
 Rotations), `TeachingGridForm.tsx` (Youth Teaching Planning), and the
-Dashboard meeting list's `MeetingRow` -- every `<tr>` gained
+Dashboard meeting list's `MeetingRow`. First pass used neutral
 `even:bg-ink/5` zebra striping (same 5% opacity this app already used
-for a cancelled row's `bg-danger/5` tint, just neutral gray instead of
-red) plus `hover:bg-ink/[0.08]` so the row under the pointer stands out
-further while actively editing it. Wherever a row already had its own
+for a cancelled row's `bg-danger/5` tint, just gray instead of red)
+plus `hover:bg-ink/[0.08]` -- the user's own follow-up confirmed gray
+wasn't distinct enough and asked for something warmer, "in the color
+scheme with the red." This app's `accent` color turns out to actually
+*be* a warm brick-red hue (`oklch(38% 0.11 20)`, see design.md), with
+a dedicated `accent-soft` token (`oklch(93% 0.025 20)`) already
+defined for exactly this purpose -- design.md's own table calls it out
+for "current-item row highlight, selected state background" -- but
+never actually used anywhere in the app until now. Every `<tr>` now
+uses `even:bg-accent-soft` for the zebra stripe and `hover:bg-accent/15`
+(a stronger step in the same warm hue, so the row under the pointer
+reads as clearly more emphasized than the zebra tint alone, not just a
+different shade of gray). Wherever a row already had its own
 conditional background (a cancelled meeting or cancelled activity,
 `bg-danger/5`), the zebra class is applied only when *not* cancelled --
-the two never compete for the same row. One accepted cosmetic
+`danger` (hue 38, orange-leaning) and `accent` (hue 20, brick-leaning)
+are different enough hues that the two still read as visually distinct
+even if they were ever shown side by side. One accepted cosmetic
 limitation on the two grids with client-side filtering
 (`CallingPlanningGridForm`/`ActivitiesTable`): a filtered-out row stays
 in the DOM (`hidden`, not removed, so an in-progress edit on it isn't
