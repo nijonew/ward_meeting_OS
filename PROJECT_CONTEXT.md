@@ -98,19 +98,19 @@ reconstructed from both:
   confirmed state this file knew about," not a live guarantee.
 - `051` (`sacrament_music.hymn_number` integer -> text -- live hymn-title
   pre-fill + the "C" prefix for Children's Songbook numbers, see Known
-  open items below): still needs to be run.
+  open items below): confirmed run.
 - `052` (new `ward_settings` table, a singleton row holding the ward's
   own display name -- the header wordmark change, see Known open items
-  below): still needs to be run.
+  below): confirmed run.
 - `053` (new `sacrament_visiting_authorities` table -- the Visiting
   Authorities multi-select + write-in list, see Known open items
-  below): still needs to be run.
+  below): confirmed run.
 - `054` (new `delete_meeting_cascade` Postgres function -- the Delete
-  Meeting action, see Known open items below): still needs to be run.
+  Meeting action, see Known open items below): confirmed run.
 - `055` (new `sacrament_rabnm.calling_planning_id` -- the explicit link
   back to the Calling Planning row an announcement came from, needed
   for Ward Business's inline pull/un-pull mechanism, see Known open
-  items below): still needs to be run.
+  items below): confirmed run.
 - `056` (makes sure `profiles.role` accepts a new `"bishop"` value,
   distinct from the shared `bishopric` role -- the Verify Logins /
   Bishop-succession feature, see Architecture above): confirmed run
@@ -133,8 +133,8 @@ reconstructed from both:
   dropped column, not meaningfully before it.
 - `059` (new `sacrament_planning.ready_for_public` boolean -- the
   "ready for public consumption" checkbox gating Communications
-  Specialist's early preview, see Known open items below): still
-  needs to be run.
+  Specialist's early preview, see Known open items below): confirmed
+  run.
 - `060` (new `features` catalog table + `calling_features` many-to-many
   join, seeds the full ~58-feature list, drops the ten `feature_*`
   boolean columns migration `057` added to `callings` -- the granular-
@@ -150,12 +150,12 @@ reconstructed from both:
   bug hit while deleting a meeting, see Known open items below):
   confirmed run.
 - `064` (new `sacrament_assignments.guest_name` column -- the guest
-  Chorister/Organist option, see Known open items below): still needs
-  to be run.
+  Chorister/Organist option, see Known open items below): confirmed
+  run.
 - `065` (one-time bulk import: 6 real announcements the ward had
   already collected on its old Google Form, pasted directly by the
   user 2026-10-10 -- see that migration file's own header comment for
-  the full column mapping): still needs to be run.
+  the full column mapping): confirmed run.
 - `066` (replaces calling_planning's calling_status/release_status
   option lists in `admin_select_options` with the user's own
   redesigned 12-item/6-item vocabulary -- see Known open items below
@@ -242,8 +242,7 @@ reconstructed from both:
 - `074` (drops `meeting_planned_elements`' `unique (meeting_id,
   element_id)` constraint, adds `announcements.planned_element_id` --
   lets a meeting have more than one Announcements block, each
-  independently scoped, see Known open items below): still needs to
-  be run.
+  independently scoped, see Known open items below): confirmed run.
 - `075` (replaces `sacrament_assignments`' stale anon-facing RLS
   policy -- gated on `stage in ('ready', 'live')`, which Sacrament
   Meeting stopped reaching entirely once its lifecycle was simplified
@@ -459,7 +458,7 @@ exclusive access.
     permanently stuck if its holder is unavailable. Succession
     protection is orthogonal to how features are catalogued, so this
     needed no change across either refactor pass.
-  - **Migration `060`, still needs to be run**: new `features`
+  - **Migration `060`, confirmed run**: new `features`
     (catalog, read-only reference data) and `calling_features` (the
     actual many-to-many assignment) tables, seeds the full ~58-feature
     list, and drops the ten `feature_*` boolean columns migration `057`
@@ -4234,8 +4233,8 @@ before fully closing it out.
     pass or is a genuine one-click-from-Home tile where the wordmark
     baseline still applies, matching this section's own original rule.
 - ~~Teaching Calendar (youth leader tile) — scope not yet defined,
-  deferred~~ **Built 2026-09-08** (migration `042`, still needs to be
-  run), per the user's own scoping: a Sunday teaching schedule, one row
+  deferred~~ **Built 2026-09-08** (migration `042`, confirmed run),
+  per the user's own scoping: a Sunday teaching schedule, one row
   per (Sunday, class), each cell a short free-text entry -- deliberately
   **not** tied to any person or calling record (no `people` FK at all,
   unlike literally everything else assignment-shaped in this app). New
@@ -4526,7 +4525,7 @@ before fully closing it out.
   typed -- only fills in when the title field arrives empty. Migration
   `048` is the matching one-time catch-up for rows already saved blank
   before this shipped -- same match rule (1985 Hymnal, blank/whitespace-only
-  `piece_name`), idempotent, still needs to be run.
+  `piece_name`), idempotent, confirmed run.
 - **One-time bulk name import, 2026-09-10** (the user's own request:
   "I also need to do a one-time name input. Some of the names are
   already in the form. I need a way to not duplicate the names as
