@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
-import { combinedTypeForClass } from "@/lib/data/class-activities-shared";
+import { combinedTypeForClass, resolveForClass } from "@/lib/data/class-activities-shared";
 
 export { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 
@@ -37,8 +37,9 @@ function blankRow(activityDate: string, className: string): ClassActivityRow {
  * One row per upcoming Wednesday between today and throughDateISO for a
  * single class -- drawing from whichever youth_activities row actually
  * applies to that date for this class: its own individual activity if
- * one exists, else the shared Combined row it attends that week (its
- * own single-gender Combined type first, then Combined YM/YW), else a
+ * one exists, else the shared Combined row it attends that week (see
+ * resolveForClass's own comment for the exact precedence between
+ * Combined YM/YW and this class's single-gender Combined type), else a
  * blank line to fill in. Every line is editable regardless of source
  * (2026-10-11, the user's own request: "all lines should ultimately be
  * editable even if they are prefilled by a combined activity table") --
@@ -53,8 +54,7 @@ export async function getClassActivityGrid(className: string, throughDateISO: st
 
   if (wednesdays.length === 0) return [];
 
-  const combinedType = combinedTypeForClass(className);
-  const candidateGroups = [className, combinedType, "Combined YM/YW"];
+  const candidateGroups = [className, combinedTypeForClass(className), "Combined YM/YW"];
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -86,8 +86,7 @@ export async function getClassActivityGrid(className: string, throughDateISO: st
   }
 
   return wednesdays.map((activityDate) => {
-    const byGroup = byDate.get(activityDate);
-    const match = byGroup?.get(className) ?? byGroup?.get(combinedType) ?? byGroup?.get("Combined YM/YW") ?? null;
+    const match = resolveForClass(byDate.get(activityDate), className);
     if (!match) return blankRow(activityDate, className);
     return {
       activityDate,

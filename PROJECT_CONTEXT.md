@@ -1933,6 +1933,50 @@ avoid confusing the two.
 
 ## Known open items
 
+**Upcoming Activities re-attributed to the 6 real classes, 2026-10-11**
+(the user's own follow-up, right after the Add/Overwrite work above
+shipped): "For the upcoming activities lists please note that I only
+want to see a listing for each of the 6 groups. So if it is a combined
+YM/YW that will overwrite any combined YM or combined YW activity
+listed in those tables. And a note can be added to each group that it
+is a combined YM/YW. Same for when a combined YM or combined YW
+activity is listed -- no need to list those types as group. Just note
+in the notes that it is a combined YM or combined YW activity."
+Scoped to `/youth-activities/upcoming` only -- the three Combined-
+group pages keep showing the real shared row as-is (the entire point
+of those pages, and of the Overwrite button built on them minutes
+earlier); re-attributing those too would have undermined both.
+- **New `resolveForClass` + `explodeActivitiesByClass`**
+  (`lib/data/class-activities-shared.ts`, pure, no DB access) -- the
+  former is the one shared precedence rule both this and
+  `getClassActivityGrid` now use: this class's own individual row
+  first, then Combined YM/YW (the user's own explicit rule here --
+  it "overwrites" either single-gender Combined type), then this
+  class's own single-gender Combined type. `getClassActivityGrid`
+  previously had the last two in the opposite order -- a real,
+  if practically harmless, inconsistency (the fixed nth-Wednesday
+  cadence means a real date is never both a Combined YM/YW week and a
+  Combined YM/YW-conflicting week at once), fixed by having both
+  functions call the one shared helper instead of each encoding its
+  own copy of the precedence.
+- **`explodeActivitiesByClass`** takes the raw `youth_activities` rows
+  and re-attributes each date to every real class it actually applies
+  to -- a Combined YM/YW row becomes 6 rows (one per class), Combined
+  YM becomes 3, an individual week stays 1 -- each carrying a
+  synthetic id (`<sourceId>::<className>`, since up to 6 rows can
+  share one real row; safe only because this feeds a read-only view
+  with no row-level action keyed on `id`) and a "`<group>` activity."
+  note folded into whatever real notes it already had. `ActivitiesTable`
+  itself needed zero changes -- the transform happens before the data
+  ever reaches it, since the output is still the same `YouthActivityRow`
+  shape.
+- Verified directly (a small throwaway script, not committed) against
+  three cases before trusting it: a Combined YM/YW date producing 6
+  rows, a Combined YM date producing 3, and an individual row on the
+  same date as an unrelated Combined row correctly taking precedence
+  for its own class while the other classes still resolve to the
+  Combined row.
+
 **New: Add Activity + Overwrite on the Combined-group pages,
 2026-10-11** (the user's own follow-up request, right after the
 per-class management page above shipped): "I would like to have a way
