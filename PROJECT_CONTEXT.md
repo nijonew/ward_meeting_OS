@@ -1933,6 +1933,63 @@ avoid confusing the two.
 
 ## Known open items
 
+**New: Add Activity + Overwrite on the Combined-group pages,
+2026-10-11** (the user's own follow-up request, right after the
+per-class management page above shipped): "I would like to have a way
+to add an activity row on the combined activity tables. I also want to
+have a button to command that the combined activity overwrite the
+activity on the same date of the appropriate groups (all YM/YW for
+combined YM/YW, only the YW for combined YW, only the YM for combined
+YM)." Two distinct additions to the three Combined-group pages
+(`/youth-activities/combined-ym`, `combined-ym-yw`, `combined-yw`),
+both `youth_activity_planning`-gated -- `/youth-activities/upcoming`
+(all groups mixed) is deliberately untouched, since the request was
+specifically about "the combined activity tables."
+- **New `lib/data/class-activities-shared.ts`** -- pure helpers (no
+  `createClient` import, so safe for a Client Component to import
+  directly, same split this app already used for
+  `sacrament-program-shared.ts`) holding `ACTIVITY_CLASSES`,
+  `combinedTypeForClass`, and the new `classesForCombinedGroup`
+  (`"Combined YM"` -> Deacons/Teachers/Priests, `"Combined YW"` ->
+  the three YW classes, `"Combined YM/YW"` -> all six). The per-class
+  grid's own `lib/data/class-activities.ts` now re-exports from here
+  rather than duplicating the mapping.
+- **Add Activity**: new `components/youth-activities/AddCombinedActivityForm.tsx`
+  -- a trimmed copy of the Manage page's own Add Activity form with
+  Group fixed (a hidden field, not a dropdown -- the page itself
+  already says which Combined type it is) rather than a new server
+  action; reuses the existing `addYouthActivity` directly. That action
+  also gained a `planning_group` field it never read before (missing
+  entirely until now, confirmed by checking) -- added to both this
+  form and the Manage page's own general Add Activity form for
+  consistency, since a brand-new Combined activity needs somewhere to
+  say who's responsible for it.
+- **Overwrite**: new `pushCombinedActivityToClasses` action
+  (`app/youth-activities/actions.ts`) and
+  `components/youth-activities/PushToClassesButton.tsx`, wired into
+  `ActivitiesTable.tsx` as a new optional `showOverwriteColumn` column
+  (per-row target classes resolved from that row's own `group_name`
+  via `classesForCombinedGroup`, not a blanket page-level flag).
+  Copies title/time/location/category/leads/notes from the Combined
+  row onto each target class's own individual row for that same
+  date -- creating it if none exists, overwriting it if one does.
+  Deliberately does **not** copy `planning_group` (a combined-only
+  concept -- an individual class's own activity has no one else to
+  name as responsible) or the confirmed/cancelled flags (left
+  independently manageable per class after the copy). Shows its own
+  inline "Overwrote `<classes>`." / error message, since the button
+  changes nothing visible about the Combined row on the page it's
+  clicked from -- without that, there'd be no feedback at all.
+- **Complementary to, not a replacement for, the per-class grid's own
+  live fallback display** (`getClassActivityGrid`, built minutes
+  earlier the same session): that page already shows a class's
+  Combined-week activity automatically, no copy needed, and editing it
+  there updates the one shared row. Overwrite is for the opposite
+  direction -- distributing real, independent per-class copies out
+  from the Combined side, once an admin wants each class to have its
+  own editable record of that week rather than continuing to read it
+  live off the shared row.
+
 **New: per-class activity management, 2026-10-11** (the user's own
 request: "I need somewhere to manage each individual class's
 activities. it should draw from the combined activity pages as

@@ -1,19 +1,24 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { ActivitiesTable } from "@/components/youth-activities/ActivitiesTable";
+import { AddCombinedActivityForm } from "@/components/youth-activities/AddCombinedActivityForm";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Read-only, pre-filtered to `group_name = "Combined YW"` -- see
- *  /youth-activities/upcoming's own comment for the shared design. */
+/** Mostly read-only, pre-filtered to `group_name = "Combined YW"` --
+ *  see /youth-activities/upcoming's own comment for the shared design.
+ *  Gained an Add Activity form and a per-row Overwrite button
+ *  (2026-10-11, the user's own request), both `youth_activity_planning`-
+ *  gated -- see ActivitiesTable's own comment on the latter. */
 export default async function CombinedYwActivitiesPage() {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
+  const canManage = hasFeature(profile, "youth_activity_planning");
 
   const all = await getYouthActivities();
   const today = todayISO();
@@ -30,8 +35,15 @@ export default async function CombinedYwActivitiesPage() {
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Combined Young Women Activities</h1>
       </section>
 
+      {canManage && <AddCombinedActivityForm groupName="Combined YW" />}
+
       <div className="rounded border border-rule bg-surface p-6">
-        <ActivitiesTable activities={activities} showGroupColumn={false} storageKey="activities-combined-yw" />
+        <ActivitiesTable
+          activities={activities}
+          showGroupColumn={false}
+          showOverwriteColumn={canManage}
+          storageKey="activities-combined-yw"
+        />
       </div>
     </main>
   );

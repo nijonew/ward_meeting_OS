@@ -147,6 +147,22 @@ export default async function YouthActivitiesManagePage() {
             />
           </label>
 
+          <label className="text-sm text-ink-muted">
+            Planning Group
+            <select
+              name="planning_group"
+              defaultValue=""
+              className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            >
+              <option value="">None</option>
+              {YOUTH_ACTIVITY_GROUPS.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-sm text-ink-muted">
               Youth Lead

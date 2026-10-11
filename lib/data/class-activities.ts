@@ -1,22 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
-import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
+import { combinedTypeForClass } from "@/lib/data/class-activities-shared";
 
-/** The 6 real classes/quorums -- excludes the "Combined ..." pseudo-
- *  values, which describe attendee scope, not an actual class. Same
- *  derivation as TEACHING_CLASSES (lib/data/teaching-assignments.ts),
- *  kept separate rather than imported from there since that module is
- *  about the Teaching domain specifically, not a general "list of real
- *  classes" utility. */
-export const ACTIVITY_CLASSES = YOUTH_ACTIVITY_GROUPS.filter((g) => !g.value.startsWith("Combined")).map((g) => g.value);
-
-const YM_CLASSES = new Set(["Deacons", "Teachers", "Priests"]);
-
-/** Which single-gender combined type a class belongs to -- every class
- *  also belongs to "Combined YM/YW" (everyone), checked separately. */
-function combinedTypeForClass(className: string): string {
-  return YM_CLASSES.has(className) ? "Combined YM" : "Combined YW";
-}
+export { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 
 export interface ClassActivityRow {
   activityDate: string;

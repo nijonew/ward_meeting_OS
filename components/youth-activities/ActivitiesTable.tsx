@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
+import { PushToClassesButton } from "@/components/youth-activities/PushToClassesButton";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
+import { classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
 
 const ALL_COLUMNS = [
@@ -75,14 +77,27 @@ function compareText(a: string, b: string): number {
  * one component renders on four different pages (Upcoming Activities,
  * Combined YM & YW, Combined YM, Combined YW) that each need their own
  * independent remembered state -- see that hook's own comment.
+ *
+ * **`showOverwriteColumn`, 2026-10-11** (the user's own request: "a
+ * button to command that the combined activity overwrite the activity
+ * on the same date of the appropriate groups") -- an extra column, on
+ * only the three Combined-group pages, with a per-row
+ * PushToClassesButton. Still false on Upcoming Activities (a mix of
+ * every group, most rows not Combined at all) and computed per-row
+ * via `classesForCombinedGroup`, not a blanket page-level flag, so a
+ * non-Combined row occasionally mixed into one of those three pages
+ * (shouldn't happen today, but nothing guarantees it never will)
+ * simply renders no button rather than erroring.
  */
 export function ActivitiesTable({
   activities,
   showGroupColumn = true,
+  showOverwriteColumn = false,
   storageKey,
 }: {
   activities: YouthActivityRow[];
   showGroupColumn?: boolean;
+  showOverwriteColumn?: boolean;
   storageKey: string;
 }) {
   const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(storageKey);
@@ -165,6 +180,11 @@ export function ActivitiesTable({
                 </div>
               </th>
             ))}
+            {showOverwriteColumn && (
+              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                Overwrite
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -195,6 +215,15 @@ export function ActivitiesTable({
                   <div className="mt-1 text-danger">Cancelled: {row.cancellation_note}</div>
                 )}
               </td>
+              {showOverwriteColumn &&
+                (() => {
+                  const targets = classesForCombinedGroup(row.group_name);
+                  return (
+                    <td className="px-2 py-1.5">
+                      {targets && <PushToClassesButton activityId={row.id} label={targets.join(", ")} />}
+                    </td>
+                  );
+                })()}
             </tr>
           ))}
         </tbody>
