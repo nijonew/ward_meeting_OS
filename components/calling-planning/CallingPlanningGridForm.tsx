@@ -72,6 +72,22 @@ function compareText(a: string, b: string): number {
  * inputs outside the native change-event path (see that component's
  * own comment), so there's no single DOM value to capture here either;
  * filtering that column still reacts only once a save completes.
+ *
+ * **Row contrast, 2026-10-10** (the user's own report: "rows blend
+ * together quite a bit"), applied identically across every "favorite
+ * grid format" page -- this one, ActivitiesTable, AssignmentGridForm,
+ * TeachingGridForm, and the Dashboard meeting list -- for a consistent
+ * look: `even:bg-ink/5` zebra striping (same 5% opacity this app
+ * already uses for a cancelled row's `bg-danger/5` tint, just neutral)
+ * plus `hover:bg-ink/[0.08]` so the row under the pointer stands out
+ * further while you're actively editing it. One known, accepted
+ * cosmetic quirk here specifically: filtered-out rows stay in the DOM
+ * (`hidden`, not removed -- see this file's own reasoning above), so
+ * `even:` (a pure CSS `:nth-child` selector) counts hidden rows toward
+ * its parity too -- after filtering, two consecutive *visible* rows can
+ * occasionally land on the same shade instead of strictly alternating.
+ * Still a real improvement over no striping at all, and not worth a
+ * JS-computed visible-index to fix.
  */
 export function CallingPlanningGridForm({
   rows,
@@ -278,7 +294,11 @@ export function CallingPlanningGridForm({
           </thead>
           <tbody>
             {sortedRows.map((row) => (
-              <tr key={row.id} hidden={!matchesFilters(row)} className="border-t border-rule/60 align-top">
+              <tr
+                key={row.id}
+                hidden={!matchesFilters(row)}
+                className="border-t border-rule/60 align-top even:bg-ink/5 hover:bg-ink/[0.08]"
+              >
                 <td className="px-2 py-1.5">
                   <select name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>
                     {callingOptions.map((c) => (

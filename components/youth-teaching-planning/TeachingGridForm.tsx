@@ -31,6 +31,12 @@ function formatDate(iso: string) {
  * /teaching-calendar to /youth-teaching-planning's per-class pages) --
  * left as an array rather than a single `class` prop since nothing else
  * about this component needs to change to support that narrowing.
+ *
+ * **Row contrast, 2026-10-10** (the user's own report: "rows blend
+ * together quite a bit") -- `even:bg-ink/5` zebra striping plus
+ * `hover:bg-ink/[0.08]`, applied identically across every "favorite
+ * grid format" page in this app -- see CallingPlanningGridForm's own
+ * comment for the full reasoning.
  */
 export function TeachingGridForm({
   classes,
@@ -68,7 +74,7 @@ export function TeachingGridForm({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.classDate} className="border-t border-rule-strong/40">
+              <tr key={row.classDate} className="border-t border-rule-strong/40 even:bg-ink/5 hover:bg-ink/[0.08]">
                 <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
                 {classes.map((c) => (
                   <td key={c} className="px-2 py-1.5 align-top">

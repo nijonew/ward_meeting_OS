@@ -1902,6 +1902,30 @@ avoid confusing the two.
 
 ## Known open items
 
+**Row contrast added to every "favorite grid format" page, 2026-10-10**
+(the user's own report: "rows blend together quite a bit," asked which
+grid(s) -- "Every 'favorite grid format' page"). Applied identically
+to five places: `CallingPlanningGridForm.tsx`, `ActivitiesTable.tsx`
+(Youth Activities' four views), `AssignmentGridForm.tsx` (Assignment
+Rotations), `TeachingGridForm.tsx` (Youth Teaching Planning), and the
+Dashboard meeting list's `MeetingRow` -- every `<tr>` gained
+`even:bg-ink/5` zebra striping (same 5% opacity this app already used
+for a cancelled row's `bg-danger/5` tint, just neutral gray instead of
+red) plus `hover:bg-ink/[0.08]` so the row under the pointer stands out
+further while actively editing it. Wherever a row already had its own
+conditional background (a cancelled meeting or cancelled activity,
+`bg-danger/5`), the zebra class is applied only when *not* cancelled --
+the two never compete for the same row. One accepted cosmetic
+limitation on the two grids with client-side filtering
+(`CallingPlanningGridForm`/`ActivitiesTable`): a filtered-out row stays
+in the DOM (`hidden`, not removed, so an in-progress edit on it isn't
+dropped -- see those files' own existing reasoning), and `even:` is a
+pure CSS `:nth-child` selector that counts hidden rows toward its
+parity too, so two consecutive *visible* rows can occasionally land on
+the same shade after filtering instead of strictly alternating -- still
+a real improvement over no striping, not worth a JS-computed
+visible-index to fix.
+
 **Calling Planning's filter now reacts to in-progress edits, not just
 saved ones, 2026-10-10.** The user's own request, right after the
 filter itself started working: "if I have complete filtered out and

@@ -44,6 +44,13 @@ function formatMeetingDate(iso: string) {
  * (CancelMeetingButton) since revealing the reason field only after
  * the button is clicked needs client state a plain server-action
  * `<form>` can't provide on its own.
+ *
+ * **Row contrast, 2026-10-10** (the user's own report: "rows blend
+ * together quite a bit") -- `even:bg-ink/5` zebra striping (skipped in
+ * favor of the existing `bg-danger/5` tint on a cancelled meeting, so
+ * the two never compete) plus `hover:bg-ink/[0.08]`, applied
+ * identically across every "favorite grid format" page in this app --
+ * see CallingPlanningGridForm's own comment for the full reasoning.
  */
 function MeetingRow({
   meeting,
@@ -96,7 +103,12 @@ function MeetingRow({
   };
 
   return (
-    <tr className={["border-t border-rule-strong/40", meeting.cancelled ? "bg-danger/5" : ""].join(" ")}>
+    <tr
+      className={[
+        "border-t border-rule-strong/40 hover:bg-ink/[0.08]",
+        meeting.cancelled ? "bg-danger/5" : "even:bg-ink/5",
+      ].join(" ")}
+    >
       <td className="px-2 py-2 align-top">{dateCell}</td>
       {showType && <td className="px-2 py-2 align-top text-sm text-ink-muted">{meeting.title}</td>}
       <td className="px-2 py-2 align-top">
