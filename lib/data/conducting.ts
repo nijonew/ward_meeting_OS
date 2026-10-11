@@ -99,12 +99,15 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
 
   const peopleById = new Map(people.map((p) => [p.id, p.name]));
 
-  // Split at Closing Hymn/Prayer, the exact same boundary
-  // app/meetings/[id]/planning/page.tsx uses for the editable grid --
-  // duplicated rather than shared, since it's ~3 lines and the two
-  // call sites are a Server Component and a data module.
+  // Split at Closing Hymn/Prayer (or Announcements, 2026-10-11 -- see
+  // the identical comment in app/meetings/[id]/planning/page.tsx for
+  // why), the exact same boundary that page uses for the editable
+  // grid -- duplicated rather than shared, since it's ~3 lines and the
+  // two call sites are a Server Component and a data module.
   const elementsForGrid = templateElements.filter((el) => el.key !== "agenda_items");
-  const closingIndex = elementsForGrid.findIndex((el) => el.key === "closing_hymn" || el.key === "closing_prayer");
+  const closingIndex = elementsForGrid.findIndex(
+    (el) => el.key === "closing_hymn" || el.key === "closing_prayer" || el.key === "announcements"
+  );
   const openingElements = closingIndex !== -1 ? elementsForGrid.slice(0, closingIndex) : elementsForGrid;
   const closingElements = closingIndex !== -1 ? elementsForGrid.slice(closingIndex) : [];
 

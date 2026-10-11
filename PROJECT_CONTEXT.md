@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 071
+## Current migration number: 072
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -216,8 +216,13 @@ reconstructed from both:
 - `071` (new `feedback` table + `table_admin_feedback` feature catalog
   row -- the persistent Feedback Widget, see Known open items below):
   confirmed run.
+- `072` (moves the `announcements` element's `sort_order` to
+  immediately before Closing Hymn in every Sacrament Meeting format
+  that has both, across `meeting_templates` and already-seeded
+  non-archived meetings -- see Known open items below): still needs to
+  be run.
 
-Next migration should be `072_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `073_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1932,6 +1937,34 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Announcements moved to right before Closing Hymn/Prayer, 2026-10-11**
+(the user's own follow-up, right after it became real: "Can we add an
+announcement section before the closing hymn and prayer?"). It had
+always sat at sort_order 70 -- right after Visiting Authorities and
+*before* the Opening Hymn (migration 033's original order), nowhere
+near the end of the meeting. New migration `072` moves it to
+immediately before Closing Hymn in every format that has both,
+computed relative to that format's own Closing Hymn sort_order (same
+`+/-N` trick migration 046 already established for Sacrament
+Administered) rather than a hardcoded absolute number -- applied to
+both `meeting_templates` (future meetings) and already-seeded
+non-archived meetings' `meeting_planned_elements`, same precedent.
+- **A real, consequential wrinkle found while placing this**: the
+  Planning/Conducting split into two grid halves around Closing
+  Hymn/Prayer, with Teaching Program (Speakers & Music) always
+  rendered *between* those halves regardless of any element's own
+  sort_order. Giving Announcements a sort_order just below Closing
+  Hymn's would only have made it the last row of the *opening* half --
+  landing it **before** Teaching Program, not after it, since the
+  halves split purely on finding `closing_hymn`/`closing_prayer`'s
+  index. Fixed by having the split also anchor on `"announcements"`
+  itself (`app/meetings/[id]/planning/page.tsx` and
+  `lib/data/conducting.ts`, both one-line changes to the same
+  `findIndex` condition) -- the real rendered order is now Teaching
+  Program -> Announcements -> Closing Hymn -> Closing Prayer, matching
+  how an actual Sacrament Meeting runs (announcements near the very
+  end, after the main content, not near the beginning).
 
 **Announcements became a real, pullable element of the Sacrament
 Meeting agenda, 2026-10-11** (the user's own request: "can we make the

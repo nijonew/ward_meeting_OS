@@ -192,7 +192,22 @@ export default async function PlanningViewPage({
   // only) -- everything before Closing Hymn/Prayer, then Closing
   // Hymn/Prayer itself. See this file's own top comment for why this
   // needs to be two <form>s instead of one.
-  const closingIndex = elementsForGrid.findIndex((el) => el.key === "closing_hymn" || el.key === "closing_prayer");
+  //
+  // Announcements also anchors the closing half now (2026-10-11, the
+  // user's own request: "add an announcement section before the
+  // closing hymn and prayer") -- Teaching Program always renders
+  // between the two halves regardless of any element's own sort_order,
+  // so getting Announcements to land *after* Teaching Program (not
+  // just numerically before Closing Hymn, which alone would still
+  // leave it in the opening half) requires it to anchor the closing
+  // slice's own start, same as closing_hymn/closing_prayer already do.
+  // Migration 072 moves its sort_order to immediately before Closing
+  // Hymn, so whichever of the two comes first in a given format's
+  // template is what actually anchors this split -- normally
+  // Announcements itself.
+  const closingIndex = elementsForGrid.findIndex(
+    (el) => el.key === "closing_hymn" || el.key === "closing_prayer" || el.key === "announcements"
+  );
   const openingElements = isSacrament && closingIndex !== -1 ? elementsForGrid.slice(0, closingIndex) : elementsForGrid;
   const closingElements = isSacrament && closingIndex !== -1 ? elementsForGrid.slice(closingIndex) : [];
 
