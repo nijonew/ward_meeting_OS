@@ -2088,6 +2088,9 @@ underlying tables' own existing anon filters either way.
 was checked in the same pass and already has a correct anon policy,
 scoped to `type = 'baby_blessing'` -- no fix needed there.
 
+**Verified in production, 2026-10-11**: the user confirmed, logged out,
+against today's real meeting -- "checked, it's working now." Closed.
+
 **Second Announcements block before Closing Hymn/Prayer, built
 2026-10-11.** Right after being told migration `072` is on hold (see
 migration history above), the user clarified the actual want: "I just
