@@ -18,6 +18,7 @@ export interface ClassActivityRow {
   location: string;
   developmentCategory: string;
   planningGroup: string;
+  confirmed: boolean;
 }
 
 function blankRow(activityDate: string, className: string): ClassActivityRow {
@@ -30,6 +31,7 @@ function blankRow(activityDate: string, className: string): ClassActivityRow {
     location: "",
     developmentCategory: "",
     planningGroup: "",
+    confirmed: false,
   };
 }
 
@@ -59,7 +61,7 @@ export async function getClassActivityGrid(className: string, throughDateISO: st
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("youth_activities")
-    .select("id, activity_date, group_name, title, location, development_category, planning_group")
+    .select("id, activity_date, group_name, title, location, development_category, planning_group, confirmed")
     .in("activity_date", wednesdays)
     .in("group_name", candidateGroups);
 
@@ -76,6 +78,7 @@ export async function getClassActivityGrid(className: string, throughDateISO: st
     location: string | null;
     development_category: string | null;
     planning_group: string | null;
+    confirmed: boolean;
   };
 
   const byDate = new Map<string, Map<string, RawRow>>();
@@ -97,6 +100,7 @@ export async function getClassActivityGrid(className: string, throughDateISO: st
       location: match.location ?? "",
       developmentCategory: match.development_category ?? "",
       planningGroup: match.planning_group ?? "",
+      confirmed: match.confirmed,
     };
   });
 }

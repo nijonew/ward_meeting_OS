@@ -1933,6 +1933,22 @@ avoid confusing the two.
 
 ## Known open items
 
+**Confirmed checkbox added to the per-class grid, 2026-10-11** (the
+user's own question after the old inline toggle was removed along
+with "All Activities": "how do we change when an activity is
+tentative vs non-tentative?" -- answered directly, Table Admin's
+Youth Activities grid still has it, but asked whether a quicker way
+was wanted; the user chose adding it to the per-class grid). New
+Confirmed column on `/youth-activities/manage/classes`
+(`ClassActivityGridForm.tsx`), same hidden-"false"-before-the-real-
+checkbox trick already used for Stake Business (an unchecked box
+submits nothing on its own). `ClassActivityRow`/`getClassActivityGrid`
+(`lib/data/class-activities.ts`) and `saveClassActivityGrid`
+(`app/youth-activities/manage/classes/actions.ts`) both gained the
+field; a brand-new row created from a blank line still defaults to
+unconfirmed (`confirmed: false`), matching Add Activity's own existing
+default.
+
 **Upcoming Activities re-attributed to the 6 real classes, 2026-10-11**
 (the user's own follow-up, right after the Add/Overwrite work above
 shipped): "For the upcoming activities lists please note that I only

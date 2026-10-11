@@ -27,17 +27,29 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
   const { profile } = await getSessionUser();
   if (!hasFeature(profile, "youth_activity_planning")) return { error: "Not authorized." };
 
-  type Fields = { title: string; location: string; development_category: string; planning_group: string };
+  type Fields = {
+    title: string;
+    location: string;
+    development_category: string;
+    planning_group: string;
+    confirmed: string;
+  };
   const byKey = new Map<string, Fields>();
+  const COLUMNS = ["title", "location", "development_category", "planning_group", "confirmed"];
 
+  // Confirmed's hidden "false" fallback is enumerated before its real
+  // checkbox in the form (so an unchecked box still submits something,
+  // same trick this app already uses for Stake Business) -- this loop
+  // overwrites per column as it walks entries in document order, so
+  // the checkbox's own "true" naturally wins when it's checked.
   for (const [name, value] of formData.entries()) {
     const parts = name.split("::");
     if (parts.length !== 3) continue;
     const [activityDate, sourceGroupName, column] = parts;
-    if (!["title", "location", "development_category", "planning_group"].includes(column)) continue;
+    if (!COLUMNS.includes(column)) continue;
 
     const key = `${activityDate}::${sourceGroupName}`;
-    const fields = byKey.get(key) ?? { title: "", location: "", development_category: "", planning_group: "" };
+    const fields = byKey.get(key) ?? { title: "", location: "", development_category: "", planning_group: "", confirmed: "false" };
     fields[column as keyof Fields] = String(value).trim();
     byKey.set(key, fields);
   }
@@ -70,6 +82,8 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
       const [activityDate, sourceGroupName] = key.split("::");
       const existingId = existingByKey.get(key);
 
+      const confirmed = fields.confirmed === "true";
+
       if (existingId) {
         return supabase
           .from("youth_activities")
@@ -78,6 +92,7 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
             location: fields.location || null,
             development_category: fields.development_category || null,
             planning_group: fields.planning_group || null,
+            confirmed,
           })
           .eq("id", existingId);
       }
@@ -90,6 +105,7 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
         location: fields.location || null,
         development_category: fields.development_category || null,
         planning_group: fields.planning_group || null,
+        confirmed,
         status: "published",
       });
     })

@@ -24,6 +24,13 @@ function formatDate(iso: string) {
  * every other "favorite grid format" page in this app -- editing a
  * Combined-sourced row writes back to that same shared row (see the
  * server action's own comment), not a class-specific fork of it.
+ *
+ * **Confirmed checkbox, 2026-10-11** (the user's own question, right
+ * after the old inline toggle was removed along with "All
+ * Activities": "how do we change when an activity is tentative vs
+ * non-tentative?") -- same hidden-"false"-before-the-real-checkbox
+ * trick already used for Stake Business, since an unchecked box
+ * submits nothing on its own.
  */
 export function ClassActivityGridForm({ rows }: { rows: ClassActivityRow[] }) {
   const [state, formAction, pending] = useActionState(saveClassActivityGrid, initialState);
@@ -41,7 +48,7 @@ export function ClassActivityGridForm({ rows }: { rows: ClassActivityRow[] }) {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              {["Date", "Title", "Location", "Category", "Planning Group"].map((h) => (
+              {["Date", "Title", "Location", "Category", "Planning Group", "Confirmed"].map((h) => (
                 <th key={h} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   {h}
                 </th>
@@ -100,6 +107,10 @@ export function ClassActivityGridForm({ rows }: { rows: ClassActivityRow[] }) {
                       placeholder={row.isCombined ? "Which class is planning this" : ""}
                       className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     />
+                  </td>
+                  <td className="px-2 py-1.5 align-top text-center">
+                    <input type="hidden" name={`${prefix}::confirmed`} value="false" />
+                    <input type="checkbox" name={`${prefix}::confirmed`} value="true" defaultChecked={row.confirmed} />
                   </td>
                 </tr>
               );
