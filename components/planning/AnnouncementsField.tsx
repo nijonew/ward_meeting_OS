@@ -37,13 +37,22 @@ function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId:
  * the same kind of action: pulling a row from a general pool into this
  * one meeting, with a real side effect (announcements.meeting_id) that
  * can't wait for the surrounding grid's own "Save All Changes."
+ *
+ * **One meeting can now have more than one of these, 2026-10-11** (see
+ * migration 074's own header) -- `plannedElementId` is which specific
+ * block this instance is ("row.id" from the `announcements` AgendaRow,
+ * which already IS the `meeting_planned_elements` row id), passed
+ * straight through to `pullAnnouncementIntoMeeting` so a pull lands in
+ * the right block rather than an ambiguous "this meeting" link.
  */
 export function AnnouncementsField({
   meetingId,
+  plannedElementId,
   items,
   pullable,
 }: {
   meetingId: string;
+  plannedElementId: string;
   items: PulledAnnouncement[];
   pullable: PulledAnnouncement[];
 }) {
@@ -53,7 +62,7 @@ export function AnnouncementsField({
   const pull = () => {
     if (!selected) return;
     startPull(async () => {
-      await pullAnnouncementIntoMeeting(meetingId, selected);
+      await pullAnnouncementIntoMeeting(meetingId, selected, plannedElementId);
       setSelected("");
     });
   };

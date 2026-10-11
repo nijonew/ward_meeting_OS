@@ -67,7 +67,13 @@ export default async function TemplatePage({
   ]);
 
   const includedElementIds = new Set(included.map((e) => e.element_id));
-  const available = applicable.filter((e) => !includedElementIds.has(e.id));
+  // `announcements` is the one element that can be added to the same
+  // meeting more than once -- a real second, independently-scoped
+  // block (migration 074, 2026-10-11: "I just want the ability to add
+  // a second announcement block before the closing hymn/prayer"), not
+  // a config change to the existing one. Every other element still
+  // follows the normal "add once" rule.
+  const available = applicable.filter((e) => !includedElementIds.has(e.id) || e.key === "announcements");
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">

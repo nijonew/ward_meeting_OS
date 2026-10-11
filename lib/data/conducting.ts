@@ -5,7 +5,7 @@ import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getSacramentProgramItems, resolveProgramItems, type ResolvedProgramItem } from "@/lib/data/sacrament-program";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
-import { getAnnouncementsForMeeting } from "@/lib/data/sacrament-announcements";
+import { getAnnouncementsByPlannedElement } from "@/lib/data/sacrament-announcements";
 import { buildConductingRows, type ConductingRow } from "@/lib/data/conducting-rows";
 
 export interface ConductingScript {
@@ -80,7 +80,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) return null;
 
-  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcements] =
+  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcementsByPlannedElement] =
     await Promise.all([
       getPlannedElements(meetingId),
       getRoleAssignments(meetingId, "sacrament_assignments"),
@@ -89,7 +89,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
       getActivePeople(),
       getSacramentProgramItems(meetingId),
       getVisitingAuthorities(meetingId),
-      getAnnouncementsForMeeting(meetingId),
+      getAnnouncementsByPlannedElement(meetingId),
     ]);
 
   const templateElements =
@@ -99,15 +99,17 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
 
   const peopleById = new Map(people.map((p) => [p.id, p.name]));
 
-  // Split at Closing Hymn/Prayer (or Announcements, 2026-10-11 -- see
-  // the identical comment in app/meetings/[id]/planning/page.tsx for
-  // why), the exact same boundary that page uses for the editable
-  // grid -- duplicated rather than shared, since it's ~3 lines and the
-  // two call sites are a Server Component and a data module.
+  // Split at Closing Hymn/Prayer (or Announcements, when a block sits
+  // immediately before one, 2026-10-11 -- see the identical comment in
+  // app/meetings/[id]/planning/page.tsx for why), the exact same
+  // boundary that page uses for the editable grid -- duplicated rather
+  // than shared, since it's a handful of lines and the two call sites
+  // are a Server Component and a data module.
   const elementsForGrid = templateElements.filter((el) => el.key !== "agenda_items");
-  const closingIndex = elementsForGrid.findIndex(
-    (el) => el.key === "closing_hymn" || el.key === "closing_prayer" || el.key === "announcements"
-  );
+  let closingIndex = elementsForGrid.findIndex((el) => el.key === "closing_hymn" || el.key === "closing_prayer");
+  if (closingIndex > 0 && elementsForGrid[closingIndex - 1].key === "announcements") {
+    closingIndex -= 1;
+  }
   const openingElements = closingIndex !== -1 ? elementsForGrid.slice(0, closingIndex) : elementsForGrid;
   const closingElements = closingIndex !== -1 ? elementsForGrid.slice(closingIndex) : [];
 
@@ -118,7 +120,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
     music: data.music,
     rabnm: data.rabnm,
     visitingAuthorities,
-    announcements,
+    announcementsByPlannedElement,
     peopleById,
   };
 

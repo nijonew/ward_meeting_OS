@@ -187,7 +187,11 @@ export type AgendaRow =
    *  `ward_business` -- a pull action with a real side effect on the
    *  `announcements` table itself, so this carries data only, no field
    *  names of its own. Replaces the old plain `banner` cue this element
-   *  fell through to (resolution_kind 'none', no real wiring at all). */
+   *  fell through to (resolution_kind 'none', no real wiring at all).
+   *  `id` is this specific `meeting_planned_elements` row -- since a
+   *  meeting can have more than one Announcements block (migration
+   *  074, 2026-10-11), this doubles as the block identifier a pull
+   *  needs to say which one it's acting on. */
   | {
       kind: "announcements";
       id: string;
@@ -227,10 +231,13 @@ export interface AgendaRowInputs {
   rabnm: RabnmRow[];
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
-  /** Already pulled into this meeting, and the general pool still
-   *  available to pull in -- see the `announcements` row kind's own
-   *  comment above. */
-  announcementsForMeeting: PulledAnnouncement[];
+  /** Already pulled into this meeting, grouped by which specific
+   *  Announcements block (`meeting_planned_elements` row id) each one
+   *  belongs to -- a meeting can have more than one (migration 074,
+   *  2026-10-11) -- plus the general pool still available to pull in,
+   *  shared across every block. See the `announcements` row kind's
+   *  own comment above. */
+  announcementsByPlannedElement: Map<string, PulledAnnouncement[]>;
   pullableAnnouncements: PulledAnnouncement[];
   /** Calling-restricted eligible-people list per person_role element key
    *  -- null means no calling-based rule is configured, fall back to
@@ -267,7 +274,7 @@ export function buildAgendaRows({
   rabnm,
   callableCallings,
   callableReleases,
-  announcementsForMeeting,
+  announcementsByPlannedElement,
   pullableAnnouncements,
   eligibilityByKey,
   allPeople,
@@ -322,7 +329,7 @@ export function buildAgendaRows({
         kind: "announcements",
         id: el.id,
         label: el.label,
-        items: announcementsForMeeting,
+        items: announcementsByPlannedElement.get(el.id) ?? [],
         pullable: pullableAnnouncements,
       });
       continue;

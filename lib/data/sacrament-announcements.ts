@@ -18,6 +18,16 @@ import { createClient } from "@/lib/supabase/server";
  * the general pool, never both -- but reuses the existing single
  * `meeting_id` FK rather than a second link table, since that's
  * already exactly what this column means everywhere else it's read.
+ *
+ * **A meeting can have more than one Announcements block, 2026-10-11**
+ * (the user's own request: "I just want the ability to add a second
+ * announcement block before the closing hymn/prayer," then, asked to
+ * confirm the shape: "Two independent blocks, each its own pool").
+ * `planned_element_id` (migration 074) is the new second key -- which
+ * SPECIFIC `meeting_planned_elements` row (not just which meeting) an
+ * announcement was pulled into, since a meeting can now have two
+ * distinct Announcements rows in its own agenda, each needing its own
+ * independent set of pulled items.
  */
 export interface PulledAnnouncement {
   id: string;
@@ -30,12 +40,18 @@ export interface PulledAnnouncement {
   end_date: string | null;
   end_time: string | null;
   link_url: string | null;
+  planned_element_id: string | null;
 }
 
-const ANNOUNCEMENT_COLUMNS = "id, title, body, organization, location, start_date, start_time, end_date, end_time, link_url";
+const ANNOUNCEMENT_COLUMNS =
+  "id, title, body, organization, location, start_date, start_time, end_date, end_time, link_url, planned_element_id";
 
 /** Published, not yet pulled into any meeting -- what the "call in an
- *  announcement" dropdown offers, regardless of which meeting is asking. */
+ *  announcement" dropdown offers, regardless of which meeting (or
+ *  which of a meeting's own blocks) is asking. Once pulled into any
+ *  block of any meeting, it's gone from this pool for every other
+ *  block too -- matching Ward Business's own "pulled once, period"
+ *  rule for Calling Planning items. */
 export async function getPullableAnnouncements(): Promise<PulledAnnouncement[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -47,14 +63,24 @@ export async function getPullableAnnouncements(): Promise<PulledAnnouncement[]> 
   return (data ?? []) as PulledAnnouncement[];
 }
 
-/** Already pulled into this specific meeting -- what Planning and
- *  Conducting both render. */
-export async function getAnnouncementsForMeeting(meetingId: string): Promise<PulledAnnouncement[]> {
+/** Already pulled into this meeting, grouped by which specific block
+ *  (`meeting_planned_elements` row id) each one belongs to -- what
+ *  Planning, Conducting, and the Archived view all render, one group
+ *  per Announcements element actually on that meeting's agenda. */
+export async function getAnnouncementsByPlannedElement(meetingId: string): Promise<Map<string, PulledAnnouncement[]>> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("announcements")
     .select(ANNOUNCEMENT_COLUMNS)
     .eq("meeting_id", meetingId)
     .order("title", { ascending: true });
-  return (data ?? []) as PulledAnnouncement[];
+
+  const result = new Map<string, PulledAnnouncement[]>();
+  for (const row of (data ?? []) as PulledAnnouncement[]) {
+    if (!row.planned_element_id) continue;
+    const list = result.get(row.planned_element_id);
+    if (list) list.push(row);
+    else result.set(row.planned_element_id, [row]);
+  }
+  return result;
 }

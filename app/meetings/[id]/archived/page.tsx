@@ -16,7 +16,7 @@ import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
-import { getAnnouncementsForMeeting } from "@/lib/data/sacrament-announcements";
+import { getAnnouncementsByPlannedElement, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 
 /**
  * Read-only meeting view -- built 2026-09-08 to be the calling-based
@@ -192,13 +192,13 @@ export default async function ArchivedMeetingPage({
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, announcements] = await Promise.all([
+  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, announcementsByPlannedElement] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
     getRoleAssignments(meetingId, roleTable),
     getElementNotes(meetingId),
     isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
-    isSacrament ? getAnnouncementsForMeeting(meetingId) : Promise.resolve([]),
+    isSacrament ? getAnnouncementsByPlannedElement(meetingId) : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
   ]);
 
   const templateElements =
@@ -250,6 +250,7 @@ export default async function ArchivedMeetingPage({
     // generic switch below would just show the bare label with nothing
     // underneath, even though real data exists once any were pulled in.
     if (isSacrament && el.key === "announcements") {
+      const announcements = announcementsByPlannedElement.get(el.id) ?? [];
       return (
         <Row key={el.id} label={el.label}>
           {announcements.length > 0 ? <Note>{announcements.map((a) => a.title).join(", ")}</Note> : <Empty />}

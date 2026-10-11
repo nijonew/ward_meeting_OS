@@ -43,7 +43,12 @@ export interface ConductingRowInputs {
   music: MusicRow[];
   rabnm: RabnmRow[];
   visitingAuthorities: VisitingAuthorityRow[];
-  announcements: PulledAnnouncement[];
+  /** Grouped by which specific Announcements block (`meeting_planned_elements`
+   *  row id) each pulled announcement belongs to -- a meeting can have
+   *  more than one (migration 074, 2026-10-11). See
+   *  lib/data/agenda-rows.ts's own `announcementsByPlannedElement` for
+   *  the matching Planning-side comment. */
+  announcementsByPlannedElement: Map<string, PulledAnnouncement[]>;
   peopleById: Map<string, string>;
 }
 
@@ -115,7 +120,7 @@ export function buildConductingRows({
   music,
   rabnm,
   visitingAuthorities,
-  announcements,
+  announcementsByPlannedElement,
   peopleById,
 }: ConductingRowInputs): ConductingRow[] {
   const rows: ConductingRow[] = [];
@@ -153,6 +158,7 @@ export function buildConductingRows({
     // are pulled in, same as Visiting Authorities below -- nothing to
     // say if nothing's been selected.
     if (key === "announcements") {
+      const announcements = announcementsByPlannedElement.get(el.id) ?? [];
       if (announcements.length === 0) continue;
       rows.push({ id: el.id, kind: "banner", label: el.label, value: null, wording: null });
       for (const item of announcements) {

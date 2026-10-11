@@ -341,7 +341,7 @@ export function AgendaGridForm({
                       {row.label}
                     </th>
                     <td className="px-2 py-1.5">
-                      <AnnouncementsField meetingId={meetingId} items={row.items} pullable={row.pullable} />
+                      <AnnouncementsField meetingId={meetingId} plannedElementId={row.id} items={row.items} pullable={row.pullable} />
                     </td>
                   </tr>
                 );

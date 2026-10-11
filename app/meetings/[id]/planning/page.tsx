@@ -21,7 +21,7 @@ import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacram
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { getCallableCallingPlanningItems } from "@/lib/data/calling-planning";
-import { getAnnouncementsForMeeting, getPullableAnnouncements } from "@/lib/data/sacrament-announcements";
+import { getAnnouncementsByPlannedElement, getPullableAnnouncements, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
@@ -137,7 +137,7 @@ export default async function PlanningViewPage({
     hymnalIndex,
     visitingAuthorities,
     callablePlanningItems,
-    announcementsForMeeting,
+    announcementsByPlannedElement,
     pullableAnnouncements,
   ] = await Promise.all([
     getPlannedElements(meetingId),
@@ -161,7 +161,10 @@ export default async function PlanningViewPage({
       : Promise.resolve({ callings: [], releases: [] }),
     // Announcements' own inline picker (2026-10-11) -- same reasoning
     // as Ward Business's, just for the `announcements` table instead.
-    isSacrament ? getAnnouncementsForMeeting(meetingId) : Promise.resolve([]),
+    // A map (not a flat list) since a meeting can have more than one
+    // Announcements block (migration 074) -- see that file's own
+    // comment.
+    isSacrament ? getAnnouncementsByPlannedElement(meetingId) : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
     isSacrament ? getPullableAnnouncements() : Promise.resolve([]),
   ]);
 
@@ -211,18 +214,29 @@ export default async function PlanningViewPage({
   // Hymn/Prayer itself. See this file's own top comment for why this
   // needs to be two <form>s instead of one.
   //
-  // Announcements also anchors the closing half now (2026-10-11, the
-  // user's own request: "add an announcement section before the
-  // closing hymn and prayer") -- Teaching Program always renders
-  // between the two halves regardless of any element's own sort_order,
-  // so getting Announcements to land *after* Teaching Program (not
-  // just numerically before Closing Hymn, which alone would still
-  // leave it in the opening half) requires it to anchor the closing
-  // slice's own start, same as closing_hymn/closing_prayer already do.
-  // Migration 072 moves its sort_order to immediately before Closing
-  // Hymn, so whichever of the two comes first in a given format's
-  // template is what actually anchors this split -- normally
-  // Announcements itself.
+  // An Announcements block immediately before Closing Hymn/Prayer also
+  // anchors the closing half (2026-10-11, the user's own request: "add
+  // an announcement section before the closing hymn and prayer") --
+  // Teaching Program always renders between the two halves regardless
+  // of any element's own sort_order, so getting that block to land
+  // *after* Teaching Program (not just numerically before Closing
+  // Hymn, which alone would still leave it in the opening half)
+  // requires it to anchor the closing slice's own start, same as
+  // closing_hymn/closing_prayer already do.
+  //
+  // **Checked by adjacency, not by key alone, since 2026-10-11** -- a
+  // meeting can now have more than one Announcements block (migration
+  // 074: "I just want the ability to add a second announcement block
+  // before the closing hymn/prayer"). Matching on `el.key ===
+  // "announcements"` inside the `findIndex` itself would grab whichever
+  // block comes FIRST, which is wrong the moment an earlier block
+  // exists too (it would wrongly anchor the closing half there,
+  // dragging Teaching Program ahead of it). Instead, find Closing
+  // Hymn/Prayer's own index first, then only shift the anchor back one
+  // slot if the element immediately before it is an Announcements
+  // block -- an earlier, unrelated block elsewhere in the agenda is
+  // untouched by this and renders inline in the opening half like any
+  // other element.
   //
   // For non-Sacrament types, this operates over `beforeAgendaItemsElements`
   // rather than the full `elementsForGrid` -- those types never have
@@ -230,9 +244,10 @@ export default async function PlanningViewPage({
   // always -1 there regardless, and `beforeAgendaItemsElements` is
   // already the right (possibly agenda_items-truncated) list to hand
   // to the grid either way.
-  const closingIndex = beforeAgendaItemsElements.findIndex(
-    (el) => el.key === "closing_hymn" || el.key === "closing_prayer" || el.key === "announcements"
-  );
+  let closingIndex = beforeAgendaItemsElements.findIndex((el) => el.key === "closing_hymn" || el.key === "closing_prayer");
+  if (closingIndex > 0 && beforeAgendaItemsElements[closingIndex - 1].key === "announcements") {
+    closingIndex -= 1;
+  }
   const openingElements =
     isSacrament && closingIndex !== -1 ? beforeAgendaItemsElements.slice(0, closingIndex) : beforeAgendaItemsElements;
   const closingElements = isSacrament && closingIndex !== -1 ? beforeAgendaItemsElements.slice(closingIndex) : [];
@@ -264,7 +279,7 @@ export default async function PlanningViewPage({
     rabnm: sacramentData?.rabnm ?? [],
     callableCallings: callablePlanningItems.callings,
     callableReleases: callablePlanningItems.releases,
-    announcementsForMeeting,
+    announcementsByPlannedElement,
     pullableAnnouncements,
     eligibilityByKey,
     allPeople: people,

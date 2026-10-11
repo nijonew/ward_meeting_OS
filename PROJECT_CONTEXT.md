@@ -233,8 +233,13 @@ reconstructed from both:
   Assignments" spreadsheet, pasted directly by the user 2026-10-11; see
   Known open items below for the other 6 columns this did NOT resolve
   and why): confirmed run.
+- `074` (drops `meeting_planned_elements`' `unique (meeting_id,
+  element_id)` constraint, adds `announcements.planned_element_id` --
+  lets a meeting have more than one Announcements block, each
+  independently scoped, see Known open items below): still needs to
+  be run.
 
-Next migration should be `074_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `075_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1950,30 +1955,85 @@ avoid confusing the two.
 
 ## Known open items
 
-**Second Announcements block before Closing Hymn/Prayer -- real need
-surfaced, design not yet settled, 2026-10-11.** Right after being told
-migration `072` is on hold (see migration history above), the user
-clarified the actual want: "I just want the ability to add a second
-announcement block before the closing hymn/prayer." Checked the schema
-before assuming this is simple: `meeting_planned_elements` has
-`unique (meeting_id, element_id)` (migration `033`) -- a meeting
-cannot have two rows for the same catalog element at all today, so
-"add a second Announcements block" isn't reachable just by adding the
-existing `announcements` element a second time via the Agenda
-Elements editor; it needs a real schema/code decision, not a config
-change. Also, `sacrament_announcements`' pull mechanism
-(`pullAnnouncementIntoMeeting`) only ever keys on the meeting's own
-`announcements.meeting_id` -- there's no second dimension (a slot,
-like `musical_number`/`speaker` already have via `slot_count`) to say
-which of two blocks a given pulled announcement belongs to, so even if
-the unique constraint were lifted, both blocks would show the exact
-same pulled list today. Two real designs this could become, not yet
-chosen: (a) make `announcements` genuinely repeatable (new slot
-concept, each block independently scoped -- same shape as Speaker/
-Musical Number), or (b) a single global announcements list with a
-per-item "which position" flag (before Visiting Authorities vs. before
-Closing Hymn) rather than two truly separate pools. Ask before building
-either -- this needs scoping, not a guess.
+**Second Announcements block before Closing Hymn/Prayer, built
+2026-10-11.** Right after being told migration `072` is on hold (see
+migration history above), the user clarified the actual want: "I just
+want the ability to add a second announcement block before the
+closing hymn/prayer." Checked the schema before assuming this is
+simple: `meeting_planned_elements` has `unique (meeting_id,
+element_id)` (migration `033`) -- a meeting couldn't have two rows for
+the same catalog element at all, so "add a second Announcements block"
+wasn't reachable just by adding the existing element a second time via
+the Agenda Elements editor. Asked the user to pick between two real
+designs (a genuinely repeatable element with each block independently
+scoped, vs. one shared list with a per-item "which position" flag) --
+answered "Two independent blocks, each its own pool."
+- **Migration `074`** drops that unique constraint outright (confirmed
+  no application code relies on it being enforced -- no `ON CONFLICT`
+  target against it anywhere, nothing else assumes exactly one row per
+  element) and adds `announcements.planned_element_id`, a nullable FK
+  to the SPECIFIC `meeting_planned_elements` row an announcement was
+  pulled into -- not just which meeting (the existing `meeting_id`,
+  migration 031, untouched). Without this second key, two Announcements
+  blocks on one meeting would have no way to tell which block a given
+  pulled announcement belongs to, and both would show the identical
+  list. `on delete set null` -- removing a block (the Agenda Elements
+  editor's Remove button) puts its announcements back in the general
+  pool rather than deleting them. Backfills any announcement already
+  pulled before this shipped onto its meeting's first (lowest
+  sort_order) Announcements block.
+- **Deliberately NOT the existing `repeatable`/`slot_count` mechanism**
+  Speaker/Musical Number already use -- that one repeats the SAME
+  element N times *adjacently*, at one position in the agenda (Speaker
+  1, Speaker 2, one after another). What's needed here is two blocks
+  at two genuinely DIFFERENT positions (one early, one right before
+  Closing Hymn) -- a different concept, so `meeting_elements.repeatable`
+  for `announcements` was left untouched (still `false`) rather than
+  overloading a flag that already means something else and would have
+  surfaced a confusing "set slot count" control on the Agenda Elements
+  editor for an element it doesn't apply to.
+- **`/meetings/[id]/template` (Agenda Elements editor)**: its "Add
+  Element" list used to drop any already-included element from the
+  picker entirely, for every element -- `announcements` is now the one
+  hardcoded exception (matching this app's own established pattern of
+  special-casing specific element keys in code rather than adding a
+  new generic schema flag for a single current need, e.g.
+  `STAKE_PRESIDENCY_CALLING_NAMES`/the existing `"announcements"`/
+  `"ward_business"` key checks already in `agenda-rows.ts`), so it
+  stays addable a second time. A newly-added second block starts at
+  the end of the agenda (same as any new element) -- use the existing
+  Move Up/Down controls to position it. Deliberately scoped to the
+  per-meeting editor only, not `/admin/meeting-templates` (the shared
+  default template all future meetings seed from) -- the user's own
+  wording was about one meeting's own agenda, not changing what every
+  future Sacrament Meeting starts with.
+- **Data layer**: `getAnnouncementsForMeeting` (a flat list for "this
+  meeting") replaced by `getAnnouncementsByPlannedElement` (a
+  `Map<plannedElementId, PulledAnnouncement[]>`) -- `buildAgendaRows`/
+  `buildConductingRows`/the Archived view's per-element renderer all
+  look up `announcementsByPlannedElement.get(el.id)` instead of
+  reading one shared list, since `el.id` (the `meeting_planned_elements`
+  row id) is exactly the new block identifier.
+  `pullAnnouncementIntoMeeting` now takes a `plannedElementId` too,
+  passed straight through from `AnnouncementsField`'s own `row.id`.
+  `getPullableAnnouncements` (the general not-yet-pulled-anywhere pool)
+  is unchanged -- shared across every block of every meeting, same as
+  before; once pulled into any block, it's gone from every other
+  block's own picker too.
+- **The opening/closing grid-half split, generalized from
+  "is this element literally `announcements`" to "is an Announcements
+  block immediately adjacent to Closing Hymn/Prayer."** The previous
+  version (`findIndex` matching `"announcements"` directly, built for
+  migration 072's single-block case) would grab whichever block comes
+  FIRST once a second one exists -- wrong the moment an earlier block
+  exists too, since it would wrongly anchor the closing half there and
+  drag Teaching Program ahead of where it belongs.
+  `app/meetings/[id]/planning/page.tsx` and `lib/data/conducting.ts`
+  both now find Closing Hymn/Prayer's own index first, then only shift
+  the anchor back one slot if the element immediately before it is an
+  Announcements block -- an earlier, unrelated block elsewhere in the
+  agenda renders inline in the opening half like any other element,
+  untouched by this check.
 
 **Agenda Items now renders at its own real template position instead
 of always being pinned to the end, 2026-10-11** (the user's own
