@@ -1970,6 +1970,29 @@ avoid confusing the two.
 
 ## Known open items
 
+**Current priority queue (set by the user 2026-10-12), work top to
+bottom:** the second-Announcements-block feature (migration 074) is
+confirmed not working in practice -- the user's own words, "It didn't
+work, but I need to move this down the list" -- specifics not yet
+gathered, deliberately deferred rather than debugged right now per
+that same instruction. This week's real priorities, in the user's own
+words:
+1. "Ensure that all required items are visible to the right people at
+   the right times" -- a general correctness pass on visibility/
+   timing, not scoped to one feature yet.
+2. "Ward business needs to work correctly... in sacrament meetings
+   (some testing needed to see if there are bugs)" -- the
+   Calling-Planning-sourced Ward Business picker inside the Sacrament
+   Meeting agenda grid.
+3. "Announcements need to be flawless (a few minor things to
+   improve)" -- the pullable-Announcements element built 2026-10-11,
+   not yet itemized.
+Also asked to review the Feedback Widget's own suggestion log
+(migration 071, `feedback` table) for anything actionable -- this
+assistant has no live database access, so that needs the user to
+paste back its current contents (or open `/admin/feedback` directly)
+before anything on it can be acted on.
+
 **Combined-group activities made editable, and a "which group is in
 charge" column added, 2026-10-11** (the user's own request: "I want to
 be able to modify combined activities. I also want to see which group
