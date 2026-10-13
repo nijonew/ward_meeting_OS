@@ -1970,6 +1970,36 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-12: Calling Planning status changes
+looked like they weren't saving.** The user's own report, right after
+the filter-visibility fix just below: "I changed a calling to 'To be
+Announced'... shows saved, no error message, reverts right away." The
+save itself was very likely succeeding the entire time (`state.success`
+was true, no `state.error`, and `saveCallingPlanningGrid`'s own
+`UPDATE` call writes every edited field in one query -- nothing in
+that action treats `calling_status` any differently from any other
+column) -- the real bug was purely client-side display, the exact same
+bug class already fixed once in this app for SacramentProgramSection's
+speaker/music fields (2026-10-07): every field in
+`CallingPlanningGridForm.tsx` is `defaultValue`-based (uncontrolled),
+and each row keeps the same React instance across a save (keyed only
+on `row.id`, which never changes) -- React only ever applies
+`defaultValue` once, at first mount, so the newly revalidated
+`row.calling_status` arriving as a fresh prop after a successful save
+was never actually reflected in the already-mounted `<select>`, which
+just snapped back to whatever it showed when the row first appeared on
+screen. Fixed by keying every editable field (not just Status -- every
+field in this grid shared the identical risk, including
+`MultiPersonSelect`'s own internal `useState`, which has the same
+seed-once-at-mount shape) on its own current saved value, forcing a
+clean remount with a fresh default exactly when that field's real
+saved value changes -- never during an in-progress, unsaved edit,
+since `row` itself only updates after a real save lands. **Not yet
+confirmed in production** -- asked the user to verify both that a hard
+refresh already showed the correct value before this fix (confirming
+the diagnosis) and that the dropdown now visibly holds the new value
+immediately after saving, no refresh needed, once this ships.
+
 **Bug found and fixed 2026-10-12: a new Excel-filter value could vanish
 a row with no warning.** The user's own report, right after the slow-
 navigation fix just below: they changed a Calling Planning row's Status

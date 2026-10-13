@@ -355,7 +355,28 @@ export function CallingPlanningGridForm({
                 ].join(" ")}
               >
                 <td className="px-2 py-1.5">
-                  <select name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>
+                  {/* key={row.<field>} on every editable field below
+                      (2026-10-12, the user's own report: "shows saved,
+                      no error message. reverts right away" -- changing
+                      Status to "To be Announced" looked like it never
+                      saved). Root cause: every field here is
+                      uncontrolled (defaultValue only), and React only
+                      ever applies defaultValue once, at first mount --
+                      the exact same bug class already fixed once in
+                      this app for SacramentProgramSection's speaker/
+                      music fields (2026-10-07, see that fix's own
+                      comment). The save itself was very likely
+                      succeeding the whole time; the already-mounted
+                      <select>/<input> just never re-synced to the
+                      fresh value revalidatePath sent back down, so it
+                      looked identical to "didn't save." Keying each
+                      field on its own current saved value forces a
+                      clean remount with a fresh default exactly when
+                      (and only when) that field's real saved value
+                      changes -- never during an in-progress, unsaved
+                      edit, since `row` itself only updates after a
+                      real save. */}
+                  <select key={row.calling_id} name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>
                     {callingOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -365,6 +386,7 @@ export function CallingPlanningGridForm({
                 </td>
                 <td className="px-2 py-1.5">
                   <input
+                    key={row.date_initiated ?? ""}
                     type="date"
                     name={`${row.id}::date_initiated`}
                     defaultValue={row.date_initiated ?? ""}
@@ -373,6 +395,7 @@ export function CallingPlanningGridForm({
                 </td>
                 <td className="px-2 py-1.5">
                   <MultiPersonSelect
+                    key={row.candidate_person_ids.join(",")}
                     name={`${row.id}::candidate_person_ids`}
                     people={people}
                     value={row.candidate_person_ids}
@@ -380,7 +403,7 @@ export function CallingPlanningGridForm({
                   />
                 </td>
                 <td className="px-2 py-1.5">
-                  <select name={`${row.id}::calling_status`} defaultValue={row.calling_status} className={INPUT_CLASS}>
+                  <select key={row.calling_status} name={`${row.id}::calling_status`} defaultValue={row.calling_status} className={INPUT_CLASS}>
                     {callingStatusOptions.map((s) => (
                       <option key={s.value} value={s.value}>
                         {s.label}
@@ -390,6 +413,7 @@ export function CallingPlanningGridForm({
                 </td>
                 <td className="px-2 py-1.5">
                   <input
+                    key={row.date_set_apart ?? ""}
                     type="date"
                     name={`${row.id}::date_set_apart`}
                     defaultValue={row.date_set_apart ?? ""}
@@ -397,10 +421,21 @@ export function CallingPlanningGridForm({
                   />
                 </td>
                 <td className="px-2 py-1.5">
-                  <textarea name={`${row.id}::notes`} defaultValue={row.notes ?? ""} rows={2} className={INPUT_CLASS} />
+                  <textarea
+                    key={row.notes ?? ""}
+                    name={`${row.id}::notes`}
+                    defaultValue={row.notes ?? ""}
+                    rows={2}
+                    className={INPUT_CLASS}
+                  />
                 </td>
                 <td className="px-2 py-1.5">
-                  <select name={`${row.id}::release_person_id`} defaultValue={row.release_person_id ?? ""} className={INPUT_CLASS}>
+                  <select
+                    key={row.release_person_id ?? ""}
+                    name={`${row.id}::release_person_id`}
+                    defaultValue={row.release_person_id ?? ""}
+                    className={INPUT_CLASS}
+                  >
                     <option value="">None / Previously Vacant</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -410,7 +445,7 @@ export function CallingPlanningGridForm({
                   </select>
                 </td>
                 <td className="px-2 py-1.5">
-                  <select name={`${row.id}::release_status`} defaultValue={row.release_status} className={INPUT_CLASS}>
+                  <select key={row.release_status} name={`${row.id}::release_status`} defaultValue={row.release_status} className={INPUT_CLASS}>
                     {releaseStatusOptions.map((s) => (
                       <option key={s.value} value={s.value}>
                         {s.label}
