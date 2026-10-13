@@ -1970,6 +1970,79 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-12: "navigation is very very slow again" --
+not the database.** The user's own report, right after the four requests
+below shipped. This assistant has no live database access, so diagnosis
+went entirely through the user's own browser DevTools -- see the
+Network-tab/Vercel-function-log walkthrough given in chat if this needs
+repeating later. The actual numbers ruled out the server immediately:
+a direct, isolated "Waiting for server response" check on both
+Announcements (44.71 ms) and Dashboard (279.44 ms) was fast -- nowhere
+close to explaining "very very slow." The real total page time (9.8 s
+for Dashboard) was the real symptom, and sorting the Network tab by
+Time exposed it directly: a pile of `fetch` requests with `_rsc=...`
+in their URL, several taking 5-20+ seconds, many of them exact
+duplicates of each other.
+
+**Root cause: Next.js's automatic Link prefetching, at volume.**
+`<Link>` prefetches its target the moment it's visible on screen,
+by default, with no opt-in needed -- this app never turned that off
+anywhere. Three places in this app render many such Links at once,
+every single page load:
+- `components/Tile.tsx` -- every tile on every hub page (the landing
+  page alone can show a dozen-plus across "This week"/"My
+  meetings"/"Music"/"Youth program"/"Administration"), each one firing
+  its own background prefetch simultaneously.
+- `components/AppHeader.tsx` -- its Home-wordmark Link renders on
+  nearly every route in the app (this component's own doc comment
+  already said so), so literally every page navigation re-fired a
+  fresh "/" prefetch on top of whatever was already in flight from the
+  page before it.
+- `app/dashboard/page.tsx`'s `MeetingRow` -- one Link per meeting row,
+  so a dashboard list of a dozen-plus meetings fired that many
+  simultaneous prefetches on its own.
+
+None of this is a database problem -- it's the browser's own limited
+connection capacity (and whatever concurrency Vercel/Supabase can
+actually serve at once) getting flooded by background requests nobody
+asked for, which then queue up and delay the *real* request a user is
+actually waiting on. Fixed by adding `prefetch={false}` to the Links in
+all three places -- every route this app links to already responds in
+well under 300ms on its own (confirmed directly via the Network tab
+above), so there's essentially nothing lost by not pre-warming it, and
+a lot gained by not flooding the connection pool on every page view.
+**Not audited further**: other `<Link>`s elsewhere in the app (back
+links, per-row links on other list pages) could theoretically add to
+this at smaller scale -- these three were fixed because the evidence
+directly implicated them (the dominant URLs in the user's own Network
+tab capture were "/" and "/announcements/public", exactly what Tile +
+AppHeader produce). Revisit with the same Network-tab technique if
+slowness persists after this ships.
+
+**Second, compounding bug found in the same investigation**: the
+user's own follow-up, mid-diagnosis -- "some of those are multiple
+clicks because I don't have a response of any kind indicating a click
+was received." This app has never had any navigation loading
+indicator anywhere. Combined with the prefetch flood above (which made
+some clicks feel like nothing happened while a dozen background
+prefetches hogged the connection ahead of the real one), a user with
+no visual feedback reasonably clicks again, and again -- directly
+explaining the *duplicate* fetches seen in the Network tab capture,
+not just the sheer volume. New `app/loading.tsx` (a plain, minimal
+"Loading…" message in this app's own established small-caption style)
+is picked up automatically by every route in the app via Next.js's own
+`loading.tsx` convention (no per-page wiring needed) -- this app's root
+layout has no persistent chrome of its own (AppHeader renders inside
+each page, not the shared layout), so this fallback briefly replaces
+the whole page content area during a real navigation, which is exactly
+what's needed to visibly confirm a click landed.
+
+**Not verified in a live browser** -- same pre-existing gap as
+everything else built this way (no local Supabase credentials in this
+working copy). Ask the user to click around production once deployed
+and confirm both (a) navigation feels faster, and (b) a brief
+"Loading…" message now shows on every click.
+
 **Four small requests worked through together, 2026-10-12** (continuing
 this week's priorities above -- "visibility to the right people at the
 right times" and "announcements... flawless" in particular):

@@ -43,9 +43,15 @@ export async function AppHeader({ tag }: { tag?: string }) {
 
   return (
     <>
+      {/* prefetch={false} on every Link in this component (2026-10-12,
+          see Tile.tsx's own comment for the full diagnosis) -- this
+          header renders on nearly every page in the app, so its Home
+          link alone was re-firing a background prefetch on every
+          single navigation, all session long. */}
       {unverifiedCount > 0 && (
         <Link
           href="/admin/verify-logins"
+          prefetch={false}
           className="mb-4 block rounded border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-medium text-ink transition-colors hover:bg-accent/20"
         >
           {unverifiedCount} login{unverifiedCount === 1 ? "" : "s"} need{unverifiedCount === 1 ? "s" : ""} verification &rarr;
@@ -54,6 +60,7 @@ export async function AppHeader({ tag }: { tag?: string }) {
       <header className="flex items-baseline justify-between border-b border-rule pb-6">
         <Link
           href="/"
+          prefetch={false}
           className="font-display text-xl tracking-tight text-ink transition-colors hover:text-ink-muted"
         >
           {wardName} Ward
@@ -77,6 +84,7 @@ export async function AppHeader({ tag }: { tag?: string }) {
           ) : (
             <Link
               href="/login"
+              prefetch={false}
               className="font-mono text-xs uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
             >
               Sign in

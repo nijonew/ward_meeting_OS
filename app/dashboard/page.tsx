@@ -77,9 +77,14 @@ function MeetingRow({
   // redirects here anyway now, so this skips that extra hop.
   const href = canManage ? `/meetings/${meeting.id}/planning` : `/meetings/${meeting.id}/${nonAdminHref}`;
 
+  // prefetch={false} (2026-10-12, see Tile.tsx's own comment for the
+  // full diagnosis) -- one of these renders per meeting row, so a
+  // dashboard list of a dozen+ meetings was firing that many
+  // simultaneous background prefetches on every load.
   const dateCell = isBuilt ? (
     <Link
       href={href}
+      prefetch={false}
       className="inline-flex items-center whitespace-nowrap rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
     >
       {formatMeetingDate(meeting.date)}

@@ -52,7 +52,19 @@ export function Tile({ title, description, href, comingSoon, disabledLabel }: Ti
 
   return (
     <li>
-      <Link href={href} className="block h-full">
+      {/* prefetch={false} (2026-10-12, the user's own report: "slow on
+          every click, every page" -- traced via the Network tab to a
+          flood of background `_rsc=` prefetch fetches, several of them
+          taking 5-20+ seconds). Next.js auto-prefetches every visible
+          Link by default; a page with a dozen+ tiles (the landing
+          page, most hub pages) was firing that many simultaneous
+          background requests on every load, queueing up and delaying
+          the actual click a user was waiting on. Every route this app
+          links to responds in well under 300ms on its own (confirmed
+          directly via the Network tab), so there's essentially nothing
+          to gain from prefetching here and a lot to lose from the
+          request-pileup it was causing. */}
+      <Link href={href} prefetch={false} className="block h-full">
         {card}
       </Link>
     </li>
