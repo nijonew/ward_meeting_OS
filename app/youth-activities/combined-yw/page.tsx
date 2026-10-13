@@ -15,11 +15,19 @@ function todayISO(): string {
  *  Gained an Add Activity form, a per-row Overwrite button, inline
  *  editing, and an "In Charge" (planning_group) column (2026-10-11,
  *  the user's own requests), all `youth_activity_planning`-gated --
- *  see ActivitiesTable's own comment for the latter two. */
-export default async function CombinedYwActivitiesPage() {
+ *  see ActivitiesTable's own comment for the latter two.
+ *  `?readonly=1` (2026-10-12) forces all of that off regardless of
+ *  feature -- set when reached via the landing page's "This week"
+ *  tile, same convention as /dashboard. */
+export default async function CombinedYwActivitiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ readonly?: string }>;
+}) {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
-  const canManage = hasFeature(profile, "youth_activity_planning");
+  const { readonly: rawReadOnly } = await searchParams;
+  const canManage = hasFeature(profile, "youth_activity_planning") && rawReadOnly !== "1";
 
   const all = await getYouthActivities();
   const today = todayISO();

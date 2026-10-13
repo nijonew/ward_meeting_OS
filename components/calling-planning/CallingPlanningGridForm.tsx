@@ -10,7 +10,15 @@ import type { PersonOption } from "@/lib/data/people";
 import type { SelectOption } from "@/lib/data/select-options";
 
 const initialState: { error?: string; success?: boolean } = {};
-const INPUT_CLASS = "w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
+// Reduced from min-w-[9rem] and capped with a max-w (2026-10-12, the
+// user's own report that this many-column grid's horizontal scrollbar
+// is "clunky" and they'd "prefer to see the line wrapped") -- eight
+// 9rem-wide columns forced a ~72rem-wide table regardless of actual
+// content, triggering a scrollbar even when nothing was really
+// overflowing. Notes (the one field long enough to actually need
+// wrapping) is already a <textarea>, which wraps natively within this
+// same class's max-w.
+const INPUT_CLASS = "w-full min-w-[7rem] max-w-[16rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 const STORAGE_KEY = "calling-planning-grid-sort-filter";
 
 const COLUMNS = [

@@ -1970,6 +1970,101 @@ avoid confusing the two.
 
 ## Known open items
 
+**Four small requests worked through together, 2026-10-12** (continuing
+this week's priorities above -- "visibility to the right people at the
+right times" and "announcements... flawless" in particular):
+
+1. **"This week" tile section made genuinely read-only.** The user's
+   own framing: Sacrament Meeting Program and the public Announcements
+   listing were already fully read-only with nothing further reachable
+   from them, but Youth Activities' hub page (`/youth-activities`)
+   showed a "Manage" tile -- and the three Combined-group pages
+   rendered real Add Activity/inline-edit/Overwrite controls -- to any
+   account holding `youth_activity_planning`, directly from this
+   public-facing tier. New `?readonly=1` query param (same convention
+   `/dashboard` already established), set only by the landing page's
+   "This week" tile and propagated through `/youth-activities` and the
+   three Combined-group pages, forces all of that off regardless of
+   feature. An account that actually manages activities is unaffected
+   everywhere else -- "Youth program" -> Youth Activity Planning ->
+   Manage still reaches full access, since that path never carries the
+   flag. **Deliberately left alone**: an admin (`sacrament_planning`/
+   `sacrament_conducting`) clicking the Sacrament Meeting Program tile
+   still sees the full Planning/Conducting/Public tab chrome from
+   `/meetings/[id]/layout.tsx` -- that's the same pre-existing,
+   deliberate "Bishopric keeps unconditional any-stage/any-date
+   preview... building the program comes before it's ready" design
+   this file already documents elsewhere, not something this change
+   touched. Threading a forced-read-only mode through the whole meeting
+   layout/tab-nav system (which has no such concept today, unlike
+   `/dashboard`) would be a much larger change than what was asked --
+   flagging this scoping call explicitly in case a narrower fix is
+   wanted there too.
+2. **Manage Announcements rebuilt into real management.** The user's
+   own comparison across all three places announcements can be
+   touched: Submit (fine), Manage Announcements (Administration ->
+   `/announcements`, "looks like no real management can happen here...
+   essentially a viewing location again"), and the Announcements table
+   in Table Admin ("this is basically what I want manage announcements
+   to be"). The old `/announcements` was a thin Publish/Archive-only
+   list over `getGeneralSubmissions` -- no way to fix a typo, a wrong
+   date, or any other field short of leaving for Table Admin directly.
+   Now renders the exact same `AdminTableEditor` component and
+   `announcements` registry column config `/admin/announcements`
+   itself uses (full inline edit/add/delete across every field), but
+   through its own `updateAnnouncementRow`/`insertAnnouncementRow`/
+   `deleteAnnouncementRow` actions (`app/announcements/actions.ts`)
+   gated on `announcement_management` rather than
+   `table_admin_announcements` -- the two entry points stay
+   independently authorized while sharing all the real read/write
+   logic (`lib/admin/table-data.ts`). A small fallback list for agenda
+   items with no meeting yet (vanishingly rare now that submission
+   always resolves to a real meeting, 2026-09-09) stays underneath,
+   using the original Publish/Archive controls, so a genuinely stray
+   one is never silently hidden.
+3. **Zebra striping, sorting, and column filtering extended to every
+   Table Admin table.** `AdminTableEditor.tsx` (the one generic engine
+   behind every `/admin/[table]` page) already had click-to-sort
+   headers (2026-09-08) but never grew the Excel/Sheets-style
+   `ColumnFilterDropdown` checklist or the visible-position zebra
+   striping every other "favorite grid format" page already has.
+   Added both, plus localStorage persistence per table
+   (`usePersistedSortFilter`, keyed by `table-admin-<table>-sort-filter`)
+   matching the sibling grids' own established convention. Sort stays
+   on each row's committed value only (never jumps mid-edit); filtering
+   reacts live to an in-progress, unsaved edit (this component already
+   tracks edits in real React state via `drafts`, so no DOM-capture
+   trick was needed the way CallingPlanningGridForm's uncontrolled
+   inputs required) -- same split CallingPlanningGridForm already
+   established between the two.
+4. **Reduced the fixed minimum widths that were forcing unnecessary
+   horizontal scrolling on wide grids** (the user's own report, naming
+   Announcements and Calling Planning specifically: "The slider scroll
+   bar is clunky. I would prefer to see the line wrapped"). The real
+   driver turned out to be the *tables*, not any one cell's content --
+   `AdminTableEditor`'s own `<table>` had a flat `min-w-[720px]` floor
+   and every input/select carried `min-w-[120px]`; Calling Planning's
+   grid carried `min-w-[9rem]` per column. Stacked across 8-15+ columns
+   (Announcements has ~15), that forced a scrollbar regardless of
+   whether anything was actually too long to fit. Dropped the table's
+   own floor entirely and reduced each input's floor (to `6rem`/`7rem`)
+   with a `16rem` cap, in both `AdminTableEditor.tsx` and
+   `CallingPlanningGridForm.tsx` -- `<textarea>` cells (Body, Notes)
+   already wrap natively within that cap. **Real limitation, not fully
+   solved**: a plain single-line `<input>` (Title, Link, Location,
+   etc.) cannot wrap by the nature of the HTML element itself -- long
+   typed content there still scrolls *within* the input box rather than
+   wrapping onto a second line. Converting those to auto-growing
+   textareas was considered and deliberately not done here: it would
+   change every `text`-type column across every Table Admin table at
+   once (this engine has no per-table styling), including many short
+   fields where a multi-row textarea would be a visual regression, and
+   couldn't be verified without a live browser (no local Supabase
+   credentials in this working copy, same gap noted throughout this
+   file). Flag this if the scrollbar is still showing up in practice
+   after this change -- the next step would be a more surgical,
+   per-column fix rather than a blanket one.
+
 **Current priority queue (set by the user 2026-10-12), work top to
 bottom:** the second-Announcements-block feature (migration 074) is
 confirmed not working in practice -- the user's own words, "It didn't

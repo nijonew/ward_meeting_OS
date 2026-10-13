@@ -4,7 +4,11 @@ import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
-export default async function YouthActivitiesPage() {
+export default async function YouthActivitiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ readonly?: string }>;
+}) {
   // Now requires login (2026-10-07, the user's own request -- the
   // landing page's own tile shows "Please log in to see youth
   // activities" when logged out, and must actually mean it). Used to
@@ -14,7 +18,15 @@ export default async function YouthActivitiesPage() {
   // this just adds the login requirement on top of it.
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
-  const canManage = hasFeature(profile, "youth_activity_planning");
+  const { readonly: rawReadOnly } = await searchParams;
+  // `?readonly=1` (2026-10-12, same convention as /dashboard) -- set by
+  // the landing page's own "This week" tile so that entry point stays
+  // read-only even for an account that otherwise manages activities.
+  // Propagated to every tile below so drilling into a Combined-group
+  // page from here stays read-only too.
+  const isReadOnly = rawReadOnly === "1";
+  const canManage = hasFeature(profile, "youth_activity_planning") && !isReadOnly;
+  const suffix = isReadOnly ? "?readonly=1" : "";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -37,17 +49,21 @@ export default async function YouthActivitiesPage() {
           manager, and both Generate actions moved to the new Manage
           tile/page below instead of sitting inline here. */}
       <TileGrid>
-        <Tile title="Upcoming Activities" description="Every activity, all groups" href="/youth-activities/upcoming" />
+        <Tile title="Upcoming Activities" description="Every activity, all groups" href={`/youth-activities/upcoming${suffix}`} />
         <Tile
           title="Combined Young Men & Young Women Activities"
           description="Combined YM/YW schedule"
-          href="/youth-activities/combined-ym-yw"
+          href={`/youth-activities/combined-ym-yw${suffix}`}
         />
-        <Tile title="Combined Young Men Activities" description="Combined YM schedule" href="/youth-activities/combined-ym" />
+        <Tile
+          title="Combined Young Men Activities"
+          description="Combined YM schedule"
+          href={`/youth-activities/combined-ym${suffix}`}
+        />
         <Tile
           title="Combined Young Women Activities"
           description="Combined YW schedule"
-          href="/youth-activities/combined-yw"
+          href={`/youth-activities/combined-yw${suffix}`}
         />
         {canManage && (
           <Tile title="Manage" description="Add activities, cadence rules, and generate" href="/youth-activities/manage" />

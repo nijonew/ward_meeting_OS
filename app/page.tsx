@@ -106,10 +106,24 @@ export default async function HomePage() {
               gated. The page itself (app/youth-activities/page.tsx)
               enforces the same login requirement server-side; this
               tile alone wouldn't stop someone from typing the URL. */}
+          {/* `readonly=1` (2026-10-12, the user's own request: "leave
+              everything in the 'This Week' section read only") -- the
+              other two tiles in this tier were already read-only with
+              no further management reachable from them (the public
+              program page, and the public announcements listing have
+              no admin controls at all), but Youth Activities' own hub
+              page shows a Manage tile (and the three Combined-group
+              pages render real Add/Edit/Overwrite controls inline) for
+              any account holding youth_activity_planning -- this flag
+              suppresses all of that for this one entry point, mirroring
+              /dashboard's own readonly convention. An account that
+              actually needs to manage activities still reaches full
+              access the normal way, via "Youth program" -> Youth
+              Activity Planning -> Manage. */}
           <Tile
             title="Youth Activities"
             description="Planned activities for YW and YM"
-            href={user ? "/youth-activities" : undefined}
+            href={user ? "/youth-activities?readonly=1" : undefined}
             disabledLabel={user ? undefined : "Please log in to see youth activities"}
           />
           {/* "Scheduled Events" (the merged Youth Activities + Ward

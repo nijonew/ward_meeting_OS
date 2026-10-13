@@ -3,28 +3,25 @@
 import { useMemo, useState, useTransition } from "react";
 import type { AdminColumnConfig, AdminOption } from "@/lib/admin/types";
 import { MeetingDatePicker } from "./MeetingDatePicker";
+import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
+import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type ActionResult = { success?: true; error?: string };
-type SortDirection = "asc" | "desc";
 
 /** Nulls/blanks always sort last regardless of direction -- a common
  *  enough convention that "reversing" a sort doesn't also mean hunting
- *  for blanks at the top. Numbers and booleans compare natively;
- *  everything else (including dates/times, which are ISO strings) is a
- *  locale-aware string compare with numeric awareness ("2" < "10"). */
-function compareValues(a: unknown, b: unknown): number {
-  const aBlank = a === null || a === undefined || a === "";
-  const bBlank = b === null || b === undefined || b === "";
-  if (aBlank && bBlank) return 0;
-  if (aBlank) return 1;
-  if (bBlank) return -1;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "boolean" && typeof b === "boolean") return a === b ? 0 : a ? 1 : -1;
-  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+ *  for blanks at the top. Everything is compared as the same display
+ *  text `cellText` resolves (see below), via a locale-aware string
+ *  compare with numeric awareness ("2" < "10"). */
+function compareValues(a: string, b: string): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-const INPUT_CLASS = "w-full min-w-[120px] rounded border border-rule bg-paper px-2 py-1 text-xs text-ink";
+const INPUT_CLASS = "w-full min-w-[6rem] max-w-[16rem] rounded border border-rule bg-paper px-2 py-1 text-xs text-ink";
 
 /**
  * Generic spreadsheet-style grid for one table: every row's cells are
@@ -33,6 +30,30 @@ const INPUT_CLASS = "w-full min-w-[120px] rounded border border-rule bg-paper px
  * new one. Which columns exist and how each renders (text/select/FK
  * dropdown/etc.) comes entirely from the table's AdminColumnConfig --
  * this component has no per-table logic of its own.
+ *
+ * **Sort/filter/zebra striping extended to every Table Admin table,
+ * 2026-10-12** (the user's own request: "Can we also get the zebra
+ * striping, sorting, and filtering on all tables in table admin?").
+ * This grid already had click-to-sort headers (2026-09-08); filtering
+ * (the same Excel/Sheets-style `ColumnFilterDropdown` checklist every
+ * other "favorite grid format" page already uses) and zebra striping
+ * (keyed to visible row position, not DOM position -- see
+ * CallingPlanningGridForm's own comment for why `:nth-child`-based
+ * striping breaks once a filter hides rows) are new. Sort/filter are
+ * persisted to localStorage per table (`usePersistedSortFilter`, keyed
+ * by `table`) for the same reason the sibling grids already do --
+ * matches this app's own established convention rather than leaving
+ * Table Admin as the one place sort/filter resets on every refresh.
+ *
+ * Sort uses each row's *committed* value only (not an in-progress,
+ * unsaved edit) so sorting never jumps a row out from under someone
+ * mid-edit -- same rule CallingPlanningGridForm already established.
+ * Filtering, by contrast, reacts live to `drafts` (already tracked in
+ * this component's own React state, unlike the sibling grids' plain
+ * uncontrolled inputs) -- editing a cell to a value the active filter
+ * excludes hides that row immediately, matching Calling Planning's own
+ * "if I move something to complete I'd like that row to disappear"
+ * behavior.
  */
 export function AdminTableEditor({
   table,
@@ -62,45 +83,15 @@ export function AdminTableEditor({
   const [newRow, setNewRow] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [sort, setSort] = useState<{ column: string; direction: SortDirection } | null>(null);
+  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<string>(`table-admin-${table}-sort-filter`);
 
   const toggleSort = (columnKey: string) => {
     setSort((prev) => {
-      if (!prev || prev.column !== columnKey) return { column: columnKey, direction: "asc" };
-      if (prev.direction === "asc") return { column: columnKey, direction: "desc" };
+      if (!prev || prev.key !== columnKey) return { key: columnKey, direction: "asc" };
+      if (prev.direction === "asc") return { key: columnKey, direction: "desc" };
       return null; // third click clears the sort, back to server/insertion order
     });
   };
-
-  // Client-side only, per the open item this closes: re-sort the already-
-  // fetched `rows` prop in place for display, nothing server-side or
-  // persisted. select/foreign_key columns sort by their displayed label
-  // (name, etc.) rather than the raw id, since sorting by UUID would be
-  // meaningless -- falls back to the raw value if no option matches.
-  const sortedRows = useMemo(() => {
-    if (!sort) return rows;
-    const column = columns.find((c) => c.column === sort.column);
-    if (!column) return rows;
-
-    let labels: Map<string, string> | null = null;
-    if (column.type === "select" || column.type === "foreign_key") {
-      const opts = column.type === "select" ? (column.options ?? []) : (fkOptions[column.column] ?? []);
-      labels = new Map(opts.map((o) => [o.value, o.label]));
-    }
-
-    const sorted = [...rows].sort((a, b) => {
-      if (column.type === "reverse_lookup") {
-        const byRow = reverseLookupValues?.[column.column] ?? {};
-        return compareValues(byRow[a.id] ?? "", byRow[b.id] ?? "");
-      }
-      const rawA = a[sort.column];
-      const rawB = b[sort.column];
-      const va = labels ? (labels.get(String(rawA)) ?? rawA) : rawA;
-      const vb = labels ? (labels.get(String(rawB)) ?? rawB) : rawB;
-      return compareValues(va, vb);
-    });
-    return sort.direction === "desc" ? sorted.reverse() : sorted;
-  }, [rows, sort, columns, fkOptions, reverseLookupValues]);
 
   // No local copy of `rows`: onUpdate/onInsert/onDelete are server actions
   // called inside startTransition, so Next refreshes this route's props
@@ -108,6 +99,83 @@ export function AdminTableEditor({
   // `rows` below is always the latest server state.
   const valueFor = (row: AdminRow, column: string) => drafts[row.id]?.[column] ?? row[column];
   const isDirty = (id: string) => Boolean(drafts[id]);
+
+  // Resolves any column's value to the display text sort/filter/the
+  // column-filter checklist all compare against -- select/foreign_key
+  // resolve to their option's label (sorting/filtering by raw UUID
+  // would be meaningless), reverse_lookup reads the precomputed map
+  // (it has no real column on this row to draft at all), boolean
+  // becomes Yes/No, everything else is just its string form.
+  const resolveDisplayText = (column: AdminColumnConfig, raw: unknown, row: AdminRow): string => {
+    if (column.type === "reverse_lookup") {
+      return reverseLookupValues?.[column.column]?.[row.id] ?? "";
+    }
+    if (column.type === "boolean") return raw ? "Yes" : "No";
+    if (column.type === "select" || column.type === "foreign_key") {
+      const opts = column.type === "select" ? (column.options ?? []) : (fkOptions[column.column] ?? []);
+      const label = opts.find((o) => o.value === String(raw))?.label;
+      if (label) return label;
+    }
+    if (raw === null || raw === undefined || raw === "") return "";
+    return String(raw);
+  };
+
+  // Committed (last-saved) display text -- used for sorting and for the
+  // column-filter dropdown's own list of distinct values, so neither
+  // jumps around while a cell is mid-edit.
+  const cellText = (row: AdminRow, column: AdminColumnConfig): string => resolveDisplayText(column, row[column.column], row);
+  // Draft-aware display text -- used for filter *matching*, so editing a
+  // cell to a value the active filter excludes hides that row right
+  // away (matches CallingPlanningGridForm's own live-filter behavior).
+  const liveCellText = (row: AdminRow, column: AdminColumnConfig): string =>
+    resolveDisplayText(column, valueFor(row, column.column), row);
+
+  // Client-side only, per the open item this closes: re-sort the already-
+  // fetched `rows` prop in place for display, nothing server-side or
+  // persisted.
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const column = columns.find((c) => c.column === sort.key);
+    if (!column) return rows;
+    const sorted = [...rows].sort((a, b) => compareValues(cellText(a, column), cellText(b, column)));
+    return sort.direction === "desc" ? sorted.reverse() : sorted;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cellText closes over fkOptions/reverseLookupValues already in deps
+  }, [rows, sort, columns, fkOptions, reverseLookupValues]);
+
+  // Every distinct value per column, across the whole (unsorted,
+  // unfiltered) dataset -- what each column's own filter dropdown
+  // offers, independent of any other column's active filter (matching
+  // Excel's own AutoFilter).
+  const columnValues = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    for (const c of columns) {
+      result[c.column] = [...new Set(rows.map((r) => cellText(r, c)))];
+    }
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cellText closes over fkOptions/reverseLookupValues already in deps
+  }, [rows, columns, fkOptions, reverseLookupValues]);
+
+  const matchesFilters = (row: AdminRow) =>
+    columns.every((c) => {
+      const selected = filters[c.column];
+      return selected == null || selected.has(liveCellText(row, c));
+    });
+
+  // Which stripe (if any) each VISIBLE row gets, keyed by row id --
+  // walks sortedRows in order and skips anything the active filters
+  // hide, so striping always strictly alternates across whatever's
+  // actually on screen (not DOM position, which still includes
+  // filtered-out rows -- see this file's own doc comment).
+  const stripeByRowId = new Map<string, boolean>();
+  {
+    let visibleIndex = 0;
+    for (const row of sortedRows) {
+      if (!matchesFilters(row)) continue;
+      stripeByRowId.set(row.id, visibleIndex % 2 === 1);
+      visibleIndex++;
+    }
+  }
+  const visibleCount = stripeByRowId.size;
 
   /** Real FK choices for a column, narrowed to this row's scope if the
    *  column declares scopedBy, plus any config-defined pseudo-choices. */
@@ -185,22 +253,29 @@ export function AdminTableEditor({
   return (
     <div className="overflow-x-auto rounded border border-rule bg-surface p-6">
       {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-      <table className="w-full min-w-[720px] text-sm">
+      <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
             {columns.map((c) => (
               <th key={c.column} className="pb-2 pr-3">
-                <button
-                  type="button"
-                  onClick={() => toggleSort(c.column)}
-                  className="flex items-center gap-1 hover:text-ink"
-                  title="Sort by this column"
-                >
-                  {c.label}
-                  <span className="w-2.5 text-[9px]">
-                    {sort?.column === c.column ? (sort.direction === "asc" ? "▲" : "▼") : ""}
-                  </span>
-                </button>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(c.column)}
+                    className="flex items-center gap-1 hover:text-ink"
+                    title="Sort by this column"
+                  >
+                    {c.label}
+                    <span className="w-2.5 text-[9px]">
+                      {sort?.key === c.column ? (sort.direction === "asc" ? "▲" : "▼") : ""}
+                    </span>
+                  </button>
+                  <ColumnFilterDropdown
+                    values={columnValues[c.column] ?? []}
+                    selected={filters[c.column] ?? null}
+                    onChange={(next) => setFilters((prev) => ({ ...prev, [c.column]: next }))}
+                  />
+                </div>
               </th>
             ))}
             <th className="pb-2" />
@@ -208,11 +283,20 @@ export function AdminTableEditor({
         </thead>
         <tbody>
           {sortedRows.map((row) => (
-            <tr key={row.id} className="border-b border-rule/40 last:border-0">
+            <tr
+              key={row.id}
+              hidden={!stripeByRowId.has(row.id)}
+              className={[
+                "border-b border-rule/40 align-top last:border-0 hover:bg-accent/15",
+                stripeByRowId.get(row.id) ? "bg-accent-soft" : "",
+              ].join(" ")}
+            >
               {columns.map((c) => (
                 <td key={c.column} className="py-2 pr-3">
                   {c.type === "reverse_lookup" ? (
-                    <span className="text-xs text-ink-muted">{reverseLookupValues?.[c.column]?.[row.id] || "—"}</span>
+                    <span className="block max-w-[16rem] whitespace-normal break-words text-xs text-ink-muted">
+                      {reverseLookupValues?.[c.column]?.[row.id] || "—"}
+                    </span>
                   ) : (
                     <AdminCellInput
                       column={c}
@@ -274,6 +358,7 @@ export function AdminTableEditor({
           </tr>
         </tbody>
       </table>
+      {rows.length > 0 && visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No rows match the current filters.</p>}
     </div>
   );
 }
