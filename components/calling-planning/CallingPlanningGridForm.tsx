@@ -281,8 +281,8 @@ export function CallingPlanningGridForm({
 
   const matchesFilters = (row: CallingPlanningRow) =>
     COLUMNS.every((c) => {
-      const selected = filters[c.key];
-      return selected == null || selected.has(liveCellText(row, c.key));
+      const excluded = filters[c.key];
+      return excluded == null || !excluded.has(liveCellText(row, c.key));
     });
   const visibleCount = sortedRows.filter(matchesFilters).length;
 
@@ -335,7 +335,7 @@ export function CallingPlanningGridForm({
                     </button>
                     <ColumnFilterDropdown
                       values={columnValues[c.key]}
-                      selected={filters[c.key] ?? null}
+                      excluded={filters[c.key] ?? null}
                       onChange={(next) => setFilters((prev) => ({ ...prev, [c.key]: next }))}
                     />
                   </div>

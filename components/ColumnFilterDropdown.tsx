@@ -15,18 +15,33 @@ const EMPTY_LABEL = "(Blanks)";
  * that actually had a per-column filter at all (Table Admin's own
  * sortable headers never grew one).
  *
- * `selected` follows Excel's own semantics: `null` means every value
- * is showing (the common/default state, and what a freshly-loaded grid
- * starts in) -- a real `Set` only ever gets created once at least one
- * value has been unchecked. An empty `Set` is a real, valid state too
- * (every box unchecked -- matches every row disappearing, same as
- * Excel), not collapsed back to `null`. The caller owns this state and
- * is responsible for computing `values` (every distinct value
- * currently in that column, across the *whole* dataset -- not
- * re-narrowed by other active filters, matching Excel's own default
- * per-column-independent behavior) and for actually filtering rows
- * against it; this component only renders the picker and reports
- * back what's checked.
+ * `excluded` tracks which values are *unchecked* (hidden), not which
+ * are checked -- `null` means nothing is excluded, i.e. every value is
+ * showing (the common/default state, and what a freshly-loaded grid
+ * starts in). A real `Set` only ever gets created once at least one
+ * value has actually been unchecked, and holds just those -- toggling
+ * every value back on collapses it back to `null`.
+ *
+ * **Deliberately NOT "the set of checked values," 2026-10-12** (a real
+ * bug found in production: the user changed a Calling Planning row's
+ * Status to "To be announced," and the row silently vanished). Root
+ * cause: the original version of this component tracked the opposite
+ * -- which values were *shown* -- so a brand-new value that didn't
+ * exist in any row the last time this column's filter was touched was
+ * never something the user could have checked, and got treated as
+ * excluded by default the moment it appeared. Tracking exclusions
+ * instead means a value nobody has ever explicitly unchecked is always
+ * visible, including one that didn't exist yet when the filter was
+ * last set -- matching what a user actually expects ("I didn't hide
+ * this, why is it hidden").
+ *
+ * The caller owns this state and is responsible for computing `values`
+ * (every distinct value currently in that column, across the *whole*
+ * dataset -- not re-narrowed by other active filters, matching Excel's
+ * own default per-column-independent behavior) and for actually
+ * filtering rows against it (show a row when `excluded == null ||
+ * !excluded.has(value)`); this component only renders the picker and
+ * reports back what's excluded.
  *
  * **Rendered through a portal, 2026-10-10** -- the first version
  * positioned its panel `absolute` inside the trigger button's own
@@ -47,11 +62,11 @@ const EMPTY_LABEL = "(Blanks)";
  */
 export function ColumnFilterDropdown({
   values,
-  selected,
+  excluded,
   onChange,
 }: {
   values: string[];
-  selected: Set<string> | null;
+  excluded: Set<string> | null;
   onChange: (next: Set<string> | null) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -90,14 +105,14 @@ export function ColumnFilterDropdown({
     ? sortedValues.filter((v) => (v || EMPTY_LABEL).toLowerCase().includes(search.trim().toLowerCase()))
     : sortedValues;
 
-  const isChecked = (v: string) => selected === null || selected.has(v);
-  const isFiltered = selected !== null && selected.size < values.length;
+  const isChecked = (v: string) => excluded === null || !excluded.has(v);
+  const isFiltered = excluded !== null && excluded.size > 0;
 
   function toggleValue(v: string) {
-    const base = selected === null ? new Set(values) : new Set(selected);
+    const base = excluded === null ? new Set<string>() : new Set(excluded);
     if (base.has(v)) base.delete(v);
     else base.add(v);
-    onChange(base.size === values.length ? null : base);
+    onChange(base.size === 0 ? null : base);
   }
 
   return (
@@ -130,7 +145,11 @@ export function ColumnFilterDropdown({
               <button type="button" onClick={() => onChange(null)} className="text-ink-muted underline hover:text-ink">
                 Select all
               </button>
-              <button type="button" onClick={() => onChange(new Set())} className="text-ink-muted underline hover:text-ink">
+              <button
+                type="button"
+                onClick={() => onChange(new Set(values))}
+                className="text-ink-muted underline hover:text-ink"
+              >
                 Clear
               </button>
             </div>

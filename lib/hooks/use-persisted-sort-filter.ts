@@ -11,10 +11,24 @@ interface StoredState<K extends string> {
   filters: Partial<Record<K, string[] | null>>;
 }
 
+// Bumped 2026-10-12: ColumnFilterDropdown's `filters` Set flipped
+// meaning from "the values shown" to "the values excluded" (fixing a
+// real bug -- a brand-new value, never seen before, used to be treated
+// as hidden by default; see that component's own comment). A v1 entry
+// loaded under the new code would have its Set reinterpreted with the
+// opposite meaning -- silently showing only what used to be hidden, and
+// vice versa -- so this intentionally drops any pre-existing save
+// rather than risk that. Bump again if this Set's meaning ever changes.
+const STORAGE_VERSION = "v2";
+
+function versionedKey(storageKey: string): string {
+  return `${storageKey}::${STORAGE_VERSION}`;
+}
+
 function loadState<K extends string>(storageKey: string): StoredState<K> | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = window.localStorage.getItem(versionedKey(storageKey));
     return raw ? (JSON.parse(raw) as StoredState<K>) : null;
   } catch {
     return null;
@@ -29,7 +43,7 @@ function saveState<K extends string>(storageKey: string, sort: SortState<K>, fil
     for (const [key, value] of entries) {
       serializedFilters[key] = value == null ? null : [...value];
     }
-    window.localStorage.setItem(storageKey, JSON.stringify({ sort, filters: serializedFilters }));
+    window.localStorage.setItem(versionedKey(storageKey), JSON.stringify({ sort, filters: serializedFilters }));
   } catch {
     // Storage full or unavailable (private browsing, etc.) -- not worth surfacing to the user.
   }

@@ -1970,6 +1970,43 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-12: a new Excel-filter value could vanish
+a row with no warning.** The user's own report, right after the slow-
+navigation fix just below: they changed a Calling Planning row's Status
+to "To be announced," and the row disappeared from the grid entirely --
+read at first as a sort bug, but it was the column filter (same header
+cell, easy to conflate with the sort button next to it).
+
+Root cause: `ColumnFilterDropdown` (and the three grids that use it --
+CallingPlanningGridForm, ActivitiesTable, and AdminTableEditor, the
+last two newly wired up this same day) tracked which values were
+*shown* -- `selected: Set<string> | null`, `null` meaning everything
+visible, a real `Set` holding whichever values the user had left
+checked. That's backwards for a value that didn't exist in any row the
+last time the filter was touched: it was never something the user
+*could* have checked, so the moment a row's value changed to it, it
+read as "not in the selected set" and vanished -- with no way for the
+user to have known that status was about to be excluded, since it
+never appeared as an uncheckable option until the instant it did.
+
+Fixed by flipping what the `Set` tracks: `ColumnFilterDropdown`'s prop
+is now `excluded` (the *unchecked* values), not `selected` (the checked
+ones) -- `null` still means nothing's excluded/everything shows, same
+default as before, but a brand-new value nobody has ever explicitly
+unchecked is now always visible, including one that didn't exist yet
+when the filter was last set. All three consuming grids'
+`matchesFilters` flipped to match (`excluded == null ||
+!excluded.has(value)`). **Also bumped `usePersistedSortFilter`'s
+internal localStorage key** (`lib/hooks/use-persisted-sort-filter.ts`,
+now suffixed `::v2`) -- a v1-saved filter, loaded under the new code
+with no migration, would have had its Set silently reinterpreted with
+the *opposite* meaning (showing only what used to be hidden and vice
+versa), which is a worse bug than just resetting everyone's saved
+filter/sort once. Confirmed via `tsc`/`eslint`/`next build` only, same
+no-live-browser gap as everything else this session -- ask the user to
+re-check a filtered column (Calling Planning's Status is the one
+already confirmed broken) once deployed.
+
 **Bug found and fixed 2026-10-12: "navigation is very very slow again" --
 not the database.** The user's own report, right after the four requests
 below shipped. This assistant has no live database access, so diagnosis

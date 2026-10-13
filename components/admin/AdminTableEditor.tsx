@@ -157,8 +157,8 @@ export function AdminTableEditor({
 
   const matchesFilters = (row: AdminRow) =>
     columns.every((c) => {
-      const selected = filters[c.column];
-      return selected == null || selected.has(liveCellText(row, c));
+      const excluded = filters[c.column];
+      return excluded == null || !excluded.has(liveCellText(row, c));
     });
 
   // Which stripe (if any) each VISIBLE row gets, keyed by row id --
@@ -272,7 +272,7 @@ export function AdminTableEditor({
                   </button>
                   <ColumnFilterDropdown
                     values={columnValues[c.column] ?? []}
-                    selected={filters[c.column] ?? null}
+                    excluded={filters[c.column] ?? null}
                     onChange={(next) => setFilters((prev) => ({ ...prev, [c.column]: next }))}
                   />
                 </div>
