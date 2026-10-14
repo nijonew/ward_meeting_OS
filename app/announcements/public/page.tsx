@@ -111,6 +111,20 @@ export default async function PublicAnnouncementsPage() {
                   {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
                   {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
                   {a.location && <p className="mt-1 text-[11px] text-ink-muted/70">Location: {a.location}</p>}
+                  {/* 2026-10-13, the user's own request: "can we get the
+                      word 'Link' to show up in the public views of the
+                      announcements as a hyperlink to any announcement
+                      that has a url?" -- the title itself has been
+                      clickable since 2026-10-10, but nothing visibly
+                      said so; this is a plainer, more obvious second
+                      way to reach the same URL. */}
+                  {a.link_url && (
+                    <p className="mt-1 text-[11px] text-ink-muted/70">
+                      <a href={a.link_url} className="underline decoration-ink-muted/40 hover:decoration-ink">
+                        Link
+                      </a>
+                    </p>
+                  )}
                 </li>
               );
             })}

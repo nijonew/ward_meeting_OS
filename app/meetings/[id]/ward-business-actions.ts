@@ -32,9 +32,20 @@ function revalidateBoth(meetingId: string) {
  * Unlike that function, this isn't limited to rows already marked "To
  * Announce in Sacrament" -- the user's own request: "the ability to
  * call in other items from calling planning even if they aren't marked
- * as ready." Pulling a row in *is* the decision to announce it, so it
- * still advances calling_status/release_status to the next step
- * regardless of where it started.
+ * as ready." Pulling a row in records where it was announced
+ * (`announced_meeting_id`) regardless of where its status started.
+ *
+ * **Calling status no longer auto-advances to "To Record," 2026-10-13**
+ * (the user's own request: "I don't want the status of those that are
+ * 'To be Announced' to change to 'To Record' automatically. I want it
+ * to be a manual change for that status change."). Pulling a calling
+ * in now leaves `calling_status` exactly as it was -- the admin moves
+ * it to "To Record" (or wherever) themselves, on their own timing,
+ * via the grid's own Status column. **Release's own auto-advance (to
+ * "Complete") is unchanged** -- the request above was specific to the
+ * calling side's "To Record" transition; release never used "To
+ * Record" as a target in the first place (it jumps straight to
+ * "Complete"), and nothing was said about changing that one.
  */
 export async function pullCallingPlanningIntoMeeting(
   meetingId: string,
@@ -60,8 +71,7 @@ export async function pullCallingPlanningIntoMeeting(
 
   let personId: string;
   let type: string;
-  let statusColumn: "calling_status" | "release_status";
-  let nextStatus: string;
+  const statusUpdate: Record<string, string> = {};
 
   if (kind === "calling") {
     const candidateIds = (planning.candidate_person_ids ?? []) as string[];
@@ -70,23 +80,14 @@ export async function pullCallingPlanningIntoMeeting(
     }
     personId = candidateIds[0];
     type = "new_calling";
-    statusColumn = "calling_status";
-    // "to_be_set_apart" doesn't exist in the redesigned calling_status
-    // vocabulary (2026-10-10, see lib/data/calling-planning.ts's own
-    // comment) -- "To Record" sits immediately after "To be Announced"
-    // in the user's own ordered list, with nothing in between.
-    nextStatus = "to_record";
+    // No calling_status change -- see this function's own doc comment.
   } else {
     if (!planning.release_person_id) {
       return { error: "No one is set to be released on this row." };
     }
     personId = planning.release_person_id;
     type = "release";
-    statusColumn = "release_status";
-    // "to_record" doesn't exist in the redesigned release_status
-    // vocabulary either -- "Complete" sits immediately after "To be
-    // Announced" there, with no intermediate recording stage anymore.
-    nextStatus = "complete";
+    statusUpdate.release_status = "complete";
   }
 
   const { data: rabnm, error: rabnmError } = await supabase
@@ -103,7 +104,7 @@ export async function pullCallingPlanningIntoMeeting(
 
   const { error: updateError } = await supabase
     .from("calling_planning")
-    .update({ announced_meeting_id: meetingId, [statusColumn]: nextStatus, updated_at: new Date().toISOString() })
+    .update({ announced_meeting_id: meetingId, ...statusUpdate, updated_at: new Date().toISOString() })
     .eq("id", planningId);
   if (updateError) return { error: updateError.message };
 
@@ -115,14 +116,23 @@ export async function pullCallingPlanningIntoMeeting(
  * Reverses pullCallingPlanningIntoMeeting -- removes the
  * sacrament_rabnm row this meeting's Ward Business created (and its
  * sacrament_rabnm_people rows, explicitly, same reasoning as
- * delete_meeting_cascade: don't assume a cascade exists) and resets the
- * Calling Planning row back to "To be Announced"
- * (announced_meeting_id cleared) so it can be pulled into a different
- * meeting, or this one again, without manual database cleanup. Only
- * ever touches a row this mechanism itself created
+ * delete_meeting_cascade: don't assume a cascade exists) and clears
+ * `announced_meeting_id` so it can be pulled into a different meeting,
+ * or this one again, without manual database cleanup. Only ever
+ * touches a row this mechanism itself created
  * (sacrament_rabnm.calling_planning_id, migration 055) -- a
  * manually-added "Other" item has no such link and isn't reachable
  * through this action.
+ *
+ * **Only resets `release_status` back to "To be Announced," not
+ * `calling_status`, 2026-10-13** -- matching
+ * `pullCallingPlanningIntoMeeting`'s own change the same day: pulling
+ * a calling in no longer auto-advances `calling_status` at all, so
+ * there's nothing of this flow's own doing left to undo on that
+ * column. Forcing it back to "to_announce" here regardless would risk
+ * clobbering a real manual status change the admin made in the
+ * meantime (exactly the kind of automatic status change they asked to
+ * stop happening).
  */
 export async function removeCallingPlanningFromMeeting(meetingId: string, planningId: string): Promise<ActionResult> {
   const denied = await requireRabnmFeature();
@@ -147,10 +157,10 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
     if (deleteError) return { error: deleteError.message };
   }
 
-  const statusColumn = rabnmRow?.type === "release" ? "release_status" : "calling_status";
+  const statusUpdate: Record<string, string> = rabnmRow?.type === "release" ? { release_status: "to_announce" } : {};
   const { error: updateError } = await supabase
     .from("calling_planning")
-    .update({ announced_meeting_id: null, [statusColumn]: "to_announce", updated_at: new Date().toISOString() })
+    .update({ announced_meeting_id: null, ...statusUpdate, updated_at: new Date().toISOString() })
     .eq("id", planningId);
   if (updateError) return { error: updateError.message };
 

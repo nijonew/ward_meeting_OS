@@ -403,13 +403,13 @@ function AdminCellInput({
     );
   }
 
-  if (column.type === "long_text") {
+  if (column.type === "long_text" || (column.type === "text" && column.wrap)) {
     return (
       <textarea
         value={value == null ? "" : String(value)}
         onChange={(e) => onChange(e.target.value)}
         rows={2}
-        className={INPUT_CLASS}
+        className={`${INPUT_CLASS} resize-y`}
       />
     );
   }

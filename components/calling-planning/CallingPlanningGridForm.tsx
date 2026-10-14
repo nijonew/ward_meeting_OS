@@ -19,6 +19,16 @@ const initialState: { error?: string; success?: boolean } = {};
 // wrapping) is already a <textarea>, which wraps natively within this
 // same class's max-w.
 const INPUT_CLASS = "w-full min-w-[7rem] max-w-[16rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
+// Wider, for Calling and Release Person specifically (2026-10-13, the
+// user's own follow-up: "so we can see the calling and release that
+// are associated with each other... a large enough field... I can see
+// all of the information"). A <select>'s own displayed text can't
+// wrap the way a <textarea> can -- the browser just clips it -- so the
+// only real fix for these two is a wider box. Calling names in
+// particular run long ("Young Women Camp Director," etc.); Status/
+// Release Status stay on the narrower INPUT_CLASS since their longest
+// real label ("To be Announced") already fits comfortably there.
+const WIDE_SELECT_CLASS = "w-full min-w-[11rem] max-w-[22rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 const STORAGE_KEY = "calling-planning-grid-sort-filter";
 
 const COLUMNS = [
@@ -376,7 +386,7 @@ export function CallingPlanningGridForm({
                       changes -- never during an in-progress, unsaved
                       edit, since `row` itself only updates after a
                       real save. */}
-                  <select key={row.calling_id} name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={INPUT_CLASS}>
+                  <select key={row.calling_id} name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={WIDE_SELECT_CLASS}>
                     {callingOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -434,7 +444,7 @@ export function CallingPlanningGridForm({
                     key={row.release_person_id ?? ""}
                     name={`${row.id}::release_person_id`}
                     defaultValue={row.release_person_id ?? ""}
-                    className={INPUT_CLASS}
+                    className={WIDE_SELECT_CLASS}
                   >
                     <option value="">None / Previously Vacant</option>
                     {people.map((p) => (

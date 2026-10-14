@@ -1970,6 +1970,60 @@ avoid confusing the two.
 
 ## Known open items
 
+**Three more requests, 2026-10-13, same session as the two below:**
+1. **Calling Planning's "To Record" auto-advance removed.** The user's
+   own words: "I don't want the status of those that are 'To be
+   Announced' to change to 'To Record' automatically. I want it to be
+   a manual change for that status change." Both places that pushed a
+   calling into a Sacrament Meeting's Ward Business used to also flip
+   `calling_status` from `to_announce` to `to_record` as a side effect
+   (`pushCallingToSacramentMeeting`, `app/calling-planning/actions.ts`;
+   `pullCallingPlanningIntoMeeting`, `app/meetings/[id]/ward-business-actions.ts`)
+   -- both now leave `calling_status` untouched; the admin moves it
+   themselves, whenever they actually want to. The matching undo
+   (`removeCallingPlanningFromMeeting`) was updated to match -- it used
+   to force `calling_status` back to `to_announce` on removal too,
+   which would now risk clobbering a real manual status change made in
+   the meantime, so it no longer touches that column at all. **Release's
+   own auto-advance (`to_announce` -> `complete`) is deliberately
+   unchanged** -- the request was specific to the calling side's "To
+   Record" step; release never used "To Record" as a target to begin
+   with (it jumps straight to "Complete"), and nothing was said about
+   changing that one. Flag if release should get the same treatment.
+2. **Wider fields instead of a wider table, where wrapping isn't
+   possible.** The user's own words, after the earlier Table Admin
+   width reduction: "if we can't wrap the whole row... can we at least
+   have a large enough field in the row that when wrapped I can see
+   all of the information? Same with the announcement table." A
+   `<select>`'s own displayed text can't wrap (browser limitation, not
+   a styling choice) -- only widening the box actually works there.
+   Calling Planning's own Calling and Release Person columns (the two
+   the user specifically named, "so we can see the calling and release
+   that are associated with each other") now use a wider class
+   (`min-w-[11rem] max-w-[22rem]`, vs. the rest of that grid's
+   `min-w-[7rem] max-w-[16rem]`) -- Status/Release Status stayed
+   narrow, since their longest real label already fits. For the
+   Announcements table specifically, new optional `wrap` flag on
+   `AdminColumnConfig` (`lib/admin/types.ts`) -- opt-in per column
+   rather than a blanket change to every "text" column in every Table
+   Admin table (most are short, fixed-shape fields that would just get
+   visually taller for nothing) -- renders a `text`-type column as a
+   small `resize-y` `<textarea>` instead of a single-line `<input>`
+   when set. Turned on for Announcements' Title/Organization/Type/
+   Audience/Where Announced/Location/Link columns (`lib/admin/registry.ts`)
+   -- Submitted By/Email/Status stayed plain, being short and
+   fixed-shape.
+3. **A visible "Link" hyperlink on the public Announcements page.**
+   The user's own words: "can we get the word 'Link' to show up in the
+   public views of the announcements as a hyperlink to any
+   announcement that has a url?" The announcement's own title has been
+   clickable when `link_url` is set since 2026-10-10, but nothing
+   visibly indicated that -- `app/announcements/public/page.tsx` now
+   also shows a plain "Link" line (same small-caption styling as the
+   existing "Location:" line) underneath, a second, more obvious way
+   to reach the same URL. Didn't touch the title-is-a-link behavior,
+   which stays as-is alongside this.
+
 **Two Calling Planning requests, 2026-10-13, right after the save-
 display bug above was confirmed fixed:**
 1. **"When we add a calling change for a new calling I would like to

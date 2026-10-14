@@ -203,15 +203,16 @@ export async function pushCallingToSacramentMeeting(
   const inserts: { type: string; person_id: string }[] = [];
   const statusUpdates: Record<string, string> = {};
 
-  // Next-status targets match pullCallingPlanningIntoMeeting's own
-  // reasoning (app/meetings/[id]/ward-business-actions.ts) -- neither
-  // "to_be_set_apart" nor the release side's old "to_record" exist in
-  // the redesigned status vocabulary (2026-10-10), so both now advance
-  // straight to whatever immediately follows "To be Announced" in the
-  // user's own ordered list.
+  // calling_status no longer auto-advances to "To Record" here
+  // (2026-10-13, the user's own request: "I don't want the status of
+  // those that are 'To be Announced' to change to 'To Record'
+  // automatically. I want it to be a manual change for that status
+  // change.") -- same fix as pullCallingPlanningIntoMeeting's own
+  // matching change the same day; see that function's doc comment for
+  // the full reasoning, including why release's own advance (to
+  // "Complete") is unchanged.
   if (planning.calling_status === "to_announce" && candidateIds.length === 1) {
     inserts.push({ type: "new_calling", person_id: candidateIds[0] });
-    statusUpdates.calling_status = "to_record";
   }
   if (planning.release_status === "to_announce" && planning.release_person_id) {
     inserts.push({ type: "release", person_id: planning.release_person_id });

@@ -36,6 +36,17 @@ export interface AdminColumnConfig {
   label: string;
   type: AdminColumnType;
   required?: boolean;
+  /** For type: "text" only -- renders as a small wrapping <textarea>
+   *  instead of a single-line <input> (2026-10-13, the user's own
+   *  report: "a large enough field... when wrapped I can see all of
+   *  the information," naming the Announcements table specifically).
+   *  A plain <input> can't wrap at all -- long content just scrolls
+   *  inside the box, out of view -- so this is the only real fix for a
+   *  text column that regularly holds more than a few words. Opt-in
+   *  per column (not a blanket change to every "text" column in every
+   *  table) since most short text columns elsewhere in this registry
+   *  would just get visually taller for no benefit. */
+  wrap?: boolean;
   /** Fixed choices, for type: "select". Used directly if optionsFrom is
    *  absent; otherwise it's the fallback when that field_key has no rows
    *  yet in admin_select_options. */

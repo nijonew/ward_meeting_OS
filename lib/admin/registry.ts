@@ -188,18 +188,24 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     requiredFeature: "table_admin_announcements",
     orderBy: { column: "created_at", ascending: false },
     columns: [
-      { column: "title", label: "Title", type: "text", required: true },
+      // wrap: true (2026-10-13, the user's own request: "a large
+      // enough field... when wrapped I can see all of the
+      // information... same with the announcement table") on every
+      // column here that regularly holds more than a few words --
+      // short, fixed-shape fields (Submitted By, Email, Status) are
+      // left as plain single-line inputs, same as before.
+      { column: "title", label: "Title", type: "text", required: true, wrap: true },
       { column: "body", label: "Body", type: "long_text", required: true },
-      { column: "organization", label: "Organization", type: "text" },
-      { column: "announcement_type", label: "Type", type: "text" },
-      { column: "audience", label: "Audience", type: "text" },
-      { column: "where_announced", label: "Where Announced", type: "text" },
+      { column: "organization", label: "Organization", type: "text", wrap: true },
+      { column: "announcement_type", label: "Type", type: "text", wrap: true },
+      { column: "audience", label: "Audience", type: "text", wrap: true },
+      { column: "where_announced", label: "Where Announced", type: "text", wrap: true },
       { column: "start_date", label: "Start Date", type: "date" },
       { column: "start_time", label: "Start Time", type: "time" },
       { column: "end_date", label: "End Date", type: "date" },
       { column: "end_time", label: "End Time", type: "time" },
-      { column: "location", label: "Location", type: "text" },
-      { column: "link_url", label: "Link", type: "text" },
+      { column: "location", label: "Location", type: "text", wrap: true },
+      { column: "link_url", label: "Link", type: "text", wrap: true },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },
       { column: "submitted_by_email", label: "Email", type: "text" },
       { column: "status", label: "Status", type: "select", required: true, options: SUBMISSION_STATUSES },
