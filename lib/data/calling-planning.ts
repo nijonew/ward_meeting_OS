@@ -163,6 +163,18 @@ export interface CallableCallingItem {
  * already enforces: there's no single person yet to announce. A row
  * can appear in both lists at once (e.g. a presidency change with both
  * a new calling and a release pending).
+ *
+ * **Excludes "Complete," 2026-10-13** (the user's own request: "in the
+ * dropdown for callings and releases I want to exclude those that are
+ * marked 'complete'"). A row can reach `calling_status`/`release_status
+ * === "complete"` without ever going through this exact pull/announce
+ * flow (e.g. an admin sets it directly in the grid for a change that's
+ * already fully done) -- `announced_meeting_id is null` alone doesn't
+ * catch that case, so a long-finished item could otherwise still clutter
+ * this picker with nothing meaningful left to announce. Checked per side
+ * independently, same as `ready` -- a row complete on one side but still
+ * pending on the other (e.g. the release is done but the new calling
+ * isn't yet) still appears in whichever list still has something to do.
  */
 export async function getCallableCallingPlanningItems(): Promise<{
   callings: CallableCallingItem[];
@@ -194,7 +206,7 @@ export async function getCallableCallingPlanningItems(): Promise<{
     if (!calling) continue;
 
     const candidateIds = r.candidate_person_ids ?? [];
-    if (candidateIds.length === 1) {
+    if (candidateIds.length === 1 && r.calling_status !== "complete") {
       const personName = nameById.get(candidateIds[0]);
       if (personName) {
         callings.push({
@@ -208,7 +220,7 @@ export async function getCallableCallingPlanningItems(): Promise<{
       }
     }
 
-    if (r.release_person_id) {
+    if (r.release_person_id && r.release_status !== "complete") {
       const personName = nameById.get(r.release_person_id);
       if (personName) {
         releases.push({

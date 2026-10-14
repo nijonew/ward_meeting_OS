@@ -34,9 +34,31 @@ export async function createCallingPlanningEntry(formData: FormData): Promise<Ac
 
   const dateInitiated = String(formData.get("date_initiated") ?? "") || null;
 
-  const { error } = await supabase
-    .from("calling_planning")
-    .insert({ calling_id: callingId, date_initiated: dateInitiated });
+  // Auto-populate the release side (2026-10-13, the user's own
+  // request: "when we add a calling change for a new calling I would
+  // like to automatically add the associated release") -- a new
+  // calling change for an already-filled calling almost always means
+  // releasing whoever holds it now, so look that up and pre-fill it
+  // instead of making the admin look it up separately. This restores
+  // what the Vision & Intended Workflows doc originally specified for
+  // this feature ("the person to be released is included by default
+  // too -- a dropdown called in from the calling's own current...
+  // holder") and the 2026-09-08 grid rebuild deliberately simplified
+  // away. Left null (renders as "Previously Vacant" in the grid) when
+  // the calling has no current holder -- nothing to release.
+  const { data: calling } = await supabase
+    .from("callings")
+    .select("current_holder_id")
+    .eq("id", callingId)
+    .maybeSingle();
+  const currentHolderId = (calling as { current_holder_id: string | null } | null)?.current_holder_id ?? null;
+
+  const { error } = await supabase.from("calling_planning").insert({
+    calling_id: callingId,
+    date_initiated: dateInitiated,
+    release_person_id: currentHolderId,
+    release_status: currentHolderId ? "to_be_released" : "previously_vacant",
+  });
 
   if (error) return { error: error.message };
   revalidatePath("/calling-planning");

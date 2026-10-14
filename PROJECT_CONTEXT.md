@@ -1970,6 +1970,44 @@ avoid confusing the two.
 
 ## Known open items
 
+**Two Calling Planning requests, 2026-10-13, right after the save-
+display bug above was confirmed fixed:**
+1. **"When we add a calling change for a new calling I would like to
+   automatically add the associated release."** `createCallingPlanningEntry`
+   (`app/calling-planning/actions.ts`) now looks up the chosen calling's
+   `current_holder_id` and pre-fills the new row's `release_person_id`
+   with it (`release_status` set to `to_be_released` to match, rather
+   than the DB default `previously_vacant`, which would otherwise
+   contradict having a real person set) -- left null/"Previously
+   Vacant" when the calling has no current holder. This restores what
+   the Vision & Intended Workflows doc originally specified for this
+   workflow ("the person to be released is included by default too")
+   and the 2026-09-08 grid rebuild deliberately simplified away,
+   flagging at the time that it was worth revisiting "if that turns
+   out to matter in practice" -- it did.
+2. **"In the dropdown for callings and releases I want to exclude
+   those that are marked 'complete'."** Read as Ward Business's own
+   Callings/Releases pull pickers (`getCallableCallingPlanningItems`,
+   `lib/data/calling-planning.ts`) rather than anything on
+   `/calling-planning` itself -- that's the one place in the app with
+   two parallel, separately-labeled dropdowns literally named
+   "Callings" and "Releases," and "complete" is an exact, real status
+   value in this app's vocabulary (not a fuzzy description), so the
+   match seemed strong enough to act on directly rather than asking
+   first; flag if that guess was wrong; `/calling-planning`'s own
+   per-row Calling/Release-person pickers were left untouched. Now
+   excludes a row from the Callings list when `calling_status ===
+   "complete"`, and from the Releases list when `release_status ===
+   "complete"`, checked independently per side (a row complete on one
+   side but not the other still shows in whichever list still has
+   something pending) -- `announced_meeting_id is null` alone didn't
+   already catch this, since a row can reach "Complete" without ever
+   going through the pull/announce flow (e.g. set directly in the
+   grid for something already fully done).
+
+Both confirmed via `tsc`/`eslint`/`next build` only, same no-live-
+browser gap as everything else this session.
+
 **Bug found and fixed 2026-10-12: Calling Planning status changes
 looked like they weren't saving.** The user's own report, right after
 the filter-visibility fix just below: "I changed a calling to 'To be
