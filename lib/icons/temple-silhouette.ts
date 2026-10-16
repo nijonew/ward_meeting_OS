@@ -23,9 +23,28 @@ export const ICON_BACKGROUND_BY_SEASON: Record<SeasonTheme, string> = {
   easter: "#592c68",
 };
 
-/** Near-white, matching the old favicon's own `oklch(99% 0.002 250)`
- *  text fill (same canvas-conversion method as the backgrounds above). */
-export const ICON_FOREGROUND = "#fbfcfd";
+/**
+ * Metallic gold, 2026-10-16 (the user's own request: "can we change
+ * the silhouette in the app to be a color other than white? Would a
+ * metalic gold color work with the color schemes?"). `#D4AF37` is the
+ * standard named "metallic gold" hex -- checked directly before
+ * shipping, not just assumed: rendered at real 16px/32px against all
+ * three seasonal backgrounds (via the same canvas/pixelated technique
+ * used to verify the silhouette trace itself) before picking it.
+ * Confirmed both visually and via WCAG contrast math (~4.5-5:1 against
+ * all three background tones, versus the previous near-white's much
+ * higher but less thematic ~15-18:1) -- gold-on-navy, gold-on-
+ * Christmas-red, and gold-on-royal-purple are all classic, legible
+ * pairings, not just a change for its own sake. A true "metallic"
+ * sheen (gradient highlights simulating reflection) was considered and
+ * rejected -- Satori can render SVG gradients, but at 16-32px actual
+ * favicon size any gradient detail collapses to noise, the same
+ * reasoning that already dropped the reference image's own fine
+ * internal stonework lines when the silhouette was first traced.
+ * Previously near-white, matching the old favicon's own
+ * `oklch(99% 0.002 250)` text fill.
+ */
+export const ICON_FOREGROUND = "#D4AF37";
 
 /**
  * Syracuse Utah Temple silhouette, traced from the exact reference the

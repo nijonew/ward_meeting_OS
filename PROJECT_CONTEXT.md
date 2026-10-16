@@ -1980,6 +1980,37 @@ avoid confusing the two.
 
 ## Known open items
 
+**App icon silhouette recolored to metallic gold, 2026-10-16** -- the
+user's own request: "can we change the silhouette in the app to be a
+color other than white? Would a metalic gold color work with the
+color schemes?" `ICON_FOREGROUND` (`lib/icons/temple-silhouette.ts`,
+shared by `app/icon.tsx`/`app/apple-icon.tsx`) changed from
+near-white (`#fbfcfd`) to `#D4AF37`, the standard named "metallic
+gold" hex.
+
+Checked before answering, not just assumed: built a standalone canvas
+preview (same technique as the original silhouette trace's own
+pixel-accuracy check) rendering several gold candidates at real
+16px/32px favicon size against all three seasonal backgrounds
+(default blue `#004a71`, Christmas red `#712329`, Easter purple
+`#592c68`), viewed directly in the built-in browser. Confirmed both
+visually and via WCAG contrast math (~4.5-5:1 against all three
+backgrounds) that `#D4AF37` stays legible at actual favicon size, and
+that gold reads as a genuinely good pairing with all three -- gold-on-
+navy, gold-on-Christmas-red, and gold-on-royal-purple are all classic,
+high-contrast combinations, not a coincidental clash. A true
+"metallic" sheen (a gradient simulating reflective highlights) was
+considered and rejected -- Satori can render SVG gradients, but at
+16-32px any gradient detail collapses to noise, same reasoning that
+already dropped the reference photo's own fine stonework/window lines
+when the silhouette was first traced.
+
+Confirmed via `tsc`/`eslint`/`next build` only for the Next.js app
+itself (same no-live-browser gap as everything else this session) --
+the color choice itself WAS visually verified directly, unlike most of
+this session's other changes. Ask the user to check the browser tab
+icon on production once deployed.
+
 **Delete added back for youth activities, 2026-10-16** -- the user's
 own report: "I am not seeing where I have the ability to delete a
 youth activity whether it is combined or not." Correct: since "All
