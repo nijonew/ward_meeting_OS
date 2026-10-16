@@ -181,7 +181,7 @@ export default async function PlanningViewPage({
     // Announcements block (migration 074) -- see that file's own
     // comment.
     isSacrament ? getAnnouncementsByPlannedElement(meetingId) : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
-    isSacrament ? getPullableAnnouncements() : Promise.resolve([]),
+    isSacrament ? getPullableAnnouncements(meetingId) : Promise.resolve([]),
   ]);
 
   // Meetings created before the per-meeting agenda existed have zero

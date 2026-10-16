@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEverPulledAnnouncementIds } from "@/lib/data/sacrament-announcements";
 
 export interface SubmissionRow {
   id: string;
@@ -32,34 +33,46 @@ export interface PublishedAnnouncement {
  * Announcements the bishopric (or communications specialist, once that
  * role has its own submission UI) has marked "published" -- these are
  * safe to show on the public landing page with no login required.
+ *
+ * Excludes anything ever pulled into a Sacrament Meeting's own
+ * Announcements block, via `getEverPulledAnnouncementIds()` -- once
+ * incorporated into a meeting's own program, it's no longer shown as
+ * a separate public announcement. **Switched from a stale
+ * `.is("meeting_id", null)` filter to this 2026-10-15** (migration
+ * 077) -- that column stopped being written once announcement pulls
+ * moved to the real `sacrament_announcement_pulls` join table (see
+ * that file's own header for why), so the old filter would have let
+ * every pulled announcement right back onto this public page.
  */
 export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("announcements")
-    .select(
-      "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url"
-    )
-    .is("meeting_id", null)
-    .eq("status", "published")
-    .order("created_at", { ascending: false });
+  const [pulledIds, { data, error }] = await Promise.all([
+    getEverPulledAnnouncementIds(),
+    supabase
+      .from("announcements")
+      .select(
+        "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url"
+      )
+      .eq("status", "published")
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (error || !data) {
     return [];
   }
 
-  return data as PublishedAnnouncement[];
+  return (data as PublishedAnnouncement[]).filter((a) => !pulledIds.has(a.id));
 }
 
 export async function getGeneralSubmissions(): Promise<SubmissionRow[]> {
   const supabase = await createClient();
 
-  const [announcementsRes, agendaRes] = await Promise.all([
+  const [pulledIds, announcementsRes, agendaRes] = await Promise.all([
+    getEverPulledAnnouncementIds(),
     supabase
       .from("announcements")
       .select("id, title, body, submitted_by_name, submitted_by_email, status, created_at")
-      .is("meeting_id", null)
       .order("created_at", { ascending: false }),
     supabase
       .from("agenda_items")
@@ -68,10 +81,12 @@ export async function getGeneralSubmissions(): Promise<SubmissionRow[]> {
       .order("created_at", { ascending: false }),
   ]);
 
-  const announcements = ((announcementsRes.data ?? []) as Omit<SubmissionRow, "kind">[]).map((r) => ({
-    ...r,
-    kind: "announcement" as const,
-  }));
+  const announcements = ((announcementsRes.data ?? []) as (Omit<SubmissionRow, "kind"> & { id: string })[])
+    .filter((r) => !pulledIds.has(r.id))
+    .map((r) => ({
+      ...r,
+      kind: "announcement" as const,
+    }));
   const agendaItems = ((agendaRes.data ?? []) as Omit<SubmissionRow, "kind">[]).map((r) => ({
     ...r,
     kind: "agenda_item" as const,

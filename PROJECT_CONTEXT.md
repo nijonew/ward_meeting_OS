@@ -257,8 +257,14 @@ reconstructed from both:
   `calling_planning` row left orphaned by the `pushCallingToSacramentMeeting`
   calling_planning_id bug -- see Known open items below): **not yet
   run** -- ask the user to run it once the matching code fix is live.
+- `077` (new `sacrament_announcement_pulls` many-to-many table, replacing
+  the single-column `announcements.meeting_id`/`planned_element_id` link
+  -- lets the same announcement be pulled into more than one Sacrament
+  Meeting at once, and re-pulled into a new one after already being used
+  in a past one; also amends `delete_meeting_cascade` to clean up the new
+  table -- see Known open items below): **not yet run**.
 
-Next migration should be `077_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `078_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1973,6 +1979,112 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Announcements rebuilt onto a real many-to-many link, 2026-10-15**
+(migration `077`, not yet run) -- the user's own report, right after
+the previous fix below shipped: "It seems like announcements that were
+announced in a previous meeting are now not an option to announce?"
+
+Root cause: `announcements.meeting_id`/`planned_element_id`
+(migrations 031/074) were single-value columns -- pulling an
+announcement into one meeting's Announcements block set them once,
+and `getPullableAnnouncements()` only ever offered announcements with
+`meeting_id is null`. Once used in any meeting, an announcement was
+gone from the pool for every future meeting too, **permanently** --
+Sacrament Meeting auto-archives within a day or two of its own date,
+at which point Planning (and its own Remove button) becomes
+read-only, so there was no practical way back for a genuinely
+recurring announcement ("Ongoing Event"/"Future - For Planning" are
+real values on the submission form's own `announcement_type`). This
+wasn't a bug in the silent-failure fix made minutes earlier (see that
+entry below) -- it's a real, separate design gap in the original
+single-column link.
+
+Presented three options in chat (free it back to the pool once its
+meeting archives; let one announcement be pulled into multiple
+meetings at once, preserving each meeting's own history; or a manual
+"un-pull from an archived meeting" control) -- the user chose true
+multi-meeting reuse with full history preserved. New
+`sacrament_announcement_pulls` table (`announcement_id`, `meeting_id`,
+`planned_element_id`, `unique (announcement_id, meeting_id)`) replaces
+the single-column link entirely:
+- `getPullableAnnouncements(meetingId)` (now takes a meetingId, where
+  it previously took none) excludes only announcements already pulled
+  into *this* meeting -- one already pulled into a different meeting
+  is still offered, so the same recurring announcement can be read
+  again in a later meeting without ever being removed from the
+  one(s) it already appeared in.
+- `getAnnouncementsByPlannedElement(meetingId)` now reads the join
+  table instead of the old flat column -- same return shape
+  (`Map<plannedElementId, PulledAnnouncement[]>`), so Planning,
+  Conducting, and the Archived view all needed zero changes beyond
+  this one function's internals.
+- `pullAnnouncementIntoMeeting`/`removeAnnouncementFromMeeting`
+  (`app/meetings/[id]/announcements-actions.ts`) now insert/delete a
+  row in the join table instead of updating two columns -- a unique-
+  constraint violation on insert (two admins adding the same
+  announcement to the same meeting at once) surfaces as "That
+  announcement is already in this meeting" rather than a raw
+  Postgres error.
+- `getPublishedAnnouncements`/`getGeneralSubmissions`
+  (`lib/data/general-submissions.ts`) switched from the now-stale
+  `.is("meeting_id", null)` filter to a new
+  `getEverPulledAnnouncementIds()` helper -- an announcement is
+  excluded from the public page/admin inbox once it's ever been
+  pulled into any meeting, same behavior as before, just driven by
+  the new table's existence instead of a column nothing writes to
+  anymore.
+- `announcements.meeting_id`/`planned_element_id` are left in the
+  schema, untouched, simply unused by the app from here on -- same
+  "harmless but real" treatment this file already gives
+  `callings.title_prefix` elsewhere, rather than a same-day column
+  drop (see migration `058`'s own deploy-ordering caution for why
+  dropping a column the same day code stops reading it is worth
+  avoiding).
+- `delete_meeting_cascade` (migration `054`) amended in the same
+  migration file to also clean up `sacrament_announcement_pulls` when
+  a meeting is deleted.
+- No new Table Admin entry -- matches `sacrament_program_items`/
+  `sacrament_visiting_authorities`'s own precedent (pure join/ordering
+  tables with nothing of their own worth a raw-data grid), not
+  `sacrament_rabnm`'s.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session -- ask the user to run migration
+`077`, then confirm an announcement already pulled into one meeting
+now shows up again in a *different* meeting's "call in an
+announcement" dropdown, and that an archived meeting still correctly
+shows what it had even if that same announcement has since been
+pulled into a newer one too.
+
+**Bug found and fixed 2026-10-15: adding an announcement in the
+Sacrament Meeting planning view could fail silently.** The user's own
+report, in the same message as the Conducting-ordering request just
+below: "I added an announcement in the sacrament meeting planning view
+and it didn't save." Traced the whole pull path end to end
+(`AnnouncementsField.tsx` -> `pullAnnouncementIntoMeeting` ->
+`getPullableAnnouncements`/`getAnnouncementsByPlannedElement`) -- the
+server action itself, its feature gate, and every prop handed down
+from `agenda-rows.ts` through `AgendaGridForm.tsx` all checked out
+structurally. The one confirmed bug: `AnnouncementsField`'s own
+`pull()` (and `ExistingRow`'s `remove()`) discarded the server
+action's result entirely -- the exact same silent-failure bug class
+already found and fixed once this session for Delete Meeting
+(`DeleteMeetingButton.tsx`). A failed pull looked identical to a
+successful one, since the dropdown cleared back to blank either way
+with nothing on screen saying it didn't land. Fixed to read the
+result and show the message inline, and to leave the dropdown's
+selection in place on failure rather than clearing it, so a retry
+doesn't require re-picking the same announcement.
+
+**Turned out to be the smaller half of a bigger, separate problem**
+-- see the entry directly above this one. The user's very next message
+reported the real underlying issue this error-surfacing fix helped
+uncover: the announcement they were trying to add had already been
+used in a past meeting, which the old single-column design made
+permanently unavailable. Both fixes stand independently -- surfacing
+real errors stays valuable regardless, and the deeper reuse fix is
+what actually explains this specific report.
 
 **Two requests, 2026-10-15, right after the "To be Announced" fix
 above shipped:**

@@ -24,19 +24,22 @@ function revalidateBoth(meetingId: string) {
 }
 
 /**
- * Pulls one announcement into one specific block of this meeting --
- * sets its existing `meeting_id` (migration 031), which
- * `getPublishedAnnouncements`/`getGeneralSubmissions`
- * (lib/data/general-submissions.ts) already treat as "spoken for,"
- * excluding it from the general public page and admin inbox the
- * moment this runs, plus `planned_element_id` (migration 074, since a
- * meeting can now have more than one Announcements block -- see that
- * migration's own header for the full writeup) saying which block.
- * Refuses to steal one already pulled into a different block (or
- * meeting) instead of silently overwriting -- `getPullableAnnouncements`
- * shouldn't offer one that's already taken, but this re-checks
- * server-side anyway, same defense-in-depth convention as every other
- * action in this app.
+ * Pulls one announcement into one specific block of one meeting --
+ * inserts a row into `sacrament_announcement_pulls` (migration 077,
+ * 2026-10-15) rather than setting a single `meeting_id` column
+ * directly on `announcements` (the original design, migration 031/074)
+ * -- see that migration's own header for why: the old single-column
+ * link meant an announcement could only ever be pulled into one
+ * meeting, period, which blocked genuinely recurring announcements
+ * from ever being re-used once their first meeting passed. The same
+ * announcement can now be pulled into any number of meetings at once.
+ *
+ * `getPullableAnnouncements` already excludes anything already pulled
+ * into THIS meeting, so a unique-constraint violation here (the
+ * `(announcement_id, meeting_id)` constraint on the new table) should
+ * only ever mean a genuine race -- two admins adding the same
+ * announcement to the same meeting at once -- surfaced as a real
+ * error rather than silently ignored.
  */
 export async function pullAnnouncementIntoMeeting(
   meetingId: string,
@@ -48,33 +51,36 @@ export async function pullAnnouncementIntoMeeting(
 
   const supabase = await createClient();
   const { error } = await supabase
-    .from("announcements")
-    .update({ meeting_id: meetingId, planned_element_id: plannedElementId })
-    .eq("id", announcementId)
-    .is("meeting_id", null);
+    .from("sacrament_announcement_pulls")
+    .insert({ announcement_id: announcementId, meeting_id: meetingId, planned_element_id: plannedElementId });
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") return { error: "That announcement is already in this meeting." };
+    return { error: error.message };
+  }
 
   revalidateBoth(meetingId);
   return { success: true };
 }
 
-/** Reverses pullAnnouncementIntoMeeting -- clears both `meeting_id`
- *  and `planned_element_id`, putting it back in the general pool
- *  (visible on the public page and admin inbox again) rather than
- *  deleting it. Scoped by meetingId alone, not which block -- removing
- *  by announcement id is unambiguous regardless of which of a
- *  meeting's blocks it came from. */
+/** Reverses pullAnnouncementIntoMeeting -- removes only this meeting's
+ *  own pull of this announcement; any other meeting it's also been
+ *  pulled into (2026-10-15) is completely untouched. Scoped by
+ *  meetingId + announcementId together, not which block -- removing by
+ *  announcement id is unambiguous regardless of which of a meeting's
+ *  blocks it came from (the `unique (announcement_id, meeting_id)`
+ *  constraint on `sacrament_announcement_pulls` guarantees at most one
+ *  matching row). */
 export async function removeAnnouncementFromMeeting(meetingId: string, announcementId: string): Promise<ActionResult> {
   const denied = await requireSacramentPlanningFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
   const { error } = await supabase
-    .from("announcements")
-    .update({ meeting_id: null, planned_element_id: null })
-    .eq("id", announcementId)
-    .eq("meeting_id", meetingId);
+    .from("sacrament_announcement_pulls")
+    .delete()
+    .eq("meeting_id", meetingId)
+    .eq("announcement_id", announcementId);
 
   if (error) return { error: error.message };
 
