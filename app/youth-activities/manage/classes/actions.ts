@@ -122,3 +122,43 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
   revalidatePath("/events");
   return { success: true };
 }
+
+/**
+ * Delete a class's own individual activity row, 2026-10-16 (the
+ * user's own report: "I am not seeing where I have the ability to
+ * delete a youth activity whether it is combined or not"). Deliberately
+ * only for a row this class actually owns (`ClassActivityGridForm`
+ * only ever renders the button when `!row.isCombined`, and this action
+ * re-checks that server-side too) -- a row drawn live from a shared
+ * Combined row (`row.isCombined`) isn't this class's own to delete;
+ * removing it here would delete the one real row every other
+ * attending class also sees, from a page that only shows one class at
+ * a time. Deleting a genuinely Combined row belongs on its own
+ * Combined-group page instead (see `deleteYouthActivity`,
+ * `app/youth-activities/actions.ts`).
+ */
+export async function deleteClassActivity(activityId: string): Promise<ActionResult> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "youth_activity_planning")) return { error: "Not authorized." };
+
+  const supabase = await createClient();
+  const { data: row, error: fetchError } = await supabase
+    .from("youth_activities")
+    .select("group_name")
+    .eq("id", activityId)
+    .maybeSingle();
+
+  if (fetchError) return { error: fetchError.message };
+  if (!row) return { success: true };
+  if (row.group_name.startsWith("Combined")) {
+    return { error: "This is a Combined activity -- delete it from its own Combined page instead." };
+  }
+
+  const { error } = await supabase.from("youth_activities").delete().eq("id", activityId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/youth-activities/manage/classes");
+  revalidatePath("/youth-activities/upcoming");
+  revalidatePath("/events");
+  return { success: true };
+}

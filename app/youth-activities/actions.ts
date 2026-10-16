@@ -206,6 +206,35 @@ async function overwriteClassesFromCombined(
   return { success: true };
 }
 
+/**
+ * Delete a youth activity outright -- removed entirely, not hidden
+ * like Cancel (`youth_activities.cancelled`, a separate, unrelated
+ * flag this action never touches). Re-added 2026-10-16: the user's
+ * own report, "I am not seeing where I have the ability to delete a
+ * youth activity whether it is combined or not" -- "All Activities"
+ * (the one page that ever had a per-row Delete) was removed outright
+ * on 2026-10-11 in favor of Table Admin's own generic grid as the
+ * fallback, which still works today but turned out to be the *only*
+ * way to delete one, with nothing on any of the dedicated Youth
+ * Activities pages themselves. No FK anywhere in this schema
+ * references a `youth_activities` row by id, so a plain delete needs
+ * no cascade cleanup first. Wired into `ActivitiesTable`'s own Delete
+ * column on the three Combined-group pages -- not Upcoming Activities,
+ * which stays deliberately read-only.
+ */
+export async function deleteYouthActivity(activityId: string): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("youth_activities").delete().eq("id", activityId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/youth-activities/manage/classes");
+  revalidateActivityListings();
+  return { success: true };
+}
+
 export async function pushCombinedActivityToClasses(activityId: string): Promise<ActionResult> {
   const denied = await requireYouthActivityPlanningFeature();
   if (denied) return denied;

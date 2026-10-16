@@ -1980,6 +1980,50 @@ avoid confusing the two.
 
 ## Known open items
 
+**Delete added back for youth activities, 2026-10-16** -- the user's
+own report: "I am not seeing where I have the ability to delete a
+youth activity whether it is combined or not." Correct: since "All
+Activities" (the one page that ever had a per-row Delete) was removed
+outright on 2026-10-11 in favor of Table Admin's own generic grid as
+the fallback, Table Admin had been the *only* way to delete a youth
+activity -- none of the dedicated Youth Activities pages had their
+own Delete control. Asked where it should live (multi-select: the
+three Combined-group pages, the per-class grid, Upcoming Activities,
+or "just tell me where it is today") -- the user picked the first two.
+- **New `deleteYouthActivity(activityId)`** (`app/youth-activities/actions.ts`),
+  gated the same way every other action in that file is
+  (`youth_activity_planning`) -- a plain delete, no FK anywhere in
+  this schema references a `youth_activities` row by id so no cascade
+  cleanup is needed first. Wired into `ActivitiesTable.tsx` as a new
+  Delete column, shown exactly where its existing `editable` flag
+  already shows Add/Edit/Overwrite (the three Combined-group pages) --
+  never on read-only Upcoming Activities, which the user didn't pick.
+- **New `deleteClassActivity(activityId)`** (`app/youth-activities/manage/classes/actions.ts`),
+  wired into `ClassActivityGridForm.tsx`'s own grid. Deliberately
+  scoped to a row this class actually owns (`!row.isCombined`) -- a
+  row drawn live from a shared Combined row has no class-specific copy
+  to delete from this single-class page; deleting that shared row here
+  would remove it for every other attending class too, from a page
+  that only shows one class at a time. The action re-checks this
+  server-side too (`group_name.startsWith("Combined")`, the same test
+  `ACTIVITY_CLASSES` itself already uses to exclude the three
+  pseudo-groups), returning a real error rather than silently deleting
+  the wrong thing if the button were ever reachable for one anyway. A
+  genuinely Combined row can still be deleted -- just from its own
+  Combined-group page, where the new Delete column above already
+  covers it.
+- Both buttons are plain `type="button"` + `useTransition` calls with
+  a `window.confirm` first (matching `DeleteMeetingButton`'s own
+  convention for an irreversible action), not real submit buttons --
+  both sit inside their grid's own wrapping `<form>` (the Save All
+  Changes form), so a submit button here would trigger that save
+  instead of deleting anything.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session -- ask the user to confirm Delete
+shows up and works on all three Combined-group pages and on the
+per-class grid (for that class's own rows only).
+
 **Announcements rebuilt onto a real many-to-many link, 2026-10-15**
 (migration `077`, not yet run) -- the user's own report, right after
 the previous fix below shipped: "It seems like announcements that were

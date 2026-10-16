@@ -1,12 +1,52 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import { PushToClassesButton } from "@/components/youth-activities/PushToClassesButton";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import { classesForCombinedGroup } from "@/lib/data/class-activities-shared";
-import { saveActivityGrid } from "@/app/youth-activities/actions";
+import { saveActivityGrid, deleteYouthActivity } from "@/app/youth-activities/actions";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
+
+/**
+ * Delete, re-added 2026-10-16 (the user's own report: "I am not
+ * seeing where I have the ability to delete a youth activity whether
+ * it is combined or not") -- a plain `type="button"` + `useTransition`
+ * call, same reasoning as `PushToClassesButton` right above it: this
+ * sits inside `editable` mode's wrapping `<form>`, and a real submit
+ * button would trigger the grid's own Save All Changes instead of
+ * deleting anything. `window.confirm` first, matching
+ * `DeleteMeetingButton`'s own convention for an irreversible action --
+ * unlike Cancel (a separate, unrelated flag), there's no "undo" once
+ * this runs.
+ */
+function DeleteActivityButton({ activityId, label }: { activityId: string; label: string }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const onClick = () => {
+    if (!window.confirm(`Permanently delete "${label}"? This cannot be undone.`)) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteYouthActivity(activityId);
+      if ("error" in result) setError(result.error);
+    });
+  };
+
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={pending}
+        className="text-xs text-danger/70 hover:text-danger disabled:opacity-50"
+      >
+        {pending ? "Deleting..." : "Delete"}
+      </button>
+      {error && <span className="text-[10px] text-danger">{error}</span>}
+    </div>
+  );
+}
 
 const ALL_COLUMNS = [
   { key: "date", label: "Date" },
@@ -125,6 +165,13 @@ function compareText(a: string, b: string): number {
  *   whichever page it's rendered on; changing either would move the
  *   row off this page entirely, a bigger operation than "modify this
  *   activity" asked for.
+ *
+ * **Delete column, 2026-10-16** (the user's own report: "I am not
+ * seeing where I have the ability to delete a youth activity whether
+ * it is combined or not") -- tied to the same `editable` flag as the
+ * save grid, so it shows exactly where Add/Edit/Overwrite already do
+ * (the three Combined-group pages), never on read-only Upcoming
+ * Activities.
  */
 export function ActivitiesTable({
   activities,
@@ -249,6 +296,11 @@ export function ActivitiesTable({
                 Overwrite
               </th>
             )}
+            {editable && (
+              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                Delete
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -319,6 +371,11 @@ export function ActivitiesTable({
                     </td>
                   );
                 })()}
+              {editable && (
+                <td className="px-2 py-1.5">
+                  <DeleteActivityButton activityId={row.id} label={row.title} />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
