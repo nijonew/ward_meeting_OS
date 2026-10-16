@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 075
+## Current migration number: 076
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -253,8 +253,12 @@ reconstructed from both:
   `sacrament_program_items` -- which had none at all, hiding the
   entire Teaching Program section the same way -- see Known open
   items below): confirmed run.
+- `076` (one-time repair: clears `announced_meeting_id` on any
+  `calling_planning` row left orphaned by the `pushCallingToSacramentMeeting`
+  calling_planning_id bug -- see Known open items below): **not yet
+  run** -- ask the user to run it once the matching code fix is live.
 
-Next migration should be `076_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `077_*.sql`. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1969,6 +1973,79 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Bug found and fixed 2026-10-15: a calling pushed from Calling
+Planning's own page could get permanently stuck once removed from Ward
+Business.** The user's own detailed report, walking through a full
+real workflow: set some rows' Status to "To be Announced," pushed them
+to this week's Sacrament Meeting from the "Ready to Announce" section
+-- the callings showed up in Ward Business, releases did not (see the
+second, separate finding below for why) -- then removed the callings
+from Ward Business to try again, and they never came back to "Ready to
+Announce," nor could they be re-pushed at all.
+
+Root cause: `pushCallingToSacramentMeeting` (`app/calling-planning/actions.ts`,
+the button on `/calling-planning` itself) has always inserted its
+`sacrament_rabnm` row without setting `calling_planning_id` -- unlike
+`pullCallingPlanningIntoMeeting` (`app/meetings/[id]/ward-business-actions.ts`,
+Ward Business's own "pull from Calling Planning" picker), which always
+has. Ward Business's Remove button (`WardBusinessField.tsx`'s
+`ExistingRow`) branches on exactly that link: set, it calls
+`removeCallingPlanningFromMeeting`, which correctly clears
+`announced_meeting_id` and resets status; unset -- which was every
+single row ever pushed from Calling Planning's own page, not an
+occasional case -- it falls back to a bare `deleteRabnmItem`, which
+only deletes the `sacrament_rabnm` row. The `calling_planning` row is
+left with `announced_meeting_id` still pointing at an announcement
+that no longer exists, status never reset -- permanently excluded from
+"Ready to Announce" (requires `announced_meeting_id is null`) and from
+ever being pushed again (`pushCallingToSacramentMeeting` requires
+`calling_status = 'to_announce'`, which it's now stuck away from),
+with no UI anywhere to clear `announced_meeting_id` directly
+(`calling_planning` is deliberately excluded from Table Admin, and the
+grid has no column for it). Fixed by adding `calling_planning_id` to
+that insert, matching the pull path exactly. **Migration `076`**
+(one-time, not yet run) repairs every row already stuck this way --
+finds any `calling_planning` row with `announced_meeting_id` set but
+no real `sacrament_rabnm` row referencing it back (the only way that
+combination happens), clears it, and resets `calling_status`/
+`release_status` back to `to_announce` only where they're still
+sitting at the exact `to_record`/`complete` values the now-also-fixed
+auto-advance bug (2026-10-13 below) would have left them at -- not a
+blanket reset, so a row at some other status for an unrelated reason
+isn't touched.
+
+**Second, separate finding from the same report -- not a bug**: "the
+callings showed up, but the releases did not" turned out to be correct
+behavior given the data, not a gap in the push logic itself.
+`pushCallingToSacramentMeeting`/`pullCallingPlanningIntoMeeting` only
+ever include a release when that `calling_planning` row's own
+`release_person_id` is actually set -- the user's report confirms they
+set Status ("To be Announced") on the *calling* side only; nothing
+said the matching release side (`release_person_id`/`release_status`)
+had ever been populated on those same rows. Since `calling_status` and
+`release_status` are genuinely independent fields on the same row
+(per the Vision & Intended Workflows doc above), there's no automatic
+link from "this calling is ready" to "so is its release" unless both
+are actually set. **Still a real, named workflow gap, not fully
+closed**: the 2026-10-13 "auto-fill release on a new calling change"
+feature below only fires when *creating* a brand-new row via "+ Start
+New Calling Change" -- it does nothing for an *existing* row someone
+is just now advancing through statuses, which is exactly this user's
+situation. For now, the fix is manual: open the specific calling's row
+on `/calling-planning` and set "Person Being Released" (and Release
+Status, if it should show as ready) directly -- once that's saved, it
+appears in Ward Business's Releases dropdown immediately, no further
+action needed. Ask before building anything more automatic here (e.g.
+backfilling `release_person_id` for existing rows from each calling's
+current holder) -- that's a real, separate feature, not implied by
+this bug report.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session -- ask the user to run migration
+`076` once deployed, then re-verify the specific callings from their
+report: do they show back up in "Ready to Announce," and does setting
+a release person on those rows make them appear in Ward Business?
 
 **Three more requests, 2026-10-13, same session as the two below:**
 1. **Calling Planning's "To Record" auto-advance removed.** The user's

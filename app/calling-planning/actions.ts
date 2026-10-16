@@ -224,9 +224,21 @@ export async function pushCallingToSacramentMeeting(
   }
 
   for (const item of inserts) {
+    // calling_planning_id set on insert (2026-10-15 bug fix, found from
+    // the user's own detailed report: a calling pushed from THIS page,
+    // then removed from Ward Business's own list, never came back and
+    // could never be re-pushed). Without this link,
+    // pullCallingPlanningIntoMeeting's counterpart undo
+    // (removeCallingPlanningFromMeeting) was unreachable -- Ward
+    // Business's Remove button falls back to a bare deleteRabnmItem
+    // for any row with no calling_planning_id, which only deletes the
+    // sacrament_rabnm row and never clears this row's own
+    // announced_meeting_id/status, leaving it permanently stuck
+    // pointing at an announcement that no longer exists. See migration
+    // 076 for the one-time repair of rows already stuck this way.
     const { data: rabnm, error: rabnmError } = await supabase
       .from("sacrament_rabnm")
-      .insert({ meeting_id: meetingId, type: item.type, calling_id: callingId })
+      .insert({ meeting_id: meetingId, type: item.type, calling_id: callingId, calling_planning_id: planningId })
       .select("id")
       .single();
 
