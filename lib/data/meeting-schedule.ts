@@ -3,6 +3,7 @@ import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
 import { seedSacramentProgramItemsForMeeting } from "@/lib/data/sacrament-program";
 import { candidateDatesForCadence, readCadenceFields } from "@/lib/data/cadence";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export interface ScheduleRule {
   id: string;
@@ -226,4 +227,58 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
   }
 
   return { created, skippedExisting };
+}
+
+/** How far out automatic generation always keeps meetings covered --
+ *  recomputed fresh on every call (via getMountainTimeNow), so the
+ *  horizon keeps sliding forward as today advances. Matches this app's
+ *  existing "today + ~2 months" default convention (see
+ *  /youth-teaching-planning's own through-date default). */
+const AUTO_GENERATE_WEEKS_AHEAD = 8;
+
+function autoGenerateThroughDate(): string {
+  const { dateIso } = getMountainTimeNow();
+  const d = new Date(`${dateIso}T00:00:00`);
+  d.setDate(d.getDate() + AUTO_GENERATE_WEEKS_AHEAD * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Lazy sweep, same pattern as autoArchivePastMeetings/
+ * sweepMeetingCancellations -- run on every /dashboard and
+ * /calling-planning load (via getUpcomingMeetings) so whatever's
+ * configured in /meeting-schedule's own cadence rules (Sacrament
+ * Meeting, Bishopric Meeting, Ward Council, Youth Council, or any
+ * other active rule) just keeps existing roughly 8 weeks out, with
+ * nobody ever needing to visit /meeting-schedule and click "Generate
+ * Meetings" themselves. The user's own request, 2026-10-16: "What if I
+ * didn't want to ever have to generate typical activity or meeting
+ * dates... It would be ok to be able to set the cadence/rules
+ * somewhere but I don't want to have to generate these events."
+ *
+ * Reuses `generateMeetingsFromRules` exactly as the manual button
+ * does -- idempotent (skips any date that already has a meeting for
+ * that type), so repeated calls on every page view are safe and cheap
+ * once the horizon is already covered. The actual cadence (which
+ * Sundays get which meeting types) is entirely driven by whatever's
+ * configured in `meeting_schedule_rules` via /meeting-schedule's own
+ * existing UI -- this function doesn't know or assume anything about
+ * the rules themselves, only that it should keep applying them without
+ * being asked. A real schedule change (Stake/General Conference,
+ * etc.) still needs the existing `meeting_cancellations`/manual-edit
+ * tools, same as before; this only automates the routine, week-to-week
+ * case.
+ *
+ * Errors are swallowed, not surfaced -- a background sweep failing
+ * (e.g. a transient DB hiccup) should never block Dashboard/Calling
+ * Planning from rendering. The manual "Generate Meetings" button on
+ * /meeting-schedule still exists too, for generating further ahead
+ * than the rolling window or retrying directly after a rules change.
+ */
+export async function autoGenerateUpcomingMeetings(): Promise<void> {
+  try {
+    await generateMeetingsFromRules(autoGenerateThroughDate());
+  } catch {
+    // Swallow -- see this function's own doc comment.
+  }
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 /**
  * Generates the three combined-week youth activities (Combined YM,
@@ -159,4 +160,47 @@ export async function generateCombinedYouthActivities(
   }
 
   return { created, skippedExisting };
+}
+
+/** Same rolling-horizon constant as meeting-schedule.ts's own
+ *  autoGenerateUpcomingMeetings -- kept as a separate copy rather than
+ *  shared, since the two engines are already deliberately independent
+ *  (see this file's own top comment) and an 8-week default happens to
+ *  suit both, not because they're meant to move together. */
+const AUTO_GENERATE_WEEKS_AHEAD = 8;
+
+function autoGenerateThroughDate(): string {
+  const { dateIso } = getMountainTimeNow();
+  const d = new Date(`${dateIso}T00:00:00`);
+  d.setDate(d.getDate() + AUTO_GENERATE_WEEKS_AHEAD * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Lazy sweep, same pattern (and the same request behind it) as
+ * meeting-schedule.ts's `autoGenerateUpcomingMeetings` -- run on every
+ * `getYouthActivities()` call (Youth Activities' browsing pages, the
+ * Manage page, etc.) so the fixed Wednesday combined-week rotation
+ * just keeps existing roughly 8 weeks out, with nobody needing to
+ * visit the Manage page and click "Generate Combined Activities"
+ * themselves. The user's own request, 2026-10-16: "What if I didn't
+ * want to ever have to generate typical activity or meeting dates...
+ * Wednesday evenings are youth activity nights."
+ *
+ * Reuses `generateCombinedYouthActivities` exactly as the manual
+ * button does -- idempotent (skips any date that already has an
+ * activity) and silently does nothing if the three rotations' own
+ * membership lists aren't configured yet (the same "missing
+ * rotations" error the manual button would show, just swallowed here
+ * rather than surfaced, since there's no one to show it to on a
+ * background sweep). The manual button on the Manage page still
+ * exists too, for generating further ahead or re-running directly
+ * after editing rotation membership.
+ */
+export async function autoGenerateCombinedYouthActivities(): Promise<void> {
+  try {
+    await generateCombinedYouthActivities(autoGenerateThroughDate());
+  } catch {
+    // Swallow -- see this function's own doc comment.
+  }
 }

@@ -18,6 +18,11 @@ export function GenerateYouthActivitiesForm() {
         the real activity in below once it&rsquo;s decided. Safe to run again later; existing dates
         are never duplicated.
       </p>
+      <p className="mt-2 text-xs text-ink-muted">
+        This already happens on its own, about 8 weeks out, every time anyone views an activities
+        page &mdash; use this only to generate further ahead than that, or right after changing a
+        rotation&rsquo;s membership.
+      </p>
 
       <form action={formAction} className="mt-4 flex flex-wrap items-center gap-3">
         <label className="text-xs text-ink-muted">

@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
+import { autoGenerateUpcomingMeetings } from "@/lib/data/meeting-schedule";
 import { getMountainTimeNow } from "@/lib/data/timezone";
 import type { Meeting, MeetingLifecycleStage, MeetingType, MeetingTypeSlug } from "@/lib/types";
 
@@ -133,7 +134,17 @@ export async function getUpcomingMeetings(): Promise<Meeting[]> {
   // cancelled meeting auto-archives regardless (see
   // autoArchivePastMeetings), so cancelling first avoids a one-render
   // lag where it briefly shows as "No Activity" instead.
+  //
+  // autoGenerateUpcomingMeetings only ever creates present/future
+  // meetings (generateMeetingsFromRules refuses a through-date in the
+  // past) -- it can't interact with the archive sweep's own past-only
+  // scope either way, but runs here, lazily on every call, so routine
+  // meetings configured in /meeting-schedule's own cadence rules just
+  // keep existing without anyone needing to visit that page and click
+  // "Generate Meetings" (see that function's own comment for the
+  // user's request behind this).
   await sweepMeetingCancellations();
+  await autoGenerateUpcomingMeetings();
   const noActivityIds = await autoArchivePastMeetings();
 
   const supabase = await createClient();

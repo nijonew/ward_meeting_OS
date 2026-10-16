@@ -1974,6 +1974,68 @@ avoid confusing the two.
 
 ## Known open items
 
+**Routine meetings and Wednesday youth activities now generate
+themselves, 2026-10-16** (the user's own words: "What if I didn't want
+to ever have to generate typical activity or meeting dates. What if it
+was assumed that wednesday evenings are youth activity nights, sundays
+hold bishopric meeting, sacrament meetings, second and fourth sundays
+are ward council and third sundays are ward youth council? It would be
+ok to be able to set the cadence/rules somewhere but I don't want to
+have to generate these events. Other events can be created manually,
+or dates changed or whatever."). Both existing cadence engines were
+already idempotent and self-contained -- the only thing missing was an
+automatic trigger, so this didn't need a new generation mechanism, just
+automating the existing one:
+- **New `autoGenerateUpcomingMeetings()`** (`lib/data/meeting-schedule.ts`)
+  -- calls the existing `generateMeetingsFromRules` with a rolling
+  "today + 8 weeks" horizon (recomputed via `getMountainTimeNow()` on
+  every call, so it keeps sliding forward), run as a lazy sweep from
+  `getUpcomingMeetings()` (`lib/data/meetings.ts`) alongside the
+  existing cancellation/archive sweeps -- so Dashboard and Calling
+  Planning loads keep every *active* rule in `/meeting-schedule`
+  covered automatically. This is genuinely rule-agnostic: it doesn't
+  know or assume Bishopric Meeting is weekly, or that Ward Council is
+  2nd/4th Sunday -- it just re-applies whatever's configured there.
+  **The user still needs to confirm the actual rules in
+  `/meeting-schedule` match what they described** (Sacrament Meeting +
+  Bishopric Meeting weekly, Ward Council on the 2nd and 4th Sunday --
+  two separate `nth_weekday` rules, since a rule only holds one
+  `nth_occurrence` -- Youth Council on the 3rd) -- this assistant has
+  no live database access to check what's actually saved there today.
+- **New `autoGenerateCombinedYouthActivities()`** (`lib/data/youth-activity-schedule.ts`)
+  -- same rolling-horizon approach, calling the existing
+  `generateCombinedYouthActivities` (the fixed 1st/2nd&4th/3rd-Wednesday
+  combined rotation), run from `getYouthActivities()`
+  (`lib/data/youth-activities.ts`) alongside its own existing sweeps.
+- **Deliberately NOT automated**: Ward Event Schedule and the general,
+  user-configurable Youth Activity Schedule cadence-rule engine
+  (`youth_activity_schedule_rules` -- a different mechanism from the
+  fixed Wednesday rotation above, see that file's own top comment for
+  why the two stay separate) -- the user's own description named only
+  the four meeting types and the Wednesday youth activities, not
+  these; scoped narrowly rather than guessing they should get the same
+  treatment. Both keep their existing manual "Generate" buttons,
+  completely unchanged.
+- **Manual "Generate" buttons kept everywhere, not removed** -- per
+  the user's own "it would be ok to be able to set the cadence/rules
+  somewhere" (implying the existing rules UI stays) and "other events
+  can be created manually... or whatever" (one-off/irregular events
+  still need manual creation, same as always). Both the Meeting
+  Schedule and Youth Activities Manage pages now show a short note
+  explaining generation already happens automatically, so the button
+  isn't confusing to find already-populated.
+- Both new functions swallow their own errors (never let a background
+  sweep failure break Dashboard/Calling Planning/the activity pages
+  from rendering) -- same philosophy as every other lazy sweep already
+  in this app.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session -- ask the user to load `/dashboard`
+or `/youth-activities` once deployed and confirm upcoming meetings/
+activities keep appearing roughly 8 weeks out with no manual Generate
+click, and to double-check `/meeting-schedule`'s own rules match the
+cadence described above.
+
 **Bug found and fixed 2026-10-16: overwriting a class's activity from
 a Combined page didn't visibly take effect everywhere.** The user's
 own report: "I added a combined YM/YW activity and it didn't overwrite

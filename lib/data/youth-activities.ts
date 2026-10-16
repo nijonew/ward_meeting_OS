@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { sweepYouthActivityCancellations } from "@/lib/data/youth-activity-cancellations";
+import { autoGenerateCombinedYouthActivities } from "@/lib/data/youth-activity-schedule";
 
 export interface YouthActivityRow {
   id: string;
@@ -24,7 +25,12 @@ export interface YouthActivityRow {
 // only published rows to anonymous/other-role requests, and everything to
 // bishopric + youth leader roles. Same query works for every visitor.
 export async function getYouthActivities(): Promise<YouthActivityRow[]> {
-  await Promise.all([sweepMeetingCancellations(), sweepYouthActivityCancellations()]);
+  // autoGenerateCombinedYouthActivities runs alongside the other two
+  // lazy sweeps (2026-10-16, the user's own request -- see that
+  // function's own comment) so the fixed Wednesday combined-week
+  // rotation keeps existing automatically, the same way the other two
+  // sweeps already keep cancellations in sync without anyone asking.
+  await Promise.all([sweepMeetingCancellations(), sweepYouthActivityCancellations(), autoGenerateCombinedYouthActivities()]);
   const supabase = await createClient();
   const { data } = await supabase
     .from("youth_activities")
