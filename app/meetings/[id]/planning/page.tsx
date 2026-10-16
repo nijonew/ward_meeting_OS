@@ -20,7 +20,7 @@ import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
-import { getCallableCallingPlanningItems } from "@/lib/data/calling-planning";
+import { getCallableCallingPlanningItems, autoAnnounceReadyCallingPlanningItems } from "@/lib/data/calling-planning";
 import { getAnnouncementsByPlannedElement, getPullableAnnouncements, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
@@ -126,6 +126,22 @@ export default async function PlanningViewPage({
   const isBishopric = meeting.meetingType === "bishopric-meeting";
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
+
+  // Auto-adds every "To be Announced" Calling Planning item (calling
+  // and release sides independently) to whichever Sacrament Meeting is
+  // nearest-upcoming right now (2026-10-15, the user's own request:
+  // "I would like to have those calling and release announcement
+  // automatically added to the next sacrament meeting... each week
+  // until their status is changed"). Lazy sweep, same pattern as
+  // autoArchivePastMeetings/sweepMeetingCancellations -- run before the
+  // fetch below so this page's own `sacramentData.rabnm`/
+  // `callablePlanningItems` already reflect it on first render. Only
+  // ever writes to the single nearest-upcoming meeting (see that
+  // function's own doc comment), regardless of which Sacrament Meeting
+  // is actually being viewed here, so it's safe to call unconditionally.
+  if (isSacrament) {
+    await autoAnnounceReadyCallingPlanningItems();
+  }
 
   const [
     plannedElements,

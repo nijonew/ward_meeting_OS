@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getActivePeople } from "@/lib/data/people";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export interface CallingDetail {
   id: string;
@@ -236,6 +237,127 @@ export async function getCallableCallingPlanningItems(): Promise<{
   }
 
   return { callings, releases };
+}
+
+/**
+ * Auto-populates the single nearest upcoming (not cancelled, not
+ * archived) Sacrament Meeting's Ward Business with every calling_planning
+ * row still marked "To be Announced" on either side -- the user's own
+ * request (2026-10-15): "I would like to have those calling and
+ * release announcement automatically added to the next sacrament
+ * meeting. They can be added to the current week's sacrament meeting
+ * each week until their status is changed. We will then control in
+ * the sacrament planning view if they will be announced or not."
+ *
+ * Deliberately independent of `announced_meeting_id` for its own
+ * eligibility check -- that column means "most recently linked to
+ * *a* meeting," which only ever points at one meeting at a time, but
+ * `calling_status`/`release_status` can resolve on different weeks
+ * from each other (e.g. a release gets recorded while the matching
+ * new calling is still pending). Checks per side, directly, whether a
+ * `sacrament_rabnm` row already links this `calling_planning` row to
+ * THIS specific meeting -- if not, and that side's status is still
+ * `to_announce`, creates it (the same effect as
+ * `pullCallingPlanningIntoMeeting`, just run automatically instead of
+ * by a click) and sets `announced_meeting_id` to this meeting
+ * afterward so the manual "call in another" dropdown stays consistent
+ * (still excludes it, same as any other already-pulled row).
+ *
+ * "We will control... if they will be announced or not" is the
+ * existing Remove button on the meeting's own Planning page, read as
+ * "not this week" rather than a permanent decline -- removing an item
+ * clears `announced_meeting_id` without touching its status, which is
+ * exactly what makes it eligible for this sweep to pick back up (onto
+ * whichever meeting is current by the time it next runs). The one
+ * real "stop" is a status change away from `to_announce`, which this
+ * sweep never touches itself.
+ *
+ * Lazy sweep on read, same pattern as `autoArchivePastMeetings`/
+ * `sweepMeetingCancellations` -- called unconditionally whenever any
+ * Sacrament Meeting's Planning page loads, but only ever writes to the
+ * one meeting that's actually nearest-upcoming as of right now, so
+ * planning several weeks ahead at once never duplicates the same
+ * pending item across more than one future meeting.
+ */
+export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
+  const supabase = await createClient();
+  const { dateIso: today } = getMountainTimeNow();
+
+  const { data: meetingRows } = await supabase
+    .from("meetings")
+    .select("id, meeting_types!inner(slug)")
+    .eq("meeting_types.slug", "sacrament-meeting")
+    .eq("cancelled", false)
+    .neq("stage", "archived")
+    .gte("date", today)
+    .order("date", { ascending: true })
+    .limit(1);
+
+  const meetingId = (meetingRows?.[0] as { id: string } | undefined)?.id;
+  if (!meetingId) return;
+
+  const { data: rows } = await supabase
+    .from("calling_planning")
+    .select("id, calling_id, calling_status, candidate_person_ids, release_person_id, release_status")
+    .or("calling_status.eq.to_announce,release_status.eq.to_announce");
+
+  if (!rows || rows.length === 0) return;
+
+  const rowIds = (rows as { id: string }[]).map((r) => r.id);
+  const { data: existingLinks } = await supabase
+    .from("sacrament_rabnm")
+    .select("calling_planning_id, type")
+    .eq("meeting_id", meetingId)
+    .in("calling_planning_id", rowIds);
+
+  const alreadyLinked = new Set(
+    ((existingLinks ?? []) as { calling_planning_id: string | null; type: string }[]).map(
+      (l) => `${l.calling_planning_id}::${l.type}`
+    )
+  );
+
+  for (const row of rows as {
+    id: string;
+    calling_id: string;
+    calling_status: string;
+    candidate_person_ids: string[] | null;
+    release_person_id: string | null;
+    release_status: string;
+  }[]) {
+    const candidateIds = row.candidate_person_ids ?? [];
+    let linkedAny = false;
+
+    if (row.calling_status === "to_announce" && candidateIds.length === 1 && !alreadyLinked.has(`${row.id}::new_calling`)) {
+      const { data: rabnm } = await supabase
+        .from("sacrament_rabnm")
+        .insert({ meeting_id: meetingId, type: "new_calling", calling_id: row.calling_id, calling_planning_id: row.id })
+        .select("id")
+        .single();
+      if (rabnm) {
+        await supabase.from("sacrament_rabnm_people").insert({ rabnm_id: rabnm.id, person_id: candidateIds[0] });
+        linkedAny = true;
+      }
+    }
+
+    if (row.release_person_id && row.release_status === "to_announce" && !alreadyLinked.has(`${row.id}::release`)) {
+      const { data: rabnm } = await supabase
+        .from("sacrament_rabnm")
+        .insert({ meeting_id: meetingId, type: "release", calling_id: row.calling_id, calling_planning_id: row.id })
+        .select("id")
+        .single();
+      if (rabnm) {
+        await supabase.from("sacrament_rabnm_people").insert({ rabnm_id: rabnm.id, person_id: row.release_person_id });
+        linkedAny = true;
+      }
+    }
+
+    if (linkedAny) {
+      await supabase
+        .from("calling_planning")
+        .update({ announced_meeting_id: meetingId, updated_at: new Date().toISOString() })
+        .eq("id", row.id);
+    }
+  }
 }
 
 /**

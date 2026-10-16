@@ -1974,6 +1974,67 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calling/release announcements now auto-add to Sacrament Meeting's
+Ward Business, 2026-10-15** (the user's own request, right after
+confirming migration `076`: "I would like to have those calling and
+release announcement automatically added to the next sacrament
+meeting. They can be added to the current week's sacrament meeting
+each week until their status is changed. We will then control in the
+sacrament planning view if they will be announced or not."). Before
+this, getting a "To be Announced" item onto a meeting's agenda always
+required an explicit manual pull (either Calling Planning's own "Ready
+to Announce" push, or Ward Business's own "call in from Calling
+Planning" dropdown) -- now it happens on its own.
+
+New `autoAnnounceReadyCallingPlanningItems()` (`lib/data/calling-planning.ts`),
+called unconditionally from `app/meetings/[id]/planning/page.tsx`
+whenever any Sacrament Meeting's Planning page loads (lazy sweep on
+read, same pattern as `autoArchivePastMeetings`/`sweepMeetingCancellations`,
+run before this page's own data fetch so the same render already
+reflects it):
+- Finds the single nearest upcoming (not cancelled, not archived)
+  Sacrament Meeting -- and only that one, regardless of which meeting
+  is actually being viewed -- so planning several weeks ahead at once
+  never duplicates the same pending item across more than one future
+  meeting. No-ops if none exists.
+- For every `calling_planning` row with `calling_status`/`release_status
+  === "to_announce"`, checks **per side independently** whether a
+  `sacrament_rabnm` row already links it to *this* meeting -- not via
+  `announced_meeting_id` (which only ever points at one meeting at a
+  time and would be ambiguous the moment the two sides resolve on
+  different weeks from each other, e.g. a release gets recorded while
+  its matching new calling is still pending) -- and creates whichever
+  side is missing, exactly matching what a manual pull already does.
+  `announced_meeting_id` is still updated afterward, purely so the
+  existing manual "call in another" dropdown keeps correctly excluding
+  it.
+- **"Each week until their status is changed"**: removing an item from
+  one week's Ward Business (the existing Remove button) clears
+  `announced_meeting_id` without touching its status -- which is
+  exactly what makes the sweep pick it back up the next time it runs,
+  attaching it to whatever's then the new current meeting. The one
+  real stop is a manual status change away from `to_announce`, which
+  this sweep never does itself (matches the 2026-10-13 fix immediately
+  below, which made that status change manual-only in the first
+  place). "We will control... if they will be announced or not" is
+  read as exactly that Remove button -- a per-week "skip this one,"
+  not a permanent decline.
+- **Scoped to the Planning page load only, not yet wired into
+  Conducting or the dashboard** -- the normal workflow (build the rest
+  of the agenda in Planning before ever reaching Conducting) should
+  already cover the real case, but flag if an item isn't showing up
+  somewhere because its meeting's Planning page genuinely hasn't been
+  opened yet since the item became ready; extending the trigger point
+  (e.g. into `getUpcomingMeetings()`, which already runs the other two
+  lazy sweeps on every Dashboard/Calling Planning page view) is a
+  contained follow-up if that turns out to matter in practice.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session -- ask the user to open the
+nearest upcoming Sacrament Meeting's Planning page and confirm any
+"To be Announced" items now appear in Ward Business without having
+been manually pulled in.
+
 **Bug found and fixed 2026-10-15: a calling pushed from Calling
 Planning's own page could get permanently stuck once removed from Ward
 Business.** The user's own detailed report, walking through a full
