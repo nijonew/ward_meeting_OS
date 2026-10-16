@@ -1974,6 +1974,44 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-16: overwriting a class's activity from
+a Combined page didn't visibly take effect everywhere.** The user's
+own report: "I added a combined YM/YW activity and it didn't overwrite
+the existing activities of the groups on that date." Two things
+tangled together, not one:
+- **Not a bug -- Add and Overwrite have always been two separate,
+  deliberate steps** (2026-10-11's own design): adding a Combined
+  activity creates that one row; it never touches each class's own
+  existing row on its own. The per-class display logic
+  (`resolveForClass`, `lib/data/class-activities-shared.ts`) also
+  deliberately prefers a class's *own* row over a Combined one
+  whenever both exist for the same date -- so until the separate
+  "Overwrite `<classes>`" button (next to the new row, on the same
+  Combined page) is actually clicked, the old individual activity
+  keeps showing everywhere, which looks identical to "nothing
+  happened."
+- **Real bug, now fixed**: `pushCombinedActivityToClasses`
+  (`app/youth-activities/actions.ts`) only ever called
+  `revalidatePath("/youth-activities/manage/classes")` after a
+  successful overwrite -- never `revalidateActivityListings()` (the
+  shared helper `addYouthActivity`/`generateYouthActivities` both
+  already call), so Upcoming Activities, the three Combined pages, and
+  Scheduled Events could all keep showing stale, pre-overwrite data
+  until a manual reload even though the actual database write
+  succeeded. Now calls both.
+- **Open question, not yet resolved**: should "Add Activity" on a
+  Combined page automatically overwrite the target classes too,
+  collapsing this into one step, instead of requiring the separate
+  click every time? The original two-step design was deliberate (an
+  automatic overwrite risks silently clobbering a class's
+  independently-edited row with no confirmation), but the user's own
+  report reads like they expected one-step behavior. Asked directly
+  rather than guessing, since this changes real, already-shipped
+  behavior either way.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session.
+
 **Calling/release announcements now auto-add to Sacrament Meeting's
 Ward Business, 2026-10-15** (the user's own request, right after
 confirming migration `076`: "I would like to have those calling and

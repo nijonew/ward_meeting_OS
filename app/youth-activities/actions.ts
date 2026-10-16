@@ -170,7 +170,18 @@ export async function pushCombinedActivityToClasses(activityId: string): Promise
   const failed = results.find((r) => r.error);
   if (failed?.error) return { error: failed.error.message };
 
+  // Bug fix (2026-10-16, the user's own report: "I added a combined
+  // YM/YW activity and it didn't overwrite the existing activities of
+  // the groups on that date") -- this only ever revalidated the
+  // per-class management page, never the other pages that also render
+  // youth_activities data (Upcoming Activities' explodeActivitiesByClass
+  // in particular now prefers each class's own row over the Combined
+  // one it was just overwritten with -- see resolveForClass's own
+  // precedence comment -- so those pages could keep showing stale,
+  // pre-overwrite data until a manual reload even though the write
+  // itself succeeded).
   revalidatePath("/youth-activities/manage/classes");
+  revalidateActivityListings();
   return { success: true };
 }
 
