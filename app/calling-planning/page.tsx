@@ -46,11 +46,21 @@ export default async function CallingPlanningPage({
   const sacramentMeetings = meetings.filter((m) => m.meetingType === "sacrament-meeting");
   const filteredCallingName = callingFilter ? callingOptions.find((c) => c.id === callingFilter)?.name : null;
 
+  // Bug fix (2026-10-16, the user's own report: "I entered a calling
+  // 'to be announced'... the new one didn't land there"). This used to
+  // require candidate_person_ids.length > 0 for the calling side,
+  // which silently excluded a row with ZERO candidates from this
+  // section entirely -- no warning, nothing -- even though neither the
+  // new automatic Ward Business sweep (autoAnnounceReadyCallingPlanningItems)
+  // nor the manual push below can ever announce a calling with no
+  // candidate selected (both require exactly one). The 2+ case already
+  // had a visible "narrow down" warning further below; the 0 case had
+  // no equivalent at all. Now includes any row with either side marked
+  // "To be Announced," regardless of candidate count or whether a
+  // release person is set yet, so every blocking reason gets a real,
+  // visible message instead of the row just not appearing.
   const readyToAnnounce = rows.filter(
-    (r) =>
-      !r.announced_meeting_id &&
-      ((r.calling_status === "to_announce" && r.candidate_person_ids.length > 0) ||
-        (r.release_status === "to_announce" && r.release_person_id))
+    (r) => !r.announced_meeting_id && (r.calling_status === "to_announce" || r.release_status === "to_announce")
   );
 
   const addEntry = async (formData: FormData) => {
@@ -145,15 +155,26 @@ export default async function CallingPlanningPage({
           </p>
           <ul className="mt-4 flex flex-col gap-4">
             {readyToAnnounce.map((r) => {
-              const needsNarrowing = r.calling_status === "to_announce" && r.candidate_person_ids.length > 1;
+              const callingReady = r.calling_status === "to_announce";
+              const callingBlocked =
+                callingReady && r.candidate_person_ids.length === 0
+                  ? "Select a candidate before the new calling can be announced."
+                  : callingReady && r.candidate_person_ids.length > 1
+                    ? "Narrow Candidates down to exactly one person before the new calling can be announced."
+                    : null;
+              const releaseReady = r.release_status === "to_announce";
+              const releaseBlocked =
+                releaseReady && !r.release_person_id
+                  ? "Set a Person Being Released before the release can be announced."
+                  : null;
+              const canPushSomething = (callingReady && !callingBlocked) || (releaseReady && !releaseBlocked);
+
               return (
                 <li key={r.id} className="rounded border border-rule/60 p-4">
                   <p className="text-sm text-ink">{r.calling_name}</p>
-                  {needsNarrowing ? (
-                    <p className="mt-2 text-xs text-accent">
-                      Narrow Candidates down to exactly one person before this can be announced.
-                    </p>
-                  ) : (
+                  {callingBlocked && <p className="mt-2 text-xs text-accent">{callingBlocked}</p>}
+                  {releaseBlocked && <p className="mt-2 text-xs text-accent">{releaseBlocked}</p>}
+                  {canPushSomething && (
                     <div className="mt-2">
                       <PushCallingForm
                         planningId={r.id}

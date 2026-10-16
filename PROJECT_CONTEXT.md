@@ -1974,6 +1974,41 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-16: a newly-entered "To be Announced"
+calling gave no indication why it wasn't showing up in Ward
+Business.** The user's own report: "I entered a calling 'to be
+announced'. The items that had previously been entered and that had
+landed in the sacrament meeting planning remained, but the new one
+didn't land there."
+
+Root cause: both the automatic sweep
+(`autoAnnounceReadyCallingPlanningItems`, built earlier the same
+session) and the manual push (`pushCallingToSacramentMeeting`) have
+always required the calling side's Candidates to be narrowed to
+*exactly one* person before announcing it -- a row with zero
+candidates selected (the likely state for a just-created entry) is
+silently skipped by both, same as a row with two or more. The 2+ case
+already had a visible warning in Calling Planning's own "Ready to
+Announce" section ("Narrow Candidates down to exactly one person");
+the 0 case had no equivalent at all -- `readyToAnnounce`'s own filter
+(`app/calling-planning/page.tsx`) required `candidate_person_ids.length
+> 0`, which excluded a zero-candidate row from that section entirely,
+so there was nowhere the user could have seen *any* indication of what
+was blocking it, automatic sweep or manual push alike.
+
+Fixed by broadening that filter to include any row with either side
+marked "To be Announced," regardless of candidate count or whether a
+release person is set yet -- every row that's actually blocked now
+shows up with a specific reason ("Select a candidate before the new
+calling can be announced," "Narrow Candidates down to exactly one
+person...," or "Set a Person Being Released before the release can be
+announced"), and the "Add to a meeting" button only appears once at
+least one side is genuinely ready to push. Confirmed via
+`tsc`/`eslint`/`next build` only, same no-live-browser gap as
+everything else this session -- ask the user to check `/calling-planning`
+for the specific calling from their report; it should now show
+exactly which of these applies.
+
 **App icon built: a Syracuse Utah Temple silhouette on the app's own
 seasonal accent color, 2026-10-16.** The user's own request: "I would
 like to create an app icon for ward OS. I would like it to be a
