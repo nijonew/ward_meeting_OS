@@ -8,11 +8,15 @@ const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink
 
 function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId: string }) {
   const [removing, startRemove] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  const remove = () =>
+  const remove = () => {
+    setError(null);
     startRemove(async () => {
-      await removeAnnouncementFromMeeting(meetingId, item.id);
+      const result = await removeAnnouncementFromMeeting(meetingId, item.id);
+      if ("error" in result) setError(result.error);
     });
+  };
 
   return (
     <tr className="border-t border-rule/40">
@@ -22,6 +26,7 @@ function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId:
         <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
           {removing ? "Removing..." : "Remove"}
         </button>
+        {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </tr>
   );
@@ -44,6 +49,19 @@ function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId:
  * which already IS the `meeting_planned_elements` row id), passed
  * straight through to `pullAnnouncementIntoMeeting` so a pull lands in
  * the right block rather than an ambiguous "this meeting" link.
+ *
+ * **Bug found and fixed 2026-10-15** (the user's own report: "I added
+ * an announcement in the sacrament meeting planning view and it didn't
+ * save"): `pull`'s result was discarded entirely, same bug class as
+ * Delete Meeting's own silent-failure bug fixed earlier this session
+ * (`DeleteMeetingButton.tsx`) -- a failed pull (wrong feature, an RLS
+ * denial, or losing a race against another block for the same
+ * announcement, which `pullAnnouncementIntoMeeting`'s own
+ * `.is("meeting_id", null)` guard would reject) looked identical to a
+ * successful one: the dropdown still cleared back to blank either way,
+ * with nothing on screen saying it didn't actually land. Now reads the
+ * result and shows the message inline if there is one, same pattern as
+ * `ExistingRow`'s own Remove button just below.
  */
 export function AnnouncementsField({
   meetingId,
@@ -58,11 +76,17 @@ export function AnnouncementsField({
 }) {
   const [selected, setSelected] = useState("");
   const [pending, startPull] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const pull = () => {
     if (!selected) return;
+    setError(null);
     startPull(async () => {
-      await pullAnnouncementIntoMeeting(meetingId, selected, plannedElementId);
+      const result = await pullAnnouncementIntoMeeting(meetingId, selected, plannedElementId);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
       setSelected("");
     });
   };
@@ -99,6 +123,7 @@ export function AnnouncementsField({
           >
             {pending ? "Adding..." : "Add"}
           </button>
+          {error && <span className="text-[11px] text-danger">{error}</span>}
         </div>
       )}
     </div>

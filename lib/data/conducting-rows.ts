@@ -130,6 +130,23 @@ export function buildConductingRows({
     musicByType.set(item.type, [...(musicByType.get(item.type) ?? []), item]);
   }
 
+  // Releases first, then new callings (the user's own request,
+  // 2026-10-15: "order callings and releases to announce all releases
+  // first and then all new callings after that"). sacrament_rabnm has
+  // no ordering column of its own and this fetch has no `.order()`
+  // (lib/data/sacrament-planning.ts), so without this the Conducting
+  // script would read back in whatever order Postgres happens to
+  // return rows, not a deliberate one. Any other legacy type (a
+  // pre-2026-10-03 "Other" item -- baby blessing, baptism, mission
+  // call, etc., still fetched here even though Planning's own
+  // WardBusinessField no longer manages them) sorts after both,
+  // keeping its own relative order via Array.prototype.sort's
+  // stability rather than being silently dropped or reshuffled.
+  const RABNM_ORDER_WEIGHT: Record<string, number> = { release: 0, new_calling: 1 };
+  const orderedRabnm = [...rabnm].sort(
+    (a, b) => (RABNM_ORDER_WEIGHT[a.type] ?? 2) - (RABNM_ORDER_WEIGHT[b.type] ?? 2)
+  );
+
   const personName = (id: string | null | undefined): string => (id ? peopleById.get(id) ?? BLANK : BLANK);
   const roleAssignedId = (role: string): string | null => roleAssignments[role]?.assigned_to_id ?? null;
   // Falls back to the role's guest name (Chorister/Organist's guest
@@ -146,7 +163,7 @@ export function buildConductingRows({
 
     if (key === "ward_business") {
       rows.push({ id: el.id, kind: "banner", label: el.label, value: null, wording: null });
-      for (const item of rabnm) {
+      for (const item of orderedRabnm) {
         rows.push({ id: `rabnm-${item.id}`, kind: "field", label: item.type.replace(/_/g, " "), value: null, wording: rabnmPrompt(item) });
       }
       continue;

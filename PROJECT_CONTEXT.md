@@ -1974,6 +1974,67 @@ avoid confusing the two.
 
 ## Known open items
 
+**Two requests, 2026-10-15, right after the "To be Announced" fix
+above shipped:**
+
+1. **Conducting view's Ward Business now announces all releases
+   before any new calling.** The user's own words: "order callings and
+   releases to announce all releases first and then all new callings
+   after that." Root cause/gap: `sacrament_rabnm` has no ordering
+   column of its own, and its own fetch
+   (`getSacramentPlanningData`, `lib/data/sacrament-planning.ts`) has
+   no `.order()` either -- the Conducting script's Ward Business loop
+   (`buildConductingRows`, `lib/data/conducting-rows.ts`) simply walked
+   the array in whatever order Postgres happened to return it, release
+   and new-calling items interleaved arbitrarily. Fixed with a small
+   stable sort (`release` weight 0, `new_calling` weight 1, everything
+   else weight 2) right before that loop -- any other, pre-2026-10-03
+   "Other" RABNM type (baby blessing, baptism, mission call, etc. --
+   still fetched here even though Planning's own `WardBusinessField`
+   no longer manages them, see that rework's own note further down)
+   sorts after both groups, keeping its own relative order rather than
+   being silently dropped or reshuffled. Scoped to the Conducting view
+   only, per the user's own wording ("in the conducting view") --
+   Planning's `WardBusinessField` already renders Releases and
+   Callings as two separately-labeled sections, so it already shows
+   releases first structurally and needed no change.
+2. **"I added an announcement in the sacrament meeting planning view
+   and it didn't save."** Traced the whole pull path
+   (`AnnouncementsField.tsx` -> `pullAnnouncementIntoMeeting`,
+   `app/meetings/[id]/announcements-actions.ts` -> `getPullableAnnouncements`/
+   `getAnnouncementsByPlannedElement`, `lib/data/sacrament-announcements.ts`)
+   end to end -- the server action itself, its feature gate
+   (`sacrament_planning`, confirmed spelled correctly against the real
+   `Feature` union), and every prop handed down from `agenda-rows.ts`
+   through `AgendaGridForm.tsx` all check out structurally. The one
+   real, confirmed bug: `AnnouncementsField`'s own `pull()` (and
+   `ExistingRow`'s `remove()`) discarded the server action's result
+   entirely -- the exact same silent-failure bug class already found
+   and fixed once this session for Delete Meeting
+   (`DeleteMeetingButton.tsx`). A failed pull (wrong feature, an RLS
+   denial, or losing a race against another block for the same
+   announcement via `pullAnnouncementIntoMeeting`'s own
+   `.is("meeting_id", null)` guard) looked identical to a successful
+   one -- the dropdown cleared back to blank regardless, with nothing
+   on screen ever saying it didn't actually land. Fixed to read the
+   result and show the message inline, and to leave the dropdown's
+   selection in place on failure (only clearing it on confirmed
+   success) so a retry doesn't require re-picking the same
+   announcement. **Not yet confirmed as the complete fix** -- this
+   session has no live database access, so if the real failure is
+   something structural (e.g. an undocumented RLS policy on
+   `announcements` predating this repo's migration history, the same
+   class of problem already found on `sacrament_assignments`/
+   `sacrament_program_items`/`agenda_items`/`bishopric_assignments` --
+   migrations 038/041/063/067/068/069/075 -- though `announcements`
+   itself has its own anon-facing policies from migration 031 onward
+   and has never shown this specific symptom before), this fix at
+   least makes the real error message visible instead of silent
+   nothing. Ask the user to retry adding an announcement and report the
+   exact message if it still doesn't save -- that will say definitively
+   whether this was purely a UI-feedback bug or points to something
+   deeper to chase next.
+
 **Bug found and fixed 2026-10-16: a newly-entered "To be Announced"
 calling gave no indication why it wasn't showing up in Ward
 Business.** The user's own report: "I entered a calling 'to be
