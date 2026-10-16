@@ -11,6 +11,15 @@ import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/
  * field, not a dropdown; there's nothing to choose, the page itself
  * already says which one) rather than a new, separate server action --
  * addYouthActivity already handles any group_name.
+ *
+ * **Also auto-overwrites each target class's own activity on the same
+ * date, 2026-10-16** -- the user's own confirmed choice, after
+ * reporting that adding a Combined activity here didn't visibly
+ * replace what each class already had: "I added a combined YM/YW
+ * activity and it didn't overwrite the existing activities of the
+ * groups on that date." `addYouthActivity` itself now does this as
+ * part of the same save (see that action's own comment) -- this form
+ * needed no changes to pick it up.
  */
 export function AddCombinedActivityForm({ groupName }: { groupName: string }) {
   // Wraps addYouthActivity (which returns ActionResult) to discard the

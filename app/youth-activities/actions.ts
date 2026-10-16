@@ -69,6 +69,30 @@ export async function addYouthActivity(formData: FormData): Promise<ActionResult
     return { error: error.message };
   }
 
+  // Auto-overwrite on add (2026-10-16, the user's own confirmed choice
+  // after reporting "I added a combined YM/YW activity and it didn't
+  // overwrite the existing activities of the groups on that date" --
+  // asked directly whether Add should also overwrite automatically
+  // rather than requiring the separate button every time, and the
+  // answer was yes). A no-op (returns success immediately) for a
+  // non-Combined group_name -- see overwriteClassesFromCombined's own
+  // comment for exactly what this does and doesn't touch; the manual
+  // "Overwrite" button stays, for re-syncing a Combined row's *later*
+  // edits out to the classes, which this add-time call can't cover.
+  const overwriteResult = await overwriteClassesFromCombined(supabase, {
+    activity_date,
+    activity_time,
+    title,
+    location,
+    development_category,
+    youth_lead,
+    advisor_lead,
+    notes,
+    group_name,
+  });
+  if ("error" in overwriteResult) return overwriteResult;
+
+  revalidatePath("/youth-activities/manage/classes");
   revalidateActivityListings();
   return { success: true };
 }
@@ -90,6 +114,18 @@ export async function generateYouthActivities(
   return { created: result.created, skippedExisting: result.skippedExisting };
 }
 
+type CombinedActivitySource = {
+  activity_date: string;
+  activity_time: string | null;
+  title: string;
+  location: string | null;
+  development_category: string | null;
+  youth_lead: string | null;
+  advisor_lead: string | null;
+  notes: string | null;
+  group_name: string;
+};
+
 /**
  * "I also want to have a button to command that the combined activity
  * overwrite the activity on the same date of the appropriate groups
@@ -105,30 +141,28 @@ export async function generateYouthActivities(
  * row, so a class's own planning state stays independently
  * manageable after the copy).
  *
- * This is a one-time "stamp a copy out to each class" action, distinct
- * from getClassActivityGrid's own live fallback display (a class with
- * no individual row yet already shows the Combined row's content
- * there automatically) -- after this runs, each target class has a
- * real row of its own, so further edits from its own page only affect
- * that one class, not the shared Combined row or any other class's
- * copy.
+ * Shared between `pushCombinedActivityToClasses` (the manual
+ * "Overwrite" button, re-syncing a Combined row's *later* edits) and
+ * `addYouthActivity` (auto-overwrite at creation time, 2026-10-16) so
+ * the two can't drift apart. A no-op, returning success immediately,
+ * when `source.group_name` isn't one of the three Combined values --
+ * callers that need to treat that as a real error (the manual button
+ * should never actually hit this case, but stays defensive) check for
+ * it themselves before calling in.
+ *
+ * This is a "stamp a copy out to each class" action, distinct from
+ * `getClassActivityGrid`'s own live fallback display (a class with no
+ * individual row yet already shows the Combined row's content there
+ * automatically) -- after this runs, each target class has a real row
+ * of its own, so further edits from its own page only affect that one
+ * class, not the shared Combined row or any other class's copy.
  */
-export async function pushCombinedActivityToClasses(activityId: string): Promise<ActionResult> {
-  const denied = await requireYouthActivityPlanningFeature();
-  if (denied) return denied;
-
-  const supabase = await createClient();
-  const { data: source, error: fetchError } = await supabase
-    .from("youth_activities")
-    .select("activity_date, activity_time, title, location, development_category, youth_lead, advisor_lead, notes, group_name")
-    .eq("id", activityId)
-    .maybeSingle();
-
-  if (fetchError) return { error: fetchError.message };
-  if (!source) return { error: "Could not find that activity." };
-
-  const targets = classesForCombinedGroup(source.group_name as string);
-  if (!targets) return { error: "Not a Combined activity." };
+async function overwriteClassesFromCombined(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  source: CombinedActivitySource
+): Promise<ActionResult> {
+  const targets = classesForCombinedGroup(source.group_name);
+  if (!targets) return { success: true };
 
   const { data: existingRows, error: existingError } = await supabase
     .from("youth_activities")
@@ -169,6 +203,26 @@ export async function pushCombinedActivityToClasses(activityId: string): Promise
 
   const failed = results.find((r) => r.error);
   if (failed?.error) return { error: failed.error.message };
+  return { success: true };
+}
+
+export async function pushCombinedActivityToClasses(activityId: string): Promise<ActionResult> {
+  const denied = await requireYouthActivityPlanningFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const { data: source, error: fetchError } = await supabase
+    .from("youth_activities")
+    .select("activity_date, activity_time, title, location, development_category, youth_lead, advisor_lead, notes, group_name")
+    .eq("id", activityId)
+    .maybeSingle();
+
+  if (fetchError) return { error: fetchError.message };
+  if (!source) return { error: "Could not find that activity." };
+  if (!classesForCombinedGroup(source.group_name as string)) return { error: "Not a Combined activity." };
+
+  const result = await overwriteClassesFromCombined(supabase, source as CombinedActivitySource);
+  if ("error" in result) return result;
 
   // Bug fix (2026-10-16, the user's own report: "I added a combined
   // YM/YW activity and it didn't overwrite the existing activities of

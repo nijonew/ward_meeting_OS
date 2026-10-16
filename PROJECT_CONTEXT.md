@@ -1999,15 +1999,16 @@ tangled together, not one:
   Scheduled Events could all keep showing stale, pre-overwrite data
   until a manual reload even though the actual database write
   succeeded. Now calls both.
-- **Open question, not yet resolved**: should "Add Activity" on a
-  Combined page automatically overwrite the target classes too,
-  collapsing this into one step, instead of requiring the separate
-  click every time? The original two-step design was deliberate (an
-  automatic overwrite risks silently clobbering a class's
-  independently-edited row with no confirmation), but the user's own
-  report reads like they expected one-step behavior. Asked directly
-  rather than guessing, since this changes real, already-shipped
-  behavior either way.
+- **Resolved the same day: Add now auto-overwrites.** Asked directly
+  whether "Add Activity" on a Combined page should also overwrite the
+  target classes automatically, collapsing the two steps into one --
+  the user chose yes. `addYouthActivity`/`pushCombinedActivityToClasses`
+  (`app/youth-activities/actions.ts`) now share one helper,
+  `overwriteClassesFromCombined` (copies the same fields either way,
+  a no-op for a non-Combined `group_name`), so the two paths can't
+  drift apart. The manual "Overwrite `<classes>`" button on each row
+  stays -- it's still the only way to re-sync a Combined row's *later*
+  edits out to the classes, which an add-time call can't cover.
 
 Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
 gap as everything else this session.
