@@ -5,6 +5,7 @@ import {
   getTemplateElements,
   getPlannedElements,
   getRoleAssignments,
+  seedPlannedElementsForMeeting,
   type TemplateElementRow,
 } from "@/lib/data/meeting-elements";
 import { getElementNotes } from "@/lib/data/meeting-element-notes";
@@ -184,13 +185,46 @@ export default async function PlanningViewPage({
     isSacrament ? getPullableAnnouncements(meetingId) : Promise.resolve([]),
   ]);
 
-  // Meetings created before the per-meeting agenda existed have zero
-  // planned-element rows (nothing was ever seeded for them) -- fall back
-  // to the shared default template by type (+ special_format, for
-  // Sacrament Meeting) so they keep rendering exactly as before.
+  // Meetings created before the per-meeting agenda existed, or created
+  // via a path that didn't seed one (see getOrCreateMeetingId's own
+  // matching fix, lib/data/meetings.ts), have zero planned-element
+  // rows. Seed this meeting's own rows right now and re-fetch, rather
+  // than just rendering the shared template read-only -- the lazy-sweep
+  // pattern already used elsewhere on this page
+  // (autoAnnounceReadyCallingPlanningItems above).
+  //
+  // **Bug found and fixed 2026-10-16** (the user's own report: a
+  // foreign key violation pulling a previously-used announcement into
+  // a meeting's Ward Business): the OLD fallback here rendered
+  // `getTemplateElements`'s rows directly -- whose own `id` is
+  // `meeting_templates.id`, a shared, generic row, never a real
+  // per-meeting one. Every `AgendaRow`'s `id` comes straight from
+  // whichever element list this page renders, so anything that needs
+  // to reference a SPECIFIC meeting's own agenda line (pulling an
+  // announcement into one, via `sacrament_announcement_pulls
+  // .planned_element_id`) was silently being handed a `meeting_templates`
+  // id that could never exist in `meeting_planned_elements`, which that
+  // column's own foreign key requires. We've already confirmed above
+  // this meeting isn't archived, so persisting real rows here is safe
+  // -- it only ever happens for a meeting still being actively planned,
+  // never one whose finalized history should stay frozen (that's
+  // `archived/page.tsx`'s own, deliberately separate, un-seeded
+  // fallback rendering -- unchanged).
+  let resolvedPlannedElements = plannedElements;
+  if (resolvedPlannedElements.length === 0) {
+    await seedPlannedElementsForMeeting(
+      meetingId,
+      meetingWithType.meetingTypeId,
+      isSacrament ? sacramentData?.planning?.special_format ?? "standard" : null
+    );
+    resolvedPlannedElements = await getPlannedElements(meetingId);
+  }
+  // Still empty only when there's truly no default template to seed
+  // from at all (no row in meeting_templates for this type/format) --
+  // the one case seedPlannedElementsForMeeting itself can't fix.
   const templateElements =
-    plannedElements.length > 0
-      ? plannedElements
+    resolvedPlannedElements.length > 0
+      ? resolvedPlannedElements
       : await getTemplateElements(meetingWithType.meetingTypeId, isSacrament ? sacramentData?.planning?.special_format ?? "standard" : null);
 
   const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;

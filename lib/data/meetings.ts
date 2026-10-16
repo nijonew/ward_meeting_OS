@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { applyRotationsToNewMeeting } from "@/lib/data/rotations";
+import { seedPlannedElementsForMeeting } from "@/lib/data/meeting-elements";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { autoGenerateUpcomingMeetings } from "@/lib/data/meeting-schedule";
 import { getMountainTimeNow } from "@/lib/data/timezone";
@@ -223,6 +224,23 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
  * advance rather than requiring each one to be individually created
  * first. Pass `cache` when resolving many dates in one call (e.g. a bulk
  * import) to avoid a repeat lookup/insert for the same date.
+ *
+ * **Bug found and fixed 2026-10-16** (the user's own report: a foreign
+ * key violation on `sacrament_announcement_pulls_planned_element_id_fkey`
+ * trying to pull a previously-used announcement into a meeting): unlike
+ * `/meetings/new`'s own `createMeeting` action and Generate Meetings
+ * (`lib/data/meeting-schedule.ts`), this function never called
+ * `seedPlannedElementsForMeeting` -- a meeting created this way (e.g.
+ * via Table Admin's `createIfMissing` calendar picker) got zero
+ * `meeting_planned_elements` rows, so its Planning page always fell
+ * back to the shared, read-only `meeting_templates` list -- whose own
+ * row ids are `meeting_templates.id`, not a real per-meeting
+ * `meeting_planned_elements.id`. Pulling an announcement into one of
+ * those fallback rows then tried to insert that non-existent id as
+ * `planned_element_id`, violating the FK. `special_format` defaults to
+ * `"standard"` for Sacrament Meeting (there's no format to know yet at
+ * this generic creation point), matching Generate Meetings' own
+ * identical default for the same reason.
  */
 export async function getOrCreateMeetingId(
   dateIso: string,
@@ -258,6 +276,11 @@ export async function getOrCreateMeetingId(
   if (error || !created) return null;
 
   await applyRotationsToNewMeeting(created.id as string, meetingType.id as string, meetingTypeSlug);
+  await seedPlannedElementsForMeeting(
+    created.id as string,
+    meetingType.id as string,
+    meetingTypeSlug === "sacrament-meeting" ? "standard" : null
+  );
 
   cache?.set(dateIso, created.id as string);
   return created.id as string;

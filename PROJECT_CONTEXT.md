@@ -1980,6 +1980,81 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-16: pulling a previously-used
+announcement into a meeting hit a foreign key violation.** The user's
+own report, right after running migration `077` and retrying: `insert
+or update on table "sacrament_announcement_pulls" violates foreign key
+constraint "sacrament_announcement_pulls_planned_element_id_fkey"`.
+
+Root cause, traced back further than the new table itself:
+`plannedElementId` (what `AnnouncementsField` passes to
+`pullAnnouncementIntoMeeting`) comes straight from `el.id` in
+`app/meetings/[id]/planning/page.tsx`'s `templateElements` list. That
+list has always had two possible sources with the SAME shape but a
+DIFFERENT meaning for `.id`: `getPlannedElements(meetingId)` (real,
+per-meeting `meeting_planned_elements` rows) when any exist, or
+`getTemplateElements(...)` (the shared, generic `meeting_templates`
+rows) as a fallback when a meeting has zero planned-element rows --
+and `getTemplateElements`'s own `.id` is `meeting_templates.id`, never
+a real `meeting_planned_elements.id`. Migration 077's new
+`sacrament_announcement_pulls.planned_element_id` column requires a
+real `meeting_planned_elements` row (`not null references
+meeting_planned_elements(id)`) -- pulling an announcement on a
+fallback-rendered meeting tried to insert a `meeting_templates.id`
+into that column, which could never exist there. (This exact same gap
+existed in the old, pre-077 single-column design too, just silently --
+`announcements.planned_element_id` was nullable but still a real FK
+to the same table, so it would have failed identically; nobody had
+hit it before now.)
+
+**Found the real source of the gap**: `getOrCreateMeetingId`
+(`lib/data/meetings.ts`, used by Table Admin's `createIfMissing`
+calendar picker to create a meeting on the fly when planning against a
+future date with no `meetings` row yet) has always called
+`applyRotationsToNewMeeting` but never `seedPlannedElementsForMeeting`
+-- unlike the other two meeting-creation paths (`/meetings/new`'s own
+action, and Generate Meetings), which both already call it. A meeting
+created this specific way has permanently had zero planned-element
+rows, with nothing to ever fill them in -- exactly the condition that
+triggers the fallback and breaks any feature (like Announcements) that
+needs to reference one specific agenda line.
+
+**Two-part fix:**
+1. `getOrCreateMeetingId` now also calls `seedPlannedElementsForMeeting`
+   (`"standard"` format for Sacrament Meeting, matching Generate
+   Meetings' own identical default at the same generic creation point)
+   -- closes the gap at the source for any meeting created this way
+   going forward.
+2. The Planning page's own fallback (`app/meetings/[id]/planning/page.tsx`)
+   no longer just renders the shared template read-only when a
+   meeting has zero planned-element rows -- it now calls
+   `seedPlannedElementsForMeeting` right there and re-fetches, the
+   same lazy-sweep-on-read pattern already used elsewhere on this same
+   page (`autoAnnounceReadyCallingPlanningItems`). This repairs the
+   user's own already-broken meeting (and any other one in the same
+   state) the next time its Planning page loads, without needing a
+   manual SQL fix. Scoped safely: by this point in the function the
+   meeting is already confirmed not archived (an earlier redirect
+   handles that), so this only ever persists real rows for a meeting
+   still being actively planned -- never retroactively invents
+   structure for one whose finalized history should stay frozen
+   (`archived/page.tsx`'s own separate, still-unseeded fallback
+   rendering is untouched, by design). Falls back to the old read-only
+   rendering only in the one case seeding itself can't fix -- no
+   default template exists at all for this meeting type/format.
+
+This doesn't contradict the Dynamic planning view architecture's own
+"no backfill was done, by design" note elsewhere in this file -- that
+was migration `033`'s own one-time decision not to bulk-backfill every
+pre-existing meeting the day it shipped, not a standing rule against
+ever seeding one later when something real actually needs it.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session -- ask the user to try pulling the
+same previously-used announcement into the same meeting again; it
+should now go through the first time, with no further migration or
+manual step needed.
+
 **App icon silhouette recolored to metallic gold, 2026-10-16** -- the
 user's own request: "can we change the silhouette in the app to be a
 color other than white? Would a metalic gold color work with the
