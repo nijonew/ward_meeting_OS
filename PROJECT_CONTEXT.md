@@ -1974,6 +1974,74 @@ avoid confusing the two.
 
 ## Known open items
 
+**App icon built: a Syracuse Utah Temple silhouette on the app's own
+seasonal accent color, 2026-10-16.** The user's own request: "I would
+like to create an app icon for ward OS. I would like it to be a
+silhouette of the Syracuse Utah Temple... Basically the temple in
+white and the background would be the color of the main color scheme
+seasonally (so it is probably more than one icon)." First pass (a
+hand-drawn approximation, researched via the temple's real architecture
+and photos) was rejected outright: "The idea for the icons is correct,
+but the silhouette is not good at all. I will provide the silhouette I
+would like" -- the user then pasted their own reference image.
+
+- **Traced, not hand-approximated.** Rather than eyeballing the user's
+  reference, it was run through an actual vectorizer (`imagetracerjs`,
+  loaded via a throwaway local HTML page served from this session's
+  own scratchpad directory, 2-color quantization) so the outer profile
+  matches their image closely. The fine internal window/stonework
+  lines in their source collapsed out naturally at 2-color
+  quantization -- confirmed this is actually correct for icon use, not
+  a loss: rendered the traced path at real 16px/32px via a canvas
+  (`image-rendering: pixelated`, so the literal pixel result was
+  visible, not a scaled-up approximation of it) before trusting it,
+  and the silhouette stayed legible at both sizes with that detail
+  gone.
+- **New `lib/icons/temple-silhouette.ts`** -- the traced path data
+  (`TEMPLE_SILHOUETTE_PATH`/`_VIEW_BOX`) plus
+  `ICON_BACKGROUND_BY_SEASON`/`ICON_FOREGROUND`, the exact hex
+  equivalents of this app's existing `oklch()` seasonal accent tokens
+  (`lib/data/season-theme.ts`). Satori (see below) doesn't support
+  `oklch()` syntax, so these needed converting -- done via a canvas 2D
+  context's real sRGB conversion, not estimated by eye. **A first
+  conversion attempt via `getComputedStyle().color` came back
+  completely wrong** (`oklch(38% 0.11 20)` → "#002600" for every hue
+  tried): this browser serializes a computed color value back out in
+  its own original `oklch(...)` notation rather than normalizing to
+  `rgb()`, so a naive digit-regex over that string silently parsed
+  nonsense (`"0.38"` splits into `"0"` and `"38"` with no decimal point
+  in a digit-only regex) instead of erroring -- caught only by
+  rendering through an actual `<canvas>` fill instead and reading the
+  real output pixel back.
+- **`app/icon.svg` (the old static "W" monogram) replaced with
+  `app/icon.tsx`**, using Next's own dynamic icon convention
+  (`ImageResponse` from `next/og`, rendered through Satori) instead of
+  three separate static files someone would need to remember to swap
+  -- calls the exact same `getSeasonTheme()` the rest of the app
+  already uses for its own color rotation (`app/layout.tsx`'s
+  `data-season` attribute), so the favicon can never drift out of sync
+  with the site's own theme. New `app/apple-icon.tsx` reuses the same
+  silhouette/season logic at Apple's own recommended 180x180, with no
+  border-radius (iOS applies its own rounded-square mask automatically
+  to apple-touch-icons -- a pre-rounded image would double-round or
+  show a background-color edge inside that mask).
+- **Real bug caught before shipping**: both new routes initially built
+  as `○` (static) in `next build`'s own output -- since
+  `getSeasonTheme()` only reads the clock (no cookies/headers/request
+  data), Next.js had no signal that it needed to render per-request,
+  so it would have frozen whichever season was active at build time
+  forever, defeating the entire point of making this dynamic instead
+  of three static files. Both now export `dynamic = "force-dynamic"`,
+  confirmed afterward to rebuild as `ƒ` (server-rendered on demand).
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else this session for the actual Next.js app --
+the silhouette itself WAS visually verified, directly, via the
+built-in browser (the trace result, the three seasonal tiles, and the
+16px/32px pixel-accurate check) before being wired in, since that part
+is a real design decision a type-check can't validate. Ask the user to
+check the browser tab icon on production once deployed.
+
 **Routine meetings and Wednesday youth activities now generate
 themselves, 2026-10-16** (the user's own words: "What if I didn't want
 to ever have to generate typical activity or meeting dates. What if it
