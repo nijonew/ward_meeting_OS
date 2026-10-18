@@ -48,6 +48,21 @@ import { formatAnnouncementSchedule } from "@/lib/data/announcements";
  * center)") -- the separate "Location: X" line below the body is gone;
  * `formatAnnouncementSchedule` now renders date/time and location
  * together in the one meta line next to the title.
+ *
+ * **Link made more pronounced + opens in a new tab, 2026-10-18** (the
+ * user's own request) -- the dedicated "Link" line (added 2026-10-13
+ * as a plainer, more obvious way to reach `link_url` than relying on
+ * the title alone being clickable) was itself easy to miss: tiny,
+ * muted, barely distinguishable from the location/meta text around
+ * it. Now a small accent-colored pill, closer to this app's other
+ * real buttons than to a plain inline text link. Both this and the
+ * title's own link now open in a new tab (`target="_blank"` +
+ * `rel="noopener noreferrer"`, the latter required alongside
+ * `target="_blank"` so the opened tab can't reach back into this
+ * page via `window.opener`) -- a submitted announcement's link is
+ * always some other site, never a page within this app, so leaving
+ * this one open rather than navigating away from the announcements
+ * list is the more useful default.
  */
 
 export default async function PublicAnnouncementsPage() {
@@ -74,7 +89,12 @@ export default async function PublicAnnouncementsPage() {
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <span className="font-display text-base text-ink">
                       {a.link_url ? (
-                        <a href={a.link_url} className="underline decoration-ink-muted/40 hover:decoration-ink">
+                        <a
+                          href={a.link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline decoration-ink-muted/40 hover:decoration-ink"
+                        >
                           {a.title}
                         </a>
                       ) : (
@@ -97,11 +117,14 @@ export default async function PublicAnnouncementsPage() {
                       said so; this is a plainer, more obvious second
                       way to reach the same URL. */}
                   {a.link_url && (
-                    <p className="mt-1 text-[11px] text-ink-muted/70">
-                      <a href={a.link_url} className="underline decoration-ink-muted/40 hover:decoration-ink">
-                        Link
-                      </a>
-                    </p>
+                    <a
+                      href={a.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/20"
+                    >
+                      Link <span aria-hidden="true">&rarr;</span>
+                    </a>
                   )}
                 </li>
               );

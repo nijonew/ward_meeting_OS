@@ -1980,6 +1980,31 @@ avoid confusing the two.
 
 ## Known open items
 
+**Announcement link made more pronounced + opens in a new tab,
+2026-10-18** (the user's own request, same conversation as the two
+entries just below: "can we make the link in announcements a bit more
+pronounced and default it to opening the link in a new tab?"). The
+dedicated "Link" line (added 2026-10-13 specifically because the
+title-is-a-link behavior wasn't visibly obvious enough on its own) had
+the same problem itself -- tiny, muted, easy to miss against the
+location/meta text around it. `app/announcements/public/page.tsx` now
+renders it as a small accent-colored pill (border/background/text all
+in this app's `accent` color, bold, with a trailing arrow) instead of
+a plain inline text link -- closer to this app's other real buttons
+than to body text. Both this and the title's own link now carry
+`target="_blank" rel="noopener noreferrer"` -- a submitted
+announcement's link is always some other site, never a page within
+this app, so opening it in a new tab rather than navigating away from
+the announcements list is the more useful default; `rel="noopener
+noreferrer"` goes along with `target="_blank"` so the new tab can't
+reach back into this page via `window.opener`.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project (still no `.env.local` in this
+working copy, confirmed again before skipping a live preview) -- ask
+the user to check that the Link button on `/announcements/public`
+reads clearly and opens in a new tab.
+
 **Location moved to after the date/time, same conversation, 2026-10-18**
 (the user's own immediate follow-up, right after confirming the date-
 format change above looked good: "Can we move the location in an
