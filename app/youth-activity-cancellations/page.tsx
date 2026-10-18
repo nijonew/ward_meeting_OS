@@ -25,7 +25,7 @@ export default async function YouthActivityCancellationsPage() {
   if (!hasFeature(profile, "youth_activity_planning")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Activity Cancellations" />
+        <AppHeader tag="All-Youth Activity Cancellations" />
         <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to manage activity cancellations.</p>
       </main>
     );
@@ -40,14 +40,14 @@ export default async function YouthActivityCancellationsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
-      <AppHeader tag="Activity Cancellations" />
+      <AppHeader tag="All-Youth Activity Cancellations" />
 
       <Link href="/youth-activity-planning" className="text-xs text-ink-muted hover:text-ink">
         &larr; Youth Activity Planning
       </Link>
 
       <section className="mt-4">
-        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Activity Cancellations</h1>
+        <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">All-Youth Activity Cancellations</h1>
         <p className="mt-2 text-sm text-ink-muted">
           A date range, a reason, and which youth groups it cancels &mdash; leave every group
           unchecked to cancel all of them for that range. Shown with the reason as a note rather

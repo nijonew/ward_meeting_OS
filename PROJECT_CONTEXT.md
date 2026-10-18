@@ -1980,6 +1980,92 @@ avoid confusing the two.
 
 ## Known open items
 
+**Youth Activity Planning hub flattened down to its real destinations,
+2026-10-17** (the user's own report: "There are too many levels to the
+tile pages. I would like to enter the youth activity planning page and
+immediately see tiles for upcoming activities, combined YM/YW, combined
+YW, Combined YM, youth teaching management, activity cancellations (but
+call it All-Youth Activity Cancellations). Any other tiles can be
+hidden."). `/youth-activity-planning` had regressed into exactly the
+problem it was meant to solve: its own 3-tile version (2026-10-10) put
+"Youth Activities" here as just another hub pointing at `/youth-activities`,
+which itself held the real tile grid for the four activity views --
+reaching Upcoming Activities took Home -> here -> Youth Activities ->
+Upcoming Activities, three real hops. This hub now links straight to
+all six of the user's named destinations itself, in the order given:
+Upcoming Activities, Combined YM/YW, Combined YW, Combined YM (all four
+still `/youth-activities/<slug>`, just one hop closer), Youth Teaching
+Management (relabeled from "Youth Teaching Calendar" -- same
+destination, `/youth-teaching-planning`, left otherwise unrenamed since
+that's a well-established feature-key name throughout the codebase, not
+something this ask was about), and All-Youth Activity Cancellations
+(renamed on its own page too, not just the tile label, matching the
+user's explicit new name throughout).
+
+**`/youth-activities` itself was deliberately NOT deleted or
+redirected** despite losing its only tile on this hub -- `/events` (the
+public merged activities/ward-events listing) links straight to it
+("Manage Youth Activities"), and it's still the real home for the
+cadence-rule engine, bulk Generate, and the per-class Manage grid, none
+of which the user named in their six-tile list. "Any other tiles can be
+hidden" was read as exactly that -- hidden, not deleted -- so a small,
+de-emphasized text link (not a tile) at the bottom of the hub keeps
+cadence rules/bulk-generate reachable for anyone who needs them,
+without them competing for attention with the six real tiles. The old,
+never-built `comingSoon` "Youth Teaching Management" stub (a separate,
+different idea -- assigning teachers to classes, not Sunday lesson
+content) is dropped along with every other now-hidden tile; ask before
+building that one for real if it turns out to still be wanted under a
+different name now that it's been reused for the real teaching page.
+
+**"Add, delete activities in the upcoming activities... tiles" was the
+one genuinely new capability, not just a relabel** -- the three
+Combined-group pages already had Add/Edit/Delete/Overwrite (2026-10-11/
+16), but Upcoming Activities had always been deliberately read-only
+(it shows every group at once, via `explodeActivitiesByClass`, which
+re-attributes a single real Combined row to every class that attends
+it -- up to 6 rows sharing one real id). Turning on the existing
+`editable` flag there outright would have been a real correctness bug:
+every one of those up-to-6 exploded rows would render an inline input
+with the identical name (`"<realId>::title"`, etc.), and `saveActivityGrid`
+would only ever see whichever one happened to land last in the
+submitted form data. Fixed by decoupling Delete into its own
+`ActivitiesTable` prop, `deletable`, independent of `editable` --
+Upcoming Activities passes `deletable` alone (a Delete column, no
+inline-edit inputs, no wrapping Save-All-Changes `<form>`), while the
+three Combined-group pages keep passing both, unchanged. A new
+`realActivityId()` helper strips the `::<className>` suffix
+`explodeActivitiesByClass` adds before handing an id to the Delete
+action, so clicking Delete on any one of a Combined activity's exploded
+rows correctly deletes the one real row (removing it for every
+attending class at once, which is correct -- it genuinely is one
+activity) rather than erroring on a synthetic id that matches nothing.
+The Delete button's confirm dialog says so explicitly
+(`warnShared`) whenever the row being deleted is one of these exploded
+copies, so it's clear up front that deleting it isn't scoped to just
+the one class shown. Add reuses the same mechanism Combined-group pages
+already had (`addYouthActivity`, generalized -- see below) with an open
+Group dropdown instead of a fixed hidden value, since Upcoming has no
+single group of its own to assume.
+
+**`AddCombinedActivityForm` generalized and renamed to
+`AddActivityForm`** (`components/youth-activities/AddActivityForm.tsx`)
+-- `groupName` is now optional: given, renders the same hidden field as
+before (the three Combined-group pages, unchanged behavior); omitted,
+renders a real `<select>` of all 9 groups (6 classes + 3 Combined
+pseudo-groups), used only by Upcoming Activities. Both Add and Delete
+on Upcoming Activities are gated on `youth_activity_planning`, the same
+feature the three Combined-group pages already gate their own controls
+on -- no new feature, no new server action beyond what already existed.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser gap
+as everything else in this project -- ask the user to open
+`/youth-activity-planning` once deployed and confirm all six tiles show
+up in the requested order, and that Add/Delete now work from Upcoming
+Activities (including deleting one row of an exploded Combined activity
+and confirming it disappears from every attending class's own view
+too, as expected).
+
 **Bug found and fixed 2026-10-16: pulling a previously-used
 announcement into a meeting hit a foreign key violation.** The user's
 own report, right after running migration `077` and retrying: `insert

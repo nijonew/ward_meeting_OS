@@ -4,7 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { ActivitiesTable } from "@/components/youth-activities/ActivitiesTable";
-import { AddCombinedActivityForm } from "@/components/youth-activities/AddCombinedActivityForm";
+import { AddActivityForm } from "@/components/youth-activities/AddActivityForm";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -40,15 +40,15 @@ export default async function CombinedYmYwActivitiesPage({
       <AppHeader tag="Combined YM/YW Activities" />
 
       <section className="mt-4">
-        <Link href="/youth-activities" className="text-xs text-ink-muted hover:text-ink">
-          &larr; Youth Activities
+        <Link href="/youth-activity-planning" className="text-xs text-ink-muted hover:text-ink">
+          &larr; Youth Activity Planning
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">
           Combined Young Men & Young Women Activities
         </h1>
       </section>
 
-      {canManage && <AddCombinedActivityForm groupName="Combined YM/YW" />}
+      {canManage && <AddActivityForm groupName="Combined YM/YW" />}
 
       <div className="rounded border border-rule bg-surface p-6">
         <ActivitiesTable

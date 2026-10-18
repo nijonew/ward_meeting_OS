@@ -13,19 +13,37 @@ import type { YouthActivityRow } from "@/lib/data/youth-activities";
  * seeing where I have the ability to delete a youth activity whether
  * it is combined or not") -- a plain `type="button"` + `useTransition`
  * call, same reasoning as `PushToClassesButton` right above it: this
- * sits inside `editable` mode's wrapping `<form>`, and a real submit
- * button would trigger the grid's own Save All Changes instead of
- * deleting anything. `window.confirm` first, matching
- * `DeleteMeetingButton`'s own convention for an irreversible action --
- * unlike Cancel (a separate, unrelated flag), there's no "undo" once
- * this runs.
+ * sits inside `editable`/`deletable` mode's own table, and a real
+ * submit button would trigger the grid's own Save All Changes (when
+ * `editable` is also on) instead of deleting anything. `window.confirm`
+ * first, matching `DeleteMeetingButton`'s own convention for an
+ * irreversible action -- unlike Cancel (a separate, unrelated flag),
+ * there's no "undo" once this runs.
+ *
+ * **`warnShared`, 2026-10-16** -- Upcoming Activities (see
+ * `realActivityId`'s own comment below) shows a Combined activity
+ * once per attending class, so deleting it from there removes it for
+ * every one of those classes at once, not just the one row on screen.
+ * The confirm text says so explicitly when `warnShared` is set, rather
+ * than letting it look like an ordinary single-row delete.
  */
-function DeleteActivityButton({ activityId, label }: { activityId: string; label: string }) {
+function DeleteActivityButton({
+  activityId,
+  label,
+  warnShared = false,
+}: {
+  activityId: string;
+  label: string;
+  warnShared?: boolean;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const onClick = () => {
-    if (!window.confirm(`Permanently delete "${label}"? This cannot be undone.`)) return;
+    const warning = warnShared
+      ? `Permanently delete "${label}"? This is a Combined activity -- deleting it removes it for every class that attends it. This cannot be undone.`
+      : `Permanently delete "${label}"? This cannot be undone.`;
+    if (!window.confirm(warning)) return;
     setError(null);
     startTransition(async () => {
       const result = await deleteYouthActivity(activityId);
@@ -74,6 +92,21 @@ function formatTime(t: string) {
   const period = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/**
+ * `explodeActivitiesByClass` gives a Combined-sourced row a synthetic
+ * id (`<sourceId>::<className>`) so up to 6 exploded rows can share one
+ * real `youth_activities` row safely in a read-only view -- see that
+ * function's own comment. Delete is a real, id-keyed action (unlike
+ * plain display), so it must always target the real row, never the
+ * synthetic one -- this strips the `::<className>` suffix back off
+ * when present, and is a no-op for an ordinary, non-exploded row (the
+ * three Combined-group pages' own rows, which are never synthetic).
+ */
+function realActivityId(id: string): string {
+  const sep = id.indexOf("::");
+  return sep === -1 ? id : id.slice(0, sep);
 }
 
 /** Same convention as CallingPlanningGridForm's sortable headers --
@@ -168,10 +201,28 @@ function compareText(a: string, b: string): number {
  *
  * **Delete column, 2026-10-16** (the user's own report: "I am not
  * seeing where I have the ability to delete a youth activity whether
- * it is combined or not") -- tied to the same `editable` flag as the
- * save grid, so it shows exactly where Add/Edit/Overwrite already do
- * (the three Combined-group pages), never on read-only Upcoming
- * Activities.
+ * it is combined or not") -- originally tied to the same `editable`
+ * flag as the save grid, so it showed exactly where Add/Edit/Overwrite
+ * already did (the three Combined-group pages), never on read-only
+ * Upcoming Activities.
+ *
+ * **Decoupled into its own `deletable` prop, 2026-10-16** (the hub
+ * cleanup: "All tiles should allow authorized users to add, delete
+ * activities in the upcoming activities, combined YM/YW, combined YW,
+ * Combined YM tiles") -- Upcoming Activities now needed Delete too,
+ * but NOT full inline `editable`: every row there can be one of up to
+ * 6 *exploded* copies of the same real Combined activity, all sharing
+ * one real id (see `explodeActivitiesByClass`), so turning on
+ * `editable` there would render the same `"<id>::title"` input name up
+ * to 6 times at once -- a real correctness bug (`saveActivityGrid`
+ * would only ever see whichever one happened to submit last). Delete
+ * has no such problem (`realActivityId` always resolves back to the
+ * one real row regardless of how many exploded copies are on screen),
+ * so it's independently gated: `deletable` renders just the Delete
+ * column and button, with no inline-edit inputs and no wrapping
+ * Save-All-Changes `<form>` unless `editable` is also on. The three
+ * Combined-group pages pass both (unchanged); Upcoming Activities
+ * passes `deletable` alone.
  */
 export function ActivitiesTable({
   activities,
@@ -179,6 +230,7 @@ export function ActivitiesTable({
   showPlanningGroupColumn = false,
   showOverwriteColumn = false,
   editable = false,
+  deletable = false,
   storageKey,
 }: {
   activities: YouthActivityRow[];
@@ -186,6 +238,7 @@ export function ActivitiesTable({
   showPlanningGroupColumn?: boolean;
   showOverwriteColumn?: boolean;
   editable?: boolean;
+  deletable?: boolean;
   storageKey: string;
 }) {
   const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(storageKey);
@@ -296,7 +349,7 @@ export function ActivitiesTable({
                 Overwrite
               </th>
             )}
-            {editable && (
+            {(editable || deletable) && (
               <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Delete
               </th>
@@ -371,9 +424,13 @@ export function ActivitiesTable({
                     </td>
                   );
                 })()}
-              {editable && (
+              {(editable || deletable) && (
                 <td className="px-2 py-1.5">
-                  <DeleteActivityButton activityId={row.id} label={row.title} />
+                  <DeleteActivityButton
+                    activityId={realActivityId(row.id)}
+                    label={row.title}
+                    warnShared={realActivityId(row.id) !== row.id}
+                  />
                 </td>
               )}
             </tr>

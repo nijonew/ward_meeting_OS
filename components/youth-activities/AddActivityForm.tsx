@@ -7,7 +7,7 @@ import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/
  * copy of the Manage page's own Add Activity form, same plain
  * server-action-as-form-action pattern (no pending/success state,
  * matching that form's own existing behavior exactly) -- Group is
- * fixed to whichever Combined type this page already is (a hidden
+ * fixed to whichever Combined type the page already is (a hidden
  * field, not a dropdown; there's nothing to choose, the page itself
  * already says which one) rather than a new, separate server action --
  * addYouthActivity already handles any group_name.
@@ -20,8 +20,20 @@ import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/
  * groups on that date." `addYouthActivity` itself now does this as
  * part of the same save (see that action's own comment) -- this form
  * needed no changes to pick it up.
+ *
+ * **Generalized from `AddCombinedActivityForm`, 2026-10-16** -- the
+ * Youth Activity Planning hub was flattened down to show Upcoming
+ * Activities as one of its own direct tiles, and that tile needed the
+ * same Add capability the three Combined-group pages already had, but
+ * with no single fixed group to assume (it shows every group at
+ * once). `groupName` is now optional: when given (the three Combined
+ * pages, unchanged), Group stays a hidden field; when omitted (Upcoming
+ * Activities), a real `<select>` of every group -- the same 9-value
+ * list (6 classes + 3 Combined pseudo-groups) the Manage page's own
+ * Add Activity form already offers -- lets the submitter pick any one
+ * of them.
  */
-export function AddCombinedActivityForm({ groupName }: { groupName: string }) {
+export function AddActivityForm({ groupName }: { groupName?: string }) {
   // Wraps addYouthActivity (which returns ActionResult) to discard the
   // return value -- <form action> requires void/Promise<void>, same
   // reasoning as the identical wrapper on the Manage page's own Add
@@ -35,7 +47,28 @@ export function AddCombinedActivityForm({ groupName }: { groupName: string }) {
     <div className="rounded border border-rule bg-surface p-4">
       <h3 className="font-display text-base">Add Activity</h3>
       <form action={add} className="mt-3 flex flex-col gap-3">
-        <input type="hidden" name="group_name" value={groupName} />
+        {groupName ? (
+          <input type="hidden" name="group_name" value={groupName} />
+        ) : (
+          <label className="text-sm text-ink-muted">
+            Group
+            <select
+              name="group_name"
+              required
+              defaultValue=""
+              className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            >
+              <option value="" disabled>
+                Choose group
+              </option>
+              {YOUTH_ACTIVITY_GROUPS.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm text-ink-muted">

@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { explodeActivitiesByClass } from "@/lib/data/class-activities-shared";
 import { ActivitiesTable } from "@/components/youth-activities/ActivitiesTable";
+import { AddActivityForm } from "@/components/youth-activities/AddActivityForm";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -23,8 +24,8 @@ function todayISO(): string {
  * component's existing per-column filter, typing into the Group
  * column's own box. Description = the existing `title` field (the
  * user's own choice when asked, rather than adding a new column).
- * Read-only -- all adding/editing/generating stays on /youth-activities
- * itself, reached via the back link below.
+ * Originally read-only -- all adding/editing/generating stayed on
+ * /youth-activities itself, reached via the back link below.
  *
  * **Re-attributed to the 6 real classes, 2026-10-11** (the user's own
  * follow-up: "I only want to see a listing for each of the 6 groups...
@@ -37,11 +38,26 @@ function todayISO(): string {
  * Notes column instead. Scoped to this page only -- the three
  * Combined-group pages keep showing the real shared row as-is, which
  * is the entire point of those pages (and of the Overwrite button
- * built on them minutes earlier).
+ * built on them).
+ *
+ * **Gained Add + Delete, 2026-10-16/17** (the hub cleanup: "All tiles
+ * should allow authorized users to add, delete activities in the
+ * upcoming activities, combined YM/YW, combined YW, Combined YM
+ * tiles") -- `AddActivityForm` with no fixed `groupName` renders a real
+ * Group dropdown (any of the 9 values), and `ActivitiesTable`'s new
+ * `deletable` prop adds a Delete column without turning on full inline
+ * `editable` -- see both components' own comments for why editable
+ * specifically would be unsafe here (an exploded Combined row shares
+ * one real id across up to 6 rows on this page; Delete's `realActivityId`
+ * resolution handles that safely, a same-named editable input six
+ * times over would not). Both gated on `youth_activity_planning`, same
+ * feature the three Combined-group pages already gate their own Add/
+ * Edit/Delete on.
  */
 export default async function UpcomingActivitiesPage() {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
+  const canManage = hasFeature(profile, "youth_activity_planning");
 
   const all = await getYouthActivities();
   const today = todayISO();
@@ -52,8 +68,8 @@ export default async function UpcomingActivitiesPage() {
       <AppHeader tag="Upcoming Activities" />
 
       <section className="mt-4">
-        <Link href="/youth-activities" className="text-xs text-ink-muted hover:text-ink">
-          &larr; Youth Activities
+        <Link href="/youth-activity-planning" className="text-xs text-ink-muted hover:text-ink">
+          &larr; Youth Activity Planning
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Upcoming Activities</h1>
         <p className="mt-2 text-sm text-ink-muted">
@@ -64,8 +80,10 @@ export default async function UpcomingActivitiesPage() {
         </p>
       </section>
 
+      {canManage && <AddActivityForm />}
+
       <div className="rounded border border-rule bg-surface p-6">
-        <ActivitiesTable activities={upcoming} storageKey="activities-upcoming" />
+        <ActivitiesTable activities={upcoming} deletable={canManage} storageKey="activities-upcoming" />
       </div>
     </main>
   );
