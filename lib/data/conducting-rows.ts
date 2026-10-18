@@ -3,6 +3,7 @@ import type { ElementNoteValue } from "@/lib/data/meeting-element-notes";
 import type { MusicRow, PlanningInfo, RabnmRow } from "@/lib/data/sacrament-planning";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
+import { formatAnnouncementDate, formatAnnouncementTime } from "@/lib/data/announcements";
 
 /**
  * The Conducting view's read-only row model, built 2026-09-10 as the
@@ -54,13 +55,22 @@ export interface ConductingRowInputs {
 
 /** The spoken line for one announcement -- the core text, plus
  *  whichever of location/date/time are actually filled in. Deliberately
- *  leaves out `link_url` -- not something to read aloud at the pulpit. */
+ *  leaves out `link_url` -- not something to read aloud at the pulpit.
+ *
+ *  **Date/time formatting, 2026-10-18** (the user's own request: "make
+ *  that change in the conducting view and where they are viewed") --
+ *  reads "Date: Monday, October 19th at 6:00 PM." instead of the raw
+ *  `start_date`/`start_time` strings Postgres returns ("2026-10-19",
+ *  "18:00:00"), matching the same format the public Announcements
+ *  page now uses (`formatAnnouncementDate`/`formatAnnouncementTime`,
+ *  `lib/data/announcements.ts`). Still only ever reads `start_date`/
+ *  `start_time` aloud -- that scope is unchanged, just the format. */
 export function announcementWording(a: PulledAnnouncement): string {
   const parts = [a.body];
   if (a.location) parts.push(`Location: ${a.location}.`);
   if (a.start_date) {
-    const time = a.start_time ? ` at ${a.start_time}` : "";
-    parts.push(`Date: ${a.start_date}${time}.`);
+    const time = a.start_time ? ` at ${formatAnnouncementTime(a.start_time)}` : "";
+    parts.push(`Date: ${formatAnnouncementDate(a.start_date)}${time}.`);
   }
   return parts.filter(Boolean).join(" ");
 }

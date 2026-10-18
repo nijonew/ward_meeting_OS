@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
+import { formatAnnouncementDateRange } from "@/lib/data/announcements";
 
 /**
  * The actual public "Announcements" page linked from the landing
@@ -29,47 +30,18 @@ import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
  * migration's source data rather than rendered as raw text here --
  * see migration 065's own header comment for where that link actually
  * ended up instead.
+ *
+ * **Date/time formatting moved to a shared helper, 2026-10-18** (the
+ * user's own request, naming the exact format wanted: "show the date
+ * in a format of day of the week, month, date (monday, october 19th
+ * at 6:00 pm)") -- `formatDate`/`formatTime`/`formatDateRange` used to
+ * live only here (abbreviated weekday/month, e.g. "Mon, Oct 19 · 6:00
+ * PM"); now `formatAnnouncementDateRange` (`lib/data/announcements.ts`)
+ * renders the fuller "Monday, October 19th at 6:00 PM" form and is
+ * shared with the Conducting script's own spoken wording, which asked
+ * for the identical change in the same request ("make that change in
+ * the conducting view and where they are viewed").
  */
-
-function formatDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-/** Postgres `time` columns come back as 24-hour "HH:MM:SS" strings --
- *  rendered as plain AM/PM (2026-10-10, the user's own request: "update
- *  the time reporting in the announcements page to am/pm rather than
- *  military time. Make it user friendly") rather than showing that raw
- *  military-time string as-is. */
-function formatTime(t: string): string {
-  const [hStr, mStr] = t.split(":");
-  const h = parseInt(hStr, 10);
-  if (Number.isNaN(h)) return t;
-  const period = h >= 12 ? "PM" : "AM";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${mStr} ${period}`;
-}
-
-function formatDateRange(a: {
-  start_date: string | null;
-  start_time: string | null;
-  end_date: string | null;
-  end_time: string | null;
-}): string | null {
-  if (!a.start_date) return null;
-  let text = formatDate(a.start_date);
-  if (a.start_time) text += ` · ${formatTime(a.start_time)}`;
-  if (a.end_date && a.end_date !== a.start_date) {
-    text += ` – ${formatDate(a.end_date)}`;
-    if (a.end_time) text += ` · ${formatTime(a.end_time)}`;
-  } else if (a.end_time) {
-    text += ` – ${formatTime(a.end_time)}`;
-  }
-  return text;
-}
 
 export default async function PublicAnnouncementsPage() {
   const announcements = await getPublishedAnnouncements();
@@ -88,7 +60,7 @@ export default async function PublicAnnouncementsPage() {
         ) : (
           <ul className="flex flex-col gap-4">
             {announcements.map((a) => {
-              const dateRange = formatDateRange(a);
+              const dateRange = formatAnnouncementDateRange(a);
               const meta = a.organization ?? "";
               return (
                 <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">

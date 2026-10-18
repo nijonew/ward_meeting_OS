@@ -1980,6 +1980,50 @@ avoid confusing the two.
 
 ## Known open items
 
+**Two follow-ups right after the auto-archive sweep above shipped,
+2026-10-18 (same conversation):**
+
+1. **"These then need to be removed from dropdown select options."**
+   Auto-archiving set `status = 'archived'`, which already excludes a
+   row from `getPublishedAnnouncements`/`getGeneralSubmissions`/Table
+   Admin's own live list -- but `getPullableAnnouncements`
+   (`lib/data/sacrament-announcements.ts`, what populates the "call in
+   an announcement" dropdown on a Sacrament Meeting's Planning page)
+   queries `announcements` directly, bypassing both the `getAdminRows`
+   `sweepBeforeRead` hook and the two `general-submissions.ts`
+   functions that call the sweep themselves. Without its own call, an
+   expired announcement would keep offering itself in that dropdown
+   until something else happened to archive it first. Now calls
+   `sweepPastAnnouncements()` directly, same as the other three real
+   read paths.
+2. **"Change the depiction of announcement schedules to not be
+   military time... show the date in a format of day of the week,
+   month, date (monday, october 19th at 6:00 pm)... make that change
+   in the conducting view and where they are viewed."** New
+   `formatAnnouncementDate`/`formatAnnouncementTime`/`formatAnnouncementDateRange`
+   (`lib/data/announcements.ts`) replace the public Announcements
+   page's own local, abbreviated formatters (`formatDate`/`formatTime`/
+   `formatDateRange`, built 2026-10-10 -- AM/PM already, but
+   "Mon, Oct 19 · 6:00 PM" rather than the fuller form now wanted) --
+   now a shared helper so the Conducting script's own spoken wording
+   (`announcementWording`, `lib/data/conducting-rows.ts`) could use
+   the identical format too, matching the user's explicit "and where
+   they are viewed." Renders "Monday, October 19th at 6:00 PM" (full
+   weekday/month names, an ordinal day suffix, "at" instead of a
+   middle dot) -- Conducting's own wording still only ever reads
+   `start_date`/`start_time` aloud, same scope as before, just the new
+   format. Table Admin's/Manage Announcements' plain `<input
+   type="date">`/`<input type="time">` editing fields are untouched --
+   this was about reader-facing depictions, not data entry.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to check that
+an expired announcement no longer shows up in a Sacrament Meeting
+Planning page's "call in an announcement" dropdown, and that both the
+public Announcements page and the Conducting script now show a date
+like "Monday, October 19th at 6:00 PM" instead of the old abbreviated/
+24-hour forms.
+
 **Announcements now auto-archive once their own date range ends,
 2026-10-18** (the user's own question: "can this automatically
 archive or delete announcements whose time has passed?"). Before this,

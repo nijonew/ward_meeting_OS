@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { sweepPastAnnouncements } from "@/lib/data/announcements";
 
 /**
  * "I want to be able to select the announcements that need to be
@@ -87,8 +88,17 @@ export async function getEverPulledAnnouncementIds(): Promise<Set<string>> {
  *  offered here** (2026-10-15, see this file's own top comment) -- a
  *  recurring announcement can be read again in a later meeting
  *  without ever being removed from the one(s) it already appeared
- *  in. */
+ *  in.
+ *
+ *  **Sweeps expired announcements first, 2026-10-18** (the user's own
+ *  follow-up right after auto-archiving shipped: "these then need to
+ *  be removed from dropdown select options") -- this query reads
+ *  `announcements` directly, bypassing `getAdminRows`'s own
+ *  `sweepBeforeRead` hook, so without this it would keep offering an
+ *  announcement whose date already passed until something else (the
+ *  public page, Manage Announcements) happened to archive it first. */
 export async function getPullableAnnouncements(meetingId: string): Promise<PulledAnnouncement[]> {
+  await sweepPastAnnouncements();
   const supabase = await createClient();
   const [{ data: alreadyHere }, { data: announcements }] = await Promise.all([
     supabase.from("sacrament_announcement_pulls").select("announcement_id").eq("meeting_id", meetingId),
