@@ -223,6 +223,40 @@ function compareText(a: string, b: string): number {
  * Save-All-Changes `<form>` unless `editable` is also on. The three
  * Combined-group pages pass both (unchanged); Upcoming Activities
  * passes `deletable` alone.
+ *
+ * **Delete pinned to the right edge, 2026-10-17** (the user's own
+ * report, after confirming Delete was already there all along: "It
+ * may have been there before and I didn't see it because it was
+ * hidden by the scroll" -- then asked to pin it). `sticky right-0` on
+ * both the header and each body cell keeps it visible at the right
+ * edge of the table's own `overflow-x-auto` container regardless of
+ * horizontal scroll position. A sticky cell needs its own opaque
+ * background (the row's `<tr>` background doesn't automatically show
+ * through a positioned cell the way it would an ordinary one) --
+ * `rowBgClass` is computed once per row and reused for both the `<tr>`
+ * and the pinned cell, so the pinned Delete button's background always
+ * matches its own row (striped, cancelled-tinted, or plain) instead of
+ * clashing with whatever scrolls underneath it.
+ *
+ * **Confirmed column, 2026-10-17** (the user's own report, same
+ * message: "I have inconsistency about what is marked as tentative and
+ * what isn't... I can't see where we make something tentative vs
+ * confirmed"). Not a scroll problem this time -- there genuinely was no
+ * control here at all. The Title cell's own "Tentative" badge (next to
+ * "Cancelled") has always been read-only on every page this component
+ * renders; the only existing way to flip it was `ClassActivityGridForm`'s
+ * own Confirmed checkbox (a different grid, scoped to one class at a
+ * time) or Table Admin's raw grid. Added the identical checkbox here,
+ * same hidden-"false"-before-the-real-checkbox convention as that
+ * component (and Stake Business before it) -- gated on `editable`
+ * alone, not `deletable`, for the same duplicate-field-name reason
+ * Time/Title/Notes already are: Upcoming Activities can show the same
+ * real row exploded into up to 6 copies, and a same-named checkbox
+ * repeated that many times has no well-defined submitted value. The
+ * existing read-only "Tentative" badge is left in place everywhere
+ * (including next to the new checkbox on an editable page) rather than
+ * removed -- harmless redundancy, and still the only indicator at all
+ * on Upcoming Activities, where there's no checkbox to look at instead.
  */
 export function ActivitiesTable({
   activities,
@@ -344,97 +378,114 @@ export function ActivitiesTable({
                 </div>
               </th>
             ))}
+            {editable && (
+              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                Confirmed
+              </th>
+            )}
             {showOverwriteColumn && (
               <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Overwrite
               </th>
             )}
             {(editable || deletable) && (
-              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+              <th className="sticky right-0 z-10 border-l border-rule/60 bg-surface px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Delete
               </th>
             )}
           </tr>
         </thead>
         <tbody>
-          {sortedRows.map((row) => (
-            <tr
-              key={row.id}
-              hidden={!stripeByRowId.has(row.id)}
-              className={[
-                "border-t border-rule/60 align-top hover:bg-accent/15",
-                row.cancelled ? "bg-danger/5" : stripeByRowId.get(row.id) ? "bg-accent-soft" : "",
-              ].join(" ")}
-            >
-              <td className="px-2 py-1.5 text-xs text-ink">{formatDate(row.activity_date)}</td>
-              <td className="px-2 py-1.5 text-xs text-ink">
-                {editable ? (
-                  <input type="time" name={`${row.id}::activity_time`} defaultValue={row.activity_time ?? ""} className={INPUT_CLASS} />
-                ) : row.activity_time ? (
-                  formatTime(row.activity_time)
-                ) : (
-                  "—"
-                )}
-              </td>
-              {showGroupColumn && <td className="px-2 py-1.5 text-xs text-ink">{row.group_name}</td>}
-              <td className="px-2 py-1.5 text-xs text-ink">
-                {editable ? (
-                  <input type="text" name={`${row.id}::title`} defaultValue={row.title} className={INPUT_CLASS} />
-                ) : (
-                  row.title
-                )}
-                {row.cancelled && (
-                  <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">Cancelled</span>
-                )}
-                {!row.cancelled && !row.confirmed && (
-                  <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">Tentative</span>
-                )}
-              </td>
-              {showPlanningGroupColumn && (
+          {sortedRows.map((row) => {
+            // Shared between the row itself and the pinned Delete cell
+            // below -- a sticky cell needs its OWN opaque background
+            // (not just inherited from the <tr>), or whatever's
+            // scrolled underneath it would show through as it's pinned
+            // in place. Keeping both in sync off one value means the
+            // pinned cell can never visually mismatch its own row.
+            const rowBgClass = row.cancelled ? "bg-danger/5" : stripeByRowId.get(row.id) ? "bg-accent-soft" : "bg-surface";
+            return (
+              <tr
+                key={row.id}
+                hidden={!stripeByRowId.has(row.id)}
+                className={["border-t border-rule/60 align-top hover:bg-accent/15", rowBgClass].join(" ")}
+              >
+                <td className="px-2 py-1.5 text-xs text-ink">{formatDate(row.activity_date)}</td>
                 <td className="px-2 py-1.5 text-xs text-ink">
                   {editable ? (
-                    <input
-                      type="text"
-                      name={`${row.id}::planning_group`}
-                      defaultValue={row.planning_group ?? ""}
-                      placeholder="Which class is planning this"
-                      className={INPUT_CLASS}
-                    />
+                    <input type="time" name={`${row.id}::activity_time`} defaultValue={row.activity_time ?? ""} className={INPUT_CLASS} />
+                  ) : row.activity_time ? (
+                    formatTime(row.activity_time)
                   ) : (
-                    row.planning_group ?? "—"
+                    "—"
                   )}
                 </td>
-              )}
-              <td className="px-2 py-1.5 text-xs text-ink-muted">
-                {editable ? (
-                  <textarea name={`${row.id}::notes`} defaultValue={row.notes ?? ""} rows={2} className={INPUT_CLASS} />
-                ) : (
-                  row.notes
-                )}
-                {row.cancelled && row.cancellation_note && (
-                  <div className="mt-1 text-danger">Cancelled: {row.cancellation_note}</div>
-                )}
-              </td>
-              {showOverwriteColumn &&
-                (() => {
-                  const targets = classesForCombinedGroup(row.group_name);
-                  return (
-                    <td className="px-2 py-1.5">
-                      {targets && <PushToClassesButton activityId={row.id} label={targets.join(", ")} />}
-                    </td>
-                  );
-                })()}
-              {(editable || deletable) && (
-                <td className="px-2 py-1.5">
-                  <DeleteActivityButton
-                    activityId={realActivityId(row.id)}
-                    label={row.title}
-                    warnShared={realActivityId(row.id) !== row.id}
-                  />
+                {showGroupColumn && <td className="px-2 py-1.5 text-xs text-ink">{row.group_name}</td>}
+                <td className="px-2 py-1.5 text-xs text-ink">
+                  {editable ? (
+                    <input type="text" name={`${row.id}::title`} defaultValue={row.title} className={INPUT_CLASS} />
+                  ) : (
+                    row.title
+                  )}
+                  {row.cancelled && (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">Cancelled</span>
+                  )}
+                  {!row.cancelled && !row.confirmed && (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">Tentative</span>
+                  )}
                 </td>
-              )}
-            </tr>
-          ))}
+                {showPlanningGroupColumn && (
+                  <td className="px-2 py-1.5 text-xs text-ink">
+                    {editable ? (
+                      <input
+                        type="text"
+                        name={`${row.id}::planning_group`}
+                        defaultValue={row.planning_group ?? ""}
+                        placeholder="Which class is planning this"
+                        className={INPUT_CLASS}
+                      />
+                    ) : (
+                      row.planning_group ?? "—"
+                    )}
+                  </td>
+                )}
+                <td className="px-2 py-1.5 text-xs text-ink-muted">
+                  {editable ? (
+                    <textarea name={`${row.id}::notes`} defaultValue={row.notes ?? ""} rows={2} className={INPUT_CLASS} />
+                  ) : (
+                    row.notes
+                  )}
+                  {row.cancelled && row.cancellation_note && (
+                    <div className="mt-1 text-danger">Cancelled: {row.cancellation_note}</div>
+                  )}
+                </td>
+                {editable && (
+                  <td className="px-2 py-1.5 text-center">
+                    <input type="hidden" name={`${row.id}::confirmed`} value="false" />
+                    <input type="checkbox" name={`${row.id}::confirmed`} value="true" defaultChecked={row.confirmed} />
+                  </td>
+                )}
+                {showOverwriteColumn &&
+                  (() => {
+                    const targets = classesForCombinedGroup(row.group_name);
+                    return (
+                      <td className="px-2 py-1.5">
+                        {targets && <PushToClassesButton activityId={row.id} label={targets.join(", ")} />}
+                      </td>
+                    );
+                  })()}
+                {(editable || deletable) && (
+                  <td className={["sticky right-0 z-10 border-l border-rule/60 px-2 py-1.5", rowBgClass].join(" ")}>
+                    <DeleteActivityButton
+                      activityId={realActivityId(row.id)}
+                      label={row.title}
+                      warnShared={realActivityId(row.id) !== row.id}
+                    />
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 

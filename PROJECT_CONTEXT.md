@@ -1980,6 +1980,60 @@ avoid confusing the two.
 
 ## Known open items
 
+**Delete pinned to the right edge, and a real Confirmed toggle added
+to the Combined-group pages, 2026-10-17** -- two follow-ups from the
+hub flattening above, both from the same conversation.
+
+1. **"I need a delete option in the YM/YW combined page in the
+   table"** turned out to be a false alarm, not a bug -- Delete had
+   already been there since 2026-10-16 (see that entry below) and was
+   reconfirmed still wired up correctly when asked. The user's own
+   follow-up explained it: "It may have been there before and I didn't
+   see it because it was hidden by the scroll" -- Delete sits at the
+   far right of a wide row (past Time, Title, In Charge, Notes, and
+   Overwrite), past the fold on anything but a very wide viewport.
+   Asked to pin it so it's always visible -- `ActivitiesTable.tsx`'s
+   Delete header and cell both gained `sticky right-0`, keeping them
+   visible at the right edge of the table's own `overflow-x-auto`
+   scroll container regardless of horizontal scroll position. A sticky
+   cell needs its own real background (it doesn't just inherit the
+   row's the way an ordinary cell effectively does) -- a new `rowBgClass`
+   value, computed once per row and shared by both the `<tr>` and the
+   pinned cell, keeps the two from ever visually mismatching (striped,
+   cancelled-tinted, or plain, the pinned Delete button's background
+   always matches its own row).
+2. **"I have inconsistency about what is marked as tentative and what
+   isn't. Seems like the YW activities have a tentative flag, but I
+   can't see where we make something tentative vs confirmed... maybe
+   that is hiding in a scroll too."** This one was a real gap, not a
+   scroll problem -- the Title cell's own "Tentative" badge (next to
+   "Cancelled") has always been read-only on every page `ActivitiesTable`
+   renders. The only existing way to actually flip `confirmed` was
+   `ClassActivityGridForm`'s own Confirmed checkbox (a different grid,
+   one class at a time) or Table Admin's raw grid -- neither of which
+   is reachable from the three Combined-group pages themselves. Added
+   the identical checkbox to `ActivitiesTable` (same hidden-"false"-
+   before-the-real-checkbox convention, and `saveActivityGrid`,
+   `app/youth-activities/actions.ts`, gained the matching `confirmed`
+   column), gated on `editable` alone -- deliberately NOT on `deletable`,
+   for the same reason Time/Title/Notes already aren't editable on
+   Upcoming Activities: that page can show the same real row exploded
+   into up to 6 copies (one per attending class), and a same-named
+   checkbox repeated that many times has no well-defined submitted
+   value. So the new Confirmed checkbox shows on the three
+   Combined-group pages, same as every other editable field there; on
+   Upcoming Activities, the existing read-only "Tentative" badge is
+   still the only indicator -- to actually change it there, go to the
+   activity's own Combined-group page (if it's a Combined activity) or
+   the per-class grid (`/youth-activities/manage/classes`, if it's an
+   individual class activity).
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to check that
+Delete now stays visible while scrolling a wide Combined-group table
+horizontally, and that the new Confirmed checkbox shows up and saves
+correctly on all three Combined-group pages.
+
 **Youth Activity Planning hub flattened down to its real destinations,
 2026-10-17** (the user's own report: "There are too many levels to the
 tile pages. I would like to enter the youth activity planning page and

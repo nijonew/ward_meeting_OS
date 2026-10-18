@@ -281,6 +281,12 @@ export async function pushCombinedActivityToClasses(activityId: string): Promise
  * row with a real id (unlike the per-class grid, which can render a
  * synthetic/fallback line for an unplanned week), so there's no lookup
  * step needed before updating.
+ *
+ * **Gained `confirmed`, 2026-10-17** (the user's own report: "I have
+ * inconsistency about what is marked as tentative and what isn't... I
+ * can't see where we make something tentative vs confirmed") -- same
+ * hidden-"false"-before-the-real-checkbox convention
+ * `saveClassActivityGrid` already uses for this exact column.
  */
 export async function saveActivityGrid(
   _prevState: { error?: string; success?: boolean },
@@ -291,8 +297,8 @@ export async function saveActivityGrid(
 
   const supabase = await createClient();
 
-  type Fields = { activity_time: string; title: string; planning_group: string; notes: string };
-  const COLUMNS = ["activity_time", "title", "planning_group", "notes"];
+  type Fields = { activity_time: string; title: string; planning_group: string; notes: string; confirmed: string };
+  const COLUMNS = ["activity_time", "title", "planning_group", "notes", "confirmed"];
   const byId = new Map<string, Fields>();
 
   for (const [name, value] of formData.entries()) {
@@ -300,7 +306,7 @@ export async function saveActivityGrid(
     if (parts.length !== 2) continue;
     const [id, column] = parts;
     if (!COLUMNS.includes(column)) continue;
-    const fields = byId.get(id) ?? { activity_time: "", title: "", planning_group: "", notes: "" };
+    const fields = byId.get(id) ?? { activity_time: "", title: "", planning_group: "", notes: "", confirmed: "false" };
     fields[column as keyof Fields] = String(value).trim();
     byId.set(id, fields);
   }
@@ -320,6 +326,7 @@ export async function saveActivityGrid(
           title: fields.title,
           planning_group: fields.planning_group || null,
           notes: fields.notes || null,
+          confirmed: fields.confirmed === "true",
         })
         .eq("id", id)
     )
