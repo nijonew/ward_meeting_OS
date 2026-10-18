@@ -1,6 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
-import { formatAnnouncementDateRange } from "@/lib/data/announcements";
+import { formatAnnouncementSchedule } from "@/lib/data/announcements";
 
 /**
  * The actual public "Announcements" page linked from the landing
@@ -41,6 +41,13 @@ import { formatAnnouncementDateRange } from "@/lib/data/announcements";
  * shared with the Conducting script's own spoken wording, which asked
  * for the identical change in the same request ("make that change in
  * the conducting view and where they are viewed").
+ *
+ * **Location folded into that same line, 2026-10-18** (the user's own
+ * immediate follow-up: "move the location in an announcement to be
+ * after the time and date (eg sunday october 25th at 7:00 pm - stake
+ * center)") -- the separate "Location: X" line below the body is gone;
+ * `formatAnnouncementSchedule` now renders date/time and location
+ * together in the one meta line next to the title.
  */
 
 export default async function PublicAnnouncementsPage() {
@@ -60,7 +67,7 @@ export default async function PublicAnnouncementsPage() {
         ) : (
           <ul className="flex flex-col gap-4">
             {announcements.map((a) => {
-              const dateRange = formatAnnouncementDateRange(a);
+              const schedule = formatAnnouncementSchedule(a);
               const meta = a.organization ?? "";
               return (
                 <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
@@ -74,15 +81,14 @@ export default async function PublicAnnouncementsPage() {
                         a.title
                       )}
                     </span>
-                    {dateRange && (
+                    {schedule && (
                       <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                        {dateRange}
+                        {schedule}
                       </span>
                     )}
                   </div>
                   {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
                   {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
-                  {a.location && <p className="mt-1 text-[11px] text-ink-muted/70">Location: {a.location}</p>}
                   {/* 2026-10-13, the user's own request: "can we get the
                       word 'Link' to show up in the public views of the
                       announcements as a hyperlink to any announcement

@@ -108,3 +108,30 @@ export function formatAnnouncementDateRange(a: {
   }
   return text;
 }
+
+/**
+ * "Monday, October 19th at 6:00 PM - Stake Center" -- the date/time
+ * range, then the location, 2026-10-18 (the user's own follow-up:
+ * "move the location in an announcement to be after the time and
+ * date"). Both the public Announcements page and the Conducting
+ * script used to show/say the two independently (a separate
+ * "Location: X" line or sentence, not necessarily positioned near the
+ * date at all) -- this combines them into the one line the user asked
+ * for, applied to both since they asked the date-format change itself
+ * be kept in sync across "the conducting view and where they are
+ * viewed." Falls back to whichever single piece is actually present
+ * when the other is missing (an undated announcement can still have a
+ * location; a located one might have no date), rather than dropping
+ * either silently.
+ */
+export function formatAnnouncementSchedule(a: {
+  start_date: string | null;
+  start_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  location: string | null;
+}): string | null {
+  const dateRange = formatAnnouncementDateRange(a);
+  if (dateRange && a.location) return `${dateRange} - ${a.location}`;
+  return dateRange || a.location || null;
+}

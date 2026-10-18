@@ -1980,6 +1980,32 @@ avoid confusing the two.
 
 ## Known open items
 
+**Location moved to after the date/time, same conversation, 2026-10-18**
+(the user's own immediate follow-up, right after confirming the date-
+format change above looked good: "Can we move the location in an
+announcement to be after the time and date (eg sunday october 25th at
+7:00 pm - stake center)"). Before this, the public Announcements page
+showed date/time next to the title and location as its own separate
+"Location: X" line below the body -- not "before" date/time exactly,
+just unrelated to it visually; the Conducting script's own spoken
+wording said "Location: X. Date: Y." as two separate sentences,
+location literally first. New `formatAnnouncementSchedule`
+(`lib/data/announcements.ts`) combines date/time and location into
+one line/sentence, location after, e.g. "Monday, October 19th at
+6:00 PM - Stake Center" -- used by both the public page (replacing the
+separate Location line entirely) and the Conducting script's wording
+(replacing both separate sentences with one), matching the user's own
+established expectation that these two views' announcement formatting
+stay in sync. Falls back to showing whichever single piece is present
+when the other is missing, so a located-but-undated or dated-but-
+unlocated announcement still shows what it has.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to check that
+both the public Announcements page and the Conducting script now show
+date/time followed by location on one line, e.g. "Monday, October
+19th at 6:00 PM - Stake Center."
+
 **Two follow-ups right after the auto-archive sweep above shipped,
 2026-10-18 (same conversation):**
 
