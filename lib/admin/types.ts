@@ -161,6 +161,19 @@ export interface AdminTableConfig {
    * convention, matching migration `060`'s seed data exactly.
    */
   requiredFeature: string;
+  /**
+   * An optional lazy sweep to run once before `getAdminRows` reads
+   * this table (2026-10-18, the user's own question: "can this
+   * automatically archive or delete announcements whose time has
+   * passed?") -- same "run it on the way in, no cron" pattern this
+   * app already uses for meetings/youth activities
+   * (`autoArchivePastMeetings`, `sweepMeetingCancellations`, etc.),
+   * generalized here as a config hook instead of a hardcoded
+   * per-table branch, matching this file's own "no per-table logic"
+   * principle. A table with none set is untouched, same as before
+   * this existed.
+   */
+  sweepBeforeRead?: () => Promise<void>;
 }
 
 /**

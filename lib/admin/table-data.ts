@@ -7,6 +7,8 @@ export type AdminRow = Record<string, unknown> & { id: string };
 type MutationResult = { success: true } | { error: string };
 
 export async function getAdminRows(config: AdminTableConfig): Promise<AdminRow[]> {
+  await config.sweepBeforeRead?.();
+
   const supabase = await createClient();
   // reverse_lookup columns have no real column on this table at all (see
   // AdminColumnConfig.reverseLookup) -- selecting one would just error.

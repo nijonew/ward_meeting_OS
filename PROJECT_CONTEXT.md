@@ -1980,6 +1980,63 @@ avoid confusing the two.
 
 ## Known open items
 
+**Announcements now auto-archive once their own date range ends,
+2026-10-18** (the user's own question: "can this automatically
+archive or delete announcements whose time has passed?"). Before this,
+`getPublishedAnnouncements()` filtered purely on `status = 'published'`
+with no date check at all -- a real, if minor, gap: an announcement for
+a one-off event stayed on the public page forever unless an admin
+remembered to archive it by hand.
+
+New `sweepPastAnnouncements()` (`lib/data/announcements.ts`) -- the
+same lazy-sweep-on-read pattern as every other automatic cleanup in
+this app (`autoArchivePastMeetings`, `sweepMeetingCancellations`,
+`autoGenerateUpcomingMeetings`), since there's still no cron
+infrastructure to run this on a real schedule. "Time has passed" means
+`end_date`, or `start_date` when there's no `end_date`, is strictly
+before today in Mountain Time (`getMountainTimeNow()`, same timezone
+reasoning as the Sacrament Meeting public-visibility fix -- this also
+governs a genuinely public page, not an admin-only filter). Many real
+announcements legitimately have neither date set (General Information,
+a standing Lesson note, etc.) -- those are never touched, nothing to
+compare against.
+
+**Archives, never deletes** -- asked for both, but auto-*deleting*
+would be the one genuinely irreversible automatic action anywhere in
+this app; every other time-based sweep already built here
+(auto-archiving a meeting, cancelling one, generating the next batch)
+only ever does something reversible, with the actual destructive
+option (Delete Meeting, Delete Youth Activity, Table Admin's row
+Delete) always a deliberate, one-at-a-time human click. Chose to match
+that precedent rather than add the first automatic permanent-delete in
+the app -- an admin can still delete an auto-archived announcement by
+hand from Manage Announcements or Table Admin if they genuinely want
+it gone for good. Only ever moves a `published` row to `archived` --
+a `pending` row (never reviewed) or one already `archived` is left
+alone.
+
+**Wired in generically, not as an announcements-specific hardcode**:
+new optional `AdminTableConfig.sweepBeforeRead` (`lib/admin/types.ts`),
+called once by `getAdminRows()` (`lib/admin/table-data.ts`) before it
+queries -- the `announcements` registry entry sets
+`sweepBeforeRead: sweepPastAnnouncements`, so both `/admin/announcements`
+(Table Admin) and `/announcements` (Manage Announcements) pick it up
+automatically through the one shared config, same reasoning as the
+`select_with_other`/`multi_select` column types added the same day.
+`getPublishedAnnouncements()`/`getGeneralSubmissions()`
+(`lib/data/general-submissions.ts`) call it directly too, since both
+query `announcements` straight from Supabase rather than through
+`getAdminRows` -- the public page and the admin inbox's own stray-items
+fallback both needed it called explicitly.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to check that
+an announcement with a past `end_date` (or `start_date` with no
+`end_date`) shows as Archived in `/announcements` and is gone from the
+public page once its Manage Announcements/Table Admin/public page is
+next loaded, and that an announcement with no dates at all is
+correctly left alone.
+
 **Table Admin gained two new column types -- `select_with_other` and
 `multi_select` -- so Manage Announcements matches the real submit
 form's own options, 2026-10-18.** The user's own report: "The manage

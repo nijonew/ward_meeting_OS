@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEverPulledAnnouncementIds } from "@/lib/data/sacrament-announcements";
+import { sweepPastAnnouncements } from "@/lib/data/announcements";
 
 export interface SubmissionRow {
   id: string;
@@ -43,8 +44,16 @@ export interface PublishedAnnouncement {
  * moved to the real `sacrament_announcement_pulls` join table (see
  * that file's own header for why), so the old filter would have let
  * every pulled announcement right back onto this public page.
+ *
+ * Also runs `sweepPastAnnouncements()` first (2026-10-18) -- an
+ * announcement whose own date range already ended gets archived
+ * (never deleted) right before this query, same lazy-sweep-on-read
+ * pattern as every other automatic cleanup in this app -- so a stale
+ * announcement can't linger on the public page just because nobody
+ * happened to open Manage Announcements since its date passed.
  */
 export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement[]> {
+  await sweepPastAnnouncements();
   const supabase = await createClient();
 
   const [pulledIds, { data, error }] = await Promise.all([
@@ -66,6 +75,7 @@ export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement
 }
 
 export async function getGeneralSubmissions(): Promise<SubmissionRow[]> {
+  await sweepPastAnnouncements();
   const supabase = await createClient();
 
   const [pulledIds, announcementsRes, agendaRes] = await Promise.all([

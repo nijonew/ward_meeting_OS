@@ -11,6 +11,7 @@ import {
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
 import { TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
+import { sweepPastAnnouncements } from "@/lib/data/announcements";
 import {
   ANNOUNCEMENT_ORGANIZATIONS,
   ANNOUNCEMENT_TYPES,
@@ -198,8 +199,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "announcements",
     label: "Announcements",
     description:
-      "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one. Organization/Type offer the same options as the submit form plus an Other override; Audience/Where Announced are the submit form's own checkbox questions, as a checkbox-in-dropdown here too.",
+      "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one, or let it auto-archive once its own date range ends. Organization/Type offer the same options as the submit form plus an Other override; Audience/Where Announced are the submit form's own checkbox questions, as a checkbox-in-dropdown here too.",
     requiredFeature: "table_admin_announcements",
+    sweepBeforeRead: sweepPastAnnouncements,
     orderBy: { column: "created_at", ascending: false },
     columns: [
       // wrap: true (2026-10-13, the user's own request: "a large
