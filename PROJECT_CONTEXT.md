@@ -1980,6 +1980,81 @@ avoid confusing the two.
 
 ## Known open items
 
+**Table Admin gained two new column types -- `select_with_other` and
+`multi_select` -- so Manage Announcements matches the real submit
+form's own options, 2026-10-18.** The user's own report: "The manage
+announcements page entries are all seemingly short answer or similar.
+Can the same options in the submit announcements page be available
+via dropdown or checkbox in dropdown on the manage announcements
+page?" Organization/Type/Audience/Where Announced had always been
+plain `text` columns in the `announcements` registry entry (see that
+entry's own prior comment: "Organization/Type are free text... since
+the real form's 'Other' answers shouldn't get stranded outside a
+fixed list; Audience/Where Announced are comma-separated... no
+multi-select column type yet") -- a deliberate choice at the time,
+but one that left the one page admins actually use to manage real
+submissions (`/announcements`, which renders the exact same registry
+config `/admin/announcements` does) with no structured editor for any
+of the four, even though the submit form itself
+(`AnnouncementForm.tsx`) has always asked for them as a radio-select-
+with-Other or a checkbox group.
+
+Rather than reverting to a fixed closed list and losing "Other" the
+way the original design worried about, both new column types solve
+that directly:
+- **`select_with_other`** (Organization, Type): a real `<select>` of
+  the same fixed options the submit form offers, plus an "Other" entry
+  that reveals a free-text box. Whenever a row's current value doesn't
+  match any fixed option -- including a genuine prior "Other" answer,
+  or the literal word "Other" itself (the submit form's own fallback
+  when "Other" is picked with nothing typed,
+  `resolveOtherRadio`/`app/submit/actions.ts`) -- the dropdown shows
+  "Other" selected with the real text underneath, so nothing already
+  submitted is ever stranded outside the list.
+- **`multi_select`** (Audience, Where Announced): a checkbox-in-dropdown
+  (`MultiSelectDropdown.tsx`, same portal/fixed-position technique
+  `ColumnFilterDropdown` already uses, needed for the same reason --
+  this grid's own wrapping div is `overflow-x-auto`, which clips an
+  ordinary absolutely-positioned panel), still storing one comma-joined
+  string on the same real `text` column -- no schema change needed.
+  Parsing that joined string back into individual checkboxes walks the
+  fixed option list in its own order and peels matches off the front
+  of the raw value (not a naive split on the separator), specifically
+  because one real option's own label contains the separator ("Ward
+  Communications (Printed, Weekly Email, Social Media, etc.)") and
+  would otherwise fracture into nonsense fragments. This assumes
+  whatever's stored preserves that same fixed order, which is always
+  true for anything saved through the real submit form -- a value
+  someone hand-typed directly into the old free-text field, in a
+  different order or containing something outside the list, might not
+  parse back into checkboxes correctly, but nothing is destroyed by
+  just viewing it; only clicking Save on that specific row would
+  replace it with whatever the checklist shows checked.
+
+Both are genuinely generic additions to `lib/admin/types.ts`'s
+`AdminColumnType`/`AdminTableEditor.tsx` -- not announcement-specific
+code paths -- available to any future Table Admin column that needs
+the same shape (a single value with a free-text escape hatch, or
+several values from a fixed list in one text column). `MULTI_SELECT_SEPARATOR`
+(`lib/data/announcement-constants.ts`) had been declared back when
+Audience/Where Announced were first built but never actually used
+anywhere until now -- it's the one shared source of truth for the
+join format between the submit form and this new editor, so the two
+can't drift apart.
+
+Both pages that render the `announcements` table -- `/admin/announcements`
+(Table Admin) and `/announcements` (Manage Announcements) -- picked
+this up automatically with no page-level changes, since both already
+share the exact same registry config and `AdminTableEditor` component.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to check
+`/announcements` once deployed: Organization/Type should show as
+dropdowns (with "Other" revealing a text box for any existing
+non-fixed answer), and Audience/Where Announced should show as a
+button summarizing the current selection that opens a checklist when
+clicked.
+
 **Delete pinned to the right edge, and a real Confirmed toggle added
 to the Combined-group pages, 2026-10-17** -- two follow-ups from the
 hub flattening above, both from the same conversation.

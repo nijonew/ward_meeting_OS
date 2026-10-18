@@ -11,6 +11,20 @@ import {
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
 import { TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
+import {
+  ANNOUNCEMENT_ORGANIZATIONS,
+  ANNOUNCEMENT_TYPES,
+  ANNOUNCEMENT_AUDIENCES,
+  ANNOUNCEMENT_WHERE,
+} from "@/lib/data/announcement-constants";
+
+/** ANNOUNCEMENT_AUDIENCES/ANNOUNCEMENT_WHERE are plain string lists (the
+ *  submit form's checkbox groups use the same string as both the
+ *  checkbox's value and its visible label) -- Table Admin's AdminOption
+ *  shape wants an explicit {value, label} pair, same convention as
+ *  every other options list in this registry. */
+const ANNOUNCEMENT_AUDIENCE_OPTIONS = ANNOUNCEMENT_AUDIENCES.map((v) => ({ value: v, label: v }));
+const ANNOUNCEMENT_WHERE_OPTIONS = ANNOUNCEMENT_WHERE.map((v) => ({ value: v, label: v }));
 
 /** Fields whose choices can be edited via the "Dropdown Option Lists"
  *  admin table below (admin_select_options) instead of code. Kept as an
@@ -184,22 +198,29 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "announcements",
     label: "Announcements",
     description:
-      "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one. Organization/Type are free text (not a fixed dropdown) since the real form's \"Other\" answers shouldn't get stranded outside a fixed list; Audience/Where Announced are comma-separated (the form's checkbox questions -- no multi-select column type yet).",
+      "Submitted announcements -- published to the public /announcements/public page by default; set Status to Archived to exclude one. Organization/Type offer the same options as the submit form plus an Other override; Audience/Where Announced are the submit form's own checkbox questions, as a checkbox-in-dropdown here too.",
     requiredFeature: "table_admin_announcements",
     orderBy: { column: "created_at", ascending: false },
     columns: [
       // wrap: true (2026-10-13, the user's own request: "a large
       // enough field... when wrapped I can see all of the
       // information... same with the announcement table") on every
-      // column here that regularly holds more than a few words --
-      // short, fixed-shape fields (Submitted By, Email, Status) are
-      // left as plain single-line inputs, same as before.
+      // plain-text column here that regularly holds more than a few
+      // words -- short, fixed-shape fields (Submitted By, Email,
+      // Status) are left as plain single-line inputs, same as before.
       { column: "title", label: "Title", type: "text", required: true, wrap: true },
       { column: "body", label: "Body", type: "long_text", required: true },
-      { column: "organization", label: "Organization", type: "text", wrap: true },
-      { column: "announcement_type", label: "Type", type: "text", wrap: true },
-      { column: "audience", label: "Audience", type: "text", wrap: true },
-      { column: "where_announced", label: "Where Announced", type: "text", wrap: true },
+      // select_with_other/multi_select, 2026-10-18 (the user's own
+      // request: "the same options in the submit announcements page
+      // [...] available via dropdown or checkbox in dropdown on the
+      // manage announcements page") -- same option lists the real
+      // submit form itself uses (AnnouncementForm.tsx), see types.ts's
+      // own doc comment on both column types for how each preserves an
+      // existing "Other"/free-text answer instead of stranding it.
+      { column: "organization", label: "Organization", type: "select_with_other", options: [...ANNOUNCEMENT_ORGANIZATIONS] },
+      { column: "announcement_type", label: "Type", type: "select_with_other", options: [...ANNOUNCEMENT_TYPES] },
+      { column: "audience", label: "Audience", type: "multi_select", options: ANNOUNCEMENT_AUDIENCE_OPTIONS },
+      { column: "where_announced", label: "Where Announced", type: "multi_select", options: ANNOUNCEMENT_WHERE_OPTIONS },
       { column: "start_date", label: "Start Date", type: "date" },
       { column: "start_time", label: "Start Time", type: "time" },
       { column: "end_date", label: "End Date", type: "date" },

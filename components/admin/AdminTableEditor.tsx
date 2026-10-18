@@ -3,8 +3,50 @@
 import { useMemo, useState, useTransition } from "react";
 import type { AdminColumnConfig, AdminOption } from "@/lib/admin/types";
 import { MeetingDatePicker } from "./MeetingDatePicker";
+import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
+import { MULTI_SELECT_SEPARATOR } from "@/lib/data/announcement-constants";
+
+/**
+ * Parses a "multi_select" column's stored, joined string back into
+ * individual selections -- see types.ts's own doc comment on this
+ * column type for the ordering assumption this relies on (always
+ * correct for data saved through the real submit form; a hand-typed
+ * legacy value could parse incompletely, never destructively, since
+ * nothing writes back until Save is clicked on that row). Walking
+ * `options` in their own fixed order and peeling one match at a time
+ * off the front of `remaining` -- rather than a naive split on the
+ * separator -- is what lets an option whose own label happens to
+ * contain the separator (e.g. this app's real "Ward Communications
+ * (Printed, Weekly Email, Social Media, etc.)" audience value) still
+ * parse correctly instead of fracturing into nonsense fragments.
+ */
+function parseMultiSelectValue(raw: unknown, options: AdminOption[]): string[] {
+  const str = raw == null ? "" : String(raw);
+  if (!str) return [];
+  const selected: string[] = [];
+  let remaining = str;
+  for (const opt of options) {
+    if (remaining === opt.value) {
+      selected.push(opt.value);
+      remaining = "";
+      break;
+    }
+    if (remaining.startsWith(`${opt.value}${MULTI_SELECT_SEPARATOR}`)) {
+      selected.push(opt.value);
+      remaining = remaining.slice(opt.value.length + MULTI_SELECT_SEPARATOR.length);
+    }
+  }
+  return selected;
+}
+
+/** The literal placeholder committed when "Other" is picked with
+ *  nothing typed yet, matching this app's own announcement submission
+ *  form's identical fallback (`resolveOtherRadio`, app/submit/actions.ts)
+ *  -- so a "select_with_other" value saved from either place reads the
+ *  same way everywhere else in the app that already expects it. */
+const OTHER_SENTINEL = "Other";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type ActionResult = { success?: true; error?: string };
@@ -111,9 +153,12 @@ export function AdminTableEditor({
       return reverseLookupValues?.[column.column]?.[row.id] ?? "";
     }
     if (column.type === "boolean") return raw ? "Yes" : "No";
-    if (column.type === "select" || column.type === "foreign_key") {
-      const opts = column.type === "select" ? (column.options ?? []) : (fkOptions[column.column] ?? []);
+    if (column.type === "select" || column.type === "select_with_other" || column.type === "foreign_key") {
+      const opts = column.type === "foreign_key" ? (fkOptions[column.column] ?? []) : (column.options ?? []);
       const label = opts.find((o) => o.value === String(raw))?.label;
+      // select_with_other falls through to the raw text below when no
+      // fixed option matches (a genuine "Other" answer) -- unlike plain
+      // "select"/"foreign_key", where that would mean stale/bad data.
       if (label) return label;
     }
     if (raw === null || raw === undefined || raw === "") return "";
@@ -181,7 +226,7 @@ export function AdminTableEditor({
    *  column declares scopedBy, plus any config-defined pseudo-choices. */
   const optionsFor = (column: AdminColumnConfig, row: AdminRow | null): AdminOption[] => {
     let base: AdminOption[];
-    if (column.type === "select") {
+    if (column.type === "select" || column.type === "select_with_other" || column.type === "multi_select") {
       base = column.options ?? [];
     } else if (column.scopedBy && row) {
       const scopeValue = valueFor(row, column.scopedBy.scopeColumn);
@@ -400,6 +445,54 @@ function AdminCellInput({
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (column.type === "select_with_other") {
+    const stringValue = value == null ? "" : String(value);
+    const isFixedOption = (options ?? []).some((o) => o.value === stringValue);
+    // Anything that isn't blank and doesn't match a fixed option is a
+    // genuine "Other" answer (including the literal word "Other" itself,
+    // the fallback this app's own submit form commits when "Other" is
+    // picked with nothing typed) -- the dropdown shows "Other" selected
+    // for all of those, never leaving a real answer stranded off the list.
+    const selectValue = stringValue === "" ? "" : isFixedOption ? stringValue : OTHER_SENTINEL;
+    return (
+      <div className="flex flex-col gap-1">
+        <select
+          value={selectValue}
+          onChange={(e) => onChange(e.target.value === OTHER_SENTINEL ? OTHER_SENTINEL : e.target.value)}
+          className={INPUT_CLASS}
+        >
+          <option value="">{column.required ? "Choose" : "None"}</option>
+          {(options ?? []).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+          <option value={OTHER_SENTINEL}>Other</option>
+        </select>
+        {selectValue === OTHER_SENTINEL && (
+          <input
+            type="text"
+            value={stringValue === OTHER_SENTINEL ? "" : stringValue}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Other (please specify)"
+            className={INPUT_CLASS}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (column.type === "multi_select") {
+    const selected = parseMultiSelectValue(value, options ?? []);
+    return (
+      <MultiSelectDropdown
+        options={options ?? []}
+        selected={selected}
+        onChange={(next) => onChange(next.join(MULTI_SELECT_SEPARATOR))}
+      />
     );
   }
 

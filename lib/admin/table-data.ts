@@ -201,6 +201,12 @@ export async function getReverseLookupValues(
  * value, but a NOT NULL text column (e.g. announcements.submitted_by_email)
  * can and should -- forcing it to null there would just turn an optional
  * field into a write that fails the column's own constraint.
+ *
+ * "select_with_other"/"multi_select" count as text types here too --
+ * both still write a plain string to a real `text` column underneath
+ * (see types.ts's own doc comment on the two), so an empty selection
+ * should behave exactly like clearing any other text field, not like
+ * clearing a strict "select"/foreign key whose "" has no valid meaning.
  */
 function sanitizePatch(config: AdminTableConfig, patch: Record<string, unknown>): Record<string, unknown> {
   const columnConfigs = new Map(config.columns.map((c) => [c.column, c]));
@@ -208,7 +214,11 @@ function sanitizePatch(config: AdminTableConfig, patch: Record<string, unknown>)
   for (const [key, value] of Object.entries(patch)) {
     const colConfig = columnConfigs.get(key);
     if (!colConfig || colConfig.type === "reverse_lookup") continue;
-    const isTextType = colConfig.type === "text" || colConfig.type === "long_text";
+    const isTextType =
+      colConfig.type === "text" ||
+      colConfig.type === "long_text" ||
+      colConfig.type === "select_with_other" ||
+      colConfig.type === "multi_select";
     clean[key] = value === "" && !isTextType ? null : value;
   }
   return clean;

@@ -16,8 +16,50 @@ export type AdminColumnType =
   | "date"
   | "time"
   | "select"
+  | "select_with_other"
+  | "multi_select"
   | "foreign_key"
   | "reverse_lookup";
+
+/**
+ * "select_with_other" and "multi_select" (2026-10-18, the user's own
+ * request, naming the Announcements table specifically: "the manage
+ * announcements page entries are all seemingly short answer... Can the
+ * same options in the submit announcements page be available via
+ * dropdown or checkbox in dropdown on the manage announcements page?").
+ * Both store a plain string on a real `text` column, same as "text" --
+ * there's no new column shape, only a richer editor UI on top of the
+ * exact same data the submit form already writes:
+ * - **"select_with_other"**: a single value from `options`, PLUS a free-
+ *   text override (matching this app's own announcement submission
+ *   form's radio-with-"Other" questions, e.g. Organization/Type). The
+ *   stored value is either one of the fixed `options`' values, or
+ *   whatever free text was typed -- never the literal word "Other"
+ *   unless that's genuinely what was typed with nothing else. The
+ *   editor shows "Other" selected (with the real text in the box
+ *   beneath it) whenever the current value doesn't match any fixed
+ *   option, so an already-submitted "Other" answer is never stranded
+ *   outside the dropdown -- this is exactly the gap that made free text
+ *   necessary here in the first place, now solved by always offering an
+ *   escape hatch instead of giving up the fixed options altogether.
+ * - **"multi_select"**: more than one value from `options` at once,
+ *   joined into the one text column with `lib/data/announcement-constants.ts`'s
+ *   `MULTI_SELECT_SEPARATOR` (matching this app's own announcement
+ *   submission form's checkbox-group questions, e.g. Audience/Where
+ *   Announced -- no "Other" on either, so this one has no free-text
+ *   escape hatch). Rendered as a dropdown button that opens a checklist
+ *   panel (`MultiSelectDropdown`), same "checkbox in dropdown" the user
+ *   asked for literally. Parsing an existing joined string back into
+ *   individual selections assumes `options`' own order is preserved in
+ *   storage (true for anything saved through the real submit form,
+ *   which always emits checked values in that fixed order) -- a value
+ *   hand-typed into this column before it became multi_select, in a
+ *   different order or containing something outside the fixed list,
+ *   may not parse back into checkboxes correctly. Nothing is overwritten
+ *   until a row is actually saved from this grid, so simply viewing such
+ *   a row can't lose data; only clicking Save on one would replace it
+ *   with just whatever the checklist shows checked.
+ */
 
 /** value/label plus an optional raw date, so a "meetings" lookup's
  *  options can be grouped onto a calendar (see MeetingDatePicker). */
@@ -47,9 +89,11 @@ export interface AdminColumnConfig {
    *  table) since most short text columns elsewhere in this registry
    *  would just get visually taller for no benefit. */
   wrap?: boolean;
-  /** Fixed choices, for type: "select". Used directly if optionsFrom is
-   *  absent; otherwise it's the fallback when that field_key has no rows
-   *  yet in admin_select_options. */
+  /** Fixed choices, for type: "select" | "select_with_other" | "multi_select".
+   *  For "select", used directly if optionsFrom is absent; otherwise it's
+   *  the fallback when that field_key has no rows yet in
+   *  admin_select_options. "select_with_other" and "multi_select" always
+   *  use this list directly -- neither reads from admin_select_options. */
   options?: AdminOption[];
   /** For type: "select" -- reads live choices from admin_select_options
    *  (field_key column) via lib/data/select-options.ts, so admins can
