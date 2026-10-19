@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useState, useActionState } from "react";
 import { requestAccess } from "@/app/auth/actions";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -37,9 +37,45 @@ const initialState: { error?: string; success?: boolean } = {};
  * account creation; everything after that (confirming the email,
  * matching to a person, granting access) is the same Verify Logins
  * flow regardless of how the account got created.
+ *
+ * **Replaced the inline success message with a real confirmation
+ * screen, 2026-10-19** -- the same fix made to `/auth/reset-password`
+ * the same day, for the identical reason (see that page's own comment
+ * for the full report this came from): the old inline "Check your
+ * email..." line sat under an otherwise-unchanged form, with a
+ * `&larr; Sign in` link right at the top inviting a click back to
+ * `/login` the moment someone saw no strong confirmation that anything
+ * had happened. On success, the form is now replaced entirely by a
+ * dedicated confirmation screen stating plainly to go open the email
+ * instead of expecting this page to do anything further.
  */
 export default function RequestAccessPage() {
   const [state, formAction, pending] = useActionState(requestAccess, initialState);
+  const [email, setEmail] = useState("");
+
+  if (state.success) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
+        <h1 className="font-display text-2xl">Check your email</h1>
+        <p className="mt-2 text-sm text-ink">
+          We sent a verification link to <strong>{email || "your email address"}</strong>.
+          Open that email and click the link in it to verify your address -- this page
+          won&rsquo;t do that for you.
+        </p>
+        <p className="mt-2 text-sm text-ink-muted">
+          Once you&rsquo;ve verified it, an admin will review your request and set up your
+          access. You&rsquo;ll be able to sign in with the email and password you just chose
+          once that&rsquo;s done.
+        </p>
+        <p className="mt-2 text-xs text-ink-muted">
+          Don&rsquo;t see it? Check your spam folder, or wait a few minutes and try again.
+        </p>
+        <Link href="/login" className="mt-6 text-xs text-ink-muted hover:text-ink">
+          &larr; Back to sign in
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
@@ -58,6 +94,8 @@ export default function RequestAccessPage() {
           type="email"
           name="email"
           required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
@@ -83,16 +121,6 @@ export default function RequestAccessPage() {
           {pending ? "Requesting..." : "Request access"}
         </button>
         {state.error && <p className="text-sm text-danger">{state.error}</p>}
-        {state.success && (
-          <p className="text-sm text-ink">
-            Check your email for a link to verify your address. Once you&rsquo;ve verified it, an
-            admin will review your request -- you&rsquo;ll be able to{" "}
-            <Link href="/login" className="underline">
-              sign in
-            </Link>{" "}
-            with the email and password you just chose once that&rsquo;s done.
-          </p>
-        )}
       </form>
     </main>
   );

@@ -1980,6 +1980,46 @@ avoid confusing the two.
 
 ## Known open items
 
+**Password reset (and self-serve sign-up) now land on a real
+confirmation screen instead of an easy-to-miss inline message,
+2026-10-19.** The user's own report: "I had someone sign in and forget
+their password. They used the password reset, but thought it was a
+bug that it went back to the log-in page. I tried it and it went back
+to the login page, but I also got an email that took me to the correct
+location. Might need a landing page after putting in an email to reset
+passwords that tells them to use the email from the system to reset
+their password rather than just going back to the log-in page."
+
+Nothing was actually broken server-side -- `requestPasswordReset`
+(`app/auth/actions.ts`) never redirects anywhere, and
+`/auth/reset-password` already rendered "Check your email for a link
+to set your password" on success. The real problem: that one small
+line sat directly underneath an otherwise completely unchanged form,
+on a page whose own `&larr; Sign in` link sits right at the top. With
+nothing strongly confirming that anything had happened, clicking that
+link straight back to `/login` was the obvious next move -- both for
+the user's own ward member and for this session's own test of it --
+indistinguishable in practice from "the page just goes back to login,"
+even though no code ever navigated there on its own.
+
+Fixed by replacing the inline message with a real confirmation screen:
+on success, `/auth/reset-password` now swaps its entire form out for a
+dedicated "Check your email" page -- the email address just submitted
+(tracked via a controlled `useState`, alongside the existing form
+submission) is echoed back, with explicit wording that the *email*
+is what finishes the job, not this page. `/auth/request-access`
+(self-serve sign-up) had the exact same shape of bug -- an inline
+"Check your email to verify..." message under an unchanged form, same
+`&larr; Sign in` link at the top -- so it got the identical fix the
+same day, proactively, since it's the same bug class the user's report
+was really about, not a separate ask.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to try both
+flows once deployed and confirm each now shows a clear "Check your
+email" screen (with the email address echoed back) instead of leaving
+the original form visible.
+
 **Announcement link made more pronounced + opens in a new tab,
 2026-10-18** (the user's own request, same conversation as the two
 entries just below: "can we make the link in announcements a bit more

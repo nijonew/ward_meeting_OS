@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useState, useActionState } from "react";
 import { requestPasswordReset } from "@/app/auth/actions";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -22,9 +22,53 @@ const initialState: { error?: string; success?: boolean } = {};
  * account, I just forgot my password" case is the only survivor of
  * that original split. Still calls the same requestPasswordReset
  * action it always has.
+ *
+ * **Replaced the inline success message with a real confirmation
+ * screen, 2026-10-19** (the user's own report: "They used the password
+ * reset, but thought it was a bug that it went back to the log-in
+ * page. I tried it and it went back to the login page, but I also got
+ * an email that took me to the correct location. Might need a landing
+ * page after putting in an email to reset passwords that tells them to
+ * use the email from the system... rather than just going back to the
+ * log-in page."). Nothing was actually broken server-side --
+ * `requestPasswordReset` never redirects, and the old version of this
+ * page DID already render "Check your email for a link to set your
+ * password" -- but that one small line sat directly under an otherwise
+ * completely unchanged form, with a `&larr; Sign in` link right at the
+ * top of the same page. With no strong visual confirmation that
+ * anything had happened, clicking that link right back to `/login` was
+ * the obvious next move, which is exactly what both the reporting user
+ * and this session's own test of it did -- indistinguishable in
+ * practice from "the page just goes back to login," even though no
+ * code ever navigated anywhere. On success, the entire form is now
+ * replaced by a dedicated confirmation screen (the "landing page" the
+ * user asked for) that states plainly to go open the email instead of
+ * expecting this page to do anything further -- the email address just
+ * submitted is echoed back for confirmation, via a controlled `email`
+ * field tracked alongside the existing uncontrolled form submission.
  */
 export default function ResetPasswordPage() {
   const [state, formAction, pending] = useActionState(requestPasswordReset, initialState);
+  const [email, setEmail] = useState("");
+
+  if (state.success) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
+        <h1 className="font-display text-2xl">Check your email</h1>
+        <p className="mt-2 text-sm text-ink">
+          We sent a password reset link to <strong>{email || "your email address"}</strong>.
+          Open that email and click the link in it to set a new password -- this page
+          won&rsquo;t do that for you.
+        </p>
+        <p className="mt-2 text-xs text-ink-muted">
+          Don&rsquo;t see it? Check your spam folder, or wait a few minutes and try again.
+        </p>
+        <Link href="/login" className="mt-6 text-xs text-ink-muted hover:text-ink">
+          &larr; Back to sign in
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
@@ -39,6 +83,8 @@ export default function ResetPasswordPage() {
           type="email"
           name="email"
           required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           className="rounded border border-rule bg-surface px-3 py-2 text-sm"
         />
@@ -50,9 +96,6 @@ export default function ResetPasswordPage() {
           {pending ? "Sending..." : "Send reset link"}
         </button>
         {state.error && <p className="text-sm text-danger">{state.error}</p>}
-        {state.success && (
-          <p className="text-sm text-ink">Check your email for a link to set your password.</p>
-        )}
       </form>
     </main>
   );
