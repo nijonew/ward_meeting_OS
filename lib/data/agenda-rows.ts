@@ -530,6 +530,19 @@ export function buildAgendaRows({
         break;
       }
 
+      // Dynamic section dividers (2026-10-19, Bishopric Meeting/Ward
+      // Council/Youth Council only -- migration 078) -- a real,
+      // freely-movable catalog element, unlike Sacrament Meeting's own
+      // synthesized dividers above (anchored by adjacency to a specific
+      // key). Reuses the same "section" AgendaRow kind; its position on
+      // the page is whatever this element's own sort_order says, so
+      // moving it via the existing Agenda Elements editor (Move Up/
+      // Down, already built) is the entire mechanism -- no anchoring
+      // logic needed here at all.
+      case "section":
+        rows.push({ kind: "section", id: el.id, label: el.label });
+        break;
+
       case "none":
       default:
         rows.push({ kind: "banner", id: el.id, label: el.label });
@@ -538,4 +551,36 @@ export function buildAgendaRows({
   }
 
   return rows;
+}
+
+/**
+ * Splits an ordered element list into named sections at every
+ * `resolution_kind === 'section'` divider (2026-10-19) -- the generic
+ * version of the single before/after split
+ * app/meetings/[id]/planning/page.tsx already used for Agenda Items
+ * (`agendaItemsIndex`), now covering Bishopric Meeting/Ward Council/
+ * Youth Council's four named sections (Devotional/Review/Discussion/
+ * Closing). The divider element itself is consumed here, not left in
+ * `elements` -- both Planning and the read-only Public view render
+ * each section's own heading directly from `label`, not from a grid
+ * row. The first section (before any divider) always has `label: null`
+ * -- in practice empty for every template this seeds, but not assumed
+ * so a meeting missing its own Devotional divider (e.g. one created
+ * before migration 078 ran) still renders everything, just ungrouped.
+ */
+export interface AgendaSection {
+  label: string | null;
+  elements: TemplateElementRow[];
+}
+
+export function splitIntoSections(elements: TemplateElementRow[]): AgendaSection[] {
+  const sections: AgendaSection[] = [{ label: null, elements: [] }];
+  for (const el of elements) {
+    if (el.resolution_kind === "section") {
+      sections.push({ label: el.label, elements: [] });
+      continue;
+    }
+    sections[sections.length - 1].elements.push(el);
+  }
+  return sections;
 }

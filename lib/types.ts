@@ -6,23 +6,20 @@
  * no mock/placeholder data layer anymore.
  */
 
-export type MeetingLifecycleStage =
-  | "template"
-  | "planning"
-  | "review"
-  | "ready"
-  | "live"
-  | "archived";
+/**
+ * Narrowed from the original 6-stage architecture.md lifecycle
+ * (template/planning/review/ready/live/archived) to the 3 values that
+ * are ever actually written, for any meeting type (2026-10-19,
+ * confirmed by grepping every `stage:` write site in the codebase --
+ * see PROJECT_CONTEXT.md). Sacrament Meeting already had this fix
+ * applied in its own display 2026-09-10 ("Review/Ready/Live were
+ * never actually reachable in the first place"); this generalizes it
+ * to the type itself, since no meeting page anywhere still shows the
+ * dead stages.
+ */
+export type MeetingLifecycleStage = "template" | "planning" | "archived";
 
-/** Ordered per the lifecycle in architecture.md section 4. */
-export const MEETING_LIFECYCLE_STAGES: MeetingLifecycleStage[] = [
-  "template",
-  "planning",
-  "review",
-  "ready",
-  "live",
-  "archived",
-];
+export const MEETING_LIFECYCLE_STAGES: MeetingLifecycleStage[] = ["template", "planning", "archived"];
 
 export type MeetingTypeSlug =
   | "sacrament-meeting"

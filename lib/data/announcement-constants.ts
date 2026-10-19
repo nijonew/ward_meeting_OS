@@ -43,6 +43,7 @@ export const ANNOUNCEMENT_AUDIENCES = [
 export const ANNOUNCEMENT_WHERE = [
   "Bishopric Meeting",
   "Ward Council Meeting",
+  "Youth Council Meeting",
   "Relief Society Class",
   "Elders Quorum Class",
   "Sunday School - Gospel Doctrine Class",
@@ -72,3 +73,18 @@ export const ANNOUNCEMENT_TYPES = [
 export const OTHER_VALUE = "Other";
 
 export const MULTI_SELECT_SEPARATOR = ", ";
+
+/**
+ * Which `ANNOUNCEMENT_WHERE` label corresponds to each collaborative
+ * meeting type's own Review section (2026-10-19) -- an announcement
+ * shows up there automatically whenever this label is checked in its
+ * own "Where should this be announced?" field, with no separate
+ * pull/consume step. Sacrament Meeting is deliberately not here -- its
+ * own Announcements block uses a completely different, explicit-pull
+ * mechanism (see lib/data/sacrament-announcements.ts).
+ */
+export const MEETING_TYPE_ANNOUNCEMENT_LABEL: Record<"bishopric-meeting" | "ward-council" | "youth-council", string> = {
+  "bishopric-meeting": "Bishopric Meeting",
+  "ward-council": "Ward Council Meeting",
+  "youth-council": "Youth Council Meeting",
+};

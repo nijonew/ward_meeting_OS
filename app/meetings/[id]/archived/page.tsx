@@ -17,6 +17,9 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { getAnnouncementsByPlannedElement, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
+import { splitIntoSections } from "@/lib/data/agenda-rows";
+import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
+import { ReviewSection } from "@/components/planning/ReviewSection";
 
 /**
  * Read-only meeting view -- built 2026-09-08 to be the calling-based
@@ -149,14 +152,22 @@ export default async function ArchivedMeetingPage({
         </div>
       );
     }
-    if (meeting.stage !== "live" && meeting.stage !== "archived") {
+    // 2026-10-19: this used to require stage === "live" specifically --
+    // a real, silent bug, since "live" was never actually reachable by
+    // any code path (see lib/types.ts's own comment), so a non-admin
+    // could never see this page before a meeting archived no matter
+    // what. Now that the dead Live tab/stage is gone, a non-admin with
+    // calling-based access sees this page any time the meeting has
+    // moved past its bare just-created stub -- restoring the Vision
+    // workflow's actual intent ("once live... can view it").
+    if (meeting.stage === "template") {
       if (isAdmin) {
         return (
           <div className="rounded border border-rule bg-surface p-6">
             <p className="text-sm text-ink-muted">
-              This meeting isn&rsquo;t live yet. It&rsquo;s still editable from{" "}
-              <Link href={`/meetings/${meetingId}/live`} className="underline">
-                Live
+              This meeting isn&rsquo;t being planned yet. Start from{" "}
+              <Link href={`/meetings/${meetingId}/planning`} className="underline">
+                Planning
               </Link>
               .
             </p>
@@ -212,6 +223,16 @@ export default async function ArchivedMeetingPage({
   const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
   const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
   const agendaItems = await getAgendaItemsForMeeting(meetingId);
+
+  // Same sectioned layout as Planning (2026-10-19) -- see that page's
+  // own comment and splitIntoSections's doc comment in agenda-rows.ts.
+  const collaborativeSections = !isSacrament ? splitIntoSections(templateElements) : [];
+  const [reviewAnnouncements, previousMinutes] = !isSacrament
+    ? await Promise.all([
+        getAnnouncementsForMeetingReview(meeting.meetingType),
+        getPreviousMeetingMinutes(meeting.meetingType, meeting.date),
+      ])
+    : [[], null];
 
   const renderedMusicKinds = new Set<string>();
   const renderedSlotKinds = new Set<string>();
@@ -328,6 +349,7 @@ export default async function ArchivedMeetingPage({
                         {item.title} &middot; {item.submitted_by_name}
                       </p>
                       {item.body && <Note>{item.body}</Note>}
+                      {item.notes && <Note>{item.notes}</Note>}
                     </div>
                   ))}
                 </div>
@@ -346,7 +368,7 @@ export default async function ArchivedMeetingPage({
     }
   }
 
-  const elementFields = templateElements.map(renderElement).filter(Boolean);
+  const elementFields = isSacrament ? templateElements.map(renderElement).filter(Boolean) : [];
 
   const musicRows = sacramentData?.music ?? [];
   const speakerRows = [
@@ -374,10 +396,45 @@ export default async function ArchivedMeetingPage({
         <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">No agenda elements were recorded for this meeting.</p>
         </div>
-      ) : (
+      ) : isSacrament ? (
         <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Agenda</h2>
           <div className="mt-4 flex flex-col gap-2">{elementFields}</div>
+        </div>
+      ) : (
+        <div className="rounded border border-rule bg-surface p-6">
+          <h2 className="font-display text-xl">Agenda</h2>
+          <div className="mt-4 flex flex-col gap-6">
+            {collaborativeSections.map((section, i) => {
+              if (section.label === "Review") {
+                return (
+                  <div key={`section-${i}`} className="border-t-2 border-rule pt-4 first:border-t-0 first:pt-0">
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">Review</span>
+                    <div className="mt-3">
+                      <ReviewSection announcements={reviewAnnouncements} previousMinutes={previousMinutes} />
+                    </div>
+                    {section.elements.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-2">{section.elements.map(renderElement)}</div>
+                    )}
+                  </div>
+                );
+              }
+
+              const rendered = section.elements.map(renderElement).filter(Boolean);
+              if (rendered.length === 0) return null;
+
+              return (
+                <div key={`section-${i}`} className="border-t-2 border-rule pt-4 first:border-t-0 first:pt-0">
+                  {section.label && (
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
+                      {section.label}
+                    </span>
+                  )}
+                  <div className="mt-3 flex flex-col gap-2">{rendered}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

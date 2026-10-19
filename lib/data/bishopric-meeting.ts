@@ -34,6 +34,10 @@ export interface AgendaItemRow {
   body: string;
   submitted_by_name: string;
   status: string;
+  /** Migration 078 -- an admin's own inline notes on this item,
+   *  rendered in the Discussion section, separate from `body` (the
+   *  submitter's own description). */
+  notes: string | null;
 }
 
 export interface UnassignedAgendaItemRow {
@@ -60,7 +64,7 @@ export async function getAgendaItemsForMeeting(meetingId: string): Promise<Agend
   const supabase = await createClient();
   const { data } = await supabase
     .from("agenda_items")
-    .select("id, title, body, submitted_by_name, status")
+    .select("id, title, body, submitted_by_name, status, notes")
     .eq("meeting_id", meetingId)
     .order("created_at");
   return (data as AgendaItemRow[] | null) ?? [];
@@ -103,7 +107,7 @@ export async function getBishopricMeetingData(meetingId: string): Promise<Bishop
       .order("due_date"),
     supabase
       .from("agenda_items")
-      .select("id, title, body, submitted_by_name, status")
+      .select("id, title, body, submitted_by_name, status, notes")
       .eq("meeting_id", meetingId)
       .order("created_at"),
   ]);

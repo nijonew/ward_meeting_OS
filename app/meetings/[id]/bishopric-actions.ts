@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 
 type ActionResult = { success: true } | { error: string };
 
+/**
+ * Only ever writes `minutes_body`/`next_meeting_date` -- the two fields
+ * BishopricMinutesForm still renders (2026-10-19, consolidated down
+ * from 9). Deliberately does NOT include the other seven columns
+ * (spiritual_thought_*, handbook_training_*, calendar_review_notes,
+ * etc.) in this upsert at all -- they're no longer submitted by the
+ * form, and including them as `null` here would silently wipe out any
+ * historical data still sitting in those columns on every save.
+ */
 export async function saveBishopricMinutes(meetingId: string, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
 
@@ -13,15 +22,6 @@ export async function saveBishopricMinutes(meetingId: string, formData: FormData
   const { error } = await supabase.from("bishopric_minutes").upsert(
     {
       meeting_id: meetingId,
-      spiritual_thought_presenter_id: field("spiritual_thought_presenter_id"),
-      spiritual_thought_notes: field("spiritual_thought_notes"),
-      handbook_training_topic: field("handbook_training_topic"),
-      handbook_training_presenter_id: field("handbook_training_presenter_id"),
-      calendar_review_notes: field("calendar_review_notes"),
-      callings_discussion_notes: field("callings_discussion_notes"),
-      sacrament_planning_discussion_notes: field("sacrament_planning_discussion_notes"),
-      young_men_coordination_notes: field("young_men_coordination_notes"),
-      impressions: field("impressions"),
       minutes_body: field("minutes_body"),
       next_meeting_date: field("next_meeting_date"),
       updated_at: new Date().toISOString(),
@@ -91,25 +91,18 @@ export async function toggleActionItem(itemId: string, meetingId: string, comple
   return { success: true };
 }
 
-export async function addAgendaItemDirect(meetingId: string, formData: FormData): Promise<ActionResult> {
+/**
+ * Per-item notes for an agenda item, rendered inline in the Discussion
+ * section (2026-10-19, migration 078's new `agenda_items.notes` column)
+ * -- replaces the old single notes block at the bottom of the page.
+ */
+export async function saveAgendaItemNotes(itemId: string, meetingId: string, notes: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const title = String(formData.get("title") ?? "").trim();
-  const body = String(formData.get("body") ?? "").trim();
-  if (!title) return { error: "Title is required." };
-
-  const { error } = await supabase.from("agenda_items").insert({
-    meeting_id: meetingId,
-    title,
-    body,
-    submitted_by_name: "Bishopric",
-    submitted_by_email: user?.email ?? "",
-    status: "published",
-  });
+  const { error } = await supabase
+    .from("agenda_items")
+    .update({ notes: notes.trim() || null })
+    .eq("id", itemId);
 
   if (error) return { error: error.message };
   revalidatePath(`/meetings/${meetingId}`);

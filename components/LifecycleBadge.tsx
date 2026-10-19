@@ -3,67 +3,40 @@ import { MEETING_LIFECYCLE_STAGES, type MeetingLifecycleStage } from "@/lib/type
 const STAGE_LABELS: Record<MeetingLifecycleStage, string> = {
   template: "Template",
   planning: "Planning",
-  review: "Review",
-  ready: "Ready",
-  live: "Live",
   archived: "Archived",
 };
 
 /**
- * Renders the meeting lifecycle (architecture.md section 4) as a stamped
- * status track, with the current stage highlighted. Intentionally reused
- * as-is on the dashboard and meeting detail views rather than re-derived,
- * per the project's own "views instead of duplicate data" principle.
+ * Renders the meeting lifecycle (lib/types.ts) as a stamped status
+ * track, with the current stage highlighted. Intentionally reused
+ * as-is on the dashboard rather than re-derived, per the project's own
+ * "views instead of duplicate data" principle.
  *
- * `compact` (2026-09-09, the user's own request: "the status fields can
- * be eliminated except for the status that is current") renders just
- * the current stage's own pill, no track/connectors -- used by
- * /dashboard's single-line grid rows, which needed the horizontal room
- * back for the date button instead. The full track stays the default
- * everywhere else (e.g. a meeting's own header), where showing the
- * whole lifecycle at a glance is still the point.
+ * `compact` (2026-09-09) renders just the current stage's own pill, no
+ * track/connectors -- used by /dashboard's single-line grid rows,
+ * which needed the horizontal room back for the date button instead.
  *
- * `stages` (2026-09-10, the user's own request: "we can remove the
- * review, ready, live statuses for sacrament meeting") lets a caller
- * show a shorter track than the full 6-stage one -- Sacrament Meeting's
- * own header passes `["template", "planning", "archived"]`, since
- * nothing in this app has ever had a way to move a meeting into
- * review/ready/live (no Table Admin column, no dedicated action --
- * `meetings.stage` is deliberately excluded from Table Admin precisely
- * because "the lifecycle... controls what the public program page
- * shows -- edit it through the meeting's own pages, not here", and no
- * such page-level control for those three stages was ever built).
- * Defaults to the full list for every other meeting type, unchanged.
- *
- * Restyled per design.md's Components section (sitewide redesign pass):
- * a bordered chip, not a filled pill, for every stage except the
- * current one -- accent fill is reserved for "this is happening now,"
- * not decoration repeated down the whole track. 4px radius (`rounded`),
- * matching every other chip/card in the app rather than this
- * component's own one-off `rounded-full`.
- *
- * **Compact mode dropped the accent fill, 2026-10-07** (the user's own
- * report: on `/dashboard`'s single-line rows, the stage pill and the
- * date button next to it -- the actual "click here to enter the
- * meeting" control -- both rendered as solid accent-filled pills,
- * making it unclear which one was actually clickable). The full,
- * multi-stage track above is unaffected -- there, filling only the
- * *current* stage among several already reads as "this one is
- * highlighted," not "this is a button," since it's visibly one chip
- * among a row of others. Compact mode shows just that one chip alone,
- * which is exactly what made it look like a second button next to the
- * date link -- now styled as a plain neutral label (the same
- * border-rule/text-ink-muted treatment the full track already uses
- * for a *past* stage), so only the date button keeps the accent fill.
+ * **Dropped the `stages` override and the dead Review/Ready/Live
+ * labels entirely, 2026-10-19** -- the full lifecycle used to list 6
+ * stages, 3 of which (review/ready/live) were never actually
+ * reachable by any code path for any meeting type (confirmed by
+ * grepping every `stage:` write site -- see lib/types.ts's own
+ * comment). Sacrament Meeting's own header already passed a shortened
+ * `["template", "planning", "archived"]` override to work around this;
+ * now that `MeetingLifecycleStage` itself only has those 3 values,
+ * every caller already shows the same short track with no override
+ * needed. This component is no longer rendered on individual meeting
+ * pages at all (removed from app/meetings/[id]/layout.tsx the same
+ * day, per the user's own request to eliminate the stage/phase
+ * concept from those pages entirely) -- only the dashboard's compact
+ * per-row badge still uses it, which is unaffected by that removal.
  */
 export function LifecycleBadge({
   stage,
   compact,
-  stages = MEETING_LIFECYCLE_STAGES,
 }: {
   stage: MeetingLifecycleStage;
   compact?: boolean;
-  stages?: MeetingLifecycleStage[];
 }) {
   if (compact) {
     return (
@@ -77,6 +50,7 @@ export function LifecycleBadge({
     );
   }
 
+  const stages = MEETING_LIFECYCLE_STAGES;
   const currentIndex = stages.indexOf(stage);
 
   return (

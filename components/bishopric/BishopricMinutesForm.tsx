@@ -1,95 +1,45 @@
 import { saveBishopricMinutes } from "@/app/meetings/[id]/bishopric-actions";
 import type { BishopricMinutes } from "@/lib/data/bishopric-meeting";
-import type { PersonOption } from "@/lib/data/people";
 
+/**
+ * Trimmed to just General Minutes + Next Meeting Date, 2026-10-19 (the
+ * user's own confirmation, "Yes, consolidate now") -- this form used to
+ * also carry Spiritual Thought/Handbook Training/Calendar Review/
+ * Callings Discussion/Sacrament Planning Discussion/Young Men
+ * Coordination/Impressions as fixed columns here, duplicating the same
+ * content the dynamic per-element agenda rows in the Discussion section
+ * already capture (Spiritual Thought and Handbook Training are real
+ * rotation-assigned roles; the rest are free_text catalog elements).
+ * Those seven `bishopric_minutes` columns are left in the schema,
+ * untouched and unused -- the same "harmless but real" treatment this
+ * app already gives `callings.title_prefix`, rather than a same-day
+ * column drop (see migration 058's own deploy-ordering caution).
+ */
 export function BishopricMinutesForm({
   meetingId,
   minutes,
-  people,
 }: {
   meetingId: string;
   minutes: BishopricMinutes | null;
-  people: PersonOption[];
 }) {
   const save = async (formData: FormData) => {
     "use server";
     await saveBishopricMinutes(meetingId, formData);
   };
 
-  const textarea = (name: string, label: string, defaultValue: string | null, rows = 2) => (
-    <label className="mt-4 block text-sm text-ink-muted">
-      {label}
-      <textarea
-        name={name}
-        defaultValue={defaultValue ?? ""}
-        rows={rows}
-        className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
-      />
-    </label>
-  );
-
   return (
     <form action={save} className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Minutes</h2>
 
       <label className="mt-4 block text-sm text-ink-muted">
-        Spiritual Thought Presenter
-        <select
-          name="spiritual_thought_presenter_id"
-          defaultValue={minutes?.spiritual_thought_presenter_id ?? ""}
+        General Minutes
+        <textarea
+          name="minutes_body"
+          defaultValue={minutes?.minutes_body ?? ""}
+          rows={5}
           className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        >
-          <option value="">Not assigned</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        />
       </label>
-      {textarea("spiritual_thought_notes", "Spiritual Thought Notes", minutes?.spiritual_thought_notes ?? null)}
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="text-sm text-ink-muted">
-          Handbook Training Topic
-          <input
-            type="text"
-            name="handbook_training_topic"
-            defaultValue={minutes?.handbook_training_topic ?? ""}
-            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
-          />
-        </label>
-        <label className="text-sm text-ink-muted">
-          Handbook Training Presenter
-          <select
-            name="handbook_training_presenter_id"
-            defaultValue={minutes?.handbook_training_presenter_id ?? ""}
-            className="mt-1 block w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
-          >
-            <option value="">Not assigned</option>
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {textarea("calendar_review_notes", "Calendar Review", minutes?.calendar_review_notes ?? null)}
-      {textarea("callings_discussion_notes", "Callings Discussion", minutes?.callings_discussion_notes ?? null)}
-      {textarea(
-        "sacrament_planning_discussion_notes",
-        "Sacrament Planning Discussion",
-        minutes?.sacrament_planning_discussion_notes ?? null
-      )}
-      {textarea(
-        "young_men_coordination_notes",
-        "Young Men Coordination",
-        minutes?.young_men_coordination_notes ?? null
-      )}
-      {textarea("impressions", "Impressions", minutes?.impressions ?? null)}
-      {textarea("minutes_body", "Minutes", minutes?.minutes_body ?? null, 5)}
 
       <label className="mt-4 block text-sm text-ink-muted">
         Next Meeting Date

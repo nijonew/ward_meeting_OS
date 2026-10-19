@@ -17,7 +17,9 @@ import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
 import { getEligiblePeopleByElementKey } from "@/lib/data/rotations";
-import { buildAgendaRows, type AgendaRow } from "@/lib/data/agenda-rows";
+import { buildAgendaRows, splitIntoSections, type AgendaRow } from "@/lib/data/agenda-rows";
+import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
+import { ReviewSection } from "@/components/planning/ReviewSection";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
@@ -234,6 +236,20 @@ export default async function PlanningViewPage({
   // everywhere, not just Bishopric Meeting.
   const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
+  // Bishopric Meeting/Ward Council/Youth Council's own sectioned agenda
+  // (2026-10-19) -- Devotional/Review/Discussion/Closing, split on the
+  // real, freely-movable 'section' catalog elements seeded by migration
+  // 078 (see splitIntoSections's own comment). Review's own content
+  // (Announcements by where_announced, previous meeting's Minutes) is
+  // synthesized here, not stored as a catalog row.
+  const collaborativeSections = !isSacrament ? splitIntoSections(templateElements) : [];
+  const [reviewAnnouncements, previousMinutes] = !isSacrament
+    ? await Promise.all([
+        getAnnouncementsForMeetingReview(meeting.meetingType),
+        getPreviousMeetingMinutes(meeting.meetingType, meeting.date),
+      ])
+    : [[], null];
+
   // Agenda Items and Ward Business are the two elements with a real
   // add/review section of their own (this page and /meetings/[id]/ward-
   // business, respectively) -- a grid row for either would just be a
@@ -251,13 +267,10 @@ export default async function PlanningViewPage({
   // above. `agendaItemsIndex` is computed against the FULL
   // `templateElements` list, before agenda_items is filtered out of
   // the grid, so the split lands exactly where the template says.
-  const hasAgendaItemsElement = templateElements.some((el) => el.key === "agenda_items");
   const agendaItemsIndex = templateElements.findIndex((el) => el.key === "agenda_items");
   const elementsForGrid: TemplateElementRow[] = templateElements.filter((el) => el.key !== "agenda_items");
   const beforeAgendaItemsElements =
     !isSacrament && agendaItemsIndex !== -1 ? templateElements.slice(0, agendaItemsIndex) : elementsForGrid;
-  const afterAgendaItemsElements =
-    !isSacrament && agendaItemsIndex !== -1 ? templateElements.slice(agendaItemsIndex + 1) : [];
 
   // Split the agenda in two around Teaching Program (Sacrament Meeting
   // only) -- everything before Closing Hymn/Prayer, then Closing
@@ -340,10 +353,6 @@ export default async function PlanningViewPage({
     ? [{ kind: "section", id: "opening-section", label: "Opening" }, ...buildAgendaRows({ elements: openingElements, ...rowInputs })]
     : buildAgendaRows({ elements: openingElements, ...rowInputs });
   const closingRows = buildAgendaRows({ elements: closingElements, ...rowInputs });
-  // Whatever the template placed after Agenda Items (non-Sacrament
-  // only, see above) -- rendered as its own grid below the Agenda
-  // Items section itself, only when there's actually anything there.
-  const afterAgendaItemsRows: AgendaRow[] = buildAgendaRows({ elements: afterAgendaItemsElements, ...rowInputs });
 
   const resolvedProgramItems = isSacrament
     ? resolveProgramItems(programItems, sacramentData?.music ?? [], sacramentData?.speakersAdults ?? [], sacramentData?.speakersYouth ?? [])
@@ -431,31 +440,78 @@ export default async function PlanningViewPage({
                 </div>
               </CombinedAgendaGrids>
             ) : (
-              <>
-                <AgendaGridForm
-                  meetingId={meetingId}
-                  roleTable={roleTable}
-                  rows={openingRows}
-                  people={people}
-                  hymnalIndex={hymnalIndex}
-                />
-                {hasAgendaItemsElement && (
-                  <div className="mt-4 border-t border-rule/60 pt-4">
-                    <AgendaItemsSection meetingId={meetingId} items={agendaItems} />
-                  </div>
-                )}
-                {afterAgendaItemsElements.length > 0 && (
-                  <div className="mt-4 border-t border-rule/60 pt-4">
-                    <AgendaGridForm
-                      meetingId={meetingId}
-                      roleTable={roleTable}
-                      rows={afterAgendaItemsRows}
-                      people={people}
-                      hymnalIndex={hymnalIndex}
-                    />
-                  </div>
-                )}
-              </>
+              <div className="flex flex-col gap-6">
+                {collaborativeSections.map((section, i) => {
+                  // Review and Discussion get real, named treatment
+                  // (synthesized content / the agenda_items split);
+                  // every other section (Devotional, Closing, and the
+                  // unlabeled lead-in before this meeting's first
+                  // divider -- e.g. one created before migration 078
+                  // seeded one) is just its own grid of ordinary rows,
+                  // still agenda_items-aware so a not-yet-migrated
+                  // meeting keeps working exactly as it did before.
+                  if (section.label === "Review") {
+                    return (
+                      <div key={`section-${i}`} className="border-t-2 border-rule pt-6 first:border-t-0 first:pt-0">
+                        <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
+                          Review
+                        </span>
+                        <div className="mt-3">
+                          <ReviewSection announcements={reviewAnnouncements} previousMinutes={previousMinutes} />
+                        </div>
+                        {section.elements.length > 0 && (
+                          <div className="mt-4">
+                            <AgendaGridForm
+                              meetingId={meetingId}
+                              roleTable={roleTable}
+                              rows={buildAgendaRows({ elements: section.elements, ...rowInputs })}
+                              people={people}
+                              hymnalIndex={hymnalIndex}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const itemsIndex = section.elements.findIndex((el) => el.key === "agenda_items");
+                  const before = itemsIndex === -1 ? section.elements : section.elements.slice(0, itemsIndex);
+                  const after = itemsIndex === -1 ? [] : section.elements.slice(itemsIndex + 1);
+
+                  if (before.length === 0 && itemsIndex === -1 && after.length === 0) return null;
+
+                  return (
+                    <div key={`section-${i}`} className="border-t-2 border-rule pt-6 first:border-t-0 first:pt-0">
+                      {section.label && (
+                        <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
+                          {section.label}
+                        </span>
+                      )}
+                      <div className="mt-3 flex flex-col gap-4">
+                        {before.length > 0 && (
+                          <AgendaGridForm
+                            meetingId={meetingId}
+                            roleTable={roleTable}
+                            rows={buildAgendaRows({ elements: before, ...rowInputs })}
+                            people={people}
+                            hymnalIndex={hymnalIndex}
+                          />
+                        )}
+                        {itemsIndex !== -1 && <AgendaItemsSection meetingId={meetingId} items={agendaItems} />}
+                        {after.length > 0 && (
+                          <AgendaGridForm
+                            meetingId={meetingId}
+                            roleTable={roleTable}
+                            rows={buildAgendaRows({ elements: after, ...rowInputs })}
+                            people={people}
+                            hymnalIndex={hymnalIndex}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -463,7 +519,7 @@ export default async function PlanningViewPage({
 
       {isBishopric && bishopricData && (
         <>
-          <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData.minutes} people={people} />
+          <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData.minutes} />
           <ActionItemsSection meetingId={meetingId} items={bishopricData.actionItems} people={people} />
         </>
       )}

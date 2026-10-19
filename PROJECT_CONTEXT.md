@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 076
+## Current migration number: 078
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -263,8 +263,19 @@ reconstructed from both:
   Meeting at once, and re-pulled into a new one after already being used
   in a past one; also amends `delete_meeting_cascade` to clean up the new
   table -- see Known open items below): **not yet run**.
+- `078` (4 new `meeting_elements` catalog rows -- Devotional/Review/
+  Discussion/Closing section dividers, `resolution_kind = 'section'` --
+  seeded into Bishopric Meeting/Ward Council/Youth Council's templates
+  and already-seeded non-archived meetings; 3 new Discussion-section
+  topics -- `focus_on_people` shared by Ward Council and Youth Council,
+  `upcoming_combined_activities`/`recent_successful_activities` for
+  Youth Council only; and `agenda_items.notes` for the new per-item
+  inline notes field -- see Known open items below): **not yet run --
+  written as `078` but not yet confirmed as the real next-free number
+  against `076`/`077` above, both also still unrun. Ask the user to
+  confirm before running any of the three.**
 
-Next migration should be `078_*.sql`. Migrations are plain `.sql` files at
+Next migration should be `079_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -1979,6 +1990,143 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Bishopric Meeting/Ward Council/Youth Council restructured into a
+sectioned agenda (Devotional/Review/Discussion/Closing), and the dead
+lifecycle stages + Template/Live tabs dropped from every meeting page,
+2026-10-19 (migration `078`, not yet run).** The user's own request,
+given while scoping a planning-view redesign for these three meeting
+types: "I want them to also have... a devotional portion in the
+beginning (opening prayer, spiritual thought) a section break, a
+review section (announcements, previous meeting minutes), a discussion
+section (agenda items and pre-planned topics), and then a closing
+section (closing prayer)." Two follow-ups reshaped the design before it
+was built:
+
+- **"Can we make the section marking lines dynamic... so I can move
+  them without it being a hard coded item?"** -- a direct rejection of
+  Sacrament Meeting's own precedent (dividers synthesized in
+  `buildAgendaRows` by `findIndex` adjacency to a specific element key).
+  Section dividers for these three types are instead 4 real, new
+  `meeting_elements` catalog rows (`devotional_section`/
+  `review_section`/`discussion_section`/`closing_section`,
+  `resolution_kind = 'section'`) -- freely add/remove/reorderable via
+  the *existing* Agenda Elements editor (`/meetings/[id]/template`),
+  same Move Up/Down controls as any other agenda line, no new UI built.
+  `buildAgendaRows` (`lib/data/agenda-rows.ts`) gained one fully
+  generic dispatch branch (`resolution_kind === 'section'`) reusing the
+  same `{kind: "section", id, label}` row Sacrament's own synthesized
+  dividers already use; new `splitIntoSections()` (same file) is the
+  shared chunker both the Planning page and the read-only non-admin
+  viewer (`app/meetings/[id]/archived/page.tsx`) now use to group an
+  agenda into its labeled sections.
+- **"I want to eliminate the phase element of all meeting pages
+  (template, planning, review, ready, live, archive, etc). The planning
+  and public tabs can remain. Seems like the phase elements don't have
+  actual workings behind them?"** -- confirmed by grepping every
+  `stage:` write site in the whole codebase: only `template`/`planning`/
+  `archived` are ever actually written, for any meeting type --
+  `review`/`ready`/`live` were never reachable, the exact same dead-
+  stage situation Sacrament Meeting's own display already had fixed
+  2026-09-10. `MeetingLifecycleStage` (`lib/types.ts`) is now narrowed
+  to those 3 real values outright (not just display-shortened per
+  caller); `LifecycleBadge` lost its `stages` override and the dead
+  labels; the badge itself is no longer rendered anywhere on
+  `app/meetings/[id]/layout.tsx`'s shared header, for any meeting type
+  (the dashboard's own compact per-row badge is unaffected -- out of
+  scope, see that file's own updated comment for why). Collaborative
+  types' tab nav is now just Planning + Public (dropping Template --
+  the Agenda Elements editor page stays, reachable only via the link
+  Planning already has to it, exactly how Sacrament Meeting has always
+  worked -- and Live, deleted outright: `app/meetings/[id]/live/page.tsx`
+  and `components/bishopric/BishopricLiveView.tsx` had no edit
+  capability and nothing tied to the `live` stage specifically, fully
+  superseded by Planning + the read-only viewer). The "Public" tab
+  (still the same `archived/page.tsx` route -- renaming that folder for
+  a label-only change felt like more churn than the ask needed) is now
+  shown unconditionally rather than only once archived, mirroring
+  Sacrament's own always-three-tabs Planning/Conducting/Public.
+
+  **Real, pre-existing bug found and fixed while removing the dead Live
+  tab**: the non-admin read-only viewer used to require
+  `stage === "live"` specifically before showing a collaborative
+  meeting's agenda to a calling-based non-admin viewer -- since `live`
+  was never actually reachable (see above), **a non-admin could never
+  see an in-progress meeting's agenda before it archived**, directly
+  contradicting the Vision workflow's own stated intent ("once live...
+  non-admin members with read rights... can view it"). Now gated on
+  `stage !== "template"` instead (i.e. "planning" or "archived"),
+  restoring that intent for real.
+
+Content for the new sections:
+- **Review**: Announcements, pulled in automatically by the *existing*
+  `announcements.where_announced` field -- no new pull/consume
+  mechanism, no join table, a deliberately different, simpler design
+  than Sacrament Meeting's own explicit-pull Announcements block. New
+  `MEETING_TYPE_ANNOUNCEMENT_LABEL` map (`lib/data/announcement-constants.ts`)
+  plus a new `"Youth Council Meeting"` value added to `ANNOUNCEMENT_WHERE`
+  itself (Bishopric Meeting/Ward Council already had their own label;
+  Youth Council didn't). Previous Meeting Minutes is "just the general
+  Minutes summary" (the user's own confirmation, not a deeper
+  breakdown) -- the most recent earlier meeting of the same type's
+  `bishopric_minutes.minutes_body` or `council_notes.notes`. Both read-
+  only everywhere, via new `lib/data/meeting-review.ts` and
+  `components/planning/ReviewSection.tsx`.
+- **Discussion**: Agenda Items lost its embedded "Add & Publish" quick-
+  add form entirely ("I also don't want a section of the page for
+  adding agenda items. that is its own page with a different link") --
+  replaced with a plain link to `/submit/agenda-item`; the existing
+  publish/archive review controls for already-submitted items are
+  unchanged. Each item now also gets its own inline notes field
+  (migration 078's new `agenda_items.notes` column, saved via
+  `saveAgendaItemNotes`) -- pre-planned topics (Spiritual Thought,
+  Handbook Training, Calendar Review, etc.) already had the equivalent
+  of this via their existing free_text rows, so only Agenda Items
+  needed real new plumbing. **New topics, confirmed by name**: Ward
+  Council gets "Focus on People"; Youth Council gets "Upcoming Combined
+  Activities," "Recent Successful Activities," and "Focus on People"
+  (the identical shared catalog row as Ward Council's).
+
+**Bishopric Minutes consolidated down to 2 fields, same day** (the
+user's own confirmation, "Yes, consolidate now," closing a duplicate-
+entry hazard this file already flagged before this thread started):
+`BishopricMinutesForm.tsx` now shows only General Minutes and Next
+Meeting Date -- the other seven fixed `bishopric_minutes` columns
+(`spiritual_thought_*`, `handbook_training_*`, `calendar_review_notes`,
+`callings_discussion_notes`, `sacrament_planning_discussion_notes`,
+`young_men_coordination_notes`, `impressions`) duplicated what the
+dynamic per-element agenda rows in the new Discussion section already
+capture. `saveBishopricMinutes` was fixed to match -- it no longer
+includes those seven columns in its upsert at all, so saving Minutes
+can't silently null them out now that the form doesn't submit them.
+Columns themselves are left in the schema, untouched and unused, same
+"harmless but real" treatment as `callings.title_prefix`.
+
+**Not verified against live data, flagged explicitly in the migration
+file itself**: every new row's `sort_order` is computed relative to
+the real, already-confirmed-to-exist `opening_prayer`/`spiritual_thought`/
+`closing_prayer` rows (same `+/-N` convention as migration 046's
+Sacrament Administered insert), not a hardcoded absolute number -- but
+this assistant has no live database access this session, so the exact
+resulting order (especially whether Discussion's divider lands before
+Handbook Training/Calendar Review/etc. for Bishopric Meeting) isn't
+confirmed. If anything lands out of order once migration `078` runs,
+the fix is a follow-up `update meeting_templates set sort_order = ...`
+by key, not a new migration number. **Also ask the user to confirm
+`078` is really the next free number** before running it -- `076`/`077`
+above are both still unrun too, and this repo has hit two real
+numbering collisions already.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser gap
+as everything else in this project -- ask the user to run migration
+`078` (after confirming the number), then check that a Bishopric
+Meeting's Planning page shows four labeled sections in the right order,
+that dragging a section divider in the Agenda Elements editor actually
+moves it, that Ward Council/Youth Council show their new topics with
+working notes, that an announcement checked for "Ward Council Meeting"/
+"Youth Council Meeting" shows up in that type's Review section, and
+that only Planning/Public tabs show on a collaborative meeting with no
+stage badge anywhere on the page.
 
 **Login page's own two links gained a short hint line, 2026-10-19**
 (the user's own immediate follow-up, right after the confirmation-
