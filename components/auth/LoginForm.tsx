@@ -22,7 +22,16 @@ const initialState: { error?: string } = {};
  *  app still needs it. "Don't have an account yet?" is now the one and
  *  only path for anyone without access; "Forgot your password?" is
  *  untouched, a genuinely different case (an existing account that
- *  can't sign in), not part of what the user was asking to collapse. */
+ *  can't sign in), not part of what the user was asking to collapse.
+ *
+ *  **Both links gained a short hint line, 2026-10-19** -- right after
+ *  fixing both destinations' own confirmation screens (see
+ *  `/auth/reset-password`'s own comment for the full report: someone
+ *  clicked "Forgot your password?", got no strong confirmation that
+ *  anything happened, and reasonably assumed it was broken). Setting
+ *  the expectation here too, before either link is even clicked --
+ *  both flows are email-based, not something this page or the next one
+ *  finishes on its own. */
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(signInWithPassword, initialState);
 
@@ -53,13 +62,21 @@ export function LoginForm() {
         {state.error && <p className="text-sm text-danger">{state.error}</p>}
       </form>
 
-      <div className="mt-4 flex flex-col gap-1.5">
-        <Link href="/auth/reset-password" className="text-xs text-ink-muted underline">
-          Forgot your password?
-        </Link>
-        <Link href="/auth/request-access" className="text-xs text-ink-muted underline">
-          Don&rsquo;t have access yet?
-        </Link>
+      <div className="mt-4 flex flex-col gap-3">
+        <div>
+          <Link href="/auth/reset-password" className="text-xs text-ink-muted underline">
+            Forgot your password?
+          </Link>
+          <p className="mt-0.5 text-[11px] text-ink-muted/70">We&rsquo;ll email you a link to reset it.</p>
+        </div>
+        <div>
+          <Link href="/auth/request-access" className="text-xs text-ink-muted underline">
+            Don&rsquo;t have access yet?
+          </Link>
+          <p className="mt-0.5 text-[11px] text-ink-muted/70">
+            We&rsquo;ll email you a link to verify your address first.
+          </p>
+        </div>
       </div>
     </>
   );

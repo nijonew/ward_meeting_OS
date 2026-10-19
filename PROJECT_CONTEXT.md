@@ -1980,6 +1980,25 @@ avoid confusing the two.
 
 ## Known open items
 
+**Login page's own two links gained a short hint line, 2026-10-19**
+(the user's own immediate follow-up, right after the confirmation-
+screen fix below: "can you also update the login page copy").
+`components/auth/LoginForm.tsx`'s "Forgot your password?"/"Don&rsquo;t
+have access yet?" links now each have a small muted line underneath
+("We&rsquo;ll email you a link to reset it."/"...to verify your
+address first.") -- setting the same expectation on the login page
+itself, before either link is even clicked, that both flows are
+email-based and won't finish on the next page by themselves. Directly
+complements the confirmation-screen fix just below rather than
+duplicating it -- that fix handles "I already clicked through and
+don't see confirmation"; this one tries to head the same confusion off
+a step earlier.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to check
+`/login` once deployed and confirm both hint lines read clearly under
+their own links.
+
 **Password reset (and self-serve sign-up) now land on a real
 confirmation screen instead of an easy-to-miss inline message,
 2026-10-19.** The user's own report: "I had someone sign in and forget
