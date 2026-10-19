@@ -30,6 +30,24 @@
 -- these land out of order once applied, the fix is a follow-up
 -- `update meeting_templates set sort_order = ...` by key, not a new
 -- migration number.
+--
+-- **First attempt failed in production** --
+-- `new row for relation "meeting_elements" violates check constraint
+-- "meeting_elements_resolution_kind_check"` inserting `'section'`.
+-- Same class of problem as migrations 038/041/063/067/068/069/075: an
+-- undocumented CHECK constraint, created directly in the Supabase SQL
+-- editor before this repo's migration history started, hardcoded
+-- against whatever `resolution_kind` values existed back then and
+-- never updated since. The real, documented set of valid values is
+-- `buildAgendaRows`'s switch (`lib/data/agenda-rows.ts`) and
+-- `archived/page.tsx`'s matching one -- a DB-side CHECK duplicating
+-- that list is exactly what just broke, same reasoning migrations
+-- 068/069 already used. File updated to drop it outright, not
+-- recreate it against an expanded list.
+
+-- 0. Drop the undocumented resolution_kind CHECK constraint -- see
+--    the note above. Not recreated.
+alter table meeting_elements drop constraint if exists meeting_elements_resolution_kind_check;
 
 -- 1. New catalog elements.
 insert into meeting_elements (key, label, resolution_kind, repeatable, max_slots, sort_order)

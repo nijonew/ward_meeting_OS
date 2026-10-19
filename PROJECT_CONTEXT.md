@@ -270,10 +270,20 @@ reconstructed from both:
   topics -- `focus_on_people` shared by Ward Council and Youth Council,
   `upcoming_combined_activities`/`recent_successful_activities` for
   Youth Council only; and `agenda_items.notes` for the new per-item
-  inline notes field -- see Known open items below): **not yet run --
-  written as `078` but not yet confirmed as the real next-free number
-  against `076`/`077` above, both also still unrun. Ask the user to
-  confirm before running any of the three.**
+  inline notes field -- see Known open items below). **First attempt
+  failed in production** -- `new row for relation "meeting_elements"
+  violates check constraint "meeting_elements_resolution_kind_check"`
+  inserting `'section'`. Same class of problem as migrations
+  038/041/063/067/068/069/075: an undocumented CHECK constraint,
+  created directly in the Supabase SQL editor before this repo's
+  migration history started, hardcoded against whatever
+  `resolution_kind` values existed back then and never updated since.
+  File updated to drop that constraint outright (not recreated against
+  an expanded list, same reasoning as migrations 068/069's identical
+  fix -- `buildAgendaRows`'s switch is the real documented source of
+  truth for valid values) -- needs to be re-run with the corrected
+  file. The number `078` itself was confirmed free by this attempt
+  (the error was about the constraint, not a numbering collision).
 
 Next migration should be `079_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -2112,10 +2122,22 @@ resulting order (especially whether Discussion's divider lands before
 Handbook Training/Calendar Review/etc. for Bishopric Meeting) isn't
 confirmed. If anything lands out of order once migration `078` runs,
 the fix is a follow-up `update meeting_templates set sort_order = ...`
-by key, not a new migration number. **Also ask the user to confirm
-`078` is really the next free number** before running it -- `076`/`077`
-above are both still unrun too, and this repo has hit two real
-numbering collisions already.
+by key, not a new migration number.
+
+**First attempt failed in production, 2026-10-19** -- exactly the
+flagged risk materialized: `new row for relation "meeting_elements"
+violates check constraint "meeting_elements_resolution_kind_check"`
+inserting `'section'`. Same undocumented-CHECK-constraint class of
+problem as migrations 038/041/063/067/068/069/075 -- created directly
+in the Supabase SQL editor before this repo's migration history
+started, hardcoded against whatever `resolution_kind` values existed
+back then. File updated to drop that constraint outright (not
+recreated against an expanded list, same reasoning migrations 068/069
+already used -- `buildAgendaRows`'s switch in `lib/data/agenda-rows.ts`
+is the real, documented source of truth for valid `resolution_kind`
+values, not a DB-side CHECK duplicating it) -- needs to be re-run with
+the corrected file. The number `078` itself is confirmed free by this
+attempt (the error was about the constraint, not a collision).
 
 Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser gap
 as everything else in this project -- ask the user to run migration
