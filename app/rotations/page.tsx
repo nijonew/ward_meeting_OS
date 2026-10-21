@@ -5,6 +5,7 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAllRotations, getAssignmentGrid, type RotationRow } from "@/lib/data/rotations";
 import { getActivePeople, type PersonOption } from "@/lib/data/people";
 import { PushRotationForm } from "@/components/rotations/PushRotationForm";
+import { PushFixedRolesForm } from "@/components/rotations/PushFixedRolesForm";
 import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
 import {
   syncRotation,
@@ -246,14 +247,22 @@ export default async function RotationsPage({
         </form>
 
         {selectedType === "sacrament-meeting" && (
-          <p className="mt-3 text-[11px] text-ink-muted/60">
-            No Presiding column. It always defaults to whoever holds the Bishop calling.
-            Conducting cycles automatically by calendar month (Bishop &rarr; 1st Counselor &rarr; 2nd
-            Counselor) based on who currently holds each calling. If it shows the same person
-            every month, check that both counselor callings actually have a current holder set
-            (Table Admin &rarr; Callings). The dropdown itself already only offers whichever of the
-            three currently has a holder.
-          </p>
+          <>
+            <p className="mt-3 text-[11px] text-ink-muted/60">
+              No Presiding column. It always defaults to whoever holds the Bishop calling.
+              Conducting cycles automatically by calendar month (Bishop &rarr; 1st Counselor &rarr; 2nd
+              Counselor) based on who currently holds each calling. If it shows the same person
+              every month, check that both counselor callings actually have a current holder set
+              (Table Admin &rarr; Callings). The dropdown itself already only offers whichever of the
+              three currently has a holder.
+            </p>
+            <p className="mt-2 text-[11px] text-ink-muted/60">
+              Presiding/Conducting are never backfilled automatically for a meeting that already
+              exists -- if one came up blank (e.g. the calling was vacant when the meeting was
+              created), use this to fill it in from the current calling holders:
+            </p>
+            <PushFixedRolesForm />
+          </>
         )}
 
         {grid.rows.length === 0 ? (

@@ -2001,6 +2001,87 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-21: pushing a Spiritual Thought/Handbook
+Training rotation forward wrote to the wrong table, and Presiding/
+Conducting had no backfill tool at all.** The user's own report: "We
+also need to fix the rotations for all rotation items. This would
+include meetings items such as sacrament meeting planning, sacrament
+meeting conducting, bishopric meeting prayers and spiritual thoughts
+and handbook trainings. These rotations are not showing up in meeting
+items." Confirmed via `AskUserQuestion`: the symptom is a genuinely
+blank dropdown (not "No one eligible," and not a missing agenda line
+entirely) -- consistent with "an assignment was never written for
+this meeting," not an eligibility-computation bug.
+
+Traced the whole generation pipeline (`applyRotationsToNewMeeting`,
+the `apply_rotation_assignment` Postgres RPC, `generateMeetingsFromRules`'s
+own call sites) end to end -- all structurally correct, and not a
+regression from this session's own recent sectioned-agenda work
+(migration 078 only ever inserts new catalog rows, never touches or
+removes `opening_prayer`/`spiritual_thought`/`handbook_training`/
+`closing_prayer`). No code bug in how a *brand-new* meeting gets its
+rotations applied at creation time.
+
+**Real bug #1, in the existing backfill tool**: "Push rotations
+starting `<date>`" (`pushRotationToUpcomingMeetings`,
+2026-09-06) always wrote into `sacrament_assignments`/
+`bishopric_assignments` regardless of which element it was pushing --
+but `applyRotationsToNewMeeting` has always routed Spiritual
+Thought/Handbook Training to `meeting_element_notes` instead (they're
+`person_and_text` elements, read by the Planning page via
+`elementNotes[key]?.person_id`, never via `roleAssignments[key]`).
+Pushing either of those two therefore wrote a row to the wrong table
+-- invisible on the agenda regardless -- and the function's own
+"already assigned" check queried that same wrong table, so a meeting
+that already had a real `meeting_element_notes` value looked blank to
+this tool and could get a second, contradictory row inserted into
+`bishopric_assignments` on top of it. Fixed by routing both the check
+and the write the same way `applyRotationsToNewMeeting` already does
+-- and simplified at the same time to call the exact same
+`apply_rotation_assignment` RPC per meeting (same atomic, row-locked
+pointer advance the creation-time path already relies on) instead of
+hand-rolling a second copy of that logic with its own `next_index`
+bookkeeping.
+
+**Real gap #2, not a bug but a missing capability**: Presiding and
+Conducting have no `rotations`/`rotation_members` row at all (they're
+resolved fresh from the Bishop/counselor callings' *current* holder
+every time a meeting is created, see `applyFixedSacramentRoles`) --
+so "Push rotations" could never reach them in the first place. A
+meeting whose Presiding/Conducting came up blank at creation (e.g. a
+counselor calling was vacant that day) had no way to ever get it filled
+in later, short of a Table Admin/`/rotations` grid edit by hand, one
+meeting at a time. New `pushFixedSacramentRolesToUpcomingMeetings`
+(`lib/data/rotations.ts`) -- the fixed-by-calling counterpart to the
+generic push tool -- fills whichever of Presiding/Conducting is
+currently blank for every upcoming Sacrament Meeting from a chosen
+date forward, reading each calling's *current* holder fresh and each
+meeting's own date to resolve Conducting's month-of-year cycle
+correctly per meeting. New "Fill Presiding/Conducting for upcoming
+meetings starting `<date>`" control on `/rotations` (Sacrament Meeting
+tab, right under the existing Presiding/Conducting explanatory note).
+Reports back not just how many it filled and how many already had
+someone, but how many it had to skip because the relevant calling
+currently has no holder set at all -- surfaced rather than left
+invisible, since a vacant counselor calling is exactly the kind of
+thing this ward has already been bitten by once before (see the
+2026-09-06 Conducting investigation elsewhere in this file).
+
+No migration needed for either fix -- both are pure application-code
+changes over existing tables.
+
+Confirmed via `tsc`/`eslint`/`next build` only, same no-live-browser
+gap as everything else in this project -- ask the user to open
+`/rotations`, pick Bishopric Meeting, and try "Push rotations starting
+`<date>`" on Spiritual Thought or Handbook Training for a date range
+that includes an already-blank meeting, confirming the Planning
+page's own agenda row picks up the filled-in person afterward (not
+just the grid). For Sacrament Meeting, try the new "Fill Presiding/
+Conducting" control the same way, and report back what it says it
+skipped -- if it reports any calling as currently having no holder,
+that's the next thing to fix directly in Table Admin -> Callings, not
+something this tool can do on its own.
+
 **Bug found and fixed 2026-10-20: tonight's Bishopric Meeting
 auto-archived before it had even happened.** The user's own report:
 "my bishopric meeting for tonight is already archived. I am guessing

@@ -2,12 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { syncRotationMembership, gridColumnsFor, gridTableFor, pushRotationToUpcomingMeetings } from "@/lib/data/rotations";
+import {
+  syncRotationMembership,
+  gridColumnsFor,
+  gridTableFor,
+  pushRotationToUpcomingMeetings,
+  pushFixedSacramentRolesToUpcomingMeetings,
+} from "@/lib/data/rotations";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 type ActionResult = { success: true } | { error: string };
 type PushActionResult = { error?: string; filled?: number; skippedExisting?: number };
+type PushFixedRolesActionResult = { error?: string; filled?: number; skippedExisting?: number; skippedVacant?: number };
 type SaveGridActionResult = { error?: string; success?: boolean };
 
 // None of these actions had a server-side check at all before this
@@ -97,6 +104,23 @@ export async function pushRotation(
   if (!fromDate) return { error: "Choose a start date." };
 
   const result = await pushRotationToUpcomingMeetings(rotationId, fromDate);
+  if ("error" in result) return result;
+
+  revalidatePath("/rotations");
+  return result;
+}
+
+export async function pushFixedSacramentRoles(
+  _prevState: unknown,
+  formData: FormData
+): Promise<PushFixedRolesActionResult> {
+  const denied = await requireRotationsFeature();
+  if (denied) return denied;
+
+  const fromDate = String(formData.get("from_date") ?? "");
+  if (!fromDate) return { error: "Choose a start date." };
+
+  const result = await pushFixedSacramentRolesToUpcomingMeetings(fromDate);
   if ("error" in result) return result;
 
   revalidatePath("/rotations");

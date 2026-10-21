@@ -232,6 +232,15 @@ export interface PushRotationResult {
   skippedExisting: number;
 }
 
+// spiritual_thought/handbook_training are 'person_and_text' catalog
+// elements -- their person goes in meeting_element_notes.person_id,
+// never in sacrament_assignments/bishopric_assignments.assigned_to_id
+// -- see applyRotationsToNewMeeting's own identical set. Kept as its
+// own copy rather than a shared export since the two functions need it
+// for slightly different things (routing a single insert vs. also
+// shaping the "already assigned" check below).
+const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "handbook_training"]);
+
 /**
  * "Push rotations starting <date>" (the user's own request, 2026-09-06)
  * -- fills in the applied-assignment grid from a rotation's own member
@@ -244,6 +253,24 @@ export interface PushRotationResult {
  * for this role is left alone, matching every other "override wins"
  * rule already used throughout this app, and the pointer only advances
  * for the ones actually filled, so this can't skip anyone's turn.
+ *
+ * **Bug found and fixed 2026-10-21** (the user's own report: "bishopric
+ * meeting prayers and spiritual thoughts and handbook trainings...
+ * are not showing up in meeting items"): this always wrote to
+ * `gridTableFor(slug)` (sacrament_assignments/bishopric_assignments)
+ * regardless of which element_key it was pushing -- but
+ * applyRotationsToNewMeeting has always routed spiritual_thought/
+ * handbook_training to meeting_element_notes instead (they're
+ * 'person_and_text' elements, read by the Planning page via
+ * `elementNotes[key]?.person_id`, never via `roleAssignments[key]`).
+ * Pushing either of those two therefore inserted a row into the wrong
+ * table entirely -- invisible on the agenda regardless -- and also
+ * meant the "already assigned" check below queried the wrong table
+ * too, so a meeting that already had a real meeting_element_notes
+ * value looked blank to this function and could get a second,
+ * contradictory row written into bishopric_assignments on top of it.
+ * Now routes both the check and the insert the same way
+ * applyRotationsToNewMeeting already does.
  */
 export async function pushRotationToUpcomingMeetings(
   rotationId: string,
@@ -253,7 +280,7 @@ export async function pushRotationToUpcomingMeetings(
 
   const { data: rotation, error: rotationError } = await supabase
     .from("rotations")
-    .select("id, meeting_type_id, element_key, next_index, meeting_types(slug), rotation_members(person_id, sort_order)")
+    .select("id, meeting_type_id, element_key, meeting_types(slug), rotation_members(person_id, sort_order)")
     .eq("id", rotationId)
     .single();
 
@@ -270,7 +297,11 @@ export async function pushRotationToUpcomingMeetings(
   );
   if (members.length === 0) return { error: "This rotation has no members yet." };
 
+  // Same routing applyRotationsToNewMeeting already uses -- see this
+  // function's own doc comment above for the bug this fixes.
+  const isPersonAndText = PERSON_AND_TEXT_ROTATION_KEYS.has(rotation.element_key);
   const table = gridTableFor(slug);
+  const target = isPersonAndText ? "element_notes" : table;
 
   const { data: meetingRows } = await supabase
     .from("meetings")
@@ -281,38 +312,149 @@ export async function pushRotationToUpcomingMeetings(
   const meetings = (meetingRows ?? []) as { id: string; date: string }[];
   if (meetings.length === 0) return { filled: 0, skippedExisting: 0 };
 
-  const { data: existingAssignments } = await supabase
-    .from(table)
-    .select("meeting_id")
-    .eq("role", rotation.element_key)
-    .in(
-      "meeting_id",
-      meetings.map((m) => m.id)
-    );
-  const alreadyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+  const meetingIds = meetings.map((m) => m.id);
+  let alreadyAssigned: Set<string>;
+  if (isPersonAndText) {
+    const { data: existingNotes } = await supabase
+      .from("meeting_element_notes")
+      .select("meeting_id")
+      .eq("element_key", rotation.element_key)
+      .not("person_id", "is", null)
+      .in("meeting_id", meetingIds);
+    alreadyAssigned = new Set(((existingNotes ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+  } else {
+    const { data: existingAssignments } = await supabase
+      .from(table)
+      .select("meeting_id")
+      .eq("role", rotation.element_key)
+      .in("meeting_id", meetingIds);
+    alreadyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+  }
 
-  let nextIndex = rotation.next_index;
+  const memberIds = members.map((m) => m.person_id);
   let filled = 0;
   let skippedExisting = 0;
 
+  // One apply_rotation_assignment call per meeting actually being
+  // filled -- the same RPC applyRotationsToNewMeeting already uses for
+  // a single new meeting, so the pointer advance stays atomic and
+  // correctly routed (element_notes vs. the role table) without this
+  // function needing to duplicate that logic by hand. It re-reads
+  // next_index live under a row lock each call, so there's no need to
+  // track it locally here either.
   for (const meeting of meetings) {
     if (alreadyAssigned.has(meeting.id)) {
       skippedExisting += 1;
       continue;
     }
-    const personId = members[nextIndex % members.length].person_id;
-    const row: Record<string, unknown> = { meeting_id: meeting.id, role: rotation.element_key, assigned_to_id: personId };
-    const { error: insertError } = await supabase.from(table).insert(row);
-    if (insertError) return { error: insertError.message };
-    nextIndex = (nextIndex + 1) % members.length;
+    const { error } = await supabase.rpc("apply_rotation_assignment", {
+      p_rotation_id: rotationId,
+      p_meeting_id: meeting.id,
+      p_element_key: rotation.element_key,
+      p_target: target,
+      p_member_ids: memberIds,
+    });
+    if (error) return { error: error.message };
     filled += 1;
   }
 
-  if (filled > 0) {
-    await supabase.from("rotations").update({ next_index: nextIndex }).eq("id", rotationId);
+  return { filled, skippedExisting };
+}
+
+export interface PushFixedRolesResult {
+  filled: number;
+  skippedExisting: number;
+  skippedVacant: number;
+}
+
+/**
+ * The fixed-by-calling counterpart to pushRotationToUpcomingMeetings
+ * above, for Presiding and Conducting -- the one case that tool can't
+ * reach at all, since neither role has a `rotations` row or a
+ * `rotation_members` list to push from (see applyFixedSacramentRoles).
+ * Built 2026-10-21 (the user's own report naming "sacrament meeting
+ * planning, sacrament meeting conducting" alongside the generic
+ * rotations as "not showing up in meeting items") -- a meeting whose
+ * Presiding/Conducting calling was vacant at creation time, or that
+ * predates this app tracking the relevant calling holders at all,
+ * never gets either role filled in later on its own; nothing before
+ * this re-applied them after the fact.
+ *
+ * For every upcoming Sacrament Meeting from the chosen date forward,
+ * fills in whichever of Presiding/Conducting is currently blank --
+ * reading each calling's CURRENT holder fresh (not a snapshot from
+ * whenever the meeting was created) and each meeting's own date to
+ * resolve Conducting's month-of-year cycle correctly per meeting, same
+ * as applyFixedSacramentRoles does for a single new meeting. Only ever
+ * fills a blank role; an already-assigned one is left alone, matching
+ * every other "override wins" rule in this app. Silently skips (and
+ * separately counts) a role whose calling is currently vacant, same
+ * as applyFixedSacramentRoles -- surfaced back to the admin rather
+ * than left invisible, since a vacant counselor calling is exactly the
+ * kind of thing this tool exists to help notice.
+ */
+export async function pushFixedSacramentRolesToUpcomingMeetings(
+  fromDateISO: string
+): Promise<PushFixedRolesResult | { error: string }> {
+  const supabase = await createClient();
+
+  const { data: meetingRows } = await supabase
+    .from("meetings")
+    .select("id, date, meeting_types!inner(slug)")
+    .eq("meeting_types.slug", "sacrament-meeting")
+    .gte("date", fromDateISO)
+    .order("date", { ascending: true });
+  const meetings = (meetingRows ?? []) as { id: string; date: string }[];
+  if (meetings.length === 0) return { filled: 0, skippedExisting: 0, skippedVacant: 0 };
+
+  const meetingIds = meetings.map((m) => m.id);
+  const { data: existingRows } = await supabase
+    .from("sacrament_assignments")
+    .select("meeting_id, role")
+    .in("role", ["presiding", "conducting"])
+    .in("meeting_id", meetingIds);
+  const existing = new Set(
+    ((existingRows ?? []) as { meeting_id: string; role: string }[]).map((r) => `${r.meeting_id}::${r.role}`)
+  );
+
+  const { data: callingRows } = await supabase
+    .from("callings")
+    .select("name, current_holder_id")
+    .in("name", CONDUCTING_CALLING_ORDER)
+    .eq("active", true);
+  const holderByCallingName = new Map(
+    ((callingRows ?? []) as { name: string; current_holder_id: string | null }[]).map((c) => [c.name, c.current_holder_id])
+  );
+
+  let filled = 0;
+  let skippedExisting = 0;
+  let skippedVacant = 0;
+
+  for (const meeting of meetings) {
+    const monthIndex = new Date(`${meeting.date}T00:00:00`).getMonth() % 3;
+    const roles: { role: string; personId: string | null | undefined }[] = [
+      { role: "presiding", personId: holderByCallingName.get("Bishop") },
+      { role: "conducting", personId: holderByCallingName.get(CONDUCTING_CALLING_ORDER[monthIndex]) },
+    ];
+
+    for (const { role, personId } of roles) {
+      if (existing.has(`${meeting.id}::${role}`)) {
+        skippedExisting += 1;
+        continue;
+      }
+      if (!personId) {
+        skippedVacant += 1;
+        continue;
+      }
+      const { error } = await supabase
+        .from("sacrament_assignments")
+        .insert({ meeting_id: meeting.id, role, assigned_to_id: personId });
+      if (error) return { error: error.message };
+      filled += 1;
+    }
   }
 
-  return { filled, skippedExisting };
+  return { filled, skippedExisting, skippedVacant };
 }
 
 /**
