@@ -5,9 +5,13 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { ActivitiesTable } from "@/components/youth-activities/ActivitiesTable";
 import { AddActivityForm } from "@/components/youth-activities/AddActivityForm";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
+// Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+// a plain UTC "today" would drop tonight's own activity from this
+// "upcoming" filter several hours before it's actually over.
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getMountainTimeNow().dateIso;
 }
 
 /** Mostly read-only, pre-filtered to `group_name = "Combined YW"` --

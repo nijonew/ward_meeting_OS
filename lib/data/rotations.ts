@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { MeetingTypeSlug } from "@/lib/types";
 import type { PersonOption } from "@/lib/data/people";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export interface RotationMember {
   id: string; // rotation_members row id
@@ -780,7 +781,10 @@ export async function getAssignmentGrid(
     : {};
   const columns: GridColumn[] = columnKeys.map((c) => ({ ...c, eligiblePeople: eligibleByColumn[c.key] ?? [] }));
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // a plain UTC "today" would drop tonight's own meeting from this
+  // grid several hours before it's actually over.
+  const { dateIso: today } = getMountainTimeNow();
 
   const { data: meetingRows } = await supabase
     .from("meetings")

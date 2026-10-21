@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
 import { combinedTypeForClass, resolveForClass } from "@/lib/data/class-activities-shared";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 
@@ -50,7 +51,9 @@ function blankRow(activityDate: string, className: string): ClassActivityRow {
  * event, not a per-class copy of it.
  */
 export async function getClassActivityGrid(className: string, throughDateISO: string): Promise<ClassActivityRow[]> {
-  const today = new Date();
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // see lib/data/meetings.ts's autoArchivePastMeetings for why.
+  const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);
   const through = new Date(`${throughDateISO}T00:00:00`);
   const wednesdays = weeklyDates(today, through, 3);
 

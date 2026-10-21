@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export interface RecentMusicItem {
   id: string;
@@ -11,7 +12,9 @@ export interface RecentMusicItem {
 
 export async function getRecentMusic(): Promise<RecentMusicItem[]> {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // see lib/data/meetings.ts's autoArchivePastMeetings for why.
+  const { dateIso: today } = getMountainTimeNow();
 
   const { data, error } = await supabase
     .from("sacrament_music")

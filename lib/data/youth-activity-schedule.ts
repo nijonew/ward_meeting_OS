@@ -78,8 +78,9 @@ export async function generateCombinedYouthActivities(
 ): Promise<GenerateYouthActivitiesResult | { error: string }> {
   const supabase = await createClient();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // see lib/data/meeting-schedule.ts's generateMeetingsFromRules for why.
+  const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);
   const through = new Date(`${throughDateISO}T00:00:00`);
   if (through < today) return { error: "The end date must be in the future." };
 

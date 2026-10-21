@@ -162,8 +162,11 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
   const rules = (await getScheduleRules()).filter((r) => r.active);
   if (rules.length === 0) return { created: 0, skippedExisting: 0 };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // a plain UTC "today" could shift the start of this candidate-date
+  // window by a day for several hours each evening, same root cause as
+  // lib/data/meetings.ts's autoArchivePastMeetings.
+  const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);
   const through = new Date(`${throughDateISO}T00:00:00`);
   if (through < today) return { error: "The end date must be in the future." };
 

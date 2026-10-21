@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
 import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 /**
  * The 6 real YM/YW classes -- excludes the "Combined ..." pseudo-values
@@ -37,7 +38,9 @@ export interface TeachingGrid {
  * original all-in-one-grid behavior.
  */
 export async function getTeachingAssignmentGrid(throughDateISO: string, classes: string[] = TEACHING_CLASSES): Promise<TeachingGrid> {
-  const today = new Date();
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // see lib/data/meetings.ts's autoArchivePastMeetings for why.
+  const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);
   const through = new Date(`${throughDateISO}T00:00:00`);
   const sundays = weeklyDates(today, through, 0);
 

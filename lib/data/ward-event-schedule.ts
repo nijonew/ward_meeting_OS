@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { candidateDatesForCadence, readCadenceFields, type CadenceShape } from "@/lib/data/cadence";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export interface WardEventScheduleRule {
   id: string;
@@ -98,8 +99,9 @@ export async function generateWardEventsFromRules(throughDateISO: string): Promi
   const rules = (await getWardEventScheduleRules()).filter((r) => r.active);
   if (rules.length === 0) return { created: 0, skippedExisting: 0 };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // see lib/data/meeting-schedule.ts's generateMeetingsFromRules for why.
+  const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);
   const through = new Date(`${throughDateISO}T00:00:00`);
   if (through < today) return { error: "The end date must be in the future." };
 

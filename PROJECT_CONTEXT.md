@@ -2001,6 +2001,103 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-20: tonight's Bishopric Meeting
+auto-archived before it had even happened.** The user's own report:
+"my bishopric meeting for tonight is already archived. I am guessing
+it is a timezone issue." Confirmed exactly right, and it was more
+widespread than just this one function -- a full codebase sweep for
+every place that computes "today" for a date comparison (not a
+precise `updated_at` timestamp, where UTC storage is correct and
+untouched) turned up **11 real call sites** still using the server's
+own UTC clock instead of Mountain Time, the same root cause already
+fixed once for the Sacrament Meeting public page (`getMountainTimeNow`,
+`lib/data/timezone.ts`) but never swept across the rest of the app.
+
+**Root cause, same shape everywhere**: `new Date().toISOString().slice(0,
+10)` (or `new Date(); x.setHours(0,0,0,0)`) reads the server's own
+clock -- Vercel serverless functions run in UTC, which rolls over to
+the next calendar day 6-7 hours before midnight actually arrives in
+Mountain Time (depending on daylight saving). For several hours every
+evening, "today" on the server is already *tomorrow* in Mountain Time
+-- so anything comparing a meeting/activity's own date against that
+UTC "today" treats something scheduled for *tonight* as already in
+the past.
+
+**The one that actually bit tonight**: `autoArchivePastMeetings`
+(`lib/data/meetings.ts`) -- runs on every `/dashboard` and
+`/calling-planning` load, archives any meeting dated before "today."
+With "today" computed in UTC, a meeting scheduled for this evening got
+archived hours before it started. Fixed to use
+`getMountainTimeNow().dateIso` instead.
+
+**The rest, found by the same sweep, fixed the same way** (swap the
+UTC computation for `getMountainTimeNow().dateIso`, or
+`new Date(`${getMountainTimeNow().dateIso}T00:00:00`)` where a real
+`Date` object feeds further date math):
+- `app/dashboard/page.tsx` -- the "hide past meetings by default"
+  filter would hide tonight's own meeting from the list for the same
+  few evening hours (less severe than archiving, but the identical
+  symptom shape).
+- `lib/data/rotations.ts` (`getAssignmentGrid`, the `/rotations`
+  applied-assignment grid) and `lib/data/music-list.ts`
+  (`getRecentMusic`, `/music`'s recent-items list) -- both use UTC
+  "today" as their lower bound for "upcoming," so tonight's own
+  meeting/music entries would silently drop out of these admin grids
+  in the evening, right when someone's most likely to be fixing them
+  ahead of the meeting.
+- `app/youth-activities/{upcoming,combined-yw,combined-ym-yw,combined-ym}/page.tsx`
+  -- all four share the identical `todayISO()` helper, same "upcoming"
+  lower-bound bug, for youth activities instead of meetings (a
+  Wednesday-evening activity would drop off these lists before it
+  happened).
+- `lib/data/meeting-schedule.ts` (`generateMeetingsFromRules`),
+  `lib/data/ward-event-schedule.ts` (`generateWardEventsFromRules`),
+  `lib/data/youth-activity-cadence-rules.ts`
+  (`generateYouthActivitiesFromRules`), `lib/data/youth-activity-schedule.ts`
+  (`generateCombinedYouthActivities`) -- all four cadence-rule
+  generators compute their own "today" as the start of the
+  candidate-date window, independently of the Mountain-Time-aware
+  value `autoGenerateUpcomingMeetings`/`autoGenerateCombinedYouthActivities`
+  already pass in as the *end* of the window. A real, if narrower,
+  version of the same bug: run in the evening on a day that's itself a
+  real cadence match (e.g. the exact Sunday a rule targets), the UTC
+  "today" could exclude that day from the window and skip generating
+  it.
+- `lib/data/teaching-assignments.ts` (`getTeachingAssignmentGrid`) and
+  `lib/data/class-activities.ts` (`getClassActivityGrid`) -- same
+  "upcoming Sundays/Wednesdays" lower-bound bug, for Youth Teaching
+  Planning and the per-class activity grid.
+
+**Deliberately left alone, flagged rather than changed** -- these are
+all just the *default* value a date `<input>` pre-fills with, never a
+gate or filter that changes what's shown or archived, so being off by
+up to a day in the pre-filled default is genuinely inconsequential (a
+human looks at a calendar before confirming either way):
+`components/admin/MeetingDatePicker.tsx`, `app/calling-planning/page.tsx`'s
+date-picker default, and the three `defaultThroughDate()`-style
+"3 months out" helpers in `app/rotations/page.tsx`,
+`app/youth-teaching-planning/page.tsx`, and
+`app/youth-activities/manage/classes/page.tsx`. Flag if any of these
+turn out to matter in practice after all.
+
+**Confirmed there's no matching bug on the database side**: grepped
+every migration file for `current_date`/`now()::date`/
+`current_timestamp` -- none of this app's Postgres functions
+(`meetings_with_real_activity`, `delete_meeting_cascade`, etc.) do
+their own date-vs-today comparison; every "is this in the past"
+decision happens in the TypeScript layer, which is what this fix
+addresses. No migration needed for this one.
+
+Confirmed via `tsc`/`eslint`/`next build` only (same no-live-browser
+gap as everything else in this project; the build locally needed
+`--webpack` instead of Turbopack due to a Windows Application Control
+policy blocking the native binary on this machine -- a local-only
+quirk, irrelevant to Vercel's own Linux build environment) -- ask the
+user to confirm tonight's Bishopric Meeting (or the next one affected)
+stays in `planning` until it actually happens, and that `/dashboard`,
+`/rotations`, and `/music` all still show a same-day meeting/activity
+in their "upcoming" lists during the evening hours.
+
 **Bishopric Meeting/Ward Council/Youth Council restructured into a
 sectioned agenda (Devotional/Review/Discussion/Closing), and the dead
 lifecycle stages + Template/Live tabs dropped from every meeting page,

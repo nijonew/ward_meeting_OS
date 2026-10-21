@@ -6,9 +6,13 @@ import { getYouthActivities } from "@/lib/data/youth-activities";
 import { explodeActivitiesByClass } from "@/lib/data/class-activities-shared";
 import { ActivitiesTable } from "@/components/youth-activities/ActivitiesTable";
 import { AddActivityForm } from "@/components/youth-activities/AddActivityForm";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 
+// Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+// a plain UTC "today" would drop tonight's own activity from this
+// "upcoming" filter several hours before it's actually over.
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getMountainTimeNow().dateIso;
 }
 
 /**

@@ -95,7 +95,17 @@ function mapMeetingRow(row: {
  */
 async function autoArchivePastMeetings(): Promise<Set<string>> {
   const supabase = await createClient();
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix,
+  // the user's own report: "my bishopric meeting for tonight is
+  // already archived"). The server (Vercel) runs in UTC, which rolls
+  // over to the next calendar day 6-7 hours before midnight actually
+  // arrives in Mountain Time -- so for several hours every evening, a
+  // meeting scheduled for *today* (Mountain) was being treated as
+  // already in the past and auto-archived before it had even
+  // happened. Same root cause, same fix, as `getMountainTimeNow`'s own
+  // doc comment already describes for the Sacrament Meeting public
+  // page -- just never applied here too.
+  const { dateIso: todayIso } = getMountainTimeNow();
 
   const { data: pastMeetings } = await supabase
     .from("meetings")

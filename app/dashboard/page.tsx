@@ -6,6 +6,7 @@ import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton"
 import { DeleteMeetingButton } from "@/components/dashboard/DeleteMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
+import { getMountainTimeNow } from "@/lib/data/timezone";
 import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
 import { allMeetingFeatures, meetingFeature } from "@/lib/data/meeting-features";
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
@@ -255,7 +256,12 @@ export default async function DashboardPage({
   // anyone who needs to find one, e.g. to review an archived meeting's
   // minutes.
   const showPast = rawPast === "1";
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
+  // see lib/data/meetings.ts's autoArchivePastMeetings for the full
+  // explanation of why a plain UTC "today" is wrong here: it would hide
+  // a meeting scheduled for tonight, Mountain Time, several hours
+  // before it's actually over.
+  const { dateIso: todayIso } = getMountainTimeNow();
 
   const { user, profile } = await getSessionUser();
 
