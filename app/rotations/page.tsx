@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAllRotations, getAssignmentGrid, type RotationRow } from "@/lib/data/rotations";
 import { getActivePeople, type PersonOption } from "@/lib/data/people";
+import { getActiveCallings, type CallingOption } from "@/lib/data/callings";
 import { PushRotationForm } from "@/components/rotations/PushRotationForm";
 import { PushFixedRolesForm } from "@/components/rotations/PushFixedRolesForm";
 import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
@@ -63,7 +64,7 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
   );
 }
 
-function RotationCard({ rotation, people }: { rotation: RotationRow; people: PersonOption[] }) {
+function RotationCard({ rotation, people, callings }: { rotation: RotationRow; people: PersonOption[]; callings: CallingOption[] }) {
   const sync = async () => {
     "use server";
     await syncRotation(rotation.id);
@@ -73,8 +74,10 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
     await addRotationMember(rotation.id, formData);
   };
 
-  const memberIds = new Set(rotation.members.map((m) => m.person_id));
+  const memberIds = new Set(rotation.members.map((m) => m.person_id).filter((id): id is string => Boolean(id)));
   const availablePeople = people.filter((p) => !memberIds.has(p.id));
+  const callingMemberIds = new Set(rotation.members.map((m) => m.calling_id).filter((id): id is string => Boolean(id)));
+  const availableCallings = callings.filter((c) => !callingMemberIds.has(c.id));
   const nextUpName = rotation.members[rotation.next_index % Math.max(rotation.members.length, 1)]?.person_name;
 
   return (
@@ -168,6 +171,24 @@ function RotationCard({ rotation, people }: { rotation: RotationRow; people: Per
         </form>
       )}
 
+      {availableCallings.length > 0 && (
+        <form action={addMember} className="mt-2 flex items-center gap-2">
+          <select name="calling_id" defaultValue="" className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
+            <option value="" disabled>
+              Add a calling&hellip;
+            </option>
+            {availableCallings.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="rounded border border-accent px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10">
+            Add
+          </button>
+        </form>
+      )}
+
       {rotation.members.length > 0 && <PushRotationForm rotationId={rotation.id} />}
     </div>
   );
@@ -196,9 +217,10 @@ export default async function RotationsPage({
     : "sacrament-meeting";
   const throughDate = rawThrough || defaultThroughDate();
 
-  const [rotations, people, grid] = await Promise.all([
+  const [rotations, people, callings, grid] = await Promise.all([
     getAllRotations(),
     getActivePeople(),
+    getActiveCallings(),
     getAssignmentGrid(selectedType, throughDate),
   ]);
 
@@ -287,7 +309,7 @@ export default async function RotationsPage({
 
       <div className="flex flex-col gap-4">
         {visibleRotations.map((r) => (
-          <RotationCard key={r.id} rotation={r} people={people} />
+          <RotationCard key={r.id} rotation={r} people={people} callings={callings} />
         ))}
       </div>
     </main>

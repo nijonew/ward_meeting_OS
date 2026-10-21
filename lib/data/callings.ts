@@ -4,6 +4,7 @@ import { personName } from "@/lib/data/calling-planning";
 export interface CallingOption {
   id: string;
   name: string;
+  title_prefix: string | null;
 }
 
 export interface CallingListItem {
@@ -18,7 +19,7 @@ export async function getActiveCallings(): Promise<CallingOption[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("callings")
-    .select("id, name")
+    .select("id, name, title_prefix")
     .eq("active", true)
     .order("sort_order");
 

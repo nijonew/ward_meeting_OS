@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
-import { getSpeakerPrayerHistory, buildDueList } from "@/lib/data/speaker-prayer-history";
+import { getSpeakerPrayerHistory, buildDueList, getSpeakingPrayingNotes } from "@/lib/data/speaker-prayer-history";
 import { getActivePeople } from "@/lib/data/people";
+import { AddEntryForm } from "@/components/speaker-prayer-history/AddEntryForm";
+import { DeleteEntryButton } from "@/components/speaker-prayer-history/DeleteEntryButton";
 
 function formatDate(iso: string) {
   if (!iso) return "";
@@ -27,10 +29,16 @@ export default async function SpeakerPrayerHistoryPage() {
     );
   }
 
-  const [entries, people] = await Promise.all([getSpeakerPrayerHistory(), getActivePeople()]);
+  const [entries, people, notesByPerson] = await Promise.all([
+    getSpeakerPrayerHistory(),
+    getActivePeople(),
+    getSpeakingPrayingNotes(),
+  ]);
 
   const speakerEntries = entries.filter((e) => e.role === "Speaker" || e.role === "Youth Speaker");
-  const prayerEntries = entries.filter((e) => e.role === "Opening Prayer" || e.role === "Closing Prayer");
+  const prayerEntries = entries.filter(
+    (e) => e.role === "Opening Prayer" || e.role === "Closing Prayer" || e.role === "Prayer"
+  );
 
   const dueToSpeak = buildDueList(speakerEntries, people);
   const dueToPray = buildDueList(prayerEntries, people);
@@ -46,15 +54,17 @@ export default async function SpeakerPrayerHistoryPage() {
       <section className="mt-4">
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Speaker &amp; Prayer History</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          Sourced from archived sacrament meetings only. Speakers and sacrament-meeting prayers don&rsquo;t
-          rotate automatically, so this is here to help spot who&rsquo;s due for a turn.
+          Sourced from archived sacrament meetings, plus the ward&rsquo;s own imported history and anything
+          logged by hand below. Speakers and sacrament-meeting prayers don&rsquo;t rotate automatically, so
+          this is here to help spot who&rsquo;s due for a turn.
         </p>
       </section>
 
       {entries.length === 0 && (
         <div className="rounded border border-rule bg-surface p-6">
           <p className="text-sm text-ink-muted">
-            No archived sacrament meetings yet. History fills in as meetings move to the archived stage.
+            No history on record yet -- it fills in as meetings move to the archived stage, or log one by hand
+            below.
           </p>
         </div>
       )}
@@ -67,7 +77,14 @@ export default async function SpeakerPrayerHistoryPage() {
               <ul className="mt-3 flex flex-col gap-1.5">
                 {dueToSpeak.slice(0, 15).map((d) => (
                   <li key={d.person_id} className="flex items-center justify-between text-sm">
-                    <span className="text-ink">{d.person_name}</span>
+                    <span className="text-ink">
+                      {d.person_name}
+                      {notesByPerson.get(d.person_id)?.speaking_note && (
+                        <span className="ml-1.5 text-[10px] text-ink-muted/70">
+                          ({notesByPerson.get(d.person_id)?.speaking_note})
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-ink-muted">{d.last_date ? formatDate(d.last_date) : "Never"}</span>
                   </li>
                 ))}
@@ -79,7 +96,14 @@ export default async function SpeakerPrayerHistoryPage() {
               <ul className="mt-3 flex flex-col gap-1.5">
                 {dueToPray.slice(0, 15).map((d) => (
                   <li key={d.person_id} className="flex items-center justify-between text-sm">
-                    <span className="text-ink">{d.person_name}</span>
+                    <span className="text-ink">
+                      {d.person_name}
+                      {notesByPerson.get(d.person_id)?.praying_note && (
+                        <span className="ml-1.5 text-[10px] text-ink-muted/70">
+                          ({notesByPerson.get(d.person_id)?.praying_note})
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-ink-muted">{d.last_date ? formatDate(d.last_date) : "Never"}</span>
                   </li>
                 ))}
@@ -97,13 +121,24 @@ export default async function SpeakerPrayerHistoryPage() {
                     <span className="text-ink">{e.person_name}</span>
                     {e.topic && <span className="text-ink-muted"> &middot; {e.topic}</span>}
                   </span>
-                  <span className="shrink-0 text-xs text-ink-muted">{formatDate(e.date)}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-ink-muted">{formatDate(e.date)}</span>
+                    {e.historyImportId && <DeleteEntryButton entryId={e.historyImportId} />}
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
         </>
       )}
+
+      <div className="rounded border border-rule bg-surface p-6">
+        <h2 className="font-display text-xl">Log a Missed or Pre-App Turn</h2>
+        <p className="mt-1 text-xs text-ink-muted">
+          For a turn this history doesn&rsquo;t already have on record -- doesn&rsquo;t need a real meeting.
+        </p>
+        <AddEntryForm people={people} />
+      </div>
     </main>
   );
 }

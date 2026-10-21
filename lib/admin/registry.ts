@@ -304,6 +304,31 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     ],
   },
 
+  speaker_prayer_history_import: {
+    table: "speaker_prayer_history_import",
+    label: "Speaker & Prayer History (Import)",
+    description:
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday use, use /speaker-prayer-history's own add-entry form instead. Holds the one-time bulk import of the ward's pre-app speaker/prayer history (migration 079) plus anything logged by hand there afterward -- not tied to any real meeting, read alongside archived-meeting data by getSpeakerPrayerHistory().",
+    requiredFeature: "table_admin_speaker_prayer_history_import",
+    orderBy: { column: "occurred_on", ascending: false },
+    columns: [
+      { column: "person_id", label: "Person", type: "foreign_key", required: true, foreignKey: PERSON_FK },
+      {
+        column: "role",
+        label: "Role",
+        type: "select",
+        required: true,
+        options: [
+          { value: "speaker", label: "Speaker" },
+          { value: "prayer", label: "Prayer" },
+        ],
+      },
+      { column: "occurred_on", label: "Date", type: "date", required: true },
+      { column: "notes", label: "Notes", type: "text" },
+      { column: "source", label: "Source", type: "text" },
+    ],
+  },
+
   meeting_action_items: {
     table: "meeting_action_items",
     label: "Meeting Action Items",

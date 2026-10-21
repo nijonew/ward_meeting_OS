@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getSacramentProgramItems } from "@/lib/data/sacrament-program";
 import { kindOfItemKey } from "@/lib/data/sacrament-program-shared";
+import { getTitlePrefixesForAssignments, formatTitleLastName } from "@/lib/data/person-display";
 
 export interface PublicOrderItem {
   heading: string;
@@ -118,10 +119,30 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     p_ids: Array.from(idSet),
   });
   const nameById = new Map(((peopleRows ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+
+  // "Title + last name" (2026-10-21) for any role resolved via a
+  // calling -- see getTitlePrefixesForAssignments. **Known limitation
+  // for a genuinely anonymous (no-login) viewer**: unlike
+  // get_public_people_names above, this reads `callings` through the
+  // ordinary client, which has no anon-facing RLS policy today -- it
+  // degrades gracefully (plain names, no error) rather than crashing,
+  // but an anonymous visitor to this specific page won't see the title
+  // prefix; an admin/Bishopric preview (always authenticated) does. A
+  // dedicated security-definer RPC, mirroring get_public_people_names,
+  // would be the fix if extending this to anonymous viewers matters.
+  const titlePairs = assignments
+    .filter((a) => a.assigned_to_id)
+    .map((a) => ({ elementKey: a.role, personId: a.assigned_to_id as string }));
+  const titlePrefixByKey = await getTitlePrefixesForAssignments("sacrament-meeting", titlePairs);
+
   const roleName = (role: string) => {
     const a = assignments.find((x) => x.role === role);
     if (!a) return null;
-    if (a.assigned_to_id) return nameById.get(a.assigned_to_id) ?? null;
+    if (a.assigned_to_id) {
+      const name = nameById.get(a.assigned_to_id) ?? null;
+      if (!name) return null;
+      return formatTitleLastName(name, titlePrefixByKey.get(`${role}::${a.assigned_to_id}`));
+    }
     return a.guest_name ?? null;
   };
   const speakerName = (s: RawSpeaker) =>

@@ -7,6 +7,7 @@ import { getSacramentProgramItems, resolveProgramItems, type ResolvedProgramItem
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { getAnnouncementsByPlannedElement } from "@/lib/data/sacrament-announcements";
 import { buildConductingRows, type ConductingRow } from "@/lib/data/conducting-rows";
+import { getTitlePrefixesForAssignments } from "@/lib/data/person-display";
 
 export interface ConductingScript {
   meetingTitle: string;
@@ -113,6 +114,30 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
   const openingElements = closingIndex !== -1 ? elementsForGrid.slice(0, closingIndex) : elementsForGrid;
   const closingElements = closingIndex !== -1 ? elementsForGrid.slice(closingIndex) : [];
 
+  // "Title + last name" (2026-10-21) -- one batched lookup for every
+  // elementKey/personId pair this script is about to render, covering
+  // both person_role and person_and_text elements plus the Chorister/
+  // Organist pair recognize_music resolves separately. See
+  // getTitlePrefixesForAssignments (lib/data/person-display.ts).
+  const titlePairs: { elementKey: string; personId: string }[] = [];
+  for (const el of elementsForGrid) {
+    if (el.key === "recognize_music") {
+      for (const role of ["chorister", "organist"]) {
+        const id = roleAssignments[role]?.assigned_to_id;
+        if (id) titlePairs.push({ elementKey: role, personId: id });
+      }
+      continue;
+    }
+    if (el.resolution_kind === "person_role") {
+      const id = roleAssignments[el.key]?.assigned_to_id;
+      if (id) titlePairs.push({ elementKey: el.key, personId: id });
+    } else if (el.resolution_kind === "person_and_text") {
+      const id = elementNotes[el.key]?.person_id;
+      if (id) titlePairs.push({ elementKey: el.key, personId: id });
+    }
+  }
+  const titlePrefixByKey = await getTitlePrefixesForAssignments("sacrament-meeting", titlePairs);
+
   const rowInputs = {
     roleAssignments,
     elementNotes,
@@ -122,6 +147,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
     visitingAuthorities,
     announcementsByPlannedElement,
     peopleById,
+    titlePrefixByKey,
   };
 
   const rows: ConductingRow[] = [

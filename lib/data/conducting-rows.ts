@@ -4,6 +4,7 @@ import type { MusicRow, PlanningInfo, RabnmRow } from "@/lib/data/sacrament-plan
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { formatAnnouncementSchedule } from "@/lib/data/announcements";
+import { formatTitleLastName } from "@/lib/data/person-display";
 
 /**
  * The Conducting view's read-only row model, built 2026-09-10 as the
@@ -51,6 +52,11 @@ export interface ConductingRowInputs {
    *  the matching Planning-side comment. */
   announcementsByPlannedElement: Map<string, PulledAnnouncement[]>;
   peopleById: Map<string, string>;
+  /** "<elementKey>::<personId>" -> that calling's title_prefix, for
+   *  whichever pairs actually resolve via a calling (2026-10-21 --
+   *  see getTitlePrefixesForAssignments, lib/data/person-display.ts).
+   *  A pair with no entry here always falls back to the plain name. */
+  titlePrefixByKey: Map<string, string>;
 }
 
 /** The spoken line for one announcement -- the core text, plus
@@ -137,6 +143,7 @@ export function buildConductingRows({
   visitingAuthorities,
   announcementsByPlannedElement,
   peopleById,
+  titlePrefixByKey,
 }: ConductingRowInputs): ConductingRow[] {
   const rows: ConductingRow[] = [];
 
@@ -162,13 +169,24 @@ export function buildConductingRows({
     (a, b) => (RABNM_ORDER_WEIGHT[a.type] ?? 2) - (RABNM_ORDER_WEIGHT[b.type] ?? 2)
   );
 
-  const personName = (id: string | null | undefined): string => (id ? peopleById.get(id) ?? BLANK : BLANK);
+  // "Title + last name" (e.g. "Bishop Nielsen") instead of a plain name,
+  // wherever this specific person currently holds the specific calling
+  // that resolved them into this specific role (2026-10-21) --
+  // titlePrefixByKey only has an entry for a pair that actually matched,
+  // so anything else (a manual pick unrelated to any calling, or a role
+  // that was never calling-based) falls straight through to the name.
+  const personName = (id: string | null | undefined, elementKey?: string): string => {
+    if (!id) return BLANK;
+    const name = peopleById.get(id) ?? BLANK;
+    if (!elementKey) return name;
+    return formatTitleLastName(name, titlePrefixByKey.get(`${elementKey}::${id}`));
+  };
   const roleAssignedId = (role: string): string | null => roleAssignments[role]?.assigned_to_id ?? null;
   // Falls back to the role's guest name (Chorister/Organist's guest
   // option, migration 064, 2026-10-07) when no real person is assigned.
   const roleDisplayName = (role: string): string => {
     const entry = roleAssignments[role];
-    if (entry?.assigned_to_id) return personName(entry.assigned_to_id);
+    if (entry?.assigned_to_id) return personName(entry.assigned_to_id, role);
     if (entry?.guest_name) return entry.guest_name;
     return BLANK;
   };
@@ -274,7 +292,7 @@ export function buildConductingRows({
 
     switch (el.resolution_kind) {
       case "person_role": {
-        const name = personName(roleAssignedId(key));
+        const name = personName(roleAssignedId(key), key);
         const wording =
           key === "opening_prayer"
             ? `${name} will offer our opening prayer.`
@@ -293,7 +311,7 @@ export function buildConductingRows({
 
       case "person_and_text": {
         const note = elementNotes[key];
-        const name = note?.person_id ? personName(note.person_id) : null;
+        const name = note?.person_id ? personName(note.person_id, key) : null;
         const value = [name, note?.text_value].filter(Boolean).join(" — ") || BLANK;
         rows.push({ id: el.id, kind: "field", label: el.label, value, wording: null });
         break;

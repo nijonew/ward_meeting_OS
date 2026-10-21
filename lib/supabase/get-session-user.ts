@@ -93,7 +93,8 @@ export type Feature =
   | "table_admin_ward_events"
   | "table_admin_youth_activities"
   | "table_admin_youth_class_teachers"
-  | "table_admin_feedback";
+  | "table_admin_feedback"
+  | "table_admin_speaker_prayer_history_import";
 
 export interface SessionProfile {
   features: Set<Feature>;

@@ -284,8 +284,16 @@ reconstructed from both:
   truth for valid values) -- needs to be re-run with the corrected
   file. The number `078` itself was confirmed free by this attempt
   (the error was about the constraint, not a numbering collision).
+- `079` (one-time bulk import of the ward's real "Speaker & Prayer
+  History" spreadsheet, attached directly by the user 2026-10-21 -- new
+  `speaker_prayer_history_import` table plus `people.speaking_note`/
+  `praying_note`, see Known open items below for the full design):
+  **not yet run**.
+- `080` (new `rotation_members.calling_id`, nullable, additive -- lets a
+  rotation cycle through callings instead of fixed people, see Known
+  open items below): **not yet run**.
 
-Next migration should be `079_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
+Next migration should be `081_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2000,6 +2008,177 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Historical speaker/prayer import, a friendlier history tool, and
+calling-based rotations, 2026-10-21** -- two related asks from the user
+in one message: "I would also like to do an import migration to
+migrate in the existing speaker history. Here is the spreadsheet with
+the data up until recently. I need it mapped and imported. If the
+existing format lacks data like this sheet has I need to have the
+speaker history tool in the app be updated and made more user
+friendly. I would like to update the rotations to be calling based
+rather than based on a person by name. Then the agenda will call the
+person by title+last name for the agenda." Full plan approved via
+`/plan` before implementation (plan file: elegant-wishing-fountain).
+
+**Part 1 -- the import (migration `079`, not yet run).** The attached
+"Speaker & Prayer History.xlsx" was parsed entirely by hand this
+session (manual PowerShell XML parsing -- no pandas/openpyxl/pip
+available in this environment, same Application Control policy that's
+blocked other tools before). Of its 9 sheets: Speaker History (411 real
+rows, 2017-2026) and Prayer History (607 real rows, 2016-2026) were
+imported; Notes Database (per-person flags like "Inactive," "Won't
+Speak," "Won't Pray," "Lives outside of ward") was imported as purely
+informational text, never used to filter who shows up on the app's own
+due-lists (the user's own explicit choice when asked); Adult/Youth/
+Prayers were confirmed via the spreadsheet's own "Instructions" sheet
+to be script-regenerated read-only report views, not source data --
+not imported; All Members (has birthdate/phone/email) was not imported
+at all, per this app's own documented no-bulk-PII-import policy (see
+the Adding New People workflow/policy above); On Radar for Prayers
+(undated, ephemeral scratch notes) was not imported either.
+- **The Prayer History sheet has no column distinguishing Opening vs.
+  Closing Prayer** -- asked the user directly rather than guessing; the
+  answer was to import every row as a single generic "Prayer" entry,
+  not split.
+- New `speaker_prayer_history_import` table (`person_id`, `role` --
+  `'speaker'`/`'prayer'` -- `occurred_on`, `notes`, `source` --
+  `'historical_import'` or `'manual'`) -- not tied to any real `meetings`
+  row at all, since most of this predates the app. Names were reformatted
+  from the sheet's "Last, First Middle" to this app's own "First Middle
+  Last" convention in the one-off generating script (scratchpad, not
+  committed) -- matching this repo's own established convention that
+  name reformatting happens in the throwaway script, never in SQL; person
+  matching itself happens in the migration's own SQL, case-insensitive
+  against whatever `people` rows actually exist when it runs (same
+  `WHERE NOT EXISTS` idiom as migrations `049`/`067`) -- a person is only
+  created because there's a real speaker/prayer turn to attach, never
+  from a Notes Database entry alone. Skips any row that already has a
+  matching real archived-meeting record for the same person + date
+  (joined through `sacrament_assignments`/`sacrament_speakers_adults/
+  youth`), so it can't double-count whatever date range the app's own
+  live data already covers, without needing to know or guess a cutover
+  date.
+- **One confirmed typo fixed with confidence**: "Braxton Merrit" (one
+  row, Prayer History) corrected to "Braxton Merritt," matching every
+  other occurrence of this same person in both sheets. **Two genuinely
+  ambiguous name clusters were deliberately left as separate `people`
+  rows, not guessed at and merged** -- flagged in the migration file's
+  own header comment for the user to check and merge by hand in Table
+  Admin if they turn out to be the same person: "Nixon J Rappleye" vs.
+  "Nixon Rappleye," and "Karleen Annick Le Tendre" vs. "Karleen
+  LeTendre" vs. "Karissa LeTendre." A case-insensitive name collision
+  (e.g. "sierra bott" vs. "Sierra Bott," both real rows in the raw
+  sheet) was deduplicated in the generating script before being written
+  to the migration -- the migration's own person-insert `WHERE NOT
+  EXISTS` only checks against the live `people` table, not sibling rows
+  in the same `INSERT`, so without this fix both case variants would
+  have been created as two separate people.
+- New Table Admin feature/registry entry, `table_admin_speaker_prayer_history_import`
+  (raw-data fallback, same "use the bespoke page for everyday work"
+  convention as `sacrament_speakers_adults`) -- nobody gets it
+  automatically, grant it via `/admin/calling-features`.
+
+**Part 1 -- the friendlier tool** (`/speaker-prayer-history`, no
+migration needed beyond the table above): `getSpeakerPrayerHistory()`
+(`lib/data/speaker-prayer-history.ts`) now merges archived-meeting data
+with `speaker_prayer_history_import` rows, rather than reading only
+from real meetings. A new "Log a Missed or Pre-App Turn" form (person,
+role, date, notes) writes directly to the same table with
+`source = 'manual'` -- the ongoing way to log one without needing Table
+Admin, gated on the existing `speaker_prayer_history` feature. Each
+entry from that table gets a Remove button in the Full History list;
+an archived-meeting-sourced entry has none, since it's owned by that
+meeting, not this table. A person with a `speaking_note`/`praying_note`
+shows it as a small muted flag next to their name on the Due to Speak/
+Due for a Prayer lists.
+
+**Part 2 -- calling-based rotations (migration `080`, not yet run).**
+Generalizes the Presiding/Conducting pattern (`applyFixedSacramentRoles`,
+`lib/data/rotations.ts` -- already resolves a role to whoever currently
+holds a specific calling, read fresh every time) to the generic
+`rotation_members` table, which has only ever cycled through fixed
+people. New `rotation_members.calling_id` (nullable, references
+`callings`) plus a `rotation_members_exactly_one_target` CHECK
+(`person_id`/`calling_id`, exactly one set) -- purely additive, every
+existing person-based member keeps working completely unchanged. **No
+change to the `apply_rotation_assignment` Postgres function itself** --
+resolving a calling-based member down to a concrete person id (that
+calling's current holder, read fresh) happens in a new
+`resolveRotationMemberIds` helper in TypeScript, right before that RPC
+is called, the same approach `applyFixedSacramentRoles` already uses.
+This keeps the one piece of this app that's hardest to inspect/test
+without live database access completely untouched. A calling-based
+member whose calling is currently vacant is silently dropped from that
+round (not guessed at), matching every other vacant-calling rule
+already in this app -- `pushRotationToUpcomingMeetings` and
+`applyRotationsToNewMeeting` both use the new helper.
+- `/rotations`' "Add someone..." person-picker gained a sibling "Add a
+  calling..." picker (reusing `getActiveCallings()`, extended to also
+  select `title_prefix`) -- both submit through the same, now-dual-mode
+  `addRotationMember` action. A rotation's member list on that page now
+  shows a calling-based member as its current holder's title+last name,
+  or "`<calling>` -- vacant" when nobody currently holds it.
+
+**Title + last name agenda display** (e.g. "Bishop Nielsen" instead of
+"John Nielsen"), the other half of the user's request -- new
+`lib/data/person-display.ts`: `formatTitleLastName(name, titlePrefix)`
+(a plain formatter) and `getTitlePrefixesForAssignments(meetingTypeSlug,
+pairs)`, a single batched query per page render (not one per person,
+matching this project's own established N+1 performance discipline --
+see the 2026-10-07 "app is extremely slow" fixes elsewhere in this
+file) that resolves, for a whole agenda's worth of
+`{elementKey, personId}` pairs at once, which ones currently match a
+calling relevant to that specific role -- the existing hardcoded lists
+for `presiding`/`conducting`/`visiting_authorities`
+(`fixedCallingNamesForKey`, now exported), or, for any other element
+key, whatever `calling_id`s that key's own `rotations` row has among
+its calling-based members (migration `080`). A pair with no match
+(a manual override to someone unrelated, or a role that was never
+calling-based) always falls through to the plain name -- never guessed.
+**Deliberately scoped to the agenda's read-only *output*, not its
+editing controls**: applied to `lib/data/conducting-rows.ts`
+(`buildConductingRows`), `lib/data/public-view.ts`
+(`getPublicSacramentView`), and `app/meetings/[id]/archived/page.tsx`
+(the non-admin read-only viewer) -- **not** to
+`components/planning/AgendaGridForm.tsx`'s person dropdowns or
+`components/rotations/AssignmentGridForm.tsx`'s per-cell selects, which
+stay plain names, since those are editing controls scanning a list of
+people, not the finished program/script "the agenda will call the
+person by title+last name" was actually describing.
+- **Known limitation, flagged rather than silently accepted**: on the
+  public Sacrament Meeting program (`/meetings/[id]/public`), this only
+  works for a logged-in admin/Bishopric preview. `callings` has no
+  anon-facing RLS policy today (unlike `people`, which the public page
+  already reads through a dedicated `get_public_people_names`
+  security-definer RPC specifically to work around this) -- for a
+  genuinely anonymous, no-login visitor, `getTitlePrefixesForAssignments`'s
+  own `callings` query comes back empty under RLS, so the page degrades
+  gracefully to plain names rather than erroring, but never actually
+  shows the title prefix to that visitor. A dedicated
+  `get_public_calling_titles`-style security-definer RPC, mirroring
+  `get_public_people_names`, would close this gap if extending title+
+  last-name to anonymous public-page viewers turns out to matter --
+  not built here since it wasn't asked for and would need its own
+  migration.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to confirm migration numbers `079`/`080` are actually free before
+running them (per this project's own repeated numbering-collision
+history), then run both and report back: how many speaker/prayer rows
+imported, how many people were newly created, and whether the two
+flagged ambiguous name clusters turned out to be the same person (if
+so, merge by hand in Table Admin -- re-point `speaker_prayer_history_import`
+rows and delete the duplicate `people` row). Then check: historical
+entries show up correctly on `/speaker-prayer-history` (Due lists, Full
+History, the new add-entry form, the note flags); on `/rotations`,
+adding a calling-based member works and a newly-created/pushed meeting
+resolves it to that calling's current holder; and the Conducting
+script / archived view (and, for an admin, the public program preview)
+show "Title Lastname" for any role resolved via a calling, while the
+Planning grid and Assignment grid still show plain names in their
+dropdowns.
 
 **Bug found and fixed 2026-10-21: pushing a Spiritual Thought/Handbook
 Training rotation forward wrote to the wrong table, and Presiding/

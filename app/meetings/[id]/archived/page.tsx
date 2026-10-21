@@ -20,6 +20,7 @@ import { getAnnouncementsByPlannedElement, type PulledAnnouncement } from "@/lib
 import { splitIntoSections } from "@/lib/data/agenda-rows";
 import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
 import { ReviewSection } from "@/components/planning/ReviewSection";
+import { getTitlePrefixesForAssignments, formatTitleLastName } from "@/lib/data/person-display";
 
 /**
  * Read-only meeting view -- built 2026-09-08 to be the calling-based
@@ -66,9 +67,17 @@ const NOTE_BOX = "rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm
 const ROW = "rounded border border-rule/60 p-3";
 const LABEL = "font-mono text-[11px] uppercase tracking-wider text-ink-muted/70";
 
-function personName(people: PersonOption[], id: string | null | undefined): string | null {
+function personName(
+  people: PersonOption[],
+  id: string | null | undefined,
+  elementKey?: string,
+  titlePrefixByKey?: Map<string, string>
+): string | null {
   if (!id) return null;
-  return people.find((p) => p.id === id)?.name ?? null;
+  const name = people.find((p) => p.id === id)?.name;
+  if (!name) return null;
+  if (!elementKey || !titlePrefixByKey) return name;
+  return formatTitleLastName(name, titlePrefixByKey.get(`${elementKey}::${id}`));
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -224,6 +233,29 @@ export default async function ArchivedMeetingPage({
   const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
   const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
+  // "Title + last name" (2026-10-21) for any role resolved via a
+  // calling -- see getTitlePrefixesForAssignments. Same approach as
+  // Conducting's own getConductingRows: gather every elementKey/personId
+  // pair this read-only view is about to render, then one batched query.
+  const titlePairs: { elementKey: string; personId: string }[] = [];
+  for (const el of templateElements) {
+    if (isSacrament && el.key === "recognize_music") {
+      for (const role of ["chorister", "organist"]) {
+        const id = roleAssignments[role]?.assigned_to_id;
+        if (id) titlePairs.push({ elementKey: role, personId: id });
+      }
+      continue;
+    }
+    if (el.resolution_kind === "person_role") {
+      const id = roleAssignments[el.key]?.assigned_to_id;
+      if (id) titlePairs.push({ elementKey: el.key, personId: id });
+    } else if (el.resolution_kind === "person_and_text") {
+      const id = elementNotes[el.key]?.person_id;
+      if (id) titlePairs.push({ elementKey: el.key, personId: id });
+    }
+  }
+  const titlePrefixByKey = await getTitlePrefixesForAssignments(meeting.meetingType, titlePairs);
+
   // Same sectioned layout as Planning (2026-10-19) -- see that page's
   // own comment and splitIntoSections's doc comment in agenda-rows.ts.
   const collaborativeSections = !isSacrament ? splitIntoSections(templateElements) : [];
@@ -249,8 +281,10 @@ export default async function ArchivedMeetingPage({
     if (isSacrament && el.key === "recognize_music") {
       const choristerAssignment = roleAssignments["chorister"];
       const organistAssignment = roleAssignments["organist"];
-      const chorister = personName(people, choristerAssignment?.assigned_to_id) ?? choristerAssignment?.guest_name ?? null;
-      const organist = personName(people, organistAssignment?.assigned_to_id) ?? organistAssignment?.guest_name ?? null;
+      const chorister =
+        personName(people, choristerAssignment?.assigned_to_id, "chorister", titlePrefixByKey) ?? choristerAssignment?.guest_name ?? null;
+      const organist =
+        personName(people, organistAssignment?.assigned_to_id, "organist", titlePrefixByKey) ?? organistAssignment?.guest_name ?? null;
       return (
         <Row key={el.id} label={el.label}>
           {chorister || organist ? (
@@ -281,7 +315,7 @@ export default async function ArchivedMeetingPage({
 
     switch (el.resolution_kind) {
       case "person_role": {
-        const name = personName(people, roleAssignments[el.key]?.assigned_to_id);
+        const name = personName(people, roleAssignments[el.key]?.assigned_to_id, el.key, titlePrefixByKey);
         return (
           <Row key={el.id} label={el.label}>
             {name ? <Plain>{name}</Plain> : <Empty />}
@@ -308,10 +342,14 @@ export default async function ArchivedMeetingPage({
 
       case "person_and_text": {
         const note: ElementNoteValue | undefined = elementNotes[el.key];
+        const displayName =
+          note?.person_name && note?.person_id
+            ? formatTitleLastName(note.person_name, titlePrefixByKey.get(`${el.key}::${note.person_id}`))
+            : note?.person_name ?? null;
         return (
           <Row key={el.id} label={el.label}>
-            {note?.person_name && <Plain>{note.person_name}</Plain>}
-            {note?.text_value ? <Note>{note.text_value}</Note> : !note?.person_name && <Empty />}
+            {displayName && <Plain>{displayName}</Plain>}
+            {note?.text_value ? <Note>{note.text_value}</Note> : !displayName && <Empty />}
           </Row>
         );
       }

@@ -137,13 +137,22 @@ export async function syncRotation(rotationId: string): Promise<ActionResult> {
   return { success: true };
 }
 
+/**
+ * Adds a rotation member, either a plain person (unchanged behavior) or
+ * a calling (migration 080, 2026-10-21) -- whichever the submitted form
+ * data actually carries. "Add a calling..." on /rotations submits
+ * calling_id instead of person_id; both end up in the same table, with
+ * the generic resolve-fresh-at-assignment-time logic in
+ * lib/data/rotations.ts handling the rest.
+ */
 export async function addRotationMember(rotationId: string, formData: FormData): Promise<ActionResult> {
   const denied = await requireRotationsFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
   const personId = String(formData.get("person_id") ?? "");
-  if (!personId) return { error: "Choose a person." };
+  const callingId = String(formData.get("calling_id") ?? "");
+  if (!personId && !callingId) return { error: "Choose a person or a calling." };
 
   const { data: existing } = await supabase
     .from("rotation_members")
@@ -154,9 +163,11 @@ export async function addRotationMember(rotationId: string, formData: FormData):
 
   const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
 
-  const { error } = await supabase
-    .from("rotation_members")
-    .insert({ rotation_id: rotationId, person_id: personId, sort_order: nextOrder });
+  const row: { rotation_id: string; person_id: string | null; calling_id: string | null; sort_order: number } = callingId
+    ? { rotation_id: rotationId, calling_id: callingId, person_id: null, sort_order: nextOrder }
+    : { rotation_id: rotationId, person_id: personId, calling_id: null, sort_order: nextOrder };
+
+  const { error } = await supabase.from("rotation_members").insert(row);
 
   if (error) return { error: error.message };
   revalidatePath("/rotations");

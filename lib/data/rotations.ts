@@ -5,7 +5,11 @@ import { getMountainTimeNow } from "@/lib/data/timezone";
 
 export interface RotationMember {
   id: string; // rotation_members row id
-  person_id: string;
+  person_id: string | null;
+  calling_id: string | null;
+  /** Display name -- the calling's current holder (title+last name) if
+   *  calling-based, the plain person name otherwise, or "<Calling> --
+   *  vacant" when calling-based and nobody currently holds it. */
   person_name: string;
   sort_order: number;
 }
@@ -28,7 +32,7 @@ export async function getAllRotations(): Promise<RotationRow[]> {
   const { data, error } = await supabase
     .from("rotations")
     .select(
-      "id, meeting_type_id, element_key, next_index, eligibility_source, eligibility_calling_names, meeting_types(name), rotation_members(id, person_id, sort_order, people(name))"
+      "id, meeting_type_id, element_key, next_index, eligibility_source, eligibility_calling_names, meeting_types(name), rotation_members(id, person_id, calling_id, sort_order, people(name), callings(name, title_prefix, current_holder_id, people:current_holder_id(name)))"
     )
     .order("element_key");
 
@@ -43,15 +47,48 @@ export async function getAllRotations(): Promise<RotationRow[]> {
       eligibility_source: "standing_attendees" | "calling_names" | "manual";
       eligibility_calling_names: string[] | null;
       meeting_types: { name?: string }[] | { name?: string } | null;
-      rotation_members: { id: string; person_id: string; sort_order: number; people: { name?: string }[] | { name?: string } | null }[] | null;
+      rotation_members:
+        | {
+            id: string;
+            person_id: string | null;
+            calling_id: string | null;
+            sort_order: number;
+            people: { name?: string }[] | { name?: string } | null;
+            callings:
+              | { name?: string; title_prefix?: string | null; current_holder_id?: string | null; people: { name?: string }[] | { name?: string } | null }[]
+              | { name?: string; title_prefix?: string | null; current_holder_id?: string | null; people: { name?: string }[] | { name?: string } | null }
+              | null;
+          }[]
+        | null;
     };
     const meetingType = Array.isArray(r.meeting_types) ? r.meeting_types[0] : r.meeting_types;
     const members = (r.rotation_members ?? [])
       .map((m) => {
+        if (m.calling_id) {
+          const calling = Array.isArray(m.callings) ? m.callings[0] : m.callings;
+          const holder = calling ? (Array.isArray(calling.people) ? calling.people[0] : calling.people) : null;
+          // Inlined rather than importing lib/data/person-display.ts's
+          // shared formatter here -- that module itself imports
+          // fixedCallingNamesForKey from this file, and a formatting
+          // one-liner isn't worth introducing the circular import.
+          const displayName = holder?.name
+            ? calling?.title_prefix
+              ? `${calling.title_prefix} ${holder.name.trim().split(/\s+/).pop()}`
+              : holder.name
+            : `${calling?.name ?? "Calling"} -- vacant`;
+          return {
+            id: m.id,
+            person_id: null,
+            calling_id: m.calling_id,
+            person_name: displayName,
+            sort_order: m.sort_order,
+          };
+        }
         const person = Array.isArray(m.people) ? m.people[0] : m.people;
         return {
           id: m.id,
           person_id: m.person_id,
+          calling_id: null,
           person_name: person?.name ?? "Unknown",
           sort_order: m.sort_order,
         };
@@ -227,6 +264,44 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
   return {};
 }
 
+/**
+ * Resolves a rotation's own member list (sorted by sort_order) down to a
+ * plain array of concrete person ids -- a calling-based member (migration
+ * `080`) resolves to that calling's CURRENT holder, read fresh right here,
+ * same as applyFixedSacramentRoles already does for Presiding/Conducting;
+ * a person-based member passes through unchanged. A calling-based member
+ * whose calling is currently vacant is dropped entirely, matching every
+ * other "skip, don't guess" vacant-calling rule in this app -- the
+ * resulting array can end up shorter than the member list itself, which
+ * is fine: apply_rotation_assignment's own next_index % length pointer
+ * already tolerates a shrinking array the same way it already tolerates
+ * someone being removed from a rotation outright.
+ */
+async function resolveRotationMemberIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  members: { person_id: string | null; calling_id: string | null; sort_order: number }[]
+): Promise<string[]> {
+  const sorted = [...members].sort((a, b) => a.sort_order - b.sort_order);
+  const callingIds = Array.from(new Set(sorted.map((m) => m.calling_id).filter((id): id is string => Boolean(id))));
+
+  let holderByCallingId = new Map<string, string | null>();
+  if (callingIds.length > 0) {
+    const { data } = await supabase.from("callings").select("id, current_holder_id").in("id", callingIds);
+    holderByCallingId = new Map(((data ?? []) as { id: string; current_holder_id: string | null }[]).map((c) => [c.id, c.current_holder_id]));
+  }
+
+  const resolved: string[] = [];
+  for (const m of sorted) {
+    if (m.calling_id) {
+      const holderId = holderByCallingId.get(m.calling_id);
+      if (holderId) resolved.push(holderId);
+      continue;
+    }
+    if (m.person_id) resolved.push(m.person_id);
+  }
+  return resolved;
+}
+
 export interface PushRotationResult {
   filled: number;
   skippedExisting: number;
@@ -280,7 +355,7 @@ export async function pushRotationToUpcomingMeetings(
 
   const { data: rotation, error: rotationError } = await supabase
     .from("rotations")
-    .select("id, meeting_type_id, element_key, meeting_types(slug), rotation_members(person_id, sort_order)")
+    .select("id, meeting_type_id, element_key, meeting_types(slug), rotation_members(person_id, calling_id, sort_order)")
     .eq("id", rotationId)
     .single();
 
@@ -292,10 +367,14 @@ export async function pushRotationToUpcomingMeetings(
   const slug = (meetingType as { slug?: string } | null)?.slug as MeetingTypeSlug | undefined;
   if (!slug) return { error: "Could not determine this rotation's meeting type." };
 
-  const members = ((rotation.rotation_members ?? []) as { person_id: string; sort_order: number }[]).sort(
-    (a, b) => a.sort_order - b.sort_order
+  if ((rotation.rotation_members ?? []).length === 0) return { error: "This rotation has no members yet." };
+  const memberIds = await resolveRotationMemberIds(
+    supabase,
+    (rotation.rotation_members ?? []) as { person_id: string | null; calling_id: string | null; sort_order: number }[]
   );
-  if (members.length === 0) return { error: "This rotation has no members yet." };
+  if (memberIds.length === 0) {
+    return { error: "This rotation's members are all calling-based and currently vacant -- nobody to assign." };
+  }
 
   // Same routing applyRotationsToNewMeeting already uses -- see this
   // function's own doc comment above for the bug this fixes.
@@ -331,7 +410,6 @@ export async function pushRotationToUpcomingMeetings(
     alreadyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
   }
 
-  const memberIds = members.map((m) => m.person_id);
   let filled = 0;
   let skippedExisting = 0;
 
@@ -540,7 +618,7 @@ export const VISITING_AUTHORITY_CALLING_NAME_PREFIXES = ["Stake High Councilor"]
  *  through to the real `rotations` table lookup. `prefixes` is only
  *  ever non-empty for Visiting Authorities' High Council seats -- see
  *  VISITING_AUTHORITY_CALLING_NAME_PREFIXES. */
-function fixedCallingNamesForKey(
+export function fixedCallingNamesForKey(
   meetingTypeSlug: MeetingTypeSlug,
   elementKey: string
 ): { exact: string[]; prefixes: string[] } | null {
@@ -712,7 +790,7 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
 
   const { data: rotations } = await supabase
     .from("rotations")
-    .select("id, element_key, rotation_members(person_id, sort_order)")
+    .select("id, element_key, rotation_members(person_id, calling_id, sort_order)")
     .eq("meeting_type_id", meetingTypeId);
 
   if (!rotations) return;
@@ -724,7 +802,7 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
     const r = row as {
       id: string;
       element_key: string;
-      rotation_members: { person_id: string; sort_order: number }[] | null;
+      rotation_members: { person_id: string | null; calling_id: string | null; sort_order: number }[] | null;
     };
 
     // Conducting is now set by applyFixedSacramentRoles above, not this
@@ -733,8 +811,9 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
     // `rotations` config row, if still configured, is simply unused now.)
     if (isSacrament && r.element_key === "conducting") continue;
 
-    const members = (r.rotation_members ?? []).sort((a, b) => a.sort_order - b.sort_order);
-    if (members.length === 0) continue;
+    if ((r.rotation_members ?? []).length === 0) continue;
+    const memberIds = await resolveRotationMemberIds(supabase, r.rotation_members ?? []);
+    if (memberIds.length === 0) continue; // all calling-based members are currently vacant
 
     const target = personAndTextKeys.has(r.element_key) ? "element_notes" : roleTable;
 
@@ -743,7 +822,7 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
       p_meeting_id: meetingId,
       p_element_key: r.element_key,
       p_target: target,
-      p_member_ids: members.map((m) => m.person_id),
+      p_member_ids: memberIds,
     });
 
     if (error) {
