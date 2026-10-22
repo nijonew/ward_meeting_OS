@@ -8,6 +8,7 @@ import {
   gridTableFor,
   pushRotationToUpcomingMeetings,
   pushFixedSacramentRolesToUpcomingMeetings,
+  PERSON_AND_TEXT_ROTATION_KEYS,
 } from "@/lib/data/rotations";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
@@ -47,6 +48,18 @@ function parseGridFieldName(name: string): { meetingId: string; roleKey: string 
  * direct edit of the applied assignment -- never touches any rotation's
  * member order or next_index pointer, so saving here doesn't skip
  * anyone in future meetings.
+ *
+ * **Bug found and fixed 2026-10-21**: Spiritual Thought/Handbook
+ * Training (`PERSON_AND_TEXT_ROTATION_KEYS`) are `person_and_text`
+ * catalog elements -- their person has only ever lived in
+ * `meeting_element_notes.person_id`, never in this role table. Routed
+ * there now, matching `pushRotationToUpcomingMeetings`/
+ * `applyRotationsToNewMeeting` -- see getAssignmentGrid's own doc
+ * comment (lib/data/rotations.ts) for the full bug writeup. Writes via
+ * upsert/update rather than delete-then-insert specifically so this
+ * never clobbers a free-text note already saved on the same element
+ * from the meeting's own Planning page -- only `person_id` is ever
+ * touched here.
  */
 export async function saveAssignmentGrid(
   meetingTypeSlug: MeetingTypeSlug,
@@ -72,6 +85,23 @@ export async function saveAssignmentGrid(
   for (const [meetingId, values] of byMeeting) {
     for (const roleKey of columnKeys) {
       const assignedToId = values[roleKey] || null;
+
+      if (PERSON_AND_TEXT_ROTATION_KEYS.has(roleKey)) {
+        if (assignedToId) {
+          const { error } = await supabase
+            .from("meeting_element_notes")
+            .upsert({ meeting_id: meetingId, element_key: roleKey, person_id: assignedToId }, { onConflict: "meeting_id,element_key" });
+          if (error) return { error: error.message };
+        } else {
+          const { error } = await supabase
+            .from("meeting_element_notes")
+            .update({ person_id: null })
+            .eq("meeting_id", meetingId)
+            .eq("element_key", roleKey);
+          if (error) return { error: error.message };
+        }
+        continue;
+      }
 
       const { error: deleteError } = await supabase
         .from(table)

@@ -309,12 +309,15 @@ export interface PushRotationResult {
 
 // spiritual_thought/handbook_training are 'person_and_text' catalog
 // elements -- their person goes in meeting_element_notes.person_id,
-// never in sacrament_assignments/bishopric_assignments.assigned_to_id
-// -- see applyRotationsToNewMeeting's own identical set. Kept as its
-// own copy rather than a shared export since the two functions need it
-// for slightly different things (routing a single insert vs. also
-// shaping the "already assigned" check below).
-const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "handbook_training"]);
+// never in sacrament_assignments/bishopric_assignments.assigned_to_id.
+// Exported and shared across every place that resolves/writes a
+// rotation-assigned person (pushRotationToUpcomingMeetings,
+// applyRotationsToNewMeeting, and the applied-assignment grid in
+// app/rotations/actions.ts) -- previously three separate copies of the
+// same set, which is exactly how the grid's own copy of this routing
+// went missing and stayed broken (2026-10-21, see getAssignmentGrid's
+// own doc comment below for that bug).
+export const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "handbook_training"]);
 
 /**
  * "Push rotations starting <date>" (the user's own request, 2026-09-06)
@@ -796,7 +799,6 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
   if (!rotations) return;
 
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
-  const personAndTextKeys = new Set(["spiritual_thought", "handbook_training"]);
 
   for (const row of rotations as unknown[]) {
     const r = row as {
@@ -815,7 +817,7 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
     const memberIds = await resolveRotationMemberIds(supabase, r.rotation_members ?? []);
     if (memberIds.length === 0) continue; // all calling-based members are currently vacant
 
-    const target = personAndTextKeys.has(r.element_key) ? "element_notes" : roleTable;
+    const target = PERSON_AND_TEXT_ROTATION_KEYS.has(r.element_key) ? "element_notes" : roleTable;
 
     const { error } = await supabase.rpc("apply_rotation_assignment", {
       p_rotation_id: r.id,
@@ -907,6 +909,29 @@ export function gridColumnsFor(meetingTypeSlug: MeetingTypeSlug): { key: string;
   return GRID_COLUMN_KEYS_BY_TYPE[meetingTypeSlug] ?? [];
 }
 
+/**
+ * Every person who "attends" a given non-Sacrament meeting type, by
+ * calling -- the exact same `meeting_type_members` -> calling ->
+ * current_holder_id resolution `computeEligiblePersonIds`'s own
+ * `"standing_attendees"` source already uses for a rotation's
+ * eligible-picker list, just exposed directly rather than requiring a
+ * `rotations` row to go through. Built 2026-10-21 (the user's own
+ * request: "limit all of the dropdown selections in non-sacrament
+ * meetings to only those who attend the meeting. digging through all
+ * members is tedious") -- used as the Planning page's own fallback
+ * person list (`allPeople`/`people`) for Bishopric Meeting/Ward
+ * Council/Youth Council, in place of every active person in the ward.
+ * Can come back empty (no calling currently maps to this meeting type
+ * via `meeting_type_members`) -- callers fall back to the full active-
+ * people list in that case rather than showing an unusably empty
+ * dropdown.
+ */
+export async function getMeetingAttendeePeople(meetingTypeId: string): Promise<PersonOption[]> {
+  const supabase = await createClient();
+  const ids = await computeEligiblePersonIds(supabase, "standing_attendees", null, meetingTypeId);
+  return personOptionsByIds(supabase, ids);
+}
+
 export async function personOptionsByIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ids: string[]
@@ -987,6 +1012,29 @@ async function eligiblePeopleByColumn(
  * generic rotation pointer, or a manual override). Meetings with none
  * created yet in that window simply won't appear -- run Generate
  * Meetings / Meeting Schedule first if a date is missing.
+ *
+ * **Bug found and fixed 2026-10-21** (the user's own report: pushing
+ * rotations left "about half" updated and the other half not, and
+ * editing Ward Council's own cells here looked like it reverted on
+ * save): this grid has always read/written Spiritual Thought/Handbook
+ * Training through `bishopric_assignments` like every other column --
+ * but those two are `person_and_text` catalog elements, whose person
+ * has only ever lived in `meeting_element_notes.person_id` (see
+ * PERSON_AND_TEXT_ROTATION_KEYS's own comment; `pushRotationToUpcomingMeetings`/
+ * `applyRotationsToNewMeeting` already route there correctly, fixed for
+ * the push tool specifically on 2026-10-21 -- this grid was the one
+ * sibling code path that never got the same fix). A push correctly
+ * filled `meeting_element_notes` and reported success, but this grid
+ * kept reading the empty `bishopric_assignments` row for that role and
+ * showed it as still blank -- indistinguishable from "didn't update."
+ * Editing one of these two columns directly here wrote into
+ * `bishopric_assignments` too, which this grid's own read-back then
+ * faithfully echoed back -- but that value was invisible to the actual
+ * agenda (the Planning page reads `meeting_element_notes` for these,
+ * never `bishopric_assignments`), which is likely what the second part
+ * of the report ("it went back to what was in the table before") was
+ * really describing once checked against the real agenda rather than
+ * this grid alone.
  */
 export async function getAssignmentGrid(
   meetingTypeSlug: MeetingTypeSlug,
@@ -1019,23 +1067,54 @@ export async function getAssignmentGrid(
   if (meetings.length === 0) return { columns, rows: [] };
 
   const meetingIds = meetings.map((m) => m.id);
-  const { data: assignmentRows } = await supabase
-    .from(table)
-    .select("meeting_id, role, assigned_to_id, people(name)")
-    .in("meeting_id", meetingIds);
+  const roleColumnKeys = columnKeys.filter((c) => !PERSON_AND_TEXT_ROTATION_KEYS.has(c.key)).map((c) => c.key);
+  const noteColumnKeys = columnKeys.filter((c) => PERSON_AND_TEXT_ROTATION_KEYS.has(c.key)).map((c) => c.key);
 
   const byMeeting = new Map<string, Record<string, GridCell>>();
-  for (const row of (assignmentRows ?? []) as unknown[]) {
-    const r = row as {
-      meeting_id: string;
-      role: string;
-      assigned_to_id: string | null;
-      people: { name?: string }[] | { name?: string } | null;
-    };
-    const person = Array.isArray(r.people) ? r.people[0] : r.people;
-    const cells = byMeeting.get(r.meeting_id) ?? {};
-    cells[r.role] = { assignedToId: r.assigned_to_id, assignedToName: person?.name ?? null };
-    byMeeting.set(r.meeting_id, cells);
+
+  if (roleColumnKeys.length > 0) {
+    const { data: assignmentRows } = await supabase
+      .from(table)
+      .select("meeting_id, role, assigned_to_id, people(name)")
+      .in("meeting_id", meetingIds)
+      .in("role", roleColumnKeys);
+
+    for (const row of (assignmentRows ?? []) as unknown[]) {
+      const r = row as {
+        meeting_id: string;
+        role: string;
+        assigned_to_id: string | null;
+        people: { name?: string }[] | { name?: string } | null;
+      };
+      const person = Array.isArray(r.people) ? r.people[0] : r.people;
+      const cells = byMeeting.get(r.meeting_id) ?? {};
+      cells[r.role] = { assignedToId: r.assigned_to_id, assignedToName: person?.name ?? null };
+      byMeeting.set(r.meeting_id, cells);
+    }
+  }
+
+  // Spiritual Thought/Handbook Training -- read from meeting_element_notes,
+  // not the role table (see this function's own doc comment above).
+  if (noteColumnKeys.length > 0) {
+    const { data: noteRows } = await supabase
+      .from("meeting_element_notes")
+      .select("meeting_id, element_key, person_id, person:person_id(name)")
+      .in("meeting_id", meetingIds)
+      .in("element_key", noteColumnKeys);
+
+    for (const row of (noteRows ?? []) as unknown[]) {
+      const r = row as {
+        meeting_id: string;
+        element_key: string;
+        person_id: string | null;
+        person: { name?: string }[] | { name?: string } | null;
+      };
+      if (!r.person_id) continue;
+      const person = Array.isArray(r.person) ? r.person[0] : r.person;
+      const cells = byMeeting.get(r.meeting_id) ?? {};
+      cells[r.element_key] = { assignedToId: r.person_id, assignedToName: person?.name ?? null };
+      byMeeting.set(r.meeting_id, cells);
+    }
   }
 
   const rows: GridRow[] = meetings.map((m) => ({

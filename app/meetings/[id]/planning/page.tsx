@@ -16,7 +16,7 @@ import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bi
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
-import { getEligiblePeopleByElementKey } from "@/lib/data/rotations";
+import { getEligiblePeopleByElementKey, getMeetingAttendeePeople } from "@/lib/data/rotations";
 import { buildAgendaRows, splitIntoSections, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
 import { ReviewSection } from "@/components/planning/ReviewSection";
@@ -148,7 +148,7 @@ export default async function PlanningViewPage({
 
   const [
     plannedElements,
-    people,
+    activePeople,
     roleAssignments,
     elementNotes,
     sacramentData,
@@ -228,6 +228,20 @@ export default async function PlanningViewPage({
     resolvedPlannedElements.length > 0
       ? resolvedPlannedElements
       : await getTemplateElements(meetingWithType.meetingTypeId, isSacrament ? sacramentData?.planning?.special_format ?? "standard" : null);
+
+  // Every person-picker on this page falls back to "the whole ward" by
+  // default (`allPeople`/`people`, below) -- restricted to this meeting
+  // type's own attendees for Bishopric Meeting/Ward Council/Youth
+  // Council (2026-10-21, the user's own request: "limit all of the
+  // dropdown selections in non-sacrament meetings to only those who
+  // attend the meeting. digging through all members is tedious").
+  // Sacrament Meeting is deliberately untouched -- it already has its
+  // own, more specific per-element calling restrictions
+  // (getEligiblePeopleByElementKey) and was never part of this ask.
+  // Falls back to every active person if no calling currently maps to
+  // this meeting type at all, rather than showing an empty dropdown.
+  const attendeePeople = isSacrament ? [] : await getMeetingAttendeePeople(meetingWithType.meetingTypeId);
+  const people = !isSacrament && attendeePeople.length > 0 ? attendeePeople : activePeople;
 
   const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
   const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;

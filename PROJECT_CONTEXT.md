@@ -2009,6 +2009,102 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-21: migration 079 couldn't run at all
+("syntax error at or near" an invisible character), the Assignment
+Grid never correctly supported Spiritual Thought/Handbook Training,
+and non-Sacrament dropdowns now restrict to meeting attendees.** Three
+things from one user report, right after migration 080 was confirmed
+run successfully (079 was not):
+
+1. **Migration 079's own file had a leading UTF-8 byte-order mark** --
+   the PowerShell script that generated it used `Set-Content -Encoding
+   utf8`, which (unlike `Write`/most other tools) prepends a BOM on
+   Windows PowerShell by default. Postgres's parser chokes on that
+   invisible character before it ever reaches the real first `--`
+   comment line (`ERROR: 42601: syntax error at or near "<BOM>"`).
+   Stripped from the file (migration 080 was written a different way
+   and never had this problem) -- the migration's own content is
+   otherwise unchanged. Ask the user to re-run `079` now.
+2. **Real, confirmed bug in the Assignment Grid (`/rotations`,
+   `getAssignmentGrid`/`saveAssignmentGrid` in `lib/data/rotations.ts`/
+   `app/rotations/actions.ts`)**: Spiritual Thought and Handbook
+   Training are `person_and_text` catalog elements -- their person has
+   only ever lived in `meeting_element_notes.person_id`, never in
+   `bishopric_assignments.assigned_to_id` (see
+   `PERSON_AND_TEXT_ROTATION_KEYS`, now exported and shared instead of
+   three separate copies). `pushRotationToUpcomingMeetings`/
+   `applyRotationsToNewMeeting` already route correctly (the former
+   fixed earlier this same session) -- but the Assignment Grid itself,
+   a third, sibling code path, was never fixed and still unconditionally
+   read/wrote both of these through `bishopric_assignments`. This
+   directly explains the user's own report: "I used the push to
+   upcoming meetings function on all of the rotations. About half of
+   the rotations updated, the other half didn't" -- of the ~10 generic
+   rotations (Bishopric ST/HT/OP/CP, Ward Council OP/CP/ST, Youth
+   Council OP/Thought/CP), the 4 Spiritual Thought/Handbook Training
+   ones were correctly filled into `meeting_element_notes` by the push
+   tool, but the Assignment Grid kept reading the (correctly empty)
+   `bishopric_assignments` row for those same roles and showed them as
+   still blank -- indistinguishable from "didn't work." Editing one of
+   those two columns directly in the grid and saving wrote into
+   `bishopric_assignments` too, which the grid's own read-back then
+   faithfully echoed -- internally consistent within the grid, but
+   invisible to the real agenda (the Planning page reads
+   `meeting_element_notes` for these, never `bishopric_assignments`),
+   which is the most likely explanation for "it went back to what was
+   in the table before" once checked against the actual meeting rather
+   than this grid alone. Fixed: the grid now reads/writes Spiritual
+   Thought/Handbook Training through `meeting_element_notes`
+   (update/upsert touching only `person_id`, never clobbering a
+   free-text note already saved from the meeting's own Planning page),
+   exactly like every other code path that resolves these two elements.
+   **Not independently confirmed**: whether Opening Prayer/Closing
+   Prayer (the other, correctly-routed half) were also showing wrong
+   values, as "many didn't update correctly" suggests -- no bug was
+   found there via code reading, and this assistant has no live
+   database access to reproduce it directly. Ask the user to re-test
+   push + manual Assignment Grid edits on all three non-Sacrament
+   meeting types now that the Spiritual Thought/Handbook Training
+   routing is fixed, and report back specifically on Opening/Closing
+   Prayer if those still misbehave -- that would point to a genuinely
+   different, not-yet-found bug.
+3. **New: non-Sacrament dropdowns restricted to the meeting's own
+   attendees** (the user's own request, same report: "I need to have
+   you limit all of the dropdown selections in non-sacrament meetings
+   to only those who attend the meeting. digging through all members
+   is tedious"). New `getMeetingAttendeePeople(meetingTypeId)`
+   (`lib/data/rotations.ts`) -- the exact same `meeting_type_members`
+   -> calling -> current holder resolution
+   `computeEligiblePersonIds`'s existing `"standing_attendees"` source
+   already used for a rotation's own eligible-picker list, just exposed
+   directly rather than needing a `rotations` row to go through it.
+   `app/meetings/[id]/planning/page.tsx`'s own person-picker fallback
+   (`allPeople`/`people`, previously every active person in the ward)
+   now resolves to this attendee list for Bishopric Meeting/Ward
+   Council/Youth Council -- falling back to every active person only
+   if no calling currently maps to that meeting type at all (an empty
+   attendee list), rather than showing an unusably empty dropdown.
+   This one change cascades to every picker that relies on that
+   fallback: `person_role` elements with no more specific rotation rule
+   of their own, `person_and_text` elements (Spiritual Thought/Handbook
+   Training's own person field), and Action Items' assignee picker
+   (`ActionItemsSection.tsx`). Sacrament Meeting is deliberately
+   untouched -- it already has its own, more specific per-element
+   calling restrictions (`getEligiblePeopleByElementKey`) and wasn't
+   part of this ask.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to re-run migration `079` (now that the BOM is gone), then check: the
+Assignment Grid correctly shows/saves Spiritual Thought/Handbook
+Training for Bishopric Meeting/Ward Council/Youth Council (and that
+editing them there is now reflected on the actual meeting's Planning
+page, not just within the grid); push-rotations now fills all ~10
+rotations correctly; and that Bishopric Meeting/Ward Council/Youth
+Council's own person-picker dropdowns (agenda roles, Spiritual
+Thought/Handbook Training, Action Items) now show a short, relevant
+list instead of every active person in the ward.
+
 **Historical speaker/prayer import, a friendlier history tool, and
 calling-based rotations, 2026-10-21** -- two related asks from the user
 in one message: "I would also like to do an import migration to

@@ -1,4 +1,4 @@
-﻿-- Migration 079: historical speaker/prayer import + a new
+-- Migration 079: historical speaker/prayer import + a new
 -- speaker_prayer_history_import table + informational people notes.
 --
 -- One-time bulk import of the ward's real "Speaker & Prayer History"
