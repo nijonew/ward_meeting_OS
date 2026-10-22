@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 078
+## Current migration number: 080
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -287,11 +287,16 @@ reconstructed from both:
 - `079` (one-time bulk import of the ward's real "Speaker & Prayer
   History" spreadsheet, attached directly by the user 2026-10-21 -- new
   `speaker_prayer_history_import` table plus `people.speaking_note`/
-  `praying_note`, see Known open items below for the full design):
-  **not yet run**.
+  `praying_note`, see Known open items below for the full design).
+  **First attempt failed in production** -- `ERROR: 42601: syntax
+  error at or near "<BOM>"`: the file had a leading UTF-8 byte-order
+  mark (the PowerShell script that generated it used `Set-Content
+  -Encoding utf8`, which prepends one on Windows PowerShell by
+  default) that Postgres's parser choked on before ever reaching the
+  real first line. Stripped -- confirmed run (with the corrected file).
 - `080` (new `rotation_members.calling_id`, nullable, additive -- lets a
   rotation cycle through callings instead of fixed people, see Known
-  open items below): **not yet run**.
+  open items below): confirmed run.
 
 Next migration should be `081_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
