@@ -3,16 +3,17 @@
 import { useActionState } from "react";
 import { pushFixedSacramentRoles } from "@/app/rotations/actions";
 
-const initialState: { error?: string; filled?: number; skippedExisting?: number; skippedVacant?: number } = {};
+const initialState: { error?: string; filled?: number; overwritten?: number; skippedVacant?: number } = {};
 
 /**
  * "Fill Presiding/Conducting starting <date>" -- the fixed-by-calling
  * counterpart to PushRotationForm (2026-10-21), for the one case that
  * tool can't reach: Presiding/Conducting have no rotation_members list
- * to push from at all. Fills whichever of the two is currently blank
- * for every upcoming Sacrament Meeting from the chosen date forward,
- * reading each calling's current holder fresh. See
- * pushFixedSacramentRolesToUpcomingMeetings (lib/data/rotations.ts).
+ * to push from at all. Resolves both roles for every upcoming
+ * Sacrament Meeting from the chosen date forward, reading each
+ * calling's current holder fresh, overwriting anything already
+ * assigned there (changed 2026-10-23 -- see
+ * pushFixedSacramentRolesToUpcomingMeetings, lib/data/rotations.ts).
  */
 export function PushFixedRolesForm() {
   const [state, formAction, pending] = useActionState(pushFixedSacramentRoles, initialState);
@@ -41,7 +42,7 @@ export function PushFixedRolesForm() {
       {state.filled !== undefined && (
         <p className="mt-1 text-[11px] text-ink-muted">
           Filled {state.filled} role{state.filled === 1 ? "" : "s"}
-          {state.skippedExisting ? ` (${state.skippedExisting} already had someone assigned)` : ""}
+          {state.overwritten ? ` (${state.overwritten} already had someone assigned and were overwritten)` : ""}
           {state.skippedVacant
             ? ` (${state.skippedVacant} skipped -- that calling currently has no holder set)`
             : ""}

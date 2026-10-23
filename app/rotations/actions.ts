@@ -14,8 +14,8 @@ import type { MeetingTypeSlug } from "@/lib/types";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 type ActionResult = { success: true } | { error: string };
-type PushActionResult = { error?: string; filled?: number; skippedExisting?: number };
-type PushFixedRolesActionResult = { error?: string; filled?: number; skippedExisting?: number; skippedVacant?: number };
+type PushActionResult = { error?: string; filled?: number; overwritten?: number };
+type PushFixedRolesActionResult = { error?: string; filled?: number; overwritten?: number; skippedVacant?: number };
 type SaveGridActionResult = { error?: string; success?: boolean };
 
 // None of these actions had a server-side check at all before this

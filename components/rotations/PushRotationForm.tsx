@@ -3,12 +3,13 @@
 import { useActionState } from "react";
 import { pushRotation } from "@/app/rotations/actions";
 
-const initialState: { error?: string; filled?: number; skippedExisting?: number } = {};
+const initialState: { error?: string; filled?: number; overwritten?: number } = {};
 
 /** "Push rotations starting <date>" -- fills the applied-assignment
  *  grid from this rotation's own order for every upcoming meeting from
- *  the chosen date forward, skipping any that already have someone
- *  assigned. See lib/data/rotations.ts's pushRotationToUpcomingMeetings. */
+ *  the chosen date forward, overwriting anything already assigned
+ *  there (changed 2026-10-23 -- see lib/data/rotations.ts's
+ *  pushRotationToUpcomingMeetings for the full reasoning). */
 export function PushRotationForm({ rotationId }: { rotationId: string }) {
   const boundPush = pushRotation.bind(null, rotationId);
   const [state, formAction, pending] = useActionState(boundPush, initialState);
@@ -37,7 +38,7 @@ export function PushRotationForm({ rotationId }: { rotationId: string }) {
       {state.filled !== undefined && (
         <p className="mt-1 text-[11px] text-ink-muted">
           Filled {state.filled} meeting{state.filled === 1 ? "" : "s"}
-          {state.skippedExisting ? ` (${state.skippedExisting} already had someone assigned and were left alone)` : ""}.
+          {state.overwritten ? ` (${state.overwritten} already had someone assigned and were overwritten)` : ""}.
         </p>
       )}
     </div>

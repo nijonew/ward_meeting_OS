@@ -304,7 +304,7 @@ async function resolveRotationMemberIds(
 
 export interface PushRotationResult {
   filled: number;
-  skippedExisting: number;
+  overwritten: number;
 }
 
 // spiritual_thought/handbook_training are 'person_and_text' catalog
@@ -326,11 +326,24 @@ export const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "hand
  * forward, to help with manual input (e.g. meetings created before a
  * rotation had any members at all -- see the empty-rotation-membership
  * finding elsewhere in PROJECT_CONTEXT.md -- never got their assignment
- * row written by applyRotationsToNewMeeting at creation time). Only
- * ever fills a blank cell -- a meeting that already has an assignment
- * for this role is left alone, matching every other "override wins"
- * rule already used throughout this app, and the pointer only advances
- * for the ones actually filled, so this can't skip anyone's turn.
+ * row written by applyRotationsToNewMeeting at creation time).
+ *
+ * **Changed 2026-10-23, per the user's own request** ("can we change the
+ * rotation push to overwrite every time we push and not just update
+ * what is blank?"): every meeting in range is now re-assigned from the
+ * rotation's own next-up order regardless of whether it already had a
+ * value -- a deliberate reversal of the original "only fills a blank
+ * cell" rule. This also means the rotation's pointer advances once per
+ * meeting in range every time this is pushed, including a meeting
+ * that's already been pushed before -- running this twice over the
+ * same date range reassigns everyone to whoever the rotation has moved
+ * on to by then, it does not repeat the same assignments. For the
+ * role-table target (sacrament_assignments/bishopric_assignments), the
+ * existing row for this role is deleted before the RPC inserts the new
+ * one, since that insert path isn't an upsert (see the RPC's own
+ * definition, migration 041) -- the element_notes target already
+ * upserts on (meeting_id, element_key), so no extra delete is needed
+ * there.
  *
  * **Bug found and fixed 2026-10-21** (the user's own report: "bishopric
  * meeting prayers and spiritual thoughts and handbook trainings...
@@ -342,13 +355,8 @@ export const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "hand
  * 'person_and_text' elements, read by the Planning page via
  * `elementNotes[key]?.person_id`, never via `roleAssignments[key]`).
  * Pushing either of those two therefore inserted a row into the wrong
- * table entirely -- invisible on the agenda regardless -- and also
- * meant the "already assigned" check below queried the wrong table
- * too, so a meeting that already had a real meeting_element_notes
- * value looked blank to this function and could get a second,
- * contradictory row written into bishopric_assignments on top of it.
- * Now routes both the check and the insert the same way
- * applyRotationsToNewMeeting already does.
+ * table entirely -- invisible on the agenda regardless. Now routes the
+ * write the same way applyRotationsToNewMeeting already does.
  */
 export async function pushRotationToUpcomingMeetings(
   rotationId: string,
@@ -392,10 +400,10 @@ export async function pushRotationToUpcomingMeetings(
     .gte("date", fromDateISO)
     .order("date", { ascending: true });
   const meetings = (meetingRows ?? []) as { id: string; date: string }[];
-  if (meetings.length === 0) return { filled: 0, skippedExisting: 0 };
+  if (meetings.length === 0) return { filled: 0, overwritten: 0 };
 
   const meetingIds = meetings.map((m) => m.id);
-  let alreadyAssigned: Set<string>;
+  let previouslyAssigned: Set<string>;
   if (isPersonAndText) {
     const { data: existingNotes } = await supabase
       .from("meeting_element_notes")
@@ -403,31 +411,40 @@ export async function pushRotationToUpcomingMeetings(
       .eq("element_key", rotation.element_key)
       .not("person_id", "is", null)
       .in("meeting_id", meetingIds);
-    alreadyAssigned = new Set(((existingNotes ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+    previouslyAssigned = new Set(((existingNotes ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
   } else {
     const { data: existingAssignments } = await supabase
       .from(table)
       .select("meeting_id")
       .eq("role", rotation.element_key)
       .in("meeting_id", meetingIds);
-    alreadyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+    previouslyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+
+    // The role-table insert the RPC does below is a plain INSERT, not an
+    // upsert (see apply_rotation_assignment, migration 041) -- unlike
+    // element_notes, which upserts on (meeting_id, element_key). Clear
+    // every existing row for this role across the whole range first so
+    // overwriting can never leave a duplicate row behind.
+    const { error: clearError } = await supabase
+      .from(table)
+      .delete()
+      .eq("role", rotation.element_key)
+      .in("meeting_id", meetingIds);
+    if (clearError) return { error: clearError.message };
   }
 
   let filled = 0;
-  let skippedExisting = 0;
+  let overwritten = 0;
 
-  // One apply_rotation_assignment call per meeting actually being
-  // filled -- the same RPC applyRotationsToNewMeeting already uses for
-  // a single new meeting, so the pointer advance stays atomic and
-  // correctly routed (element_notes vs. the role table) without this
-  // function needing to duplicate that logic by hand. It re-reads
-  // next_index live under a row lock each call, so there's no need to
-  // track it locally here either.
+  // One apply_rotation_assignment call per meeting in range -- the same
+  // RPC applyRotationsToNewMeeting already uses for a single new
+  // meeting, so the pointer advance stays atomic and correctly routed
+  // (element_notes vs. the role table) without this function needing to
+  // duplicate that logic by hand. It re-reads next_index live under a
+  // row lock each call, so there's no need to track it locally here
+  // either. Every meeting is processed regardless of whether it already
+  // had a value -- see this function's own 2026-10-23 doc comment above.
   for (const meeting of meetings) {
-    if (alreadyAssigned.has(meeting.id)) {
-      skippedExisting += 1;
-      continue;
-    }
     const { error } = await supabase.rpc("apply_rotation_assignment", {
       p_rotation_id: rotationId,
       p_meeting_id: meeting.id,
@@ -437,14 +454,15 @@ export async function pushRotationToUpcomingMeetings(
     });
     if (error) return { error: error.message };
     filled += 1;
+    if (previouslyAssigned.has(meeting.id)) overwritten += 1;
   }
 
-  return { filled, skippedExisting };
+  return { filled, overwritten };
 }
 
 export interface PushFixedRolesResult {
   filled: number;
-  skippedExisting: number;
+  overwritten: number;
   skippedVacant: number;
 }
 
@@ -462,17 +480,21 @@ export interface PushFixedRolesResult {
  * this re-applied them after the fact.
  *
  * For every upcoming Sacrament Meeting from the chosen date forward,
- * fills in whichever of Presiding/Conducting is currently blank --
- * reading each calling's CURRENT holder fresh (not a snapshot from
- * whenever the meeting was created) and each meeting's own date to
- * resolve Conducting's month-of-year cycle correctly per meeting, same
- * as applyFixedSacramentRoles does for a single new meeting. Only ever
- * fills a blank role; an already-assigned one is left alone, matching
- * every other "override wins" rule in this app. Silently skips (and
- * separately counts) a role whose calling is currently vacant, same
- * as applyFixedSacramentRoles -- surfaced back to the admin rather
- * than left invisible, since a vacant counselor calling is exactly the
- * kind of thing this tool exists to help notice.
+ * resolves whichever of Presiding/Conducting it's for -- reading each
+ * calling's CURRENT holder fresh (not a snapshot from whenever the
+ * meeting was created) and each meeting's own date to resolve
+ * Conducting's month-of-year cycle correctly per meeting, same as
+ * applyFixedSacramentRoles does for a single new meeting. Silently
+ * skips (and separately counts) a role whose calling is currently
+ * vacant, same as applyFixedSacramentRoles -- surfaced back to the
+ * admin rather than left invisible, since a vacant counselor calling
+ * is exactly the kind of thing this tool exists to help notice.
+ *
+ * **Changed 2026-10-23, per the user's own request** ("can we change
+ * the rotation push to overwrite every time we push and not just
+ * update what is blank?"): an already-assigned role is no longer left
+ * alone -- its existing row is deleted and replaced with whatever the
+ * calling's current holder resolves to now, every time this is pushed.
  */
 export async function pushFixedSacramentRolesToUpcomingMeetings(
   fromDateISO: string
@@ -486,7 +508,7 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
     .gte("date", fromDateISO)
     .order("date", { ascending: true });
   const meetings = (meetingRows ?? []) as { id: string; date: string }[];
-  if (meetings.length === 0) return { filled: 0, skippedExisting: 0, skippedVacant: 0 };
+  if (meetings.length === 0) return { filled: 0, overwritten: 0, skippedVacant: 0 };
 
   const meetingIds = meetings.map((m) => m.id);
   const { data: existingRows } = await supabase
@@ -508,7 +530,7 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
   );
 
   let filled = 0;
-  let skippedExisting = 0;
+  let overwritten = 0;
   let skippedVacant = 0;
 
   for (const meeting of meetings) {
@@ -519,23 +541,29 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
     ];
 
     for (const { role, personId } of roles) {
-      if (existing.has(`${meeting.id}::${role}`)) {
-        skippedExisting += 1;
-        continue;
-      }
       if (!personId) {
         skippedVacant += 1;
         continue;
+      }
+      const hadExisting = existing.has(`${meeting.id}::${role}`);
+      if (hadExisting) {
+        const { error: deleteError } = await supabase
+          .from("sacrament_assignments")
+          .delete()
+          .eq("meeting_id", meeting.id)
+          .eq("role", role);
+        if (deleteError) return { error: deleteError.message };
       }
       const { error } = await supabase
         .from("sacrament_assignments")
         .insert({ meeting_id: meeting.id, role, assigned_to_id: personId });
       if (error) return { error: error.message };
       filled += 1;
+      if (hadExisting) overwritten += 1;
     }
   }
 
-  return { filled, skippedExisting, skippedVacant };
+  return { filled, overwritten, skippedVacant };
 }
 
 /**

@@ -2014,6 +2014,54 @@ avoid confusing the two.
 
 ## Known open items
 
+**Rotation push changed to overwrite every time, not just fill blanks,
+2026-10-23** (the user's own request: "can we change the rotation push
+to overwrite every time we push and not just update what is blank?").
+Both push tools on `/rotations` -- "Push rotations starting `<date>`"
+(`pushRotationToUpcomingMeetings`, the generic rotation-member push)
+and "Fill Presiding/Conducting for upcoming meetings starting `<date>`"
+(`pushFixedSacramentRolesToUpcomingMeetings`, the fixed-by-calling
+counterpart, both `lib/data/rotations.ts`) -- had always skipped any
+meeting that already had a value for the role being pushed, per the
+original 2026-09-06 design's own "override wins, pointer only advances
+for what's actually applied" rule. This reverses that specifically for
+these two tools: every meeting in the chosen date range is now
+reassigned from the rotation's current next-up order (or, for
+Presiding/Conducting, each calling's current holder) regardless of
+whether it already had a value.
+
+A real consequence worth knowing before using it: since the generic
+push's pointer advances once per meeting it touches, and every meeting
+in range is now touched every time, **running the same push twice over
+the same date range does not reproduce the same assignments** -- it
+reassigns everyone to whoever the rotation has moved on to by the
+second push. This is a deliberate trade-off of "overwrite always"
+itself, not a bug -- re-running a push is now a real "recompute this
+whole stretch from here" action, not a safe no-op retry.
+
+Implementation note, not visible to the user: the role-table target
+(`sacrament_assignments`/`bishopric_assignments`) is a plain `INSERT`
+inside `apply_rotation_assignment` (migration 041), not an upsert --
+unlike the `meeting_element_notes` target, which already upserts on
+`(meeting_id, element_key)`. Overwriting that target safely now
+deletes any existing row for the role first, both in the generic push
+(one batched delete across the whole date range before the per-meeting
+RPC loop) and in the fixed-roles push (per role, right before its
+insert) -- without this, re-pushing would have left a duplicate row
+behind instead of replacing the old one. Both functions' result shape
+changed from `skippedExisting` to `overwritten` (now counting how many
+of the processed meetings already had a value, purely informational --
+nothing is skipped anymore) -- `PushRotationForm.tsx`/
+`PushFixedRolesForm.tsx` and the two action wrappers in
+`app/rotations/actions.ts` updated to match.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to try both push tools on `/rotations` over a date range that includes
+an already-filled meeting and confirm it's reassigned (not left alone),
+and that the result message now reads "... already had someone
+assigned and were overwritten" instead of "were left alone"/"skipped."
+
 **Bug found and fixed 2026-10-21: migration 079 couldn't run at all
 ("syntax error at or near" an invisible character), the Assignment
 Grid never correctly supported Spiritual Thought/Handbook Training,
