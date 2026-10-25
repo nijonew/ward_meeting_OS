@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
-import { formatAnnouncementSchedule } from "@/lib/data/announcements";
+import { formatAnnouncementSchedule, groupAndSortAnnouncements } from "@/lib/data/announcements";
+import type { PublishedAnnouncement } from "@/lib/data/general-submissions";
 
 /**
  * The actual public "Announcements" page linked from the landing
@@ -63,10 +65,69 @@ import { formatAnnouncementSchedule } from "@/lib/data/announcements";
  * always some other site, never a page within this app, so leaving
  * this one open rather than navigating away from the announcements
  * list is the more useful default.
+ *
+ * **Grouped by title + sorted soonest-to-latest, 2026-10-24** (the
+ * user's own report: "I have several assignments on different dates.
+ * They have the same title and I want them grouped together, but I
+ * want the overall sort to be by soonest date to latest date, but with
+ * those of the same title grouped together"). This list had only ever
+ * been sorted by `created_at DESC` -- newest-*submitted* first, with no
+ * relationship at all to each announcement's own event date -- so
+ * several same-titled entries for different dates (e.g. a few practice
+ * dates for the same assignment) could land scattered anywhere in the
+ * list depending purely on when each was typed in. `groupAndSortAnnouncements`
+ * (`lib/data/announcements.ts`) now clusters by exact title (trimmed,
+ * case-insensitive) and orders both the clusters and each cluster's own
+ * members by date, soonest first; a cluster with more than one member
+ * renders as one card with the shared title shown once, each dated
+ * instance listed underneath instead of repeating the full card N
+ * times. A cluster of exactly one (the ordinary case) still renders
+ * exactly as it always has.
  */
+
+/** Meta line, body, and Link button -- everything about one announcement
+ *  except its title and schedule, whose placement differs between a
+ *  lone announcement (title + schedule share one row) and a grouped
+ *  sub-item (no title of its own; the schedule effectively stands in
+ *  for it). Both call sites render those two separately, then this. */
+function AnnouncementBody({ a }: { a: PublishedAnnouncement }) {
+  const meta = a.organization ?? "";
+  return (
+    <>
+      {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
+      {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
+      {/* 2026-10-13, the user's own request: "can we get the word
+          'Link' to show up in the public views of the announcements as
+          a hyperlink to any announcement that has a url?" -- the title
+          itself has been clickable since 2026-10-10, but nothing
+          visibly said so; this is a plainer, more obvious second way
+          to reach the same URL. */}
+      {a.link_url && (
+        <a
+          href={a.link_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/20"
+        >
+          Link <span aria-hidden="true">&rarr;</span>
+        </a>
+      )}
+    </>
+  );
+}
+
+function LinkedText({ href, children }: { href: string | null; children: ReactNode }) {
+  if (!href) return <>{children}</>;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-ink-muted/40 hover:decoration-ink">
+      {children}
+    </a>
+  );
+}
 
 export default async function PublicAnnouncementsPage() {
   const announcements = await getPublishedAnnouncements();
+  const groups = groupAndSortAnnouncements(announcements);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -77,55 +138,53 @@ export default async function PublicAnnouncementsPage() {
       </section>
 
       <div className="rounded border border-rule bg-surface p-6">
-        {announcements.length === 0 ? (
+        {groups.length === 0 ? (
           <p className="text-sm text-ink-muted">Nothing posted yet.</p>
         ) : (
           <ul className="flex flex-col gap-4">
-            {announcements.map((a) => {
-              const schedule = formatAnnouncementSchedule(a);
-              const meta = a.organization ?? "";
-              return (
-                <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <span className="font-display text-base text-ink">
-                      {a.link_url ? (
-                        <a
-                          href={a.link_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline decoration-ink-muted/40 hover:decoration-ink"
-                        >
-                          {a.title}
-                        </a>
-                      ) : (
-                        a.title
-                      )}
-                    </span>
-                    {schedule && (
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                        {schedule}
+            {groups.map((group) => {
+              // A lone announcement keeps its exact original layout --
+              // title and schedule share one row, same as before this
+              // change. Only a real cluster (>1 same-titled item) gets
+              // the new shared-heading treatment.
+              if (group.items.length === 1) {
+                const a = group.items[0];
+                const schedule = formatAnnouncementSchedule(a);
+                return (
+                  <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="font-display text-base text-ink">
+                        <LinkedText href={a.link_url}>{a.title}</LinkedText>
                       </span>
-                    )}
-                  </div>
-                  {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
-                  {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
-                  {/* 2026-10-13, the user's own request: "can we get the
-                      word 'Link' to show up in the public views of the
-                      announcements as a hyperlink to any announcement
-                      that has a url?" -- the title itself has been
-                      clickable since 2026-10-10, but nothing visibly
-                      said so; this is a plainer, more obvious second
-                      way to reach the same URL. */}
-                  {a.link_url && (
-                    <a
-                      href={a.link_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/20"
-                    >
-                      Link <span aria-hidden="true">&rarr;</span>
-                    </a>
-                  )}
+                      {schedule && (
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                          {schedule}
+                        </span>
+                      )}
+                    </div>
+                    <AnnouncementBody a={a} />
+                  </li>
+                );
+              }
+
+              return (
+                <li key={group.items.map((a) => a.id).join("-")} className="rounded border border-rule/60 px-3 py-2 text-sm">
+                  <span className="font-display text-base text-ink">
+                    <LinkedText href={group.items[0].link_url}>{group.title}</LinkedText>
+                  </span>
+                  <ul className="mt-2 flex flex-col gap-3 divide-y divide-rule/40">
+                    {group.items.map((a) => {
+                      const schedule = formatAnnouncementSchedule(a);
+                      return (
+                        <li key={a.id} className="pt-3 first:pt-0">
+                          {schedule && (
+                            <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">{schedule}</p>
+                          )}
+                          <AnnouncementBody a={a} />
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </li>
               );
             })}

@@ -2022,6 +2022,63 @@ avoid confusing the two.
 
 ## Known open items
 
+**Public Announcements page grouped by title and sorted by event date,
+2026-10-24** (the user's own question, then request: "How are they
+currently sorted when displayed?... I have several assignments on
+different dates. They have the same title and I want them grouped
+together, but I want the overall sort to be by soonest date to latest
+date, but with those of the same title grouped together"). Answered
+the first question directly before building anything: `/announcements/public`
+(`getPublishedAnnouncements`, `lib/data/general-submissions.ts`) had
+only ever been sorted by `created_at DESC` -- newest-*submitted* first,
+with zero relationship to each announcement's own event date -- so
+several same-titled entries for different dates (the user's own
+example: "assignments" with the same title, different dates) could
+land scattered anywhere in the list depending purely on when each was
+typed in, not when it's actually happening.
+
+New `groupAndSortAnnouncements()` (`lib/data/announcements.ts`) --
+clusters announcements sharing an exact title (trimmed, case-
+insensitive) together, then sorts both the clusters themselves (by
+each cluster's own earliest dated member) and each cluster's own
+members, soonest-to-latest. An announcement with no `start_date` at
+all (General Information, a standing Lesson note, etc. -- legitimately
+has nothing to sort by) sorts to the very end, consistent with every
+other date-based sort already in this app treating "no date" as
+"last," never "first" -- among themselves, dateless clusters sort by
+title alphabetically. Purely a display-layer helper -- doesn't touch
+what's fetched or which rows count as published; `getPublishedAnnouncements`'s
+own already-filtered list is passed straight through.
+
+`app/announcements/public/page.tsx` renders a cluster of exactly one
+(the ordinary case -- most announcements don't share a title with
+anything else) exactly as it always has: title and schedule sharing
+one row, same layout as before this change. A real cluster (more than
+one same-titled item) renders as a single card with the shared title
+shown once, each dated instance listed underneath it instead of
+repeating the whole card -- avoids both the old scattering problem and
+a title needlessly repeated N times for what's really one assignment
+recurring on several dates.
+
+**Deliberately scoped to the public page only** -- the Bishopric/Ward
+Council/Youth Council Review section's own announcement listing
+(`lib/data/meeting-review.ts`) wasn't touched: it never even selects
+`start_date` today (only id/title/body/where_announced), so there was
+no date to sort by there in the first place, and the user's own report
+was specifically about "when displayed" on the page ward members
+actually see. Flag if that section should get the same treatment later
+-- it would need its own query extended with the date columns first.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- the sort/
+group logic itself was hand-traced against a worked example (three
+titles, one repeated across two dates, one dateless) before trusting
+it, since this is pure TypeScript with no DB dependency to verify
+against directly. Ask the user to check `/announcements/public` once
+deployed and confirm their own same-titled, multi-date announcements
+now cluster together under one heading, ordered soonest-to-latest
+overall.
+
 **Sacrament Meeting Music Planning (`/music`) rebuilt as a real
 editable grid, 2026-10-24** (the user's own request: "Can we update the
 look of sacrament meeting music planning? Basically I want someone

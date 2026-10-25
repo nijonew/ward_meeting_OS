@@ -135,3 +135,71 @@ export function formatAnnouncementSchedule(a: {
   if (dateRange && a.location) return `${dateRange} - ${a.location}`;
   return dateRange || a.location || null;
 }
+
+export interface AnnouncementGroup<T> {
+  /** The shared title every item in this group has in common -- taken
+   *  from whichever member sorts first within the group (its own
+   *  earliest-dated one, if any has a date). */
+  title: string;
+  items: T[];
+}
+
+/**
+ * Groups announcements sharing an exact title (trimmed, case-
+ * insensitive) together, then sorts everything soonest-date-to-latest
+ * -- both the groups themselves (by their own earliest dated member)
+ * and each group's own members -- for the public page's listing
+ * (2026-10-24, the user's own request, after noticing several
+ * same-titled entries for different dates scattered apart by the old
+ * submission-time sort: "I have several assignments on different
+ * dates. They have the same title and I want them grouped together,
+ * but I want the overall sort to be by soonest date to latest date,
+ * but with those of the same title grouped together").
+ *
+ * An announcement with no `start_date` at all (General Information, a
+ * standing Lesson note, etc. -- legitimately has nothing to sort by)
+ * sorts to the very end, as its own group if its title is otherwise
+ * unique, ordered alphabetically by title among the other dateless
+ * ones -- consistent with every other date-based sort already in this
+ * app treating "no date" as "last," never "first." Grouping is purely
+ * a display concern -- it doesn't change what's fetched or which rows
+ * are considered published; `getPublishedAnnouncements` (or any other
+ * already-filtered list) is meant to be passed straight through.
+ */
+export function groupAndSortAnnouncements<T extends { title: string; start_date: string | null; start_time: string | null }>(
+  announcements: T[]
+): AnnouncementGroup<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const a of announcements) {
+    const key = a.title.trim().toLowerCase();
+    const existing = groups.get(key);
+    if (existing) existing.push(a);
+    else groups.set(key, [a]);
+  }
+
+  const result: AnnouncementGroup<T>[] = Array.from(groups.values()).map((items) => {
+    // Dated items first (soonest first), dateless items last -- so
+    // `sorted[0].start_date` below is the group's own earliest date,
+    // or null only when nothing in the group has one at all.
+    const sorted = [...items].sort((a, b) => {
+      if (!a.start_date && !b.start_date) return 0;
+      if (!a.start_date) return 1;
+      if (!b.start_date) return -1;
+      if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+      return (a.start_time ?? "").localeCompare(b.start_time ?? "");
+    });
+    return { title: sorted[0].title, items: sorted };
+  });
+
+  result.sort((a, b) => {
+    const dateA = a.items[0].start_date;
+    const dateB = b.items[0].start_date;
+    if (!dateA && !dateB) return a.title.localeCompare(b.title);
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    return a.title.localeCompare(b.title);
+  });
+
+  return result;
+}
