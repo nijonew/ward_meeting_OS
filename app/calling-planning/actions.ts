@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { insertSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
+import { clearPoolExclusion } from "@/lib/data/pool-sweep";
 
 type ActionResult = { success: true } | { error: string };
 type SaveGridActionResult = { error?: string; success?: boolean };
@@ -236,21 +238,18 @@ export async function pushCallingToSacramentMeeting(
     // announced_meeting_id/status, leaving it permanently stuck
     // pointing at an announcement that no longer exists. See migration
     // 076 for the one-time repair of rows already stuck this way.
-    const { data: rabnm, error: rabnmError } = await supabase
-      .from("sacrament_rabnm")
-      .insert({ meeting_id: meetingId, type: item.type, calling_id: callingId, calling_planning_id: planningId })
-      .select("id")
-      .single();
-
-    if (rabnmError || !rabnm) {
-      return { error: rabnmError?.message ?? "Could not create the announcement." };
-    }
-
-    const { error: peopleError } = await supabase
-      .from("sacrament_rabnm_people")
-      .insert({ rabnm_id: rabnm.id, person_id: item.person_id });
-
-    if (peopleError) return { error: peopleError.message };
+    //
+    // Shared with pullCallingPlanningIntoMeeting/pullRabnmPlanningIntoMeeting
+    // (2026-10-25 consolidation) -- see lib/data/sacrament-rabnm-linking.ts.
+    const inserted = await insertSacramentRabnmLink({
+      meetingId,
+      type: item.type,
+      callingId,
+      personIds: [item.person_id],
+      linkColumn: "calling_planning_id",
+      linkId: planningId,
+    });
+    if ("error" in inserted) return inserted;
   }
 
   const { error: updateError } = await supabase
@@ -264,12 +263,13 @@ export async function pushCallingToSacramentMeeting(
   // pushed (2026-10-25, migration 084) -- a manual push here is a
   // deliberate "yes, announce this at this meeting after all," same
   // reasoning as pullCallingPlanningIntoMeeting's own identical fix.
-  await supabase
-    .from("calling_planning_meeting_exclusions")
-    .delete()
-    .eq("calling_planning_id", planningId)
-    .eq("meeting_id", meetingId)
-    .in("side", inserts.map((i) => i.type));
+  await clearPoolExclusion(
+    "calling_planning_meeting_exclusions",
+    "calling_planning_id",
+    planningId,
+    meetingId,
+    inserts.map((i) => i.type)
+  );
 
   revalidatePath("/calling-planning");
   revalidatePath(`/meetings/${meetingId}/planning`);

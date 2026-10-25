@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { sweepPastAnnouncements, compareAnnouncementsBySchedule } from "@/lib/data/announcements";
 import { SACRAMENT_MEETING_ANNOUNCEMENT_LABEL } from "@/lib/data/announcement-constants";
+import { sweepPoolIntoMeeting } from "@/lib/data/pool-sweep";
 
 /**
  * "I want to be able to select the announcements that need to be
@@ -177,24 +178,33 @@ export async function getAnnouncementsByPlannedElement(meetingId: string): Promi
  * pulled into this meeting, or explicitly excluded from it (an
  * admin's own Remove click -- see `sacrament_announcement_exclusions`
  * and `removeAnnouncementFromMeeting`'s own comment).
+ *
+ * **Sweep mechanics extracted into `sweepPoolIntoMeeting`, 2026-10-25**
+ * (`lib/data/pool-sweep.ts`) -- shared with
+ * `autoAnnounceReadyCallingPlanningItems` (`lib/data/calling-planning.ts`),
+ * which had independently grown the identical "skip anything already
+ * linked or excluded" shape. This function keeps its own "find the
+ * meeting's Announcements block" lookup and its one side's real
+ * eligibility/insert rule; only the generic loop moved. Pure refactor --
+ * no behavior change (each eligible announcement is now inserted one at
+ * a time rather than in a single batched insert, which has no visible
+ * effect on the end result).
  */
+interface AnnouncementSweepCandidate {
+  id: string;
+  where_announced: string | null;
+  start_date: string | null;
+  end_date: string | null;
+}
+
 export async function autoPullSacramentAnnouncements(meetingId: string, meetingDateIso: string): Promise<void> {
   const supabase = await createClient();
 
-  const [{ data: block }, { data: candidates }, { data: alreadyHere }, { data: excluded }] = await Promise.all([
-    supabase
-      .from("meeting_planned_elements")
-      .select("id, sort_order, meeting_elements(key)")
-      .eq("meeting_id", meetingId)
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("announcements")
-      .select("id, where_announced, start_date, end_date")
-      .eq("status", "published")
-      .ilike("where_announced", `%${SACRAMENT_MEETING_ANNOUNCEMENT_LABEL}%`),
-    supabase.from("sacrament_announcement_pulls").select("announcement_id").eq("meeting_id", meetingId),
-    supabase.from("sacrament_announcement_exclusions").select("announcement_id").eq("meeting_id", meetingId),
-  ]);
+  const { data: block } = await supabase
+    .from("meeting_planned_elements")
+    .select("id, sort_order, meeting_elements(key)")
+    .eq("meeting_id", meetingId)
+    .order("sort_order", { ascending: true });
 
   type BlockRow = { id: string; meeting_elements: { key?: string } | { key?: string }[] | null };
   const announcementsBlock = ((block ?? []) as BlockRow[]).find((row) => {
@@ -202,25 +212,54 @@ export async function autoPullSacramentAnnouncements(meetingId: string, meetingD
     return el?.key === "announcements";
   });
   if (!announcementsBlock) return;
+  const plannedElementId = announcementsBlock.id;
 
-  const alreadyPulled = new Set((alreadyHere ?? []).map((r) => (r as { announcement_id: string }).announcement_id));
-  const excludedIds = new Set((excluded ?? []).map((r) => (r as { announcement_id: string }).announcement_id));
-
-  const toInsert = ((candidates ?? []) as { id: string; where_announced: string | null; start_date: string | null; end_date: string | null }[])
-    .filter((a) => {
-      if (alreadyPulled.has(a.id) || excludedIds.has(a.id)) return false;
-      // Exact-label match, not just a substring hit -- where_announced
-      // is a comma-joined list (MULTI_SELECT_SEPARATOR), so the ilike
-      // query above is a cheap pre-filter only; confirm the real token.
-      const labels = (a.where_announced ?? "").split(",").map((s) => s.trim());
-      if (!labels.includes(SACRAMENT_MEETING_ANNOUNCEMENT_LABEL)) return false;
-      if (!a.start_date) return true; // no dates at all -- always active while published
-      const windowEnd = a.end_date ?? a.start_date;
-      return meetingDateIso >= a.start_date && meetingDateIso <= windowEnd;
-    })
-    .map((a) => ({ announcement_id: a.id, meeting_id: meetingId, planned_element_id: announcementsBlock.id }));
-
-  if (toInsert.length > 0) {
-    await supabase.from("sacrament_announcement_pulls").insert(toInsert);
-  }
+  await sweepPoolIntoMeeting<AnnouncementSweepCandidate>(meetingId, {
+    fetchCandidates: async () => {
+      const { data: candidates } = await supabase
+        .from("announcements")
+        .select("id, where_announced, start_date, end_date")
+        .eq("status", "published")
+        .ilike("where_announced", `%${SACRAMENT_MEETING_ANNOUNCEMENT_LABEL}%`);
+      return (candidates ?? []) as AnnouncementSweepCandidate[];
+    },
+    idOf: (row) => row.id,
+    sides: [
+      {
+        side: "default",
+        isEligible: (row) => {
+          // Exact-label match, not just a substring hit -- where_announced
+          // is a comma-joined list (MULTI_SELECT_SEPARATOR), so the ilike
+          // query above is a cheap pre-filter only; confirm the real token.
+          const labels = (row.where_announced ?? "").split(",").map((s) => s.trim());
+          if (!labels.includes(SACRAMENT_MEETING_ANNOUNCEMENT_LABEL)) return false;
+          if (!row.start_date) return true; // no dates at all -- always active while published
+          const windowEnd = row.end_date ?? row.start_date;
+          return meetingDateIso >= row.start_date && meetingDateIso <= windowEnd;
+        },
+        insert: async (row, mtgId) => {
+          const { error } = await supabase
+            .from("sacrament_announcement_pulls")
+            .insert({ announcement_id: row.id, meeting_id: mtgId, planned_element_id: plannedElementId });
+          return !error;
+        },
+      },
+    ],
+    alreadyLinked: async (mtgId, poolIds) => {
+      const { data: alreadyHere } = await supabase
+        .from("sacrament_announcement_pulls")
+        .select("announcement_id")
+        .eq("meeting_id", mtgId)
+        .in("announcement_id", poolIds);
+      return new Set(((alreadyHere ?? []) as { announcement_id: string }[]).map((r) => `${r.announcement_id}::default`));
+    },
+    excluded: async (mtgId, poolIds) => {
+      const { data: excludedRows } = await supabase
+        .from("sacrament_announcement_exclusions")
+        .select("announcement_id")
+        .eq("meeting_id", mtgId)
+        .in("announcement_id", poolIds);
+      return new Set(((excludedRows ?? []) as { announcement_id: string }[]).map((r) => `${r.announcement_id}::default`));
+    },
+  });
 }

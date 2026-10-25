@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getActivePeople } from "@/lib/data/people";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import { insertSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
+import { sweepPoolIntoMeeting } from "@/lib/data/pool-sweep";
 
 export interface CallingDetail {
   id: string;
@@ -292,7 +294,28 @@ export async function getCallableCallingPlanningItems(): Promise<{
  * alongside the existing "already linked" check -- which
  * `pullCallingPlanningIntoMeeting`/`pushCallingToSacramentMeeting`
  * both clear again on a deliberate manual re-add.
+ *
+ * **Sweep mechanics extracted into `sweepPoolIntoMeeting`, 2026-10-25**
+ * (`lib/data/pool-sweep.ts`) -- shared with `autoPullSacramentAnnouncements`
+ * (`lib/data/sacrament-announcements.ts`), which had independently grown
+ * the identical "skip anything already linked or excluded" shape. This
+ * function keeps its own "find the single nearest-upcoming meeting"
+ * logic and its two sides' real eligibility/insert rules; only the
+ * generic loop moved. Each side's `insert` calls Module 1's
+ * `insertSacramentRabnmLink` (`lib/data/sacrament-rabnm-linking.ts`),
+ * the same helper `pullCallingPlanningIntoMeeting`/
+ * `pushCallingToSacramentMeeting` already call for a manual pull. Pure
+ * refactor -- no behavior change.
  */
+interface CallingPlanningSweepRow {
+  id: string;
+  calling_id: string;
+  calling_status: string;
+  candidate_person_ids: string[] | null;
+  release_person_id: string | null;
+  release_status: string;
+}
+
 export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
   const supabase = await createClient();
   const { dateIso: today } = getMountainTimeNow();
@@ -310,88 +333,76 @@ export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
   const meetingId = (meetingRows?.[0] as { id: string } | undefined)?.id;
   if (!meetingId) return;
 
-  const { data: rows } = await supabase
-    .from("calling_planning")
-    .select("id, calling_id, calling_status, candidate_person_ids, release_person_id, release_status")
-    .or("calling_status.eq.to_announce,release_status.eq.to_announce");
-
-  if (!rows || rows.length === 0) return;
-
-  const rowIds = (rows as { id: string }[]).map((r) => r.id);
-  const [{ data: existingLinks }, { data: exclusions }] = await Promise.all([
-    supabase
-      .from("sacrament_rabnm")
-      .select("calling_planning_id, type")
-      .eq("meeting_id", meetingId)
-      .in("calling_planning_id", rowIds),
-    supabase
-      .from("calling_planning_meeting_exclusions")
-      .select("calling_planning_id, side")
-      .eq("meeting_id", meetingId)
-      .in("calling_planning_id", rowIds),
-  ]);
-
-  const alreadyLinked = new Set(
-    ((existingLinks ?? []) as { calling_planning_id: string | null; type: string }[]).map(
-      (l) => `${l.calling_planning_id}::${l.type}`
-    )
-  );
-  const excluded = new Set(
-    ((exclusions ?? []) as { calling_planning_id: string; side: string }[]).map((e) => `${e.calling_planning_id}::${e.side}`)
-  );
-
-  for (const row of rows as {
-    id: string;
-    calling_id: string;
-    calling_status: string;
-    candidate_person_ids: string[] | null;
-    release_person_id: string | null;
-    release_status: string;
-  }[]) {
-    const candidateIds = row.candidate_person_ids ?? [];
-    let linkedAny = false;
-
-    if (
-      row.calling_status === "to_announce" &&
-      candidateIds.length === 1 &&
-      !alreadyLinked.has(`${row.id}::new_calling`) &&
-      !excluded.has(`${row.id}::new_calling`)
-    ) {
-      const { data: rabnm } = await supabase
+  await sweepPoolIntoMeeting<CallingPlanningSweepRow>(meetingId, {
+    fetchCandidates: async () => {
+      const { data: rows } = await supabase
+        .from("calling_planning")
+        .select("id, calling_id, calling_status, candidate_person_ids, release_person_id, release_status")
+        .or("calling_status.eq.to_announce,release_status.eq.to_announce");
+      return (rows ?? []) as CallingPlanningSweepRow[];
+    },
+    idOf: (row) => row.id,
+    sides: [
+      {
+        side: "new_calling",
+        isEligible: (row) => row.calling_status === "to_announce" && (row.candidate_person_ids ?? []).length === 1,
+        insert: async (row, mtgId) => {
+          const inserted = await insertSacramentRabnmLink({
+            meetingId: mtgId,
+            type: "new_calling",
+            callingId: row.calling_id,
+            personIds: [row.candidate_person_ids![0]],
+            linkColumn: "calling_planning_id",
+            linkId: row.id,
+          });
+          return !("error" in inserted);
+        },
+      },
+      {
+        side: "release",
+        isEligible: (row) => Boolean(row.release_person_id) && row.release_status === "to_announce",
+        insert: async (row, mtgId) => {
+          const inserted = await insertSacramentRabnmLink({
+            meetingId: mtgId,
+            type: "release",
+            callingId: row.calling_id,
+            personIds: [row.release_person_id!],
+            linkColumn: "calling_planning_id",
+            linkId: row.id,
+          });
+          return !("error" in inserted);
+        },
+      },
+    ],
+    alreadyLinked: async (mtgId, poolIds) => {
+      const { data: existingLinks } = await supabase
         .from("sacrament_rabnm")
-        .insert({ meeting_id: meetingId, type: "new_calling", calling_id: row.calling_id, calling_planning_id: row.id })
-        .select("id")
-        .single();
-      if (rabnm) {
-        await supabase.from("sacrament_rabnm_people").insert({ rabnm_id: rabnm.id, person_id: candidateIds[0] });
-        linkedAny = true;
-      }
-    }
-
-    if (
-      row.release_person_id &&
-      row.release_status === "to_announce" &&
-      !alreadyLinked.has(`${row.id}::release`) &&
-      !excluded.has(`${row.id}::release`)
-    ) {
-      const { data: rabnm } = await supabase
-        .from("sacrament_rabnm")
-        .insert({ meeting_id: meetingId, type: "release", calling_id: row.calling_id, calling_planning_id: row.id })
-        .select("id")
-        .single();
-      if (rabnm) {
-        await supabase.from("sacrament_rabnm_people").insert({ rabnm_id: rabnm.id, person_id: row.release_person_id });
-        linkedAny = true;
-      }
-    }
-
-    if (linkedAny) {
+        .select("calling_planning_id, type")
+        .eq("meeting_id", mtgId)
+        .in("calling_planning_id", poolIds);
+      return new Set(
+        ((existingLinks ?? []) as { calling_planning_id: string | null; type: string }[]).map(
+          (l) => `${l.calling_planning_id}::${l.type}`
+        )
+      );
+    },
+    excluded: async (mtgId, poolIds) => {
+      const { data: exclusions } = await supabase
+        .from("calling_planning_meeting_exclusions")
+        .select("calling_planning_id, side")
+        .eq("meeting_id", mtgId)
+        .in("calling_planning_id", poolIds);
+      return new Set(
+        ((exclusions ?? []) as { calling_planning_id: string; side: string }[]).map((e) => `${e.calling_planning_id}::${e.side}`)
+      );
+    },
+    onLinked: async (row, mtgId) => {
       await supabase
         .from("calling_planning")
-        .update({ announced_meeting_id: meetingId, updated_at: new Date().toISOString() })
+        .update({ announced_meeting_id: mtgId, updated_at: new Date().toISOString() })
         .eq("id", row.id);
-    }
-  }
+    },
+  });
 }
 
 /**

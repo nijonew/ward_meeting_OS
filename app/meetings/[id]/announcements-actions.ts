@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { clearPoolExclusion } from "@/lib/data/pool-sweep";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -67,11 +68,7 @@ export async function pullAnnouncementIntoMeeting(
     return { error: error.message };
   }
 
-  await supabase
-    .from("sacrament_announcement_exclusions")
-    .delete()
-    .eq("meeting_id", meetingId)
-    .eq("announcement_id", announcementId);
+  await clearPoolExclusion("sacrament_announcement_exclusions", "announcement_id", announcementId, meetingId);
 
   revalidateBoth(meetingId);
   return { success: true };

@@ -1,8 +1,20 @@
 "use server";
 
+// The four pull/remove functions below each used to carry their own
+// copy of the "insert into sacrament_rabnm + sacrament_rabnm_people" /
+// "find and delete them back out" logic -- extracted 2026-10-25 into
+// `lib/data/sacrament-rabnm-linking.ts` (shared by Calling Planning and
+// RABNM Planning, the two pools that both realize a pull this way) and
+// the exclusion-clearing helper into `lib/data/pool-sweep.ts` (shared
+// with the Announcements pull, which has the identical "a manual
+// re-add clears a prior Remove" need). Pure refactor -- no behavior
+// change, see PROJECT_CONTEXT.md's Known open items for the full
+// writeup.
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { insertSacramentRabnmLink, removeSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
+import { clearPoolExclusion } from "@/lib/data/pool-sweep";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -97,17 +109,15 @@ export async function pullCallingPlanningIntoMeeting(
     statusUpdate.release_status = "complete";
   }
 
-  const { data: rabnm, error: rabnmError } = await supabase
-    .from("sacrament_rabnm")
-    .insert({ meeting_id: meetingId, type, calling_id: planning.calling_id, calling_planning_id: planningId })
-    .select("id")
-    .single();
-  if (rabnmError || !rabnm) return { error: rabnmError?.message ?? "Could not create the announcement." };
-
-  const { error: peopleError } = await supabase
-    .from("sacrament_rabnm_people")
-    .insert({ rabnm_id: rabnm.id, person_id: personId });
-  if (peopleError) return { error: peopleError.message };
+  const inserted = await insertSacramentRabnmLink({
+    meetingId,
+    type,
+    callingId: planning.calling_id,
+    personIds: [personId],
+    linkColumn: "calling_planning_id",
+    linkId: planningId,
+  });
+  if ("error" in inserted) return inserted;
 
   const { error: updateError } = await supabase
     .from("calling_planning")
@@ -115,12 +125,7 @@ export async function pullCallingPlanningIntoMeeting(
     .eq("id", planningId);
   if (updateError) return { error: updateError.message };
 
-  await supabase
-    .from("calling_planning_meeting_exclusions")
-    .delete()
-    .eq("calling_planning_id", planningId)
-    .eq("meeting_id", meetingId)
-    .eq("side", type);
+  await clearPoolExclusion("calling_planning_meeting_exclusions", "calling_planning_id", planningId, meetingId, [type]);
 
   revalidateBoth(meetingId);
   return { success: true };
@@ -169,35 +174,23 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
   if (denied) return denied;
 
   const supabase = await createClient();
-  const { data: rabnmRow } = await supabase
-    .from("sacrament_rabnm")
-    .select("id, type")
-    .eq("meeting_id", meetingId)
-    .eq("calling_planning_id", planningId)
-    .maybeSingle();
+  const removed = await removeSacramentRabnmLink(meetingId, "calling_planning_id", planningId);
+  if ("error" in removed) return removed;
 
-  if (rabnmRow) {
-    const { error: peopleDeleteError } = await supabase
-      .from("sacrament_rabnm_people")
-      .delete()
-      .eq("rabnm_id", rabnmRow.id);
-    if (peopleDeleteError) return { error: peopleDeleteError.message };
-
-    const { error: deleteError } = await supabase.from("sacrament_rabnm").delete().eq("id", rabnmRow.id);
-    if (deleteError) return { error: deleteError.message };
-  }
-
-  const statusUpdate: Record<string, string> = rabnmRow?.type === "release" ? { release_status: "to_announce" } : {};
+  const statusUpdate: Record<string, string> = removed.removedType === "release" ? { release_status: "to_announce" } : {};
   const { error: updateError } = await supabase
     .from("calling_planning")
     .update({ announced_meeting_id: null, ...statusUpdate, updated_at: new Date().toISOString() })
     .eq("id", planningId);
   if (updateError) return { error: updateError.message };
 
-  if (rabnmRow) {
+  if (removed.removedType) {
     await supabase
       .from("calling_planning_meeting_exclusions")
-      .upsert({ calling_planning_id: planningId, meeting_id: meetingId, side: rabnmRow.type }, { onConflict: "calling_planning_id,meeting_id,side", ignoreDuplicates: true });
+      .upsert(
+        { calling_planning_id: planningId, meeting_id: meetingId, side: removed.removedType },
+        { onConflict: "calling_planning_id,meeting_id,side", ignoreDuplicates: true }
+      );
   }
 
   revalidateBoth(meetingId);
@@ -238,26 +231,17 @@ export async function pullRabnmPlanningIntoMeeting(meetingId: string, planningId
     return { error: "This has already been announced in a meeting." };
   }
 
-  const { data: rabnm, error: rabnmError } = await supabase
-    .from("sacrament_rabnm")
-    .insert({
-      meeting_id: meetingId,
-      type: planning.type,
-      detail: planning.detail,
-      event_date: planning.event_date,
-      rabnm_planning_id: planningId,
-    })
-    .select("id")
-    .single();
-  if (rabnmError || !rabnm) return { error: rabnmError?.message ?? "Could not create the announcement." };
-
   const personRows = (planning.sacrament_rabnm_planning_people ?? []) as { person_id: string }[];
-  if (personRows.length > 0) {
-    const { error: peopleError } = await supabase
-      .from("sacrament_rabnm_people")
-      .insert(personRows.map((p) => ({ rabnm_id: rabnm.id, person_id: p.person_id })));
-    if (peopleError) return { error: peopleError.message };
-  }
+  const inserted = await insertSacramentRabnmLink({
+    meetingId,
+    type: planning.type,
+    detail: planning.detail,
+    eventDate: planning.event_date,
+    personIds: personRows.map((p) => p.person_id),
+    linkColumn: "rabnm_planning_id",
+    linkId: planningId,
+  });
+  if ("error" in inserted) return inserted;
 
   const { error: updateError } = await supabase
     .from("sacrament_rabnm_planning")
@@ -281,23 +265,8 @@ export async function removeRabnmPlanningFromMeeting(meetingId: string, planning
   if (denied) return denied;
 
   const supabase = await createClient();
-  const { data: rabnmRow } = await supabase
-    .from("sacrament_rabnm")
-    .select("id")
-    .eq("meeting_id", meetingId)
-    .eq("rabnm_planning_id", planningId)
-    .maybeSingle();
-
-  if (rabnmRow) {
-    const { error: peopleDeleteError } = await supabase
-      .from("sacrament_rabnm_people")
-      .delete()
-      .eq("rabnm_id", rabnmRow.id);
-    if (peopleDeleteError) return { error: peopleDeleteError.message };
-
-    const { error: deleteError } = await supabase.from("sacrament_rabnm").delete().eq("id", rabnmRow.id);
-    if (deleteError) return { error: deleteError.message };
-  }
+  const removed = await removeSacramentRabnmLink(meetingId, "rabnm_planning_id", planningId);
+  if ("error" in removed) return removed;
 
   const { error: updateError } = await supabase
     .from("sacrament_rabnm_planning")

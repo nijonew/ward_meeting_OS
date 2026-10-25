@@ -2038,6 +2038,81 @@ avoid confusing the two.
 
 ## Known open items
 
+**Pool-pattern consolidation, logic only, 2026-10-25** -- prompted by
+a reflective question the user asked after fixing two instances of
+the identical bug this same day (the Announcements exclusion fix and
+the Calling Planning exclusion fix just below): "Knowing what you know
+now about this project how would you have organized the back end if
+you were to start it over again? Can we take some of those principles
+and make changes now that improve organization, function, consistency,
+performance of the app based on improvements to the back end?" The
+user picked this consolidation first out of several suggested
+candidates: "Let's start with the pool-pattern consolidation."
+
+Three separate systems built this session -- Calling Planning,
+RABNM Planning, and Announcements, each "a standing pool, pulled into
+a specific meeting, respecting what's already there and what was
+explicitly removed" -- had each independently grown the same two
+pieces of real, duplicated logic. The exact "a manual Remove doesn't
+stick against the lazy auto-sweep" bug (see the migration 083/084
+entries just below) had to be found and fixed twice in this one
+session for exactly that reason: the logic lived in two separate
+places with no shared code to fix once.
+
+**Scope, confirmed directly with the user before touching anything**:
+the three systems are not uniform enough to collapse into one schema
+without a real behavior change (Announcements supports a many-to-many,
+multi-meeting pull via a real join table; Calling Planning and RABNM
+Planning each track a single `announced_meeting_id` on their own pool
+row, one meeting at a time) -- asked how far to take it, the user
+chose "Logic only, schema untouched." No migration, no schema change,
+no behavior change for any of the three features -- a pure TypeScript
+refactor.
+
+Two genuinely-shared patterns, each shared by a different pair:
+- **New `lib/data/sacrament-rabnm-linking.ts`** -- `insertSacramentRabnmLink`/
+  `removeSacramentRabnmLink`, the "realize a pull as a real
+  `sacrament_rabnm`(+`sacrament_rabnm_people`) row, or undo it" mechanics
+  Calling Planning and RABNM Planning both duplicated near-verbatim
+  across all four of `app/meetings/[id]/ward-business-actions.ts`'s
+  pull/remove functions. Each caller keeps its own validation
+  (narrow-to-one-candidate, release-person-set checks), its own
+  status-update decisions, and its own exclusion handling -- only the
+  actual two-table read/write moved.
+- **New `lib/data/pool-sweep.ts`** -- `sweepPoolIntoMeeting<TRow>`, one
+  generic function covering "sweep eligible pool rows into a specific
+  meeting, skipping anything already linked or explicitly excluded,"
+  parameterized by one or more named `sides` (Calling Planning has two,
+  `new_calling`/`release`; Announcements has one, `default`) so both
+  shapes fit the same loop. `autoAnnounceReadyCallingPlanningItems`
+  (`lib/data/calling-planning.ts`) and `autoPullSacramentAnnouncements`
+  (`lib/data/sacrament-announcements.ts`) each keep their own "which
+  meeting(s) do I even target" strategy (the single nearest-upcoming
+  one vs. every in-window meeting whose Planning page loads) and their
+  own real eligibility/insert rules -- only the generic skip-already-
+  linked-or-excluded loop moved. Also exports `clearPoolExclusion`, the
+  ~5-line "delete the matching exclusion row on a deliberate manual
+  re-add" block `pullCallingPlanningIntoMeeting`, `pullAnnouncementIntoMeeting`,
+  and `pushCallingToSacramentMeeting` each had their own copy of.
+- One small, accepted behavior difference with zero visible effect:
+  `autoPullSacramentAnnouncements` now inserts each eligible
+  announcement one at a time through the shared sweep rather than in a
+  single batched insert -- same end result, slightly more round trips
+  in the rare case of several announcements becoming eligible in the
+  same sweep.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- this is a
+pure refactor with no migration, so there's nothing new to run. Ask
+the user to re-walk the exact same checks already used to confirm the
+original three features and the two bug fixes below still hold:
+pulling/removing an item for each of the three pool types still works
+and shows up correctly on the meeting; removing a release/new-calling
+(migration 084) or a Sacrament-Meeting-flagged announcement (migration
+083) from the meeting that's currently the nearest-upcoming one stays
+removed across a page reload; manually re-adding either one afterward
+still works.
+
 **Bug found and fixed 2026-10-25: removing a released (or newly
 called) individual from Sacrament Meeting's Ward Business didn't
 actually stick (migration `084`, not yet run).** The user's own
