@@ -2033,6 +2033,54 @@ avoid confusing the two.
 
 ## Known open items
 
+**`/rotations`' Rotation Order cards (and the applied-assignment grid
+above them) now sort by meeting, in meeting order, 2026-10-25** --
+the user's own request: "sort the 'rotation' categories on the page
+by meeting rather than alphabetically by item name... in meeting
+order, meaning opening prayer first, spiritual thought second (if
+applicable), handbook training third (if applicable), and closing
+prayer last for each meeting... also in the table view above the
+rotation categories."
+
+`GRID_COLUMN_KEYS_BY_TYPE` (`lib/data/rotations.ts`) -- already the
+one source of truth for the applied-assignment grid's own column
+order per meeting type -- had Closing Prayer sitting second (right
+after Opening Prayer, before Spiritual Thought/Handbook Training) for
+Bishopric Meeting/Ward Council/Youth Council, not last. Reordered to
+Opening Prayer, Spiritual Thought, Handbook Training (Bishopric
+Meeting only -- the other two don't have it, so it's simply absent
+from their own column list, matching "if applicable"), Closing Prayer.
+Sacrament Meeting's own three columns (Conducting, Chorister,
+Organist) are unaffected -- no prayer sequence involved there at all.
+
+The Rotation Order cards below the grid previously came from
+`getAllRotations()`'s plain `.order("element_key")` -- alphabetical by
+the raw key ("chorister" before "closing_prayer" before
+"handbook_training" before "opening_prayer"...), with no relationship
+to either which meeting a rotation belongs to or when it actually
+happens. New `sortRotationsByMeeting()` (`app/rotations/page.tsx`)
+groups by meeting type first (`MEETING_TYPE_TABS`'s own order --
+Sacrament, Bishopric, Ward Council, Youth Council), then within each
+group reuses `gridColumnsFor(slug)` -- the exact same per-type order
+the grid above was just reordered to use -- so the two can never drift
+apart from each other. Sacrament Meeting's own two cards (Chorister,
+Organist -- Presiding/Conducting are filtered out earlier, being
+fixed-by-calling rather than real rotations) have no "meeting order"
+concept to apply, so they just keep `gridColumnsFor`'s own listed
+order for that type.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean, confirming it wasn't caused by anything touched here), same
+no-live-database-access gap as everything else in this project -- ask
+the user to open `/rotations` for each of the three non-Sacrament
+meeting types and confirm both the grid's own columns and the
+Rotation Order cards below it now read Opening Prayer, Spiritual
+Thought, Handbook Training (Bishopric Meeting only), Closing Prayer,
+in that order, and that Sacrament Meeting's own tab/cards are
+unaffected.
+
 **The public page's soonest-to-latest announcement sort now also
 applies to how announcements order within a meeting, 2026-10-25** --
 the user's own request: "I would like for the sort we discussed for

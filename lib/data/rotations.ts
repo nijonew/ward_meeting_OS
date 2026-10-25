@@ -909,21 +909,28 @@ const GRID_COLUMN_KEYS_BY_TYPE: Record<MeetingTypeSlug, { key: string; label: st
     { key: "chorister", label: "Chorister" },
     { key: "organist", label: "Organist" },
   ],
+  // Meeting order, not alphabetical (2026-10-25, the user's own
+  // request): Opening Prayer first, then Spiritual Thought and
+  // Handbook Training where that type actually has them, Closing
+  // Prayer always last -- matches the real order these happen in the
+  // meeting itself. Also the one canonical ordering `gridColumnsFor`
+  // (below) hands back to app/rotations/page.tsx for sorting the
+  // Rotation Order cards the same way.
   "bishopric-meeting": [
     { key: "opening_prayer", label: "Opening Prayer" },
-    { key: "closing_prayer", label: "Closing Prayer" },
     { key: "spiritual_thought", label: "Spiritual Thought" },
     { key: "handbook_training", label: "Handbook Training" },
+    { key: "closing_prayer", label: "Closing Prayer" },
   ],
   "ward-council": [
     { key: "opening_prayer", label: "Opening Prayer" },
-    { key: "closing_prayer", label: "Closing Prayer" },
     { key: "spiritual_thought", label: "Spiritual Thought" },
+    { key: "closing_prayer", label: "Closing Prayer" },
   ],
   "youth-council": [
     { key: "opening_prayer", label: "Opening Prayer" },
-    { key: "closing_prayer", label: "Closing Prayer" },
     { key: "spiritual_thought", label: "Spiritual Thought" },
+    { key: "closing_prayer", label: "Closing Prayer" },
   ],
 };
 

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
-import { getAllRotations, getAssignmentGrid, type RotationRow } from "@/lib/data/rotations";
+import { getAllRotations, getAssignmentGrid, gridColumnsFor, type RotationRow } from "@/lib/data/rotations";
 import { getActivePeople, type PersonOption } from "@/lib/data/people";
 import { getActiveCallings, type CallingOption } from "@/lib/data/callings";
 import { PushRotationForm } from "@/components/rotations/PushRotationForm";
@@ -43,6 +43,45 @@ const MEETING_TYPE_TABS: { slug: MeetingTypeSlug; label: string }[] = [
   { slug: "ward-council", label: "Ward Council" },
   { slug: "youth-council", label: "Youth Council" },
 ];
+
+/**
+ * By meeting, then in meeting order within it -- Opening Prayer
+ * first, Spiritual Thought/Handbook Training where that type actually
+ * has them, Closing Prayer always last (2026-10-25, the user's own
+ * request: "sort the 'rotation' categories on the page by meeting
+ * rather than alphabetically by item name... in meeting order"). Was
+ * `getAllRotations()`'s own plain `.order("element_key")` (alphabetical
+ * by key -- "chorister" before "closing_prayer" before "handbook_training"
+ * before "opening_prayer", etc.), with no relationship to either which
+ * meeting a rotation belongs to or when it actually happens.
+ *
+ * Reuses `gridColumnsFor` -- the exact same per-type column order the
+ * applied-assignment grid above this section was just reordered to
+ * use -- as the one source of truth for "meeting order," so the two
+ * can't drift apart from each other. Meeting-type grouping follows
+ * `MEETING_TYPE_TABS`'s own order (Sacrament, Bishopric, Ward Council,
+ * Youth Council); within Sacrament's own two rotations (Chorister,
+ * Organist -- Presiding/Conducting are filtered out before this ever
+ * runs), there's no "meeting order" concept to apply, so they keep
+ * `gridColumnsFor`'s own listed order for that type.
+ */
+function sortRotationsByMeeting(rotations: RotationRow[]): RotationRow[] {
+  const typeRank = new Map(MEETING_TYPE_TABS.map((t, i) => [t.label, i]));
+  const roleRankByMeetingName = new Map(
+    MEETING_TYPE_TABS.map((t) => [t.label, new Map(gridColumnsFor(t.slug).map((c, i) => [c.key, i]))])
+  );
+
+  return [...rotations].sort((a, b) => {
+    const typeA = typeRank.get(a.meeting_type_name) ?? Infinity;
+    const typeB = typeRank.get(b.meeting_type_name) ?? Infinity;
+    if (typeA !== typeB) return typeA - typeB;
+
+    const roleRanks = roleRankByMeetingName.get(a.meeting_type_name);
+    const rankA = roleRanks?.get(a.element_key) ?? Infinity;
+    const rankB = roleRanks?.get(b.element_key) ?? Infinity;
+    return rankA - rankB;
+  });
+}
 
 function defaultThroughDate(): string {
   const d = new Date();
@@ -224,7 +263,7 @@ export default async function RotationsPage({
     getAssignmentGrid(selectedType, throughDate),
   ]);
 
-  const visibleRotations = rotations.filter((r) => !FIXED_BY_CALLING_KEYS.has(r.element_key));
+  const visibleRotations = sortRotationsByMeeting(rotations.filter((r) => !FIXED_BY_CALLING_KEYS.has(r.element_key)));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12 sm:px-8">
