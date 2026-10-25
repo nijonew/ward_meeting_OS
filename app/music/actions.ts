@@ -2,22 +2,74 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getAdminTableConfig } from "@/lib/admin/registry";
+import { updateAdminRow, insertAdminRow, deleteAdminRow } from "@/lib/admin/table-data";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
-import { lookupHymnTitle, lookupHymnTitles } from "@/lib/data/hymnal";
+import { lookupHymnTitles } from "@/lib/data/hymnal";
 import type { ParsedMusicRow } from "@/lib/data/music-parsing";
 
 type ActionResult = { success: true; count: number } | { error: string };
+type GridActionResult = { success: true } | { error: string };
+
+/** Both the bulk-paste tool and the grid below share this one gate --
+ *  re-checked here server-side, not just by the page's own gate,
+ *  matching every other feature-gated action in this app. Found
+ *  missing entirely on `submitBulkMusicRows`/the now-removed single-add
+ *  form while building the grid (2026-10-24) -- neither had ever
+ *  checked anything beyond "is someone signed in." */
+async function requireMusicFeature(): Promise<{ userId: string } | { error: string }> {
+  const { user, profile } = await getSessionUser();
+  if (!user) return { error: "You must be signed in." };
+  if (!hasFeature(profile, "sacrament_music")) return { error: "Not authorized." };
+  return { userId: user.id };
+}
+
+/**
+ * The grid itself (2026-10-24, the user's own request: "I want someone
+ * entering music to be able to do it much like the page
+ * .../admin/sacrament_music"). Reuses the exact same `AdminTableEditor`
+ * component and `sacrament_music` registry column config Table Admin's
+ * own `/admin/sacrament_music` renders -- full inline edit/add/delete,
+ * not just bulk-paste-then-review -- but gated on `sacrament_music`
+ * (the Music planner feature), not `table_admin_sacrament_music`, same
+ * split `app/announcements/actions.ts` already established for Manage
+ * Announcements vs. raw Table Admin access.
+ */
+export async function updateMusicRow(table: string, id: string, patch: Record<string, unknown>): Promise<GridActionResult> {
+  const auth = await requireMusicFeature();
+  if (!("userId" in auth)) return auth;
+  const config = getAdminTableConfig("sacrament_music");
+  if (!config) return { error: "Unknown table." };
+  const result = await updateAdminRow(config, id, patch);
+  if ("success" in result) revalidatePath("/music");
+  return result;
+}
+
+export async function insertMusicRow(table: string, patch: Record<string, unknown>): Promise<GridActionResult> {
+  const auth = await requireMusicFeature();
+  if (!("userId" in auth)) return auth;
+  const config = getAdminTableConfig("sacrament_music");
+  if (!config) return { error: "Unknown table." };
+  const result = await insertAdminRow(config, patch);
+  if ("success" in result) revalidatePath("/music");
+  return result;
+}
+
+export async function deleteMusicRow(table: string, id: string): Promise<GridActionResult> {
+  const auth = await requireMusicFeature();
+  if (!("userId" in auth)) return auth;
+  const config = getAdminTableConfig("sacrament_music");
+  if (!config) return { error: "Unknown table." };
+  const result = await deleteAdminRow(config, id);
+  if ("success" in result) revalidatePath("/music");
+  return result;
+}
 
 export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<ActionResult> {
+  const auth = await requireMusicFeature();
+  if (!("userId" in auth)) return auth;
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: "You must be signed in." };
-  }
 
   const validRows = rows.filter((r) => r.errors.length === 0 && r.dateIso && r.type);
   if (validRows.length === 0) {
@@ -58,7 +110,7 @@ export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<Actio
       group_name: row.groupName || (row.matchedIndividualId ? null : row.performerText),
       accompanist_id: row.matchedAccompanistId,
       status: "published",
-      submitted_by: user.id,
+      submitted_by: auth.userId,
     });
   }
 
@@ -74,54 +126,4 @@ export async function submitBulkMusicRows(rows: ParsedMusicRow[]): Promise<Actio
 
   revalidatePath("/music");
   return { success: true, count: insertRows.length };
-}
-
-export async function addSingleMusicItem(formData: FormData): Promise<ActionResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: "You must be signed in." };
-  }
-
-  const dateIso = String(formData.get("date") ?? "");
-  const type = String(formData.get("type") ?? "");
-
-  if (!dateIso || !type) {
-    return { error: "Date and type are required." };
-  }
-
-  const meetingId = await getOrCreateMeetingId(dateIso, "sacrament-meeting");
-
-  if (!meetingId) {
-    return { error: "Could not find or create that meeting." };
-  }
-
-  const hymnNumber = String(formData.get("hymn_number") ?? "").trim() || null;
-  let pieceName = String(formData.get("piece_name") ?? "").trim() || null;
-  if (hymnNumber && !pieceName) {
-    pieceName = await lookupHymnTitle(hymnNumber);
-  }
-
-  const { error } = await supabase.from("sacrament_music").insert({
-    meeting_id: meetingId,
-    type,
-    hymn_number: hymnNumber,
-    piece_name: pieceName,
-    individual_id: String(formData.get("individual_id") ?? "") || null,
-    group_name: String(formData.get("group_name") ?? "").trim() || null,
-    accompanist_id: String(formData.get("accompanist_id") ?? "") || null,
-    status: "published",
-    submitted_by: user.id,
-  });
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/music");
-  return { success: true, count: 1 };
 }

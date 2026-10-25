@@ -2022,6 +2022,64 @@ avoid confusing the two.
 
 ## Known open items
 
+**Sacrament Meeting Music Planning (`/music`) rebuilt as a real
+editable grid, 2026-10-24** (the user's own request: "Can we update the
+look of sacrament meeting music planning? Basically I want someone
+entering music to be able to do it much like the page
+.../admin/sacrament_music"). Same move already made for Manage
+Announcements (2026-10-12) -- `/music` now renders the exact same
+`AdminTableEditor` component and `sacrament_music` registry column
+config (`lib/admin/registry.ts`) that `/admin/sacrament_music` itself
+uses: full inline edit/add/delete across every field (Meeting, Type,
+Slot, Hymn #, Piece Name, Individual, Group Name, Accompanist),
+sortable/filterable columns, the same `createIfMissing` calendar picker
+on the Meeting column that creates a meeting on the fly for a future
+Sunday with no row yet -- but gated on `sacrament_music` (the Music
+planner feature everyone already uses to reach this page), not
+`table_admin_sacrament_music`, same split `app/announcements/actions.ts`
+already established. New `updateMusicRow`/`insertMusicRow`/
+`deleteMusicRow` (`app/music/actions.ts`) call the shared
+`updateAdminRow`/`insertAdminRow`/`deleteAdminRow` helpers directly
+(not `app/admin/[table]/actions.ts`'s own wrappers, which check the
+Table Admin feature instead), keeping the two entry points
+independently authorized while sharing every bit of the real read/
+write logic. No migration needed -- same table, same columns, just a
+different front end.
+
+**`QuickAddMusic`/`RecentMusicList` deleted outright, not left
+unlinked** -- the grid already covers everything both did and more
+(every row directly editable, not just addable; sortable/filterable
+rather than a fixed read-only recap), matching this project's own
+established "don't leave a second, now-redundant place to edit the
+same data" principle. `getRecentMusic`/`RecentMusicItem`
+(`lib/data/music-list.ts`) had no other caller, so the whole file went
+with it. `addSingleMusicItem` (`app/music/actions.ts`) is gone too, its
+only caller being `QuickAddMusic`. `BulkMusicEntry` (paste many rows at
+once from a spreadsheet) stays, rendered below the grid -- a genuinely
+different, faster bulk workflow the grid has no equivalent for, same
+reasoning Manage Announcements kept its own "stray agenda items"
+fallback alongside its own grid.
+
+**Real, pre-existing security gap found and fixed while touching these
+actions**: `submitBulkMusicRows` (the bulk-paste action) and the
+now-deleted `addSingleMusicItem` had never checked anything beyond "is
+someone signed in" -- the `sacrament_music` feature was only ever
+enforced by the page's own gate, not re-checked server-side, unlike
+every other feature-gated action in this app. Both (well, the one that
+survives) now go through a shared `requireMusicFeature()` helper that
+re-checks `hasFeature(profile, "sacrament_music")` directly, matching
+the established convention everywhere else.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project (one build
+attempt hit an unrelated transient Google Fonts fetch failure on
+`app/layout.tsx`'s `next/font/google` import -- a retry built clean,
+confirming it wasn't caused by anything touched here) -- ask the user
+to open `/music` and confirm the grid shows every existing music row,
+editing/adding/deleting a row works, picking a future Sunday with no
+meeting yet creates one automatically, and the bulk-paste tool below
+the grid still works as before.
+
 **Landing page's prominent Sacrament Meeting tile never actually
 honored early-access viewing, 2026-10-24** (the user's own report,
 right after the Primary Program work below: "I also need to have
