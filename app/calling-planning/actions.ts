@@ -260,6 +260,17 @@ export async function pushCallingToSacramentMeeting(
 
   if (updateError) return { error: updateError.message };
 
+  // Clears any standing exclusion for whichever side(s) were just
+  // pushed (2026-10-25, migration 084) -- a manual push here is a
+  // deliberate "yes, announce this at this meeting after all," same
+  // reasoning as pullCallingPlanningIntoMeeting's own identical fix.
+  await supabase
+    .from("calling_planning_meeting_exclusions")
+    .delete()
+    .eq("calling_planning_id", planningId)
+    .eq("meeting_id", meetingId)
+    .in("side", inserts.map((i) => i.type));
+
   revalidatePath("/calling-planning");
   revalidatePath(`/meetings/${meetingId}/planning`);
   return { success: true };

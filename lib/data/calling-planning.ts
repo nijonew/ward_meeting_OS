@@ -278,6 +278,20 @@ export async function getCallableCallingPlanningItems(): Promise<{
  * one meeting that's actually nearest-upcoming as of right now, so
  * planning several weeks ahead at once never duplicates the same
  * pending item across more than one future meeting.
+ *
+ * **Respects a standing exclusion, 2026-10-25** (migration 084, the
+ * user's own report: "I am not able to remove released individuals
+ * from sacrament meeting planning"). Before this, removing a release
+ * (or new calling) from the meeting that's currently the single
+ * nearest-upcoming one -- the single most common case -- only ever
+ * cleared `announced_meeting_id`, which made the row immediately
+ * eligible again, so the very next page load re-ran this exact sweep
+ * and re-created the identical row right back. `removeCallingPlanningFromMeeting`
+ * (app/meetings/[id]/ward-business-actions.ts) now also records a
+ * `calling_planning_meeting_exclusions` row on removal -- checked here
+ * alongside the existing "already linked" check -- which
+ * `pullCallingPlanningIntoMeeting`/`pushCallingToSacramentMeeting`
+ * both clear again on a deliberate manual re-add.
  */
 export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
   const supabase = await createClient();
@@ -304,16 +318,26 @@ export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
   if (!rows || rows.length === 0) return;
 
   const rowIds = (rows as { id: string }[]).map((r) => r.id);
-  const { data: existingLinks } = await supabase
-    .from("sacrament_rabnm")
-    .select("calling_planning_id, type")
-    .eq("meeting_id", meetingId)
-    .in("calling_planning_id", rowIds);
+  const [{ data: existingLinks }, { data: exclusions }] = await Promise.all([
+    supabase
+      .from("sacrament_rabnm")
+      .select("calling_planning_id, type")
+      .eq("meeting_id", meetingId)
+      .in("calling_planning_id", rowIds),
+    supabase
+      .from("calling_planning_meeting_exclusions")
+      .select("calling_planning_id, side")
+      .eq("meeting_id", meetingId)
+      .in("calling_planning_id", rowIds),
+  ]);
 
   const alreadyLinked = new Set(
     ((existingLinks ?? []) as { calling_planning_id: string | null; type: string }[]).map(
       (l) => `${l.calling_planning_id}::${l.type}`
     )
+  );
+  const excluded = new Set(
+    ((exclusions ?? []) as { calling_planning_id: string; side: string }[]).map((e) => `${e.calling_planning_id}::${e.side}`)
   );
 
   for (const row of rows as {
@@ -327,7 +351,12 @@ export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
     const candidateIds = row.candidate_person_ids ?? [];
     let linkedAny = false;
 
-    if (row.calling_status === "to_announce" && candidateIds.length === 1 && !alreadyLinked.has(`${row.id}::new_calling`)) {
+    if (
+      row.calling_status === "to_announce" &&
+      candidateIds.length === 1 &&
+      !alreadyLinked.has(`${row.id}::new_calling`) &&
+      !excluded.has(`${row.id}::new_calling`)
+    ) {
       const { data: rabnm } = await supabase
         .from("sacrament_rabnm")
         .insert({ meeting_id: meetingId, type: "new_calling", calling_id: row.calling_id, calling_planning_id: row.id })
@@ -339,7 +368,12 @@ export async function autoAnnounceReadyCallingPlanningItems(): Promise<void> {
       }
     }
 
-    if (row.release_person_id && row.release_status === "to_announce" && !alreadyLinked.has(`${row.id}::release`)) {
+    if (
+      row.release_person_id &&
+      row.release_status === "to_announce" &&
+      !alreadyLinked.has(`${row.id}::release`) &&
+      !excluded.has(`${row.id}::release`)
+    ) {
       const { data: rabnm } = await supabase
         .from("sacrament_rabnm")
         .insert({ meeting_id: meetingId, type: "release", calling_id: row.calling_id, calling_planning_id: row.id })

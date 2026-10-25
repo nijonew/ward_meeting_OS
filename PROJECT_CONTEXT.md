@@ -316,8 +316,15 @@ reconstructed from both:
   actually stick against the new Sacrament Meeting auto-pull sweep; and
   amends `delete_meeting_cascade` to clean up the new table, see Known
   open items below): confirmed run.
+- `084` (new `calling_planning_meeting_exclusions` table -- the same
+  "a manual Remove must stick against the auto-pull sweep" fix as
+  migration `083`, now applied to Calling Planning's own releases/new-
+  callings sweep; amends `delete_meeting_cascade` again, see Known
+  open items below): **not yet run** -- ask the user to confirm `084`
+  is actually free before running it, per this project's own repeated
+  numbering-collision history.
 
-Next migration should be `084_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
+Next migration should be `085_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2032,6 +2039,54 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Bug found and fixed 2026-10-25: removing a released (or newly
+called) individual from Sacrament Meeting's Ward Business didn't
+actually stick (migration `084`, not yet run).** The user's own
+report: "I am not able to remove released individuals from sacrament
+meeting planning."
+
+Root cause, traced through the code (no live database access to
+reproduce directly, but the logic is unambiguous): `removeCallingPlanningFromMeeting`
+(`app/meetings/[id]/ward-business-actions.ts`) deletes the
+`sacrament_rabnm` row and clears `calling_planning.announced_meeting_id`
+back to null -- but `autoAnnounceReadyCallingPlanningItems`
+(`lib/data/calling-planning.ts`, the lazy sweep that runs on every
+Sacrament Meeting Planning page load) only ever checks "is
+`calling_status`/`release_status` still `to_announce` AND not yet
+linked to the single nearest-upcoming meeting." For the single most
+common case of all -- removing something from the meeting that
+currently *is* the nearest-upcoming one, i.e. the one actually being
+worked on this week -- clearing that link makes the row immediately
+eligible again, so the very next page render re-runs the exact same
+sweep and silently re-creates the identical row. From the user's own
+vantage point, Remove visibly does nothing.
+
+Same class of bug as the Announcements auto-pull sweep's own
+equivalent problem, fixed the same way earlier this same day
+(migration 083, `sacrament_announcement_exclusions`): new
+`calling_planning_meeting_exclusions` table (`calling_planning_id`,
+`meeting_id`, `side` -- `"new_calling"`/`"release"`, the same values
+`sacrament_rabnm.type` already uses, one shared vocabulary rather
+than inventing a second one). `removeCallingPlanningFromMeeting` now
+also records an exclusion row on removal (a no-op for a row this
+mechanism never auto-swept in the first place); the sweep checks it
+alongside its existing "already linked" check; both manual re-add
+paths -- `pullCallingPlanningIntoMeeting` (Ward Business's own picker)
+and `pushCallingToSacramentMeeting` (Calling Planning's "Ready to
+Announce" push) -- clear the matching exclusion again, so a
+deliberate manual re-add always overrides a prior Remove.
+`delete_meeting_cascade` amended to clean up the new table when a
+meeting is deleted.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to confirm migration number `084` is actually free, then run it and
+check: removing a release (or new calling) from the Sacrament Meeting
+that's currently the nearest-upcoming one actually stays removed
+across a page reload, and that manually re-adding it from either Ward
+Business's own dropdown or Calling Planning's "Ready to Announce"
+section brings it right back.
 
 **Agenda elements can now be added, removed, reordered, and slot-
 counted directly from the Planning page, for every meeting type,

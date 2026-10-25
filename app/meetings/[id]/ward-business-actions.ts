@@ -46,6 +46,13 @@ function revalidateBoth(meetingId: string) {
  * calling side's "To Record" transition; release never used "To
  * Record" as a target in the first place (it jumps straight to
  * "Complete"), and nothing was said about changing that one.
+ *
+ * **Clears any standing exclusion for this pair, 2026-10-25** (migration
+ * 084) -- a manual pull here is a deliberate "yes, announce this at
+ * this meeting after all," so it overrides a prior Remove click (see
+ * `removeCallingPlanningFromMeeting`'s own comment) the same way
+ * `pullAnnouncementIntoMeeting` already does for the equivalent
+ * Announcements exclusion.
  */
 export async function pullCallingPlanningIntoMeeting(
   meetingId: string,
@@ -108,6 +115,13 @@ export async function pullCallingPlanningIntoMeeting(
     .eq("id", planningId);
   if (updateError) return { error: updateError.message };
 
+  await supabase
+    .from("calling_planning_meeting_exclusions")
+    .delete()
+    .eq("calling_planning_id", planningId)
+    .eq("meeting_id", meetingId)
+    .eq("side", type);
+
   revalidateBoth(meetingId);
   return { success: true };
 }
@@ -133,6 +147,22 @@ export async function pullCallingPlanningIntoMeeting(
  * clobbering a real manual status change the admin made in the
  * meantime (exactly the kind of automatic status change they asked to
  * stop happening).
+ *
+ * **Also records a standing exclusion, 2026-10-25** (migration 084,
+ * the user's own report: "I am not able to remove released
+ * individuals from sacrament meeting planning"). Without this,
+ * `autoAnnounceReadyCallingPlanningItems` re-runs on every Sacrament
+ * Meeting Planning page load and only checks "is this still
+ * `to_announce` and not yet linked to the nearest-upcoming meeting" --
+ * for the single most common case (removing something from the
+ * meeting that currently IS the nearest-upcoming one), clearing
+ * `announced_meeting_id` just above made the row immediately eligible
+ * again, so the very next page load silently re-created the exact
+ * same row, making Remove look like it did nothing at all. A no-op
+ * for a row this mechanism never auto-swept in the first place
+ * (nothing ever reads the exclusion for one that wasn't eligible to
+ * begin with) -- always recording it is simpler than first checking
+ * whether it was needed.
  */
 export async function removeCallingPlanningFromMeeting(meetingId: string, planningId: string): Promise<ActionResult> {
   const denied = await requireRabnmFeature();
@@ -163,6 +193,12 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
     .update({ announced_meeting_id: null, ...statusUpdate, updated_at: new Date().toISOString() })
     .eq("id", planningId);
   if (updateError) return { error: updateError.message };
+
+  if (rabnmRow) {
+    await supabase
+      .from("calling_planning_meeting_exclusions")
+      .upsert({ calling_planning_id: planningId, meeting_id: meetingId, side: rabnmRow.type }, { onConflict: "calling_planning_id,meeting_id,side", ignoreDuplicates: true });
+  }
 
   revalidateBoth(meetingId);
   return { success: true };
