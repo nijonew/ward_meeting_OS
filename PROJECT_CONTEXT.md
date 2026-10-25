@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 081
+## Current migration number: 083
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -307,9 +307,7 @@ reconstructed from both:
   tables + `sacrament_rabnm.rabnm_planning_id` -- the standing
   Recognitions/Advancements/Baptisms/New Members/Baby Blessings planning
   pool, Ward Business's new third section, see Known open items below):
-  **not yet run** -- ask the user to confirm `082` is actually free
-  before running it, per this project's own repeated numbering-collision
-  history.
+  confirmed run.
 - `083` (new `announcements.recurrence`/`recurrence_day_of_week`/
   `recurrence_nth_occurrence`/`recurrence_day_of_month` columns -- a
   real recurring-schedule shape instead of a single date range that
@@ -317,10 +315,7 @@ reconstructed from both:
   table -- lets a manual "Remove" on an auto-pulled announcement
   actually stick against the new Sacrament Meeting auto-pull sweep; and
   amends `delete_meeting_cascade` to clean up the new table, see Known
-  open items below): **not yet run** -- ask the user to confirm `083`
-  is actually free before running it (and that `082` is confirmed run
-  or genuinely still pending), per this project's own repeated
-  numbering-collision history.
+  open items below): confirmed run.
 
 Next migration should be `084_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -2065,11 +2060,9 @@ per-table logic" principle.
 Confirmed via `tsc`/`eslint`/`next build --webpack` only -- this
 working copy still has no `.env.local` (confirmed again before
 skipping a live preview), the same standing environment gap as
-everything else in this project. Ask the user to open `/announcements`
-(or `/admin/announcements`), confirm the Clear button shows up next
-to a filled-in Start/End Date or Time, and that clicking it then
-saving actually blanks the field (not just visually, re-load the page
-to confirm it stuck).
+everything else in this project. **Confirmed working in production
+2026-10-25** -- the user's own words, right after trying it: "clear
+works well."
 
 **Announcements gained a real recurring-schedule shape, a public-page
 redesign, and a genuinely automatic Sacrament Meeting auto-pull,
@@ -2166,11 +2159,9 @@ be dropped from the submit form too -- answers below):
      Remove) that the simpler live-read design can't support.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
-database-access gap as everything else in this project -- ask the user
-to confirm migration numbers `082`/`083` are actually free (in that
-order -- `083`'s own `delete_meeting_cascade` amendment is written
-against `082`'s version of that function, so `082` needs to run
-first), then run both and check: a recurring announcement (e.g. "Weekly
+database-access gap as everything else in this project. **Migrations
+`082`/`083` confirmed run 2026-10-25** -- functional behavior not yet
+confirmed; ask the user to check: a recurring announcement (e.g. "Weekly
 on Sundays, starting September 6") reads correctly on both
 `/announcements/public` and a Conducting script; checking "Sacrament
 Meeting" on a new announcement makes it appear in every upcoming
@@ -2292,9 +2283,9 @@ so the 5 new type values display correctly there with no code change
 either.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
-database-access gap as everything else in this project -- ask the user
-to confirm migration number `082` is actually free, then run it and
-check: adding a Recognition/Advancement/Baptism/New Member/Baby
+database-access gap as everything else in this project. **Migration
+`082` confirmed run 2026-10-25** -- functional behavior not yet
+confirmed; ask the user to check: adding a Recognition/Advancement/Baptism/New Member/Baby
 Blessing on `/rabnm-planning` shows up there and in the new Table Admin
 grid; pulling one into a specific Sacrament Meeting's Ward Business
 removes it from the pool page's own list and shows it on the meeting
