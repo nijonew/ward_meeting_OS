@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 083
+## Current migration number: 084
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -320,9 +320,7 @@ reconstructed from both:
   "a manual Remove must stick against the auto-pull sweep" fix as
   migration `083`, now applied to Calling Planning's own releases/new-
   callings sweep; amends `delete_meeting_cascade` again, see Known
-  open items below): **not yet run** -- ask the user to confirm `084`
-  is actually free before running it, per this project's own repeated
-  numbering-collision history.
+  open items below): confirmed run.
 
 Next migration should be `085_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
@@ -2080,13 +2078,10 @@ deliberate manual re-add always overrides a prior Remove.
 meeting is deleted.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
-database-access gap as everything else in this project -- ask the user
-to confirm migration number `084` is actually free, then run it and
-check: removing a release (or new calling) from the Sacrament Meeting
-that's currently the nearest-upcoming one actually stays removed
-across a page reload, and that manually re-adding it from either Ward
-Business's own dropdown or Calling Planning's "Ready to Announce"
-section brings it right back.
+database-access gap as everything else in this project. **Migration
+`084` confirmed run, and the fix itself confirmed working in
+production, 2026-10-25** -- the user's own words: "ran 84, confirmed
+fix works."
 
 **Agenda elements can now be added, removed, reordered, and slot-
 counted directly from the Planning page, for every meeting type,
