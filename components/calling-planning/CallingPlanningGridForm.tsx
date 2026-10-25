@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, useActionState } from "react";
 import { saveCallingPlanningGrid, deleteCallingPlanningEntry } from "@/app/calling-planning/actions";
 import { MultiPersonSelect } from "@/components/calling-planning/MultiPersonSelect";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
+import { DualScrollbar } from "@/components/DualScrollbar";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import type { CallingPlanningRow, CallingOption } from "@/lib/data/calling-planning";
 import type { PersonOption } from "@/lib/data/people";
@@ -325,7 +326,8 @@ export function CallingPlanningGridForm({
         }
       }}
     >
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4">
+        <DualScrollbar>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
@@ -477,6 +479,7 @@ export function CallingPlanningGridForm({
             ))}
           </tbody>
         </table>
+        </DualScrollbar>
         {visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No rows match the current filters.</p>}
       </div>
 

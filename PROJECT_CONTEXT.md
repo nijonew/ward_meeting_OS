@@ -2033,6 +2033,65 @@ avoid confusing the two.
 
 ## Known open items
 
+**A second, sticky-to-the-viewport horizontal scrollbar added to
+every "favorite grid format" page and Table Admin's own generic grid,
+2026-10-25** -- the user's own question: "Is there a way to keep the
+bottom scroll bar always on the screen or have one top and bottom of
+the window on table pages like the announcements and calling
+planning?"
+
+A browser's native horizontal scrollbar sits at the very bottom edge
+of its own scrolling element's box, in normal document flow -- for a
+tall grid (many rows), that's far below the visible viewport, so
+reaching it means scrolling the whole page down past the grid first.
+There's no CSS way to reposition a native scrollbar independently of
+its element, so new `components/DualScrollbar.tsx` adds a second,
+thin scroll strip that *is* a real `position: sticky; bottom: 0`
+element instead -- it stays pinned to the bottom of the viewport for
+as long as any part of the grid is still on screen, then scrolls away
+normally once the grid has fully scrolled past, satisfying the user's
+own "keep the bottom scroll bar always on the screen" framing more
+directly than the "one top and bottom" fallback they also offered.
+Dragging it scrolls the real table horizontally and vice versa
+(two-way synced via a plain scroll-event listener on each side,
+guarded against an infinite ping-pong with a `syncing` ref); a
+`ResizeObserver` keeps its own scrollable width in sync with the real
+table's (a column widening, a filter hiding rows, the window itself
+resizing). Only rendered once there's actually overflow to scroll --
+a grid that already fits shows nothing extra. Deliberately additive,
+not a replacement for the table's own native scrollbar, which still
+works fine for a mouse wheel/trackpad swipe directly over it.
+
+Wrapped around every "favorite grid format" page's own `overflow-x-auto`
+table container -- `AdminTableEditor.tsx` (so both Manage
+Announcements and every `/admin/[table]` page get it), Calling
+Planning (`CallingPlanningGridForm.tsx`), Assignment Rotations
+(`AssignmentGridForm.tsx`), the per-class activity grid
+(`ClassActivityGridForm.tsx`), Youth Teaching Planning
+(`TeachingGridForm.tsx`), and Youth Activities' shared
+`ActivitiesTable.tsx` (all four pages that render it, Delete's own
+`sticky right-0` column included -- unaffected, since it's still
+scoped to the exact same real scroll container, just now wrapped by
+this one). **Deliberately left alone**: the Sacrament Meeting/
+collaborative agenda grid (`AgendaGridForm.tsx`) and the Dashboard
+meeting list (`app/dashboard/page.tsx`) -- both are label+value or
+few-column layouts that essentially never actually overflow
+horizontally in practice, unlike the wide multi-column admin grids
+this request was actually about; the component costs nothing extra
+when there's no overflow, but there was no real problem to fix on
+either of these two.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project (this working
+copy still has no `.env.local`, so a live scroll-sync check isn't
+possible here) -- ask the user to open `/announcements` or
+`/calling-planning` with enough rows to scroll past a screen's worth,
+confirm a second thin scrollbar stays stuck to the bottom of the
+browser window while scrolling down through the table, that dragging
+either scrollbar moves the other in sync, and that it disappears once
+the whole table has scrolled past (and never shows up at all on a
+table that already fits on screen).
+
 **A real "Clear" button added to every date/time field in Table
 Admin, 2026-10-25** -- the user's own report, right after the
 Announcements recurrence work above shipped: "I need a way to remove

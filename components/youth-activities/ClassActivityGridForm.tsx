@@ -3,6 +3,7 @@
 import { useState, useActionState, useTransition } from "react";
 import { saveClassActivityGrid, deleteClassActivity } from "@/app/youth-activities/manage/classes/actions";
 import { YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
+import { DualScrollbar } from "@/components/DualScrollbar";
 import type { ClassActivityRow } from "@/lib/data/class-activities";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -90,7 +91,8 @@ export function ClassActivityGridForm({ rows }: { rows: ClassActivityRow[] }) {
 
   return (
     <form action={formAction} onChange={() => setDirty(true)}>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4">
+        <DualScrollbar>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
@@ -168,6 +170,7 @@ export function ClassActivityGridForm({ rows }: { rows: ClassActivityRow[] }) {
             })}
           </tbody>
         </table>
+        </DualScrollbar>
       </div>
 
       <div className="mt-4 flex items-center gap-3">

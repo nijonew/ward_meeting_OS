@@ -5,6 +5,7 @@ import type { AdminColumnConfig, AdminOption } from "@/lib/admin/types";
 import { MeetingDatePicker } from "./MeetingDatePicker";
 import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
+import { DualScrollbar } from "@/components/DualScrollbar";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import { MULTI_SELECT_SEPARATOR } from "@/lib/data/announcement-constants";
 
@@ -296,8 +297,9 @@ export function AdminTableEditor({
   };
 
   return (
-    <div className="overflow-x-auto rounded border border-rule bg-surface p-6">
+    <div className="rounded border border-rule bg-surface p-6">
       {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      <DualScrollbar>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-rule text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
@@ -403,6 +405,7 @@ export function AdminTableEditor({
           </tr>
         </tbody>
       </table>
+      </DualScrollbar>
       {rows.length > 0 && visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No rows match the current filters.</p>}
     </div>
   );

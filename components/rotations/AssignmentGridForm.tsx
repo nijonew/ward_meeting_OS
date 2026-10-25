@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useActionState } from "react";
 import { saveAssignmentGrid } from "@/app/rotations/actions";
+import { DualScrollbar } from "@/components/DualScrollbar";
 import type { GridColumn, GridRow } from "@/lib/data/rotations";
 import type { PersonOption } from "@/lib/data/people";
 import type { MeetingTypeSlug } from "@/lib/types";
@@ -85,7 +86,8 @@ export function AssignmentGridForm({
 
   return (
     <form action={formAction} onChange={() => setDirty(true)}>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4">
+        <DualScrollbar>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
@@ -129,6 +131,7 @@ export function AssignmentGridForm({
             ))}
           </tbody>
         </table>
+        </DualScrollbar>
       </div>
 
       <div className="mt-4 flex items-center gap-3">

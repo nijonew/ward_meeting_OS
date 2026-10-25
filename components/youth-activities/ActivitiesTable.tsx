@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState, useTransition } from "react";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import { PushToClassesButton } from "@/components/youth-activities/PushToClassesButton";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
+import { DualScrollbar } from "@/components/DualScrollbar";
 import { classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 import { saveActivityGrid, deleteYouthActivity } from "@/app/youth-activities/actions";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
@@ -352,7 +353,8 @@ export function ActivitiesTable({
   }
 
   const table = (
-    <div className="overflow-x-auto">
+    <div>
+      <DualScrollbar>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -488,6 +490,7 @@ export function ActivitiesTable({
           })}
         </tbody>
       </table>
+      </DualScrollbar>
 
       {visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No activities match the current filters.</p>}
     </div>

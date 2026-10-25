@@ -2,6 +2,7 @@
 
 import { useState, useActionState } from "react";
 import { saveTeachingGrid } from "@/app/youth-teaching-planning/actions";
+import { DualScrollbar } from "@/components/DualScrollbar";
 import type { TeachingGridRow } from "@/lib/data/teaching-assignments";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -59,7 +60,8 @@ export function TeachingGridForm({
 
   return (
     <form action={formAction} onChange={() => setDirty(true)}>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4">
+        <DualScrollbar>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
@@ -91,6 +93,7 @@ export function TeachingGridForm({
             ))}
           </tbody>
         </table>
+        </DualScrollbar>
       </div>
 
       <div className="mt-4 flex items-center gap-3">
