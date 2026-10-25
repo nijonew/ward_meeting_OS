@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { sweepPastAnnouncements } from "@/lib/data/announcements";
+import { SACRAMENT_MEETING_ANNOUNCEMENT_LABEL } from "@/lib/data/announcement-constants";
 
 /**
  * "I want to be able to select the announcements that need to be
@@ -52,10 +53,14 @@ export interface PulledAnnouncement {
   end_date: string | null;
   end_time: string | null;
   link_url: string | null;
+  recurrence: string | null;
+  recurrence_day_of_week: number | null;
+  recurrence_nth_occurrence: number | null;
+  recurrence_day_of_month: number | null;
 }
 
 const ANNOUNCEMENT_COLUMNS =
-  "id, title, body, organization, location, start_date, start_time, end_date, end_time, link_url";
+  "id, title, body, organization, location, start_date, start_time, end_date, end_time, link_url, recurrence, recurrence_day_of_week, recurrence_nth_occurrence, recurrence_day_of_month";
 
 function toPulledAnnouncement(raw: unknown): PulledAnnouncement | null {
   if (!raw) return null;
@@ -134,4 +139,82 @@ export async function getAnnouncementsByPlannedElement(meetingId: string): Promi
   }
   for (const list of result.values()) list.sort((a, b) => a.title.localeCompare(b.title));
   return result;
+}
+
+/**
+ * Auto-fills this one meeting's first Announcements block with every
+ * published announcement flagged "Sacrament Meeting" in
+ * `where_announced` whose own active window covers this meeting's
+ * date -- migration 083, the user's own request: "I want items with
+ * that option selected automatically landing in the Sacrament meeting
+ * programs up until the time the announced item has lapsed or
+ * occurred." Confirmed with the user: a recurring item should land in
+ * EVERY applicable Sacrament Meeting during its window, not just the
+ * nearest one -- so this is called once per Sacrament Meeting's own
+ * Planning page load (same lazy-sweep-on-read pattern as
+ * `autoAnnounceReadyCallingPlanningItems`), not scoped to a single
+ * "nearest upcoming" meeting the way that one is.
+ *
+ * "In window" is a plain date-range check against `start_date`/
+ * `end_date` -- deliberately NOT matched against the recurrence
+ * pattern's own specific weekday/date. The recurrence fields only
+ * describe which days the series itself falls on (a Tuesday class, a
+ * Sunday class, whatever) -- Sacrament Meeting is always Sunday, so
+ * matching the exact occurrence day would mean a non-Sunday class
+ * could never be reminded about at all. The point of this auto-pull
+ * is "remind the ward this is still going on," every week it's
+ * active, not "this literally happens today."
+ *
+ * Creates a real `sacrament_announcement_pulls` row, same as a manual
+ * pull -- reusable by every other reader (Planning, Conducting,
+ * Archived) with no changes needed there. Skips anything already
+ * pulled into this meeting, or explicitly excluded from it (an
+ * admin's own Remove click -- see `sacrament_announcement_exclusions`
+ * and `removeAnnouncementFromMeeting`'s own comment).
+ */
+export async function autoPullSacramentAnnouncements(meetingId: string, meetingDateIso: string): Promise<void> {
+  const supabase = await createClient();
+
+  const [{ data: block }, { data: candidates }, { data: alreadyHere }, { data: excluded }] = await Promise.all([
+    supabase
+      .from("meeting_planned_elements")
+      .select("id, sort_order, meeting_elements(key)")
+      .eq("meeting_id", meetingId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("announcements")
+      .select("id, where_announced, start_date, end_date")
+      .eq("status", "published")
+      .ilike("where_announced", `%${SACRAMENT_MEETING_ANNOUNCEMENT_LABEL}%`),
+    supabase.from("sacrament_announcement_pulls").select("announcement_id").eq("meeting_id", meetingId),
+    supabase.from("sacrament_announcement_exclusions").select("announcement_id").eq("meeting_id", meetingId),
+  ]);
+
+  type BlockRow = { id: string; meeting_elements: { key?: string } | { key?: string }[] | null };
+  const announcementsBlock = ((block ?? []) as BlockRow[]).find((row) => {
+    const el = Array.isArray(row.meeting_elements) ? row.meeting_elements[0] : row.meeting_elements;
+    return el?.key === "announcements";
+  });
+  if (!announcementsBlock) return;
+
+  const alreadyPulled = new Set((alreadyHere ?? []).map((r) => (r as { announcement_id: string }).announcement_id));
+  const excludedIds = new Set((excluded ?? []).map((r) => (r as { announcement_id: string }).announcement_id));
+
+  const toInsert = ((candidates ?? []) as { id: string; where_announced: string | null; start_date: string | null; end_date: string | null }[])
+    .filter((a) => {
+      if (alreadyPulled.has(a.id) || excludedIds.has(a.id)) return false;
+      // Exact-label match, not just a substring hit -- where_announced
+      // is a comma-joined list (MULTI_SELECT_SEPARATOR), so the ilike
+      // query above is a cheap pre-filter only; confirm the real token.
+      const labels = (a.where_announced ?? "").split(",").map((s) => s.trim());
+      if (!labels.includes(SACRAMENT_MEETING_ANNOUNCEMENT_LABEL)) return false;
+      if (!a.start_date) return true; // no dates at all -- always active while published
+      const windowEnd = a.end_date ?? a.start_date;
+      return meetingDateIso >= a.start_date && meetingDateIso <= windowEnd;
+    })
+    .map((a) => ({ announcement_id: a.id, meeting_id: meetingId, planned_element_id: announcementsBlock.id }));
+
+  if (toInsert.length > 0) {
+    await supabase.from("sacrament_announcement_pulls").insert(toInsert);
+  }
 }

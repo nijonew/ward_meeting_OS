@@ -3,7 +3,7 @@ import type { ElementNoteValue } from "@/lib/data/meeting-element-notes";
 import type { MusicRow, PlanningInfo, RabnmRow } from "@/lib/data/sacrament-planning";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
-import { formatAnnouncementSchedule } from "@/lib/data/announcements";
+import { formatAnnouncementScheduleLine } from "@/lib/data/announcements";
 import { formatTitleLastName } from "@/lib/data/person-display";
 
 /**
@@ -81,7 +81,7 @@ export interface ConductingRowInputs {
  *  Y." sentences (location used to come first). */
 export function announcementWording(a: PulledAnnouncement): string {
   const parts = [a.body];
-  const schedule = formatAnnouncementSchedule(a);
+  const schedule = formatAnnouncementScheduleLine(a);
   if (schedule) parts.push(`${schedule}.`);
   return parts.filter(Boolean).join(" ");
 }

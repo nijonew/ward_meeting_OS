@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
-import { formatAnnouncementSchedule, groupAndSortAnnouncements } from "@/lib/data/announcements";
+import { formatAnnouncementScheduleLine, groupAndSortAnnouncements } from "@/lib/data/announcements";
 import type { PublishedAnnouncement } from "@/lib/data/general-submissions";
 
 /**
@@ -85,16 +85,20 @@ import type { PublishedAnnouncement } from "@/lib/data/general-submissions";
  * exactly as it always has.
  */
 
-/** Meta line, body, and Link button -- everything about one announcement
- *  except its title and schedule, whose placement differs between a
- *  lone announcement (title + schedule share one row) and a grouped
+/** Body + Link button -- everything about one announcement except its
+ *  title and schedule, whose placement differs between a lone
+ *  announcement (title + schedule share one row) and a grouped
  *  sub-item (no title of its own; the schedule effectively stands in
- *  for it). Both call sites render those two separately, then this. */
+ *  for it). Both call sites render those two separately, then this.
+ *
+ *  **No Organization line, 2026-10-25** (the user's own request: "I
+ *  want to not include the 'submitting organization'... portion of
+ *  announcements in the announcements page at this time") -- still
+ *  collected on the submit form and shown in Manage Announcements/
+ *  Table Admin, just not on this public page. */
 function AnnouncementBody({ a }: { a: PublishedAnnouncement }) {
-  const meta = a.organization ?? "";
   return (
     <>
-      {meta && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-muted/60">{meta}</p>}
       {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
       {/* 2026-10-13, the user's own request: "can we get the word
           'Link' to show up in the public views of the announcements as
@@ -149,7 +153,7 @@ export default async function PublicAnnouncementsPage() {
               // the new shared-heading treatment.
               if (group.items.length === 1) {
                 const a = group.items[0];
-                const schedule = formatAnnouncementSchedule(a);
+                const schedule = formatAnnouncementScheduleLine(a);
                 return (
                   <li key={a.id} className="rounded border border-rule/60 px-3 py-2 text-sm">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -174,7 +178,7 @@ export default async function PublicAnnouncementsPage() {
                   </span>
                   <ul className="mt-2 flex flex-col gap-3 divide-y divide-rule/40">
                     {group.items.map((a) => {
-                      const schedule = formatAnnouncementSchedule(a);
+                      const schedule = formatAnnouncementScheduleLine(a);
                       return (
                         <li key={a.id} className="pt-3 first:pt-0">
                           {schedule && (

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib/data/announcement-constants";
 
 /**
  * Archives any "published" announcement whose own date range has
@@ -134,6 +135,82 @@ export function formatAnnouncementSchedule(a: {
   const dateRange = formatAnnouncementDateRange(a);
   if (dateRange && a.location) return `${dateRange} - ${a.location}`;
   return dateRange || a.location || null;
+}
+
+/** "September 6" -- no weekday, no year. Used only for a recurring
+ *  series' own date range, where the cadence phrase already states
+ *  which weekday the series falls on (repeating it in the date too is
+ *  exactly the confusing shape the user flagged: "Sunday, September
+ *  6th... Sunday, November 22nd" reads like it spans every day in
+ *  between, not "weekly on Sundays"). `formatAnnouncementDate` (above)
+ *  is still used as-is for a one-time item, where stating the weekday
+ *  is the whole point. */
+function formatMonthDay(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  const month = d.toLocaleDateString("en-US", { month: "long" });
+  return `${month} ${ordinal(d.getDate())}`;
+}
+
+interface RecurrenceFields {
+  recurrence: string | null;
+  recurrence_day_of_week: number | null;
+  recurrence_nth_occurrence: number | null;
+  recurrence_day_of_month: number | null;
+}
+
+/**
+ * "Weekly on Sundays" / "Monthly on the 2nd Tuesday" / "Monthly on the
+ * 15th" -- migration 083's recurrence fields, read into one phrase.
+ * Returns null for a one-time item (`recurrence` unset) -- callers
+ * fall back to the plain weekday-stating date format in that case.
+ */
+export function formatAnnouncementRecurrencePhrase(a: RecurrenceFields): string | null {
+  if (a.recurrence === "weekly") {
+    return `Weekly on ${WEEKDAY_PLURAL_NAMES[a.recurrence_day_of_week ?? 0]}`;
+  }
+  if (a.recurrence === "monthly_nth_weekday") {
+    const nth = NTH_OCCURRENCE_NAMES[(a.recurrence_nth_occurrence ?? 1) - 1] ?? "1st";
+    return `Monthly on the ${nth} ${WEEKDAY_NAMES[a.recurrence_day_of_week ?? 0]}`;
+  }
+  if (a.recurrence === "monthly_date") {
+    return `Monthly on the ${ordinal(a.recurrence_day_of_month ?? 1)}`;
+  }
+  return null;
+}
+
+/**
+ * The full schedule line for any announcement, one-time or recurring
+ * -- `formatAnnouncementSchedule` (above) for a one-time item,
+ * unchanged; for a recurring one, the cadence phrase plus the
+ * occurrence's own time and the series' own date range (weekday-free,
+ * see `formatMonthDay`), then location, same ordering/joining as the
+ * one-time version. Public page + Conducting script both use this now
+ * instead of calling `formatAnnouncementSchedule` directly, so a
+ * recurring item reads correctly in both places.
+ */
+export function formatAnnouncementScheduleLine(
+  a: RecurrenceFields & {
+    start_date: string | null;
+    start_time: string | null;
+    end_date: string | null;
+    end_time: string | null;
+    location: string | null;
+  }
+): string | null {
+  const phrase = formatAnnouncementRecurrencePhrase(a);
+  if (!phrase) return formatAnnouncementSchedule(a);
+
+  const parts = [phrase];
+  if (a.start_time && a.end_time) parts.push(`${formatAnnouncementTime(a.start_time)} – ${formatAnnouncementTime(a.end_time)}`);
+  else if (a.start_time) parts.push(formatAnnouncementTime(a.start_time));
+
+  if (a.start_date) {
+    parts.push(a.end_date && a.end_date !== a.start_date ? `${formatMonthDay(a.start_date)} – ${formatMonthDay(a.end_date)}` : `starting ${formatMonthDay(a.start_date)}`);
+  }
+
+  let text = parts.join(", ");
+  if (a.location) text += ` - ${a.location}`;
+  return text;
 }
 
 export interface AnnouncementGroup<T> {

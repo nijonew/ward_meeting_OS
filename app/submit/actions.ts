@@ -88,6 +88,23 @@ export async function submitAnnouncement(formData: FormData) {
   const location = String(formData.get("location") ?? "").trim() || null;
   const linkUrl = String(formData.get("link_url") ?? "").trim() || null;
 
+  // RecurrenceToggle's checkbox has a hidden "" fallback before it in
+  // the DOM (so unchecking it still submits something) -- getAll's
+  // LAST entry is the real submitted state, matching how every other
+  // hidden-fallback checkbox in this app is read (see
+  // saveAgendaGrid's PLANNING_BOOLEAN_COLUMNS handling).
+  const isRecurringValues = formData.getAll("is_recurring");
+  const isRecurring = isRecurringValues[isRecurringValues.length - 1] === "on";
+  const recurrence = isRecurring ? String(formData.get("recurrence") ?? "").trim() || null : null;
+  const recurrenceDayOfWeek =
+    isRecurring && (recurrence === "weekly" || recurrence === "monthly_nth_weekday")
+      ? Number(formData.get("recurrence_day_of_week") ?? 0)
+      : null;
+  const recurrenceNthOccurrence =
+    isRecurring && recurrence === "monthly_nth_weekday" ? Number(formData.get("recurrence_nth_occurrence") ?? 1) : null;
+  const recurrenceDayOfMonth =
+    isRecurring && recurrence === "monthly_date" ? Number(formData.get("recurrence_day_of_month") ?? 1) : null;
+
   if (!title || !body || !organization || !announcementType || !audience || !whereAnnounced) {
     redirect(
       `/submit/announcement?error=${encodeURIComponent(
@@ -112,6 +129,10 @@ export async function submitAnnouncement(formData: FormData) {
     end_time: endTime,
     location,
     link_url: linkUrl,
+    recurrence,
+    recurrence_day_of_week: recurrenceDayOfWeek,
+    recurrence_nth_occurrence: recurrenceNthOccurrence,
+    recurrence_day_of_month: recurrenceDayOfMonth,
   });
 
   if (error) {

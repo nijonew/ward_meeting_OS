@@ -25,7 +25,12 @@ import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { getCallableCallingPlanningItems, autoAnnounceReadyCallingPlanningItems } from "@/lib/data/calling-planning";
 import { getCallableRabnmPlanningItems } from "@/lib/data/sacrament-rabnm-planning";
-import { getAnnouncementsByPlannedElement, getPullableAnnouncements, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
+import {
+  getAnnouncementsByPlannedElement,
+  getPullableAnnouncements,
+  autoPullSacramentAnnouncements,
+  type PulledAnnouncement,
+} from "@/lib/data/sacrament-announcements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
@@ -145,6 +150,15 @@ export default async function PlanningViewPage({
   // is actually being viewed here, so it's safe to call unconditionally.
   if (isSacrament) {
     await autoAnnounceReadyCallingPlanningItems();
+    // Auto-fills this meeting's Announcements block with every
+    // "Sacrament Meeting"-flagged announcement currently in its active
+    // window (2026-10-25, migration 083) -- see that function's own
+    // doc comment. Unlike the sweep above, this isn't scoped to a
+    // single "nearest upcoming" meeting -- a recurring announcement
+    // should land in every applicable meeting, so it needs to run
+    // fresh against whichever meeting's Planning page is actually
+    // being viewed.
+    await autoPullSacramentAnnouncements(meetingId, meeting.date);
   }
 
   const [

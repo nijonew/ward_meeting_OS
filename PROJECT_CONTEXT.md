@@ -310,8 +310,19 @@ reconstructed from both:
   **not yet run** -- ask the user to confirm `082` is actually free
   before running it, per this project's own repeated numbering-collision
   history.
+- `083` (new `announcements.recurrence`/`recurrence_day_of_week`/
+  `recurrence_nth_occurrence`/`recurrence_day_of_month` columns -- a
+  real recurring-schedule shape instead of a single date range that
+  reads like a multi-day event; new `sacrament_announcement_exclusions`
+  table -- lets a manual "Remove" on an auto-pulled announcement
+  actually stick against the new Sacrament Meeting auto-pull sweep; and
+  amends `delete_meeting_cascade` to clean up the new table, see Known
+  open items below): **not yet run** -- ask the user to confirm `083`
+  is actually free before running it (and that `082` is confirmed run
+  or genuinely still pending), per this project's own repeated
+  numbering-collision history.
 
-Next migration should be `083_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
+Next migration should be `084_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2026,6 +2037,117 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Announcements gained a real recurring-schedule shape, a public-page
+redesign, and a genuinely automatic Sacrament Meeting auto-pull,
+2026-10-25 (migration `083`, not yet run).** The user's own report,
+pointing at a real live announcement as the example of the problem:
+"Weekly Self Reliance Classes Sunday, September 6th at 3:00 PM --
+Sunday, November 22nd" reads like the class runs every single day in
+that range, not "weekly on Sundays." Three asks in one message,
+clarified with the user via `AskUserQuestion` before building (cadence
+vocabulary, auto-pull scope, and whether Organization/Audience should
+be dropped from the submit form too -- answers below):
+
+1. **Public page display simplified** -- "Short Title / Description /
+   Date - Time - Location," dropping the "submitting organization"
+   line (confirmed: still collected on the submit form and still shown
+   in Manage Announcements/Table Admin, just not on the public page;
+   Audience was never shown there to begin with, so nothing changed
+   for it). `AnnouncementBody` (`app/announcements/public/page.tsx`)
+   no longer renders the small-caps `organization` meta line.
+2. **A real recurrence shape**, confirmed with the user: Weekly,
+   Monthly on the same weekday ("2nd Tuesday"), Monthly on the same
+   date ("the 15th") -- "every other week" was considered and not
+   chosen. New `announcements.recurrence`/`recurrence_day_of_week`/
+   `recurrence_nth_occurrence`/`recurrence_day_of_month` columns
+   (migration 083, no CHECK constraint -- same reasoning as every
+   other admin-facing vocabulary column in this app after this
+   project's own repeated undocumented-CHECK-constraint incidents).
+   `start_date`/`end_date` keep their existing meaning (the series'
+   own first/last occurrence date, end nullable = ongoing) and
+   `start_time`/`end_time` keep theirs (each occurrence's own time) --
+   only the cadence itself is new. Deliberately NOT the full
+   Meeting-Schedule-style cadence engine (`lib/data/cadence.ts`/
+   `CadenceFields.tsx`), which also generates real calendar rows -- an
+   announcement only needs a phrase to *display*, not individual
+   occurrence rows, so this is its own smaller picker
+   (`components/submit/RecurrenceFields.tsx`) sharing the same
+   weekday/nth vocabulary for consistency (`WEEKDAY_NAMES`/
+   `NTH_OCCURRENCE_NAMES`, `lib/data/announcement-constants.ts`).
+   New `formatAnnouncementRecurrencePhrase`/`formatAnnouncementScheduleLine`
+   (`lib/data/announcements.ts`) render "Weekly on Sundays, 3:00 PM,
+   starting September 6" / "Monthly on the 2nd Tuesday, 7:00 PM" / etc.
+   -- falls back to the existing `formatAnnouncementSchedule` (full
+   weekday-stating date) for a one-time item, completely unchanged.
+   Both the public page and the Conducting script's own spoken wording
+   (`announcementWording`, `lib/data/conducting-rows.ts`) use the new
+   function now, matching this app's own established precedent of
+   keeping the two in sync.
+3. **"Sacrament Meeting" added as a real `where_announced` option**
+   (`ANNOUNCEMENT_WHERE`), and -- the user's own words -- "I want items
+   with that option selected automatically landing in the Sacrament
+   meeting programs up until the time the announced item has lapsed or
+   occurred." Confirmed with the user: a recurring item should land in
+   **every** applicable Sacrament Meeting during its active window,
+   not just the nearest one. New `autoPullSacramentAnnouncements(meetingId,
+   meetingDateIso)` (`lib/data/sacrament-announcements.ts`) -- a lazy
+   sweep, same pattern as `autoAnnounceReadyCallingPlanningItems`, but
+   run once per Sacrament Meeting's own Planning page load (not scoped
+   to a single "nearest upcoming" meeting the way that one is, since a
+   multi-week series needs to land in *each* applicable week's own
+   meeting as that meeting's own Planning page gets visited). Reuses
+   the existing `sacrament_announcement_pulls` table (migration 077)
+   for the actual link -- the sweep just creates those rows
+   automatically; every other reader (Planning, Conducting, Archived)
+   needed zero changes.
+   - **"In window" is a plain date-range check, not a match against
+     the recurrence pattern's own specific weekday/date** -- the
+     recurrence fields only describe which days the series itself
+     falls on (a Tuesday class, say), and Sacrament Meeting is always
+     Sunday, so matching the exact occurrence day would mean a
+     non-Sunday class could never be reminded about at all. The point
+     is "remind the ward this is still going on," every week it's
+     active within `[start_date, end_date ?? start_date]`, not
+     "this literally happens today." An announcement with no
+     `start_date` at all (General Information, etc.) is treated as
+     always active while published.
+   - **New `sacrament_announcement_exclusions` table** (migration
+     083) -- without this, the sweep re-running on every Planning page
+     load would just re-add the exact same pull the instant an admin
+     clicked Remove on an auto-pulled announcement, since it would
+     still be "in window." `removeAnnouncementFromMeeting`
+     (`app/meetings/[id]/announcements-actions.ts`) now also writes an
+     exclusion row (harmless no-op for a manually-pulled, non-auto
+     announcement -- nothing reads the exclusion for one that was
+     never flagged for Sacrament Meeting); `pullAnnouncementIntoMeeting`
+     clears any standing exclusion for that pair first, so a deliberate
+     manual re-add always overrides a prior Remove.
+   - **Deliberately NOT added to `MEETING_TYPE_ANNOUNCEMENT_LABEL`**
+     (the live-read, no-pull-table mechanism Bishopric Meeting/Ward
+     Council/Youth Council's own Review section already uses) -- those
+     three have no "already incorporated" state to track and no Remove
+     button; Sacrament Meeting's own Announcements block still needs
+     the real pull-row mechanism (multiple independent blocks per
+     meeting, migration 074; an admin's own per-meeting override via
+     Remove) that the simpler live-read design can't support.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to confirm migration numbers `082`/`083` are actually free (in that
+order -- `083`'s own `delete_meeting_cascade` amendment is written
+against `082`'s version of that function, so `082` needs to run
+first), then run both and check: a recurring announcement (e.g. "Weekly
+on Sundays, starting September 6") reads correctly on both
+`/announcements/public` and a Conducting script; checking "Sacrament
+Meeting" on a new announcement makes it appear in every upcoming
+Sacrament Meeting's own Announcements block automatically, with no
+manual pull needed, for as long as its window is active; removing it
+from one specific meeting's Ward Business sticks (doesn't come back
+the next time that meeting's Planning page loads) while still showing
+correctly on every other meeting in range; and that the public
+Announcements page no longer shows an "Organization" line under any
+announcement's title.
 
 **Ward Business restored planning-ahead access to Recognitions,
 Advancements, Baptisms, New Members, and Baby Blessings, 2026-10-24

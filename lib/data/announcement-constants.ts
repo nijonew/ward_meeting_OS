@@ -41,6 +41,7 @@ export const ANNOUNCEMENT_AUDIENCES = [
 ] as const;
 
 export const ANNOUNCEMENT_WHERE = [
+  "Sacrament Meeting",
   "Bishopric Meeting",
   "Ward Council Meeting",
   "Youth Council Meeting",
@@ -58,6 +59,38 @@ export const ANNOUNCEMENT_WHERE = [
   "Primary Sharing Time",
   "Ward Communications (Printed, Weekly Email, Social Media, etc.)",
 ] as const;
+
+/**
+ * "Sacrament Meeting" (added 2026-10-25, migration 083) works
+ * differently from the other three `MEETING_TYPE_ANNOUNCEMENT_LABEL`
+ * entries above -- those are a live read of `where_announced` with no
+ * pull/consume step; Sacrament Meeting still uses the existing
+ * explicit-pull `sacrament_announcement_pulls` table, just populated
+ * automatically now instead of by hand. See
+ * `autoPullSacramentAnnouncements` (lib/data/sacrament-announcements.ts).
+ */
+export const SACRAMENT_MEETING_ANNOUNCEMENT_LABEL = "Sacrament Meeting";
+
+/**
+ * A recurring announcement's cadence (migration 083) -- `start_date`/
+ * `end_date` stay the series' own first/last occurrence date (end
+ * nullable = ongoing), `start_time`/`end_time` stay each occurrence's
+ * own time; these three values just describe which days within that
+ * window the series actually falls on, for a human-readable phrase
+ * ("Weekly on Sundays," "Monthly on the 2nd Tuesday," "Monthly on the
+ * 15th") instead of a date range that reads like one continuous
+ * event. `null`/unset means a one-time item -- the existing behavior,
+ * completely unchanged.
+ */
+export const ANNOUNCEMENT_RECURRENCE_TYPES = [
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly_nth_weekday", label: "Monthly (same weekday, e.g. \"2nd Tuesday\")" },
+  { value: "monthly_date", label: "Monthly (same date, e.g. \"the 15th\")" },
+] as const;
+
+export const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+export const WEEKDAY_PLURAL_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"] as const;
+export const NTH_OCCURRENCE_NAMES = ["1st", "2nd", "3rd", "4th", "5th"] as const;
 
 export const ANNOUNCEMENT_TYPES = [
   { value: "Single Event", label: "Single Event (scheduled meeting, activity, etc.)" },

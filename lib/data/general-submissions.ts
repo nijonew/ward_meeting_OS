@@ -28,6 +28,10 @@ export interface PublishedAnnouncement {
   end_time: string | null;
   location: string | null;
   link_url: string | null;
+  recurrence: string | null;
+  recurrence_day_of_week: number | null;
+  recurrence_nth_occurrence: number | null;
+  recurrence_day_of_month: number | null;
 }
 
 /**
@@ -61,7 +65,7 @@ export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement
     supabase
       .from("announcements")
       .select(
-        "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url"
+        "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url, recurrence, recurrence_day_of_week, recurrence_nth_occurrence, recurrence_day_of_month"
       )
       .eq("status", "published")
       .order("created_at", { ascending: false }),

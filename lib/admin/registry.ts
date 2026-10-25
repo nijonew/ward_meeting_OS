@@ -18,6 +18,9 @@ import {
   ANNOUNCEMENT_TYPES,
   ANNOUNCEMENT_AUDIENCES,
   ANNOUNCEMENT_WHERE,
+  ANNOUNCEMENT_RECURRENCE_TYPES,
+  WEEKDAY_NAMES,
+  NTH_OCCURRENCE_NAMES,
 } from "@/lib/data/announcement-constants";
 
 /** ANNOUNCEMENT_AUDIENCES/ANNOUNCEMENT_WHERE are plain string lists (the
@@ -27,6 +30,8 @@ import {
  *  every other options list in this registry. */
 const ANNOUNCEMENT_AUDIENCE_OPTIONS = ANNOUNCEMENT_AUDIENCES.map((v) => ({ value: v, label: v }));
 const ANNOUNCEMENT_WHERE_OPTIONS = ANNOUNCEMENT_WHERE.map((v) => ({ value: v, label: v }));
+const WEEKDAY_OPTIONS = WEEKDAY_NAMES.map((d, i) => ({ value: String(i), label: d }));
+const NTH_OCCURRENCE_OPTIONS = NTH_OCCURRENCE_NAMES.map((n, i) => ({ value: String(i + 1), label: n }));
 
 /** Fields whose choices can be edited via the "Dropdown Option Lists"
  *  admin table below (admin_select_options) instead of code. Kept as an
@@ -228,6 +233,14 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "start_time", label: "Start Time", type: "time" },
       { column: "end_date", label: "End Date", type: "date" },
       { column: "end_time", label: "End Time", type: "time" },
+      // Recurrence (migration 083, 2026-10-25) -- blank/unset means a
+      // one-time item, the unchanged default. Set primarily from the
+      // submit form's own RecurrenceFields picker; exposed here too as
+      // the raw-data fallback for a correction.
+      { column: "recurrence", label: "Recurrence", type: "select", options: [...ANNOUNCEMENT_RECURRENCE_TYPES] },
+      { column: "recurrence_day_of_week", label: "Recurs On (Weekday)", type: "select", options: WEEKDAY_OPTIONS },
+      { column: "recurrence_nth_occurrence", label: "Recurs On (Nth, Monthly)", type: "select", options: NTH_OCCURRENCE_OPTIONS },
+      { column: "recurrence_day_of_month", label: "Recurs On (Day of Month)", type: "text" },
       { column: "location", label: "Location", type: "text", wrap: true },
       { column: "link_url", label: "Link", type: "text", wrap: true },
       { column: "submitted_by_name", label: "Submitted By", type: "text", required: true },

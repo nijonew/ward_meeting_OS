@@ -8,6 +8,7 @@ import {
   ANNOUNCEMENT_TYPES,
   OTHER_VALUE,
 } from "@/lib/data/announcement-constants";
+import { RecurrenceToggle } from "@/components/submit/RecurrenceFields";
 
 const INPUT_CLASS = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
 const LABEL_CLASS = "text-xs text-ink-muted";
@@ -115,24 +116,28 @@ export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) 
       <input type="text" name="title" required placeholder="Announcement Title (short name)" className={INPUT_CLASS} />
       <textarea name="body" required rows={4} placeholder="Full Description" className={INPUT_CLASS} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className={LABEL_CLASS}>
-          Start Date
-          <input type="date" name="start_date" className={`mt-1 block w-full ${INPUT_CLASS}`} />
-        </label>
-        <label className={LABEL_CLASS}>
-          Start Time
-          <input type="time" name="start_time" className={`mt-1 block w-full ${INPUT_CLASS}`} />
-        </label>
-        <label className={LABEL_CLASS}>
-          End Date
-          <input type="date" name="end_date" className={`mt-1 block w-full ${INPUT_CLASS}`} />
-        </label>
-        <label className={LABEL_CLASS}>
-          End Time
-          <input type="time" name="end_time" className={`mt-1 block w-full ${INPUT_CLASS}`} />
-        </label>
-      </div>
+      <RecurrenceToggle>
+        {(recurring) => (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className={LABEL_CLASS}>
+              {recurring ? "Series Start Date" : "Start Date"}
+              <input type="date" name="start_date" className={`mt-1 block w-full ${INPUT_CLASS}`} />
+            </label>
+            <label className={LABEL_CLASS}>
+              {recurring ? "Each Occurrence's Start Time" : "Start Time"}
+              <input type="time" name="start_time" className={`mt-1 block w-full ${INPUT_CLASS}`} />
+            </label>
+            <label className={LABEL_CLASS}>
+              {recurring ? "Series End Date (leave blank if ongoing)" : "End Date"}
+              <input type="date" name="end_date" className={`mt-1 block w-full ${INPUT_CLASS}`} />
+            </label>
+            <label className={LABEL_CLASS}>
+              {recurring ? "Each Occurrence's End Time" : "End Time"}
+              <input type="time" name="end_time" className={`mt-1 block w-full ${INPUT_CLASS}`} />
+            </label>
+          </div>
+        )}
+      </RecurrenceToggle>
 
       <input type="text" name="location" placeholder="Location" className={INPUT_CLASS} />
       <input type="url" name="link_url" placeholder="Link to event info" className={INPUT_CLASS} />

@@ -40,6 +40,14 @@ function revalidateBoth(meetingId: string) {
  * only ever mean a genuine race -- two admins adding the same
  * announcement to the same meeting at once -- surfaced as a real
  * error rather than silently ignored.
+ *
+ * **Clears any standing exclusion for this pair, 2026-10-25** (migration
+ * 083) -- a manual pull here is a deliberate "yes, include this one
+ * after all," so it overrides a prior Remove click (see
+ * `removeAnnouncementFromMeeting`'s own comment) the same way it
+ * already would for a newly-added announcement, rather than leaving
+ * a stale exclusion that would otherwise mean nothing today but could
+ * confuse a later read of that table.
  */
 export async function pullAnnouncementIntoMeeting(
   meetingId: string,
@@ -59,6 +67,12 @@ export async function pullAnnouncementIntoMeeting(
     return { error: error.message };
   }
 
+  await supabase
+    .from("sacrament_announcement_exclusions")
+    .delete()
+    .eq("meeting_id", meetingId)
+    .eq("announcement_id", announcementId);
+
   revalidateBoth(meetingId);
   return { success: true };
 }
@@ -70,7 +84,19 @@ export async function pullAnnouncementIntoMeeting(
  *  announcement id is unambiguous regardless of which of a meeting's
  *  blocks it came from (the `unique (announcement_id, meeting_id)`
  *  constraint on `sacrament_announcement_pulls` guarantees at most one
- *  matching row). */
+ *  matching row).
+ *
+ * **Also records a standing exclusion, 2026-10-25** (migration 083) --
+ * `autoPullSacramentAnnouncements` re-runs every time this meeting's
+ * own Planning page loads, so without recording that this specific
+ * pair was deliberately removed, the very next page load would just
+ * re-add the exact same announcement right back (it's still "in
+ * window," which is the only thing the sweep checks). This is a no-op
+ * for an announcement that was never auto-pullable in the first place
+ * (nothing ever reads the exclusion for one that isn't flagged for
+ * Sacrament Meeting) -- always writing it is simpler than first
+ * checking whether it was needed.
+ */
 export async function removeAnnouncementFromMeeting(meetingId: string, announcementId: string): Promise<ActionResult> {
   const denied = await requireSacramentPlanningFeature();
   if (denied) return denied;
@@ -83,6 +109,10 @@ export async function removeAnnouncementFromMeeting(meetingId: string, announcem
     .eq("announcement_id", announcementId);
 
   if (error) return { error: error.message };
+
+  await supabase
+    .from("sacrament_announcement_exclusions")
+    .upsert({ meeting_id: meetingId, announcement_id: announcementId }, { onConflict: "announcement_id,meeting_id", ignoreDuplicates: true });
 
   revalidateBoth(meetingId);
   return { success: true };
