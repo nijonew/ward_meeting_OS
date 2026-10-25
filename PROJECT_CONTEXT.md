@@ -2022,6 +2022,52 @@ avoid confusing the two.
 
 ## Known open items
 
+**Table Admin index shows titles only, and the stock footer tagline
+dropped everywhere it appeared, 2026-10-25** (the user's own request:
+"update the table admin page to have titles only, no descriptions on
+each line. I also want to eliminate the phrase 'planning, conducting,
+and publishing meetings from one source of truth' from footers or
+anywhere else it appears"). Two small, unrelated cleanups done
+together.
+
+`/admin`'s table list (`TableList` in `app/admin/page.tsx`) no longer
+shows each table's own `description` as a truncated caption next to
+its title -- every row is now just the title, matching the "Other
+Admin Tools" section's three hardcoded links (Calling Features,
+Meeting Templates, Verify Logins), which lost their own inline
+captions the same way. The registry's `description` field itself is
+untouched and still does real work -- it still renders once, at the
+top of that table's own `/admin/[table]` page -- this only removed the
+redundant shorter copy that used to repeat on the index.
+
+The footer tagline ("Ward OS &middot; planning, conducting, and
+publishing meetings from one source of truth." / "Ward Meeting OS
+&middot; ...") appeared in four places across three files:
+`app/dashboard/page.tsx`, `app/music/page.tsx`, and twice in
+`app/meetings/[id]/layout.tsx` (its two separate return paths -- the
+bare no-chrome fallback for a Sacrament Meeting viewer who can neither
+plan nor conduct, and the normal full-chrome footer). All four now
+just read "Ward OS"/"Ward Meeting OS" with the tagline sentence
+dropped, keeping each file's own existing brand text rather than
+unifying the two different wordings this file already used
+inconsistently. The landing page's own footer ("Ward OS &mdash;
+`<ward name>` &mdash; Syracuse Utah Stake") never contained this phrase
+to begin with and was already left alone.
+
+**Flagged, not touched**: `app/layout.tsx`'s `<meta name="description">`
+("Plan, conduct, and publish ward meetings from one source of truth.")
+carries the same underlying tagline in different wording (infinitive
+"Plan, conduct, and publish" rather than the gerund "planning,
+conducting, and publishing" the user specifically quoted) -- it's not
+a footer and isn't a literal occurrence of the quoted phrase, so it
+was left as-is; ask if this should go too the next time this comes up.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/admin`, `/dashboard`, `/music`, and any meeting page's
+footer once deployed and confirm the tagline sentence is gone from all
+of them.
+
 **Public Announcements page grouped by title and sorted by event date,
 2026-10-24** (the user's own question, then request: "How are they
 currently sorted when displayed?... I have several assignments on

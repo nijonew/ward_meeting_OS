@@ -97,8 +97,7 @@ export default async function MeetingLayout({
           <div className="mt-8 flex-1">{children}</div>
 
           <footer className="mt-auto pt-16 text-xs text-ink-muted">
-            Ward Meeting OS &middot; planning, conducting, and publishing meetings from one source of
-            truth.
+            Ward Meeting OS
           </footer>
         </main>
       );
@@ -143,8 +142,7 @@ export default async function MeetingLayout({
       <div className="mt-8 flex-1">{children}</div>
 
       <footer className="mt-auto pt-16 text-xs text-ink-muted">
-        Ward Meeting OS &middot; planning, conducting, and publishing meetings from one source of
-        truth.
+        Ward Meeting OS
       </footer>
     </main>
   );

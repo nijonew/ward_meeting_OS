@@ -138,8 +138,7 @@ export default async function MusicPage() {
       <BulkMusicEntry people={people} />
 
       <footer className="mt-auto pt-16 text-xs text-ink-muted">
-        Ward Meeting OS &middot; planning, conducting, and publishing meetings from one source of
-        truth.
+        Ward Meeting OS
       </footer>
     </main>
   );

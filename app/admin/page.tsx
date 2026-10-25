@@ -21,14 +21,17 @@ const SACRAMENT_CONTENT_TABLES = new Set([
   "sacrament_speakers_youth",
 ]);
 
+// Titles only, no per-row description (2026-10-25, the user's own
+// request) -- each table's own `description` still exists in the
+// registry and still renders once, at the top of that table's own
+// `/admin/[table]` page -- only this index's own list rows dropped it.
 function TableList({ tables }: { tables: AdminTableConfig[] }) {
   return (
     <ul className="divide-y divide-rule rounded border border-rule bg-surface">
       {tables.map((t) => (
         <li key={t.table}>
-          <Link href={`/admin/${t.table}`} className="flex items-baseline justify-between px-6 py-4 hover:bg-paper">
-            <span className="font-medium text-ink">{t.label}</span>
-            {t.description && <span className="ml-4 truncate text-xs text-ink-muted">{t.description}</span>}
+          <Link href={`/admin/${t.table}`} className="block px-6 py-4 font-medium text-ink hover:bg-paper">
+            {t.label}
           </Link>
         </li>
       ))}
@@ -97,44 +100,22 @@ export default async function AdminIndexPage() {
           <ul className="mt-3 divide-y divide-rule rounded border border-rule bg-surface">
             {canManageCallingFeatures && (
               <li>
-                <Link
-                  href="/admin/calling-features"
-                  className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
-                >
-                  <span className="font-medium text-ink">Calling Features</span>
-                  <span className="ml-4 truncate text-xs text-ink-muted">
-                    Pick a calling, check off every feature it grants -- replaces hand-adding rows
-                    to the raw Calling Features table one at a time
-                  </span>
+                <Link href="/admin/calling-features" className="block px-6 py-4 font-medium text-ink hover:bg-paper">
+                  Calling Features
                 </Link>
               </li>
             )}
             {canManageTemplates && (
               <li>
-                <Link
-                  href="/admin/meeting-templates"
-                  className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
-                >
-                  <span className="font-medium text-ink">Meeting Templates</span>
-                  <span className="ml-4 truncate text-xs text-ink-muted">
-                    Default agenda elements new meetings are seeded with, by meeting type (and
-                    format, for Sacrament Meeting)
-                  </span>
+                <Link href="/admin/meeting-templates" className="block px-6 py-4 font-medium text-ink hover:bg-paper">
+                  Meeting Templates
                 </Link>
               </li>
             )}
             {canVerifyLogins && (
               <li>
-                <Link
-                  href="/admin/verify-logins"
-                  className="flex items-baseline justify-between px-6 py-4 hover:bg-paper"
-                >
-                  <span className="font-medium text-ink">Verify Logins</span>
-                  <span className="ml-4 truncate text-xs text-ink-muted">
-                    Match a new login to a person -- their access then follows automatically from
-                    whichever calling(s) that person holds. Also reachable from the banner at the
-                    top of the page whenever one is waiting.
-                  </span>
+                <Link href="/admin/verify-logins" className="block px-6 py-4 font-medium text-ink hover:bg-paper">
+                  Verify Logins
                 </Link>
               </li>
             )}
