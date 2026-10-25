@@ -5,6 +5,7 @@ import type { MusicRow, SpeakerRow, PlanningInfo, RabnmRow } from "@/lib/data/sa
 import type { PersonOption } from "@/lib/data/people";
 import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
+import type { CallableRabnmItem } from "@/lib/data/sacrament-rabnm-planning";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { slotLabel } from "@/lib/data/sacrament-constants";
 
@@ -179,6 +180,7 @@ export type AgendaRow =
       items: RabnmRow[];
       callableCallings: CallableCallingItem[];
       callableReleases: CallableCallingItem[];
+      callableRabnm: CallableRabnmItem[];
     }
   /** Announcements, inline (2026-10-11, the user's own request: "I want
    *  to be able to select the announcements that need to be included in
@@ -231,6 +233,7 @@ export interface AgendaRowInputs {
   rabnm: RabnmRow[];
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
+  callableRabnm: CallableRabnmItem[];
   /** Already pulled into this meeting, grouped by which specific
    *  Announcements block (`meeting_planned_elements` row id) each one
    *  belongs to -- a meeting can have more than one (migration 074,
@@ -274,6 +277,7 @@ export function buildAgendaRows({
   rabnm,
   callableCallings,
   callableReleases,
+  callableRabnm,
   announcementsByPlannedElement,
   pullableAnnouncements,
   eligibilityByKey,
@@ -316,6 +320,7 @@ export function buildAgendaRows({
         items: rabnm,
         callableCallings,
         callableReleases,
+        callableRabnm,
       });
       continue;
     }

@@ -167,3 +167,108 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
   revalidateBoth(meetingId);
   return { success: true };
 }
+
+function revalidateRabnmPlanning(meetingId: string) {
+  revalidatePath(`/meetings/${meetingId}/planning`);
+  revalidatePath("/rabnm-planning");
+}
+
+/**
+ * Pulls one standing RABNM-planning-pool row (migration 082 --
+ * Recognitions/Advancements/Baptisms/New Members/Baby Blessings) into
+ * this meeting's Ward Business -- the direct counterpart to
+ * pullCallingPlanningIntoMeeting above, for the pool built the same
+ * way Calling Planning already works: a standing not-yet-announced
+ * list, pulled into a specific meeting on demand. Unlike Calling
+ * Planning's two-sided (calling/release) split, a RABNM-planning row
+ * always carries its own single `type`, so there's no `kind` argument
+ * here.
+ */
+export async function pullRabnmPlanningIntoMeeting(meetingId: string, planningId: string): Promise<ActionResult> {
+  const denied = await requireRabnmFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const { data: planning, error: fetchError } = await supabase
+    .from("sacrament_rabnm_planning")
+    .select("type, detail, event_date, announced_meeting_id, sacrament_rabnm_planning_people(person_id)")
+    .eq("id", planningId)
+    .single();
+
+  if (fetchError || !planning) {
+    return { error: fetchError?.message ?? "Could not load this planning record." };
+  }
+  if (planning.announced_meeting_id) {
+    return { error: "This has already been announced in a meeting." };
+  }
+
+  const { data: rabnm, error: rabnmError } = await supabase
+    .from("sacrament_rabnm")
+    .insert({
+      meeting_id: meetingId,
+      type: planning.type,
+      detail: planning.detail,
+      event_date: planning.event_date,
+      rabnm_planning_id: planningId,
+    })
+    .select("id")
+    .single();
+  if (rabnmError || !rabnm) return { error: rabnmError?.message ?? "Could not create the announcement." };
+
+  const personRows = (planning.sacrament_rabnm_planning_people ?? []) as { person_id: string }[];
+  if (personRows.length > 0) {
+    const { error: peopleError } = await supabase
+      .from("sacrament_rabnm_people")
+      .insert(personRows.map((p) => ({ rabnm_id: rabnm.id, person_id: p.person_id })));
+    if (peopleError) return { error: peopleError.message };
+  }
+
+  const { error: updateError } = await supabase
+    .from("sacrament_rabnm_planning")
+    .update({ announced_meeting_id: meetingId, updated_at: new Date().toISOString() })
+    .eq("id", planningId);
+  if (updateError) return { error: updateError.message };
+
+  revalidateRabnmPlanning(meetingId);
+  return { success: true };
+}
+
+/**
+ * Reverses pullRabnmPlanningIntoMeeting -- removes the sacrament_rabnm
+ * row this meeting's Ward Business created (and its
+ * sacrament_rabnm_people rows) and clears announced_meeting_id so the
+ * pool row goes back into circulation, same reasoning as
+ * removeCallingPlanningFromMeeting above.
+ */
+export async function removeRabnmPlanningFromMeeting(meetingId: string, planningId: string): Promise<ActionResult> {
+  const denied = await requireRabnmFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const { data: rabnmRow } = await supabase
+    .from("sacrament_rabnm")
+    .select("id")
+    .eq("meeting_id", meetingId)
+    .eq("rabnm_planning_id", planningId)
+    .maybeSingle();
+
+  if (rabnmRow) {
+    const { error: peopleDeleteError } = await supabase
+      .from("sacrament_rabnm_people")
+      .delete()
+      .eq("rabnm_id", rabnmRow.id);
+    if (peopleDeleteError) return { error: peopleDeleteError.message };
+
+    const { error: deleteError } = await supabase.from("sacrament_rabnm").delete().eq("id", rabnmRow.id);
+    if (deleteError) return { error: deleteError.message };
+  }
+
+  const { error: updateError } = await supabase
+    .from("sacrament_rabnm_planning")
+    .update({ announced_meeting_id: null, updated_at: new Date().toISOString() })
+    .eq("id", planningId);
+  if (updateError) return { error: updateError.message };
+
+  revalidateRabnmPlanning(meetingId);
+  return { success: true };
+}

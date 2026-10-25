@@ -24,6 +24,7 @@ import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacram
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { getCallableCallingPlanningItems, autoAnnounceReadyCallingPlanningItems } from "@/lib/data/calling-planning";
+import { getCallableRabnmPlanningItems } from "@/lib/data/sacrament-rabnm-planning";
 import { getAnnouncementsByPlannedElement, getPullableAnnouncements, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
@@ -156,6 +157,7 @@ export default async function PlanningViewPage({
     hymnalIndex,
     visitingAuthorities,
     callablePlanningItems,
+    callableRabnm,
     announcementsByPlannedElement,
     pullableAnnouncements,
   ] = await Promise.all([
@@ -178,6 +180,10 @@ export default async function PlanningViewPage({
     isSacrament
       ? getCallableCallingPlanningItems()
       : Promise.resolve({ callings: [], releases: [] }),
+    // Ward Business's RABNM-planning third section (2026-10-24) -- same
+    // reasoning, small enough (every not-yet-announced pool row,
+    // ward-wide) to fetch unconditionally.
+    isSacrament ? getCallableRabnmPlanningItems() : Promise.resolve([]),
     // Announcements' own inline picker (2026-10-11) -- same reasoning
     // as Ward Business's, just for the `announcements` table instead.
     // A map (not a flat list) since a meeting can have more than one
@@ -356,6 +362,7 @@ export default async function PlanningViewPage({
     rabnm: sacramentData?.rabnm ?? [],
     callableCallings: callablePlanningItems.callings,
     callableReleases: callablePlanningItems.releases,
+    callableRabnm,
     announcementsByPlannedElement,
     pullableAnnouncements,
     eligibilityByKey,

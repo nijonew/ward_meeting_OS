@@ -62,6 +62,11 @@ export interface RabnmRow {
    *  should reverse it there too" apart from a manually-added "Other"
    *  item, which has no such link. */
   calling_planning_id: string | null;
+  /** Set only for a row created through the RABNM planning-pool pull
+   *  mechanism (migration 082) -- the same role calling_planning_id
+   *  plays, for Recognitions/Advancements/Baptisms/New Members/Baby
+   *  Blessings instead of Callings/Releases. */
+  rabnm_planning_id: string | null;
 }
 
 export interface SacramentPlanningData {
@@ -110,7 +115,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
     supabase
       .from("sacrament_rabnm")
       .select(
-        "id, type, detail, event_date, calling_planning_id, callings(name), sacrament_rabnm_people(people(name))"
+        "id, type, detail, event_date, calling_planning_id, rabnm_planning_id, callings(name), sacrament_rabnm_people(people(name))"
       )
       .eq("meeting_id", meetingId),
   ]);
@@ -153,6 +158,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         detail: string | null;
         event_date: string | null;
         calling_planning_id: string | null;
+        rabnm_planning_id: string | null;
         callings: unknown;
         sacrament_rabnm_people: { people: { name?: string } | null }[] | null;
       };
@@ -163,6 +169,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         detail: r.detail,
         event_date: r.event_date,
         calling_planning_id: r.calling_planning_id,
+        rabnm_planning_id: r.rabnm_planning_id,
         people: (r.sacrament_rabnm_people ?? [])
           .map((p) => p.people?.name)
           .filter((name): name is string => Boolean(name)),

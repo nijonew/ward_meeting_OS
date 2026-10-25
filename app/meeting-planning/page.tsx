@@ -41,8 +41,16 @@ export default async function MeetingPlanningPage() {
   const canMeetingCancellations = hasFeature(profile, "meeting_cancellations");
   const canRotations = hasFeature(profile, "rotations");
   const canSpeakerPrayerHistory = hasFeature(profile, "speaker_prayer_history");
+  const canRabnmPlanning = hasFeature(profile, "sacrament_rabnm");
 
-  if (!canPlanAnyMeeting && !canMeetingSchedule && !canMeetingCancellations && !canRotations && !canSpeakerPrayerHistory) {
+  if (
+    !canPlanAnyMeeting &&
+    !canMeetingSchedule &&
+    !canMeetingCancellations &&
+    !canRotations &&
+    !canSpeakerPrayerHistory &&
+    !canRabnmPlanning
+  ) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Meeting Planning" />
@@ -99,6 +107,13 @@ export default async function MeetingPlanningPage() {
               title="Speaker & Prayer History"
               description="Who's due for a turn"
               href="/speaker-prayer-history"
+            />
+          )}
+          {canRabnmPlanning && (
+            <Tile
+              title="Recognitions & Advancements Planning"
+              description="Plan ahead for Ward Business's other categories"
+              href="/rabnm-planning"
             />
           )}
         </TileGrid>

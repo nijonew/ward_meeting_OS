@@ -77,6 +77,19 @@ export const MUSIC_ARRANGE_SLOTS = [
   "musical_number_6",
 ] as const;
 
+/**
+ * Every value sacrament_rabnm.type has ever held, kept for historical
+ * display/editing in Table Admin's own raw grid -- never renamed or
+ * trimmed, per this project's own "keep old keys, add new ones" rule
+ * (migration 066's calling-status redesign is the precedent). The 5
+ * "recognition"/"advancement"/"new_member" + the already-matching
+ * "baptism"/"baby_blessing" are what a sacrament_rabnm_planning pool
+ * entry's own type always resolves to once pulled into a meeting
+ * (migration 082) -- "presidency_change" and "baby_born" are retired
+ * going forward (presidency_change is redundant with a Calling pull +
+ * a Release pull from the same Calling Planning row; baby_born folds
+ * into "recognition") but still shown correctly for any existing row.
+ */
 export const RABNM_TYPES = [
   { value: "release", label: "Release" },
   { value: "new_calling", label: "New Calling" },
@@ -86,6 +99,26 @@ export const RABNM_TYPES = [
   { value: "aaronic_priesthood", label: "Aaronic Priesthood" },
   { value: "baptism", label: "Baptism" },
   { value: "new_record", label: "New Record" },
+  { value: "baby_blessing", label: "Baby Blessing" },
+  { value: "recognition", label: "Recognition" },
+  { value: "advancement", label: "Advancement" },
+  { value: "new_member", label: "New Member" },
+] as const;
+
+/**
+ * The 5 forward-going categories for the standing RABNM planning pool
+ * (sacrament_rabnm_planning, migration 082) -- Ward Business's third
+ * section, below the unchanged Callings/Releases. Recognitions is a
+ * catch-all: missionary calls/farewells, Eagle Scout, a birth
+ * announcement, and calling/release business handled inside a specific
+ * class rather than from the stand, simply announced as having already
+ * taken place.
+ */
+export const RABNM_PLANNING_TYPES = [
+  { value: "recognition", label: "Recognition" },
+  { value: "advancement", label: "Advancement" },
+  { value: "baptism", label: "Baptism" },
+  { value: "new_member", label: "New Member" },
   { value: "baby_blessing", label: "Baby Blessing" },
 ] as const;
 

@@ -88,6 +88,7 @@ export type Feature =
   | "table_admin_sacrament_music"
   | "table_admin_sacrament_planning"
   | "table_admin_sacrament_rabnm"
+  | "table_admin_sacrament_rabnm_planning"
   | "table_admin_sacrament_speakers_adults"
   | "table_admin_sacrament_speakers_youth"
   | "table_admin_ward_events"

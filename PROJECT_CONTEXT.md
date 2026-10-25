@@ -302,11 +302,16 @@ reconstructed from both:
   banner line from that format's own template, pre-seeds the new
   flexible item in its place via `sacrament_program_templates`, and
   repairs any already-seeded non-archived meeting using that format the
-  same way, see Known open items below): **not yet run** -- ask the
-  user to confirm `081` is actually free before running it, per this
-  project's own repeated numbering-collision history.
+  same way, see Known open items below): confirmed run.
+- `082` (new `sacrament_rabnm_planning`/`sacrament_rabnm_planning_people`
+  tables + `sacrament_rabnm.rabnm_planning_id` -- the standing
+  Recognitions/Advancements/Baptisms/New Members/Baby Blessings planning
+  pool, Ward Business's new third section, see Known open items below):
+  **not yet run** -- ask the user to confirm `082` is actually free
+  before running it, per this project's own repeated numbering-collision
+  history.
 
-Next migration should be `082_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
+Next migration should be `083_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2021,6 +2026,127 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Ward Business restored planning-ahead access to Recognitions,
+Advancements, Baptisms, New Members, and Baby Blessings, 2026-10-24
+(migration `082`, not yet run).** The user's own report: "Help me with
+Ward Business... I would like to have each one of those items available
+to add to the meeting much like items in the teaching section. Then I
+want to reference callings/releases on their own planning page and
+Recognitions, Advancements, Baptism, New Members, Baby Blessings from a
+single table page." These five had had no planning-view UI at all since
+the 2026-10-03 Ward Business rework collapsed everything down to a
+Calling-Planning-only pull mechanism -- only reachable through Table
+Admin's raw `sacrament_rabnm` grid, which can't even reach the people
+attached to a row (a separate join table the generic grid doesn't
+support), and whose own description was already stale, still claiming
+"add these from that meeting's own Planning view instead."
+
+Three decisions confirmed directly with the user before building this:
+1. **Category mapping**: Recognitions is a new catch-all (missionary
+   calls/farewells, Eagle Scout, a birth announcement, and calling/
+   release business handled inside a specific class rather than from
+   the stand -- "largely considered a recognition"); Advancements (was
+   "Aaronic Priesthood"); Baptisms; New Members (was "New Record"); Baby
+   Blessings. "Presidency Change" is dropped outright -- "now redundant
+   and not necessary," since it's just a Calling pull + a Release pull
+   from the same Calling Planning row. "Baby Born" folds into
+   Recognitions.
+2. **Ward Business layout**: Callings and Releases stay exactly as they
+   are, unchanged -- a new third block sits below them with its own
+   single "Add to Ward Business" dropdown (an `<optgroup>` per category,
+   Teaching-Program-style) covering the 5 categories.
+3. **Two-tier access**, same split already used for Manage Announcements
+   vs. Table Admin's `announcements`, and `/music` vs. Table Admin's
+   `sacrament_music`: a simple add-a-row/remove-a-row list per category
+   on a new bespoke page (no bulk save, no sort/filter -- Teaching
+   Program's own simplicity), plus a real Table Admin entry over the
+   same pool table for the full sortable/filterable/Save-All-Changes
+   grid when that's what's needed.
+
+New `sacrament_rabnm_planning`/`sacrament_rabnm_planning_people` tables
+mirror `calling_planning`'s own proven pool shape exactly -- a standing
+pool of not-yet-announced rows (`announced_meeting_id` nullable,
+null means still in the pool), pulled into a specific meeting by
+creating a linked `sacrament_rabnm` row (new `rabnm_planning_id` column
+on that existing table, playing the same role `calling_planning_id`
+already does) and setting the pool row's `announced_meeting_id`;
+removing it from a meeting reverses both sides. Kept as a genuinely
+separate table from `sacrament_rabnm`, not a dual-purpose reuse of its
+own `meeting_id` -- a meeting being deleted must never destroy a
+standing pool record, only detach it (`delete_meeting_cascade`,
+migration 054/077, amended again here to null out this new table's
+`announced_meeting_id` the same way it already does for
+`calling_planning`'s).
+
+`RABNM_TYPES` (`lib/data/sacrament-constants.ts`, still used by
+`sacrament_rabnm`'s own Table Admin entry) is **not renamed or
+trimmed** -- every old historical value stays selectable there, so an
+existing row keeps displaying/saving correctly, matching this project's
+own established "keep old keys, add new ones, never rename or remove"
+precedent (migration 066's calling-status redesign is the cited
+example). New `RABNM_PLANNING_TYPES` (5 keys: `recognition`,
+`advancement`, `baptism`, `new_member`, `baby_blessing`) is what a pool
+entry's own `type` always resolves to once pulled into a meeting.
+
+New `lib/data/sacrament-rabnm-planning.ts` (`getRabnmPlanningPool`,
+`getCallableRabnmPlanningItems`) is the data layer, mirroring
+`lib/data/calling-planning.ts`'s own shape; new pull/remove functions
+in `app/meetings/[id]/ward-business-actions.ts`
+(`pullRabnmPlanningIntoMeeting`/`removeRabnmPlanningFromMeeting`)
+directly mirror `pullCallingPlanningIntoMeeting`/
+`removeCallingPlanningFromMeeting` in the same file. New
+`RabnmPlanningSection` in `components/planning/WardBusinessField.tsx`
+is the new third block (Callings/Releases' own `CallingPlanningSection`
+is completely untouched); `callableRabnm` threads through
+`lib/data/agenda-rows.ts`'s `ward_business` row kind and
+`components/planning/AgendaGridForm.tsx` the same way
+`callableCallings`/`callableReleases` already do, fetched in
+`app/meetings/[id]/planning/page.tsx` via `getCallableRabnmPlanningItems()`.
+
+New `/rabnm-planning` page (`app/rabnm-planning/page.tsx` +
+`app/rabnm-planning/actions.ts` + `components/rabnm-planning/RabnmPlanningCategorySection.tsx`)
+is the standing pool's own simple add/remove page -- five sections, one
+per category, each a compact existing-rows table (people &middot;
+detail &middot; event date &middot; Remove) plus a small add-row form
+underneath (reuses `MultiPersonSelect`, the same chip-style
+multi-person picker Calling Planning's own Candidates field uses).
+Gated on the existing `sacrament_rabnm` feature, same as Ward
+Business's own pull/remove actions -- no new feature needed for this
+page. Reached from a new tile on `/meeting-planning`, alongside Speaker
+& Prayer History. New `sacrament_rabnm_planning` entry in
+`lib/admin/registry.ts` is the full grid-with-Save-All-Changes fallback,
+gated on a new `table_admin_sacrament_rabnm_planning` feature (added to
+the `Feature` union in `lib/supabase/get-session-user.ts` and seeded
+into the `features` catalog by the migration itself) -- nobody gets it
+automatically, grant it via `/admin/calling-features` as the usual
+one-time bootstrapping step for a new Table Admin table.
+
+**Not changed, left as the already-sensible default**:
+`lib/data/conducting-rows.ts`'s `rabnmPrompt()` switch has no dedicated
+case for `recognition`/`advancement`/`new_member` -- its existing
+`default: return item.detail ?? ""` already reads back whatever the
+admin typed into Detail when adding the pool row, which is exactly what
+those three categories need (there's no fixed sustaining/releasing
+language to synthesize the way Release/New Calling have). `baptism`/
+`baby_blessing` already had dedicated cases from before this rework and
+keep working unchanged for a pool-pulled row of either type. The
+archived/read-only view (`app/meetings/[id]/archived/page.tsx`) already
+renders every `sacrament_rabnm` row generically by type/people/detail,
+so the 5 new type values display correctly there with no code change
+either.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to confirm migration number `082` is actually free, then run it and
+check: adding a Recognition/Advancement/Baptism/New Member/Baby
+Blessing on `/rabnm-planning` shows up there and in the new Table Admin
+grid; pulling one into a specific Sacrament Meeting's Ward Business
+removes it from the pool page's own list and shows it on the meeting
+(and in the Conducting script); removing it from the meeting's Ward
+Business puts it back in the pool; deleting that meeting (Delete
+Meeting) does **not** delete the pool entry, just detaches it; and that
+Callings/Releases are visually and functionally unchanged.
 
 **Table Admin index shows titles only, and the stock footer tagline
 dropped everywhere it appeared, 2026-10-25** (the user's own request:

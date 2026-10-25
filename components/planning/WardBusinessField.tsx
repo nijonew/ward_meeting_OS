@@ -5,9 +5,13 @@ import { deleteRabnmItem } from "@/app/meetings/[id]/planning/actions";
 import {
   pullCallingPlanningIntoMeeting,
   removeCallingPlanningFromMeeting,
+  pullRabnmPlanningIntoMeeting,
+  removeRabnmPlanningFromMeeting,
 } from "@/app/meetings/[id]/ward-business-actions";
 import type { RabnmRow } from "@/lib/data/sacrament-planning";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
+import type { CallableRabnmItem } from "@/lib/data/sacrament-rabnm-planning";
+import { RABNM_PLANNING_TYPES } from "@/lib/data/sacrament-constants";
 
 const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 
@@ -119,6 +123,125 @@ function CallingPlanningSection({
 }
 
 /**
+ * The third Ward Business block, added 2026-10-24 -- the user's own
+ * request to restore planning-ahead access to the five smaller RABNM
+ * subsections (Recognitions/Advancements/Baptisms/New Members/Baby
+ * Blessings, migration 082), which had no planning-view UI at all since
+ * the 2026-10-03 rework collapsed everything down to Callings/Releases.
+ * Deliberately one combined dropdown (an <optgroup> per category),
+ * Teaching-Program-style, rather than five separate pickers like
+ * Callings/Releases get -- the user's own explicit choice between the
+ * two options presented ("keep those two categories... and just add a
+ * new dropdown below them for the RABNM categories"). The standing pool
+ * itself is managed from its own page, /rabnm-planning -- this is only
+ * the pull-into-this-meeting half.
+ */
+function RabnmPlanningSection({
+  meetingId,
+  existing,
+  candidates,
+}: {
+  meetingId: string;
+  existing: RabnmRow[];
+  candidates: CallableRabnmItem[];
+}) {
+  const [selected, setSelected] = useState("");
+  const [pending, startPull] = useTransition();
+
+  const byType = new Map<string, string>(RABNM_PLANNING_TYPES.map((t) => [t.value, t.label]));
+  const grouped = RABNM_PLANNING_TYPES.map((t) => ({
+    label: t.label,
+    items: candidates.filter((c) => c.type === t.value),
+  })).filter((g) => g.items.length > 0);
+
+  const pull = () => {
+    if (!selected) return;
+    startPull(async () => {
+      await pullRabnmPlanningIntoMeeting(meetingId, selected);
+      setSelected("");
+    });
+  };
+
+  return (
+    <div>
+      <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
+        Recognitions, Advancements, Baptisms, New Members &amp; Baby Blessings
+      </p>
+
+      {existing.length > 0 ? (
+        <table className="mt-2 w-full text-sm">
+          <tbody>
+            {existing.map((item) => (
+              <tr key={item.id} className="border-t border-rule/40 align-top">
+                <td className="py-1.5 pr-3 text-ink-muted">{byType.get(item.type) ?? item.type}</td>
+                <ExistingRabnmCells item={item} meetingId={meetingId} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="mt-2 text-sm text-ink-muted">None yet.</p>
+      )}
+
+      {grouped.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select value={selected} onChange={(e) => setSelected(e.target.value)} className={SELECT}>
+            <option value="">Add to Ward Business&hellip;</option>
+            {grouped.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.items.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={pull}
+            disabled={!selected || pending}
+            className="rounded border border-rule px-2 py-1 text-xs text-ink hover:bg-ink/5 disabled:opacity-50"
+          >
+            {pending ? "Adding..." : "Add"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Just the two trailing <td>s of ExistingRabnmRow's row -- split out so
+ *  RabnmPlanningSection can prepend its own Type <td> to the same <tr>
+ *  without duplicating the Remove-button logic. */
+function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
+  const [removing, startRemove] = useTransition();
+
+  const remove = () =>
+    startRemove(async () => {
+      if (item.rabnm_planning_id) {
+        await removeRabnmPlanningFromMeeting(meetingId, item.rabnm_planning_id);
+      } else {
+        await deleteRabnmItem(item.id, meetingId);
+      }
+    });
+
+  return (
+    <>
+      <td className="py-1.5 pr-3">
+        {item.people.length > 0 ? item.people.join(", ") : "—"}
+        {item.detail ? ` -- ${item.detail}` : ""}
+      </td>
+      <td className="py-1.5 text-right">
+        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+          {removing ? "Removing..." : "Remove"}
+        </button>
+      </td>
+    </>
+  );
+}
+
+/**
  * Ward Business, inline in the agenda grid -- reworked again 2026-10-03
  * per the user's own follow-up ("I still don't like the format"):
  * "appear more like the calling planning table but with less
@@ -151,14 +274,18 @@ export function WardBusinessField({
   items,
   callableCallings,
   callableReleases,
+  callableRabnm,
 }: {
   meetingId: string;
   items: RabnmRow[];
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
+  callableRabnm: CallableRabnmItem[];
 }) {
   const releaseItems = items.filter((i) => i.type === "release");
   const callingItems = items.filter((i) => i.type === "new_calling");
+  const rabnmPlanningTypeKeys = new Set<string>(RABNM_PLANNING_TYPES.map((t) => t.value));
+  const rabnmItems = items.filter((i) => rabnmPlanningTypeKeys.has(i.type) || Boolean(i.rabnm_planning_id));
 
   return (
     <div className="flex flex-col gap-4">
@@ -176,6 +303,7 @@ export function WardBusinessField({
         existing={callingItems}
         candidates={callableCallings}
       />
+      <RabnmPlanningSection meetingId={meetingId} existing={rabnmItems} candidates={callableRabnm} />
     </div>
   );
 }
