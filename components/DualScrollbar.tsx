@@ -38,19 +38,36 @@ import { useEffect, useRef, useState } from "react";
  * Re-checks on every resize (a column widening, a filter hiding rows,
  * the window itself resizing) via `ResizeObserver` on the real
  * scrollable content, not just once on mount.
+ *
+ * **Hides itself once the real native scrollbar is already visible,
+ * 2026-10-25** (the user's own follow-up: "can we have the second
+ * scroll bar automatically disappear when the native scrollbar
+ * appears? otherwise we see two scrollbars"). The clone's whole
+ * reason to exist is reaching a scrollbar that's currently off-screen
+ * -- once you've scrolled far enough down that the table's own bottom
+ * edge (where its native scrollbar lives) is back in view, showing
+ * both is exactly the redundant double-scrollbar the user flagged. A
+ * zero-height sentinel sits right at the bottom of the real scrollable
+ * content; an `IntersectionObserver` watching it toggles the clone
+ * off the instant that point enters the viewport, and back on once it
+ * scrolls back out (in either direction -- scrolling further down
+ * past a short table, or back up away from a tall one's own bottom).
  */
 export function DualScrollbar({ children }: { children: React.ReactNode }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cloneRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
   const [hasOverflow, setHasOverflow] = useState(false);
+  const [nativeVisible, setNativeVisible] = useState(false);
 
   useEffect(() => {
     const scroller = scrollRef.current;
     const clone = cloneRef.current;
     const spacer = spacerRef.current;
-    if (!scroller || !clone || !spacer) return;
+    const sentinel = sentinelRef.current;
+    if (!scroller || !clone || !spacer || !sentinel) return;
 
     const syncSize = () => {
       spacer.style.width = `${scroller.scrollWidth}px`;
@@ -82,22 +99,29 @@ export function DualScrollbar({ children }: { children: React.ReactNode }) {
     // outer box stays the same size.
     if (scroller.firstElementChild) resizeObserver.observe(scroller.firstElementChild);
 
+    const intersectionObserver = new IntersectionObserver(([entry]) => setNativeVisible(entry.isIntersecting));
+    intersectionObserver.observe(sentinel);
+
     return () => {
       scroller.removeEventListener("scroll", onScrollerScroll);
       clone.removeEventListener("scroll", onCloneScroll);
       resizeObserver.disconnect();
+      intersectionObserver.disconnect();
     };
   }, []);
+
+  const showClone = hasOverflow && !nativeVisible;
 
   return (
     <div className="relative">
       <div ref={scrollRef} className="overflow-x-auto">
         {children}
+        <div ref={sentinelRef} aria-hidden="true" />
       </div>
       <div
         ref={cloneRef}
         aria-hidden="true"
-        className={`sticky bottom-0 z-20 overflow-x-auto overflow-y-hidden bg-surface ${hasOverflow ? "h-3" : "h-0"}`}
+        className={`sticky bottom-0 z-20 overflow-x-auto overflow-y-hidden bg-surface ${showClone ? "h-3" : "h-0"}`}
       >
         <div ref={spacerRef} className="h-px" />
       </div>

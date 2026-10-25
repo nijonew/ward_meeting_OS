@@ -2116,6 +2116,19 @@ this request was actually about; the component costs nothing extra
 when there's no overflow, but there was no real problem to fix on
 either of these two.
 
+**Hides itself once the real native scrollbar comes into view, same
+day** -- the user's own immediate follow-up: "can we have the second
+scroll bar automatically disappear when the native scrollbar appears?
+otherwise we see two scrollbars." The clone's whole reason to exist is
+reaching a scrollbar that's currently off-screen -- once the table's
+own bottom edge (where its native scrollbar actually lives) has
+scrolled back into view, showing both was exactly the redundant
+double-scrollbar being reported. A zero-height sentinel now sits right
+at the bottom of the real scrollable content, inside the same
+`overflow-x-auto` container; an `IntersectionObserver` watching it
+toggles the clone off the instant that point enters the viewport, and
+back on once it scrolls back out of view in either direction.
+
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
 database-access gap as everything else in this project (this working
 copy still has no `.env.local`, so a live scroll-sync check isn't
@@ -2123,9 +2136,11 @@ possible here) -- ask the user to open `/announcements` or
 `/calling-planning` with enough rows to scroll past a screen's worth,
 confirm a second thin scrollbar stays stuck to the bottom of the
 browser window while scrolling down through the table, that dragging
-either scrollbar moves the other in sync, and that it disappears once
-the whole table has scrolled past (and never shows up at all on a
-table that already fits on screen).
+either scrollbar moves the other in sync, that it disappears once the
+whole table has scrolled past (and never shows up at all on a table
+that already fits on screen), and now also that it disappears the
+moment the table's own real scrollbar comes into view (reappearing if
+you scroll back up away from it).
 
 **A real "Clear" button added to every date/time field in Table
 Admin, 2026-10-25** -- the user's own report, right after the
