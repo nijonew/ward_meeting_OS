@@ -31,7 +31,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Ward Meeting OS",
-  description: "Plan, conduct, and publish ward meetings from one source of truth.",
+  description: "Ward meeting agendas, assignments, and sacrament program planning.",
 };
 
 export default async function RootLayout({

@@ -2054,19 +2054,24 @@ inconsistently. The landing page's own footer ("Ward OS &mdash;
 `<ward name>` &mdash; Syracuse Utah Stake") never contained this phrase
 to begin with and was already left alone.
 
-**Flagged, not touched**: `app/layout.tsx`'s `<meta name="description">`
+**Follow-up, same day**: `app/layout.tsx`'s `<meta name="description">`
 ("Plan, conduct, and publish ward meetings from one source of truth.")
-carries the same underlying tagline in different wording (infinitive
+carried the same underlying tagline in different wording (infinitive
 "Plan, conduct, and publish" rather than the gerund "planning,
-conducting, and publishing" the user specifically quoted) -- it's not
-a footer and isn't a literal occurrence of the quoted phrase, so it
-was left as-is; ask if this should go too the next time this comes up.
+conducting, and publishing" the user had specifically quoted) -- flagged
+rather than touched at first, since it's not a footer and wasn't a
+literal occurrence of the quoted phrase. The user asked for it too
+("also remove it from the layout.tsx description") -- now reads "Ward
+meeting agendas, assignments, and sacrament program planning.", a
+plain factual description with no tagline/marketing phrasing, rather
+than left blank.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
 database-access gap as everything else in this project -- ask the user
 to check `/admin`, `/dashboard`, `/music`, and any meeting page's
 footer once deployed and confirm the tagline sentence is gone from all
-of them.
+of them, and that the browser tab/link-preview description reads the
+new plain text.
 
 **Public Announcements page grouped by title and sorted by event date,
 2026-10-24** (the user's own question, then request: "How are they
