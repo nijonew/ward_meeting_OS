@@ -2033,6 +2033,41 @@ avoid confusing the two.
 
 ## Known open items
 
+**Announcement auto-archive now checks the time of day, not just the
+date, 2026-10-25** -- the user's own report: "there is an event that
+happened earlier today that is still showing up. I would love for
+that to auto archive after the stated end time." The existing
+auto-archive sweep (`sweepPastAnnouncements`, built 2026-10-18)
+already compared an announcement's own `end_date`/`start_date`
+against today, but treated "today" as one all-day unit -- an event
+that ended at 10 AM stayed visible on the public page until midnight,
+since its date hadn't actually changed yet.
+
+`getMountainTimeNow()` (`lib/data/timezone.ts`) gained a third return
+value, `timeIso` (zero-padded "HH:MM:SS," lexically comparable
+against a Postgres `time` column's own string form), alongside the
+existing `dateIso`/`hour`. `sweepPastAnnouncements` now also checks
+`end_time ?? start_time` (the same fallback pairing the date check
+already used) once the effective date is today -- an announcement
+with no time at all set on today's date still stays visible the whole
+day, unchanged; only one with a real time on today's own date can now
+lapse before midnight. Rewritten as a plain fetch-then-filter-in-JS
+(the table is small -- a ward's worth of announcements -- so pulling
+every published row costs nothing real) rather than contorting the
+new multi-field fallback into one PostgREST filter string. Every
+existing caller (`/announcements/public`, the admin inbox, the
+Sacrament Meeting "call in an announcement" dropdown) picks this up
+automatically with no changes of their own, since they all call this
+same function.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check that the specific announcement from their report now shows
+as Archived (and is gone from the public page) the next time any page
+that calls `sweepPastAnnouncements` is loaded after its end time has
+passed, and that an announcement with only a date (no time) still
+stays visible for the whole of its own day as before.
+
 **A second, sticky-to-the-viewport horizontal scrollbar added to
 every "favorite grid format" page and Table Admin's own generic grid,
 2026-10-25** -- the user's own question: "Is there a way to keep the

@@ -1,18 +1,22 @@
 const MOUNTAIN_TIME_ZONE = "America/Denver";
 
 /**
- * Current date (YYYY-MM-DD) and hour (0-23) in Mountain Time -- via the
- * real IANA "America/Denver" zone, which correctly tracks the MST/MDT
+ * Current date (YYYY-MM-DD), hour (0-23), and time-of-day
+ * (zero-padded "HH:MM:SS", lexically comparable against a Postgres
+ * `time` column's own string form) in Mountain Time -- via the real
+ * IANA "America/Denver" zone, which correctly tracks the MST/MDT
  * transition, not a fixed UTC offset that would drift wrong twice a
  * year.
  */
-export function getMountainTimeNow(): { dateIso: string; hour: number } {
+export function getMountainTimeNow(): { dateIso: string; hour: number; timeIso: string } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: MOUNTAIN_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).formatToParts(new Date());
 
@@ -21,8 +25,13 @@ export function getMountainTimeNow(): { dateIso: string; hour: number } {
   // the runtime -- normalize that back to 0.
   const hourRaw = parseInt(get("hour"), 10);
   const hour = hourRaw === 24 ? 0 : hourRaw;
+  const hourPadded = String(hour).padStart(2, "0");
 
-  return { dateIso: `${get("year")}-${get("month")}-${get("day")}`, hour };
+  return {
+    dateIso: `${get("year")}-${get("month")}-${get("day")}`,
+    hour,
+    timeIso: `${hourPadded}:${get("minute")}:${get("second")}`,
+  };
 }
 
 /**

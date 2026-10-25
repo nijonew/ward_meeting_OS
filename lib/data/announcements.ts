@@ -31,16 +31,48 @@ import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib
  * reviewed, or one already `archived`, is left alone, so this can
  * never surface something that was never published or re-touch a
  * status an admin already set deliberately.
+ *
+ * **Also checks the time of day, not just the date, 2026-10-25** (the
+ * user's own report: "there is an event that happened earlier today
+ * that is still showing up... I would love for that to auto archive
+ * after the stated end time"). Before this, "today" was treated as a
+ * single all-day unit -- an event ending at 10 AM stayed visible
+ * until midnight, since its own date hadn't changed yet. The
+ * "effective" cutoff date/time is `end_date ?? start_date` /
+ * `end_time ?? start_time` (the same fallback pairing already used
+ * for the date, so an announcement with only a start time still gets
+ * a real cutoff rather than needing an end time specifically) -- one
+ * whose effective date is today but has no time at all set still
+ * stays visible the whole day, same as before this change; only one
+ * with an actual time on today's date can lapse before midnight. Done
+ * as a plain JS comparison over a small fetched candidate set rather
+ * than contorting this into one PostgREST filter string -- this table
+ * is small (a ward's worth of announcements), so fetching every
+ * published row to filter in memory costs nothing real.
  */
 export async function sweepPastAnnouncements(): Promise<void> {
   const supabase = await createClient();
-  const { dateIso: today } = getMountainTimeNow();
+  const { dateIso: today, timeIso: now } = getMountainTimeNow();
 
-  await supabase
+  const { data } = await supabase
     .from("announcements")
-    .update({ status: "archived" })
-    .eq("status", "published")
-    .or(`end_date.lt.${today},and(end_date.is.null,start_date.lt.${today})`);
+    .select("id, start_date, start_time, end_date, end_time")
+    .eq("status", "published");
+
+  const lapsedIds = (data ?? [])
+    .filter((a) => {
+      const effectiveDate = a.end_date ?? a.start_date;
+      if (!effectiveDate) return false; // no date at all -- nothing to compare against
+      if (effectiveDate < today) return true;
+      if (effectiveDate > today) return false;
+      const effectiveTime = a.end_time ?? a.start_time;
+      return effectiveTime != null && effectiveTime < now;
+    })
+    .map((a) => a.id as string);
+
+  if (lapsedIds.length > 0) {
+    await supabase.from("announcements").update({ status: "archived" }).in("id", lapsedIds);
+  }
 }
 
 function ordinal(day: number): string {
