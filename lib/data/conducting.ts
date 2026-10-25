@@ -24,8 +24,8 @@ export interface ConductingScript {
  *  same real order or it stops matching what's on the agenda).
  *  Speaker/Youth Speaker rows are value-only (a name isn't "suggested
  *  wording" the way a hymn intro is, per the user's own scoping of
- *  this redesign); Musical Number/Intermediate Hymn/Testimony get a
- *  suggested line too. */
+ *  this redesign); Musical Number/Intermediate Hymn/Testimony/Primary
+ *  Program get a suggested line too. */
 function programItemRow(item: ResolvedProgramItem, peopleById: Map<string, string>): ConductingRow {
   switch (item.kind) {
     case "speaker":
@@ -52,13 +52,33 @@ function programItemRow(item: ResolvedProgramItem, peopleById: Map<string, strin
         wording: `Intermediate hymn number ${item.hymnNumber || "?"}, ${item.title || "(title not entered)"}.`,
       };
     case "testimony":
-    default:
       return {
         id: item.id,
         kind: "banner",
         label: "Testimonies",
         value: null,
         wording: "We now invite members of the ward to bear their testimonies.",
+      };
+    case "primary_program":
+      // Added 2026-10-24 -- a real case, not the old shared default
+      // with testimony: both used to fall into one `case "testimony":
+      // default:` block, which would have wrongly announced "We now
+      // invite members of the ward to bear their testimonies" for a
+      // Primary Program item once this kind existed.
+      return {
+        id: item.id,
+        kind: "banner",
+        label: "Primary Program",
+        value: null,
+        wording: "We now invite the Primary to present their program.",
+      };
+    default:
+      return {
+        id: item.id,
+        kind: "banner",
+        label: item.label,
+        value: null,
+        wording: null,
       };
   }
 }

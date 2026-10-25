@@ -196,6 +196,10 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
       items.push({ heading: "Testimonies", detail: null });
       continue;
     }
+    if (kind === "primary_program") {
+      items.push({ heading: "Primary Program", detail: null });
+      continue;
+    }
     if (kind === "speaker" || kind === "youth_speaker") {
       const speaker = (kind === "speaker" ? adultBySlot : youthBySlot).get(item.itemKey);
       if (!speaker) continue;

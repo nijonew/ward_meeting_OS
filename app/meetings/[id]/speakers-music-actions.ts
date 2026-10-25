@@ -51,13 +51,15 @@ function revalidateBoth(meetingId: string) {
 /**
  * Adds one item to the list. `itemKeyInput` is the dropdown's own
  * value -- a real slot ("speaker_3") for the numbered kinds, or the
- * bare kind name for the two that aren't numbered ("testimony",
- * "intermediate_hymn"). Intermediate Hymn has no number of its own in
- * the dropdown (unlike Speaker/Youth Speaker/Musical Number, which are
- * explicitly numbered 1-9) -- the next free intermediate_hymn_N slot is
- * assigned automatically here, the same positional numbering
- * sacrament_music.slot already used for repeatable hymns before this
- * rework.
+ * bare kind name for the ones that aren't numbered ("testimony",
+ * "primary_program", "intermediate_hymn"). Intermediate Hymn has no
+ * number of its own in the dropdown (unlike Speaker/Youth Speaker/
+ * Musical Number, which are explicitly numbered 1-9) -- the next free
+ * intermediate_hymn_N slot is assigned automatically here, the same
+ * positional numbering sacrament_music.slot already used for
+ * repeatable hymns before this rework. Testimony/Primary Program are
+ * one-shot -- `unique (meeting_id, item_key)` on sacrament_program_items
+ * (migration 046) already keeps either from being added twice.
  */
 export async function addProgramItem(meetingId: string, itemKeyInput: string): Promise<ActionResult> {
   const auth = await requireBishopric();

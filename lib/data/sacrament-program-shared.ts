@@ -10,7 +10,13 @@
  * file is only ever used from Server Components in the App Router.
  */
 
-export type ProgramItemKind = "youth_speaker" | "speaker" | "musical_number" | "intermediate_hymn" | "testimony";
+export type ProgramItemKind =
+  | "youth_speaker"
+  | "speaker"
+  | "musical_number"
+  | "intermediate_hymn"
+  | "testimony"
+  | "primary_program";
 
 export interface ProgramItemOption {
   key: string; // e.g. "speaker_3", or "testimony"
@@ -20,7 +26,7 @@ export interface ProgramItemOption {
 
 /** Every selectable item, in the order they should list in the "Add"
  *  dropdown -- youth speakers, then speakers, then musical numbers
- *  (each 1-9, per the user's own numbers), then the two unnumbered
+ *  (each 1-9, per the user's own numbers), then the three unnumbered
  *  options. */
 export function allProgramItemOptions(): ProgramItemOption[] {
   const options: ProgramItemOption[] = [];
@@ -36,17 +42,29 @@ export function allProgramItemOptions(): ProgramItemOption[] {
   }
   options.push({ key: "intermediate_hymn", label: "Intermediate Hymn", kind: "intermediate_hymn" });
   options.push({ key: "testimony", label: "Testimony", kind: "testimony" });
+  // Added 2026-10-24 (the user's own request: a "Primary Program" item
+  // addable into the teaching portion of any Sacrament Meeting) --
+  // same one-shot, no-underlying-data-row shape as Testimony: the
+  // Primary organization performs the whole segment, nothing here to
+  // pick or save. Distinct from the older, unrelated meeting_elements
+  // catalog row of the same key/label (migration 033) -- that one is a
+  // fixed, format-only line seeded only into the "Primary Program"
+  // special_format's main agenda grid; this is a freely addable item
+  // in the Teaching Program list, available on any Sacrament Meeting
+  // regardless of its special_format.
+  options.push({ key: "primary_program", label: "Primary Program", kind: "primary_program" });
   return options;
 }
 
 /** item_key -> kind, without needing the full option list -- Intermediate
- *  Hymn can repeat (unlike Testimony), so its underlying slot is
- *  auto-numbered ("intermediate_hymn_1", "_2", ...) the first time it's
- *  picked from the dropdown's single unnumbered "Intermediate Hymn"
- *  option, same numbering scheme sacrament_music.slot already used
- *  before this rework. */
+ *  Hymn can repeat (unlike Testimony/Primary Program), so its underlying
+ *  slot is auto-numbered ("intermediate_hymn_1", "_2", ...) the first
+ *  time it's picked from the dropdown's single unnumbered "Intermediate
+ *  Hymn" option, same numbering scheme sacrament_music.slot already
+ *  used before this rework. */
 export function kindOfItemKey(itemKey: string): ProgramItemKind {
   if (itemKey === "testimony") return "testimony";
+  if (itemKey === "primary_program") return "primary_program";
   if (itemKey.startsWith("intermediate_hymn")) return "intermediate_hymn";
   if (itemKey.startsWith("youth_speaker_")) return "youth_speaker";
   if (itemKey.startsWith("speaker_")) return "speaker";
@@ -66,6 +84,7 @@ export interface ProgramItemRow {
 export function itemLabel(itemKey: string): string {
   const kind = kindOfItemKey(itemKey);
   if (kind === "testimony") return "Testimony";
+  if (kind === "primary_program") return "Primary Program";
   if (kind === "intermediate_hymn") {
     const n = itemKey.replace("intermediate_hymn_", "").replace("intermediate_hymn", "");
     return n && n !== "1" ? `Intermediate Hymn ${n}` : "Intermediate Hymn";
@@ -137,7 +156,8 @@ export function resolveProgramItems(
       };
     }
 
-    // testimony -- nothing to resolve, it's a placeholder line.
+    // testimony / primary_program -- nothing to resolve, both are
+    // placeholder lines with no underlying data row.
     return {
       id: item.id,
       itemKey: item.itemKey,

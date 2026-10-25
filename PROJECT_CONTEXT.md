@@ -2014,6 +2014,88 @@ avoid confusing the two.
 
 ## Known open items
 
+**"Primary Program" added as a selectable Teaching Program item, 2026-10-24**
+(the user's own request: "Can we add a 'Primary Program' item that can
+be added into the teaching portion of sacrament meetings?"). The
+Teaching Program section (Speakers & Music,
+`components/planning/SacramentProgramSection.tsx`, built 2026-09-09)
+already lets an admin freely add/remove/reorder Youth Speaker 1-9,
+Speaker 1-9, Musical Number 1-9, Intermediate Hymn, and Testimony as
+individual lines on any Sacrament Meeting's agenda -- "Primary
+Program" is now a sixth option in that same dropdown, on every
+Sacrament Meeting regardless of `special_format`. No migration needed:
+`sacrament_program_items.item_key` (migration 046) is plain text with
+no catalog/CHECK constraint restricting its values.
+
+Built with the exact same shape as Testimony -- a one-shot placeholder
+with no underlying data row at all (the Primary organization performs
+the whole segment; nothing here to pick a person or enter a hymn for).
+New `"primary_program"` member of `ProgramItemKind`
+(`lib/data/sacrament-program-shared.ts`): added to `allProgramItemOptions()`,
+`kindOfItemKey()` (an exact-string match, same as `"testimony"` --
+without it, "primary_program" would have silently fallen through to
+the `musical_number` catch-all), `itemLabel()`, and the resolver's
+already-generic placeholder branch (no change needed there -- it
+already covers "any kind that isn't speaker/youth_speaker/musical_number/
+intermediate_hymn"). `unique (meeting_id, item_key)` already on that
+table keeps it one-shot the same way it already does for Testimony --
+no new constraint needed.
+
+Every other consumer of a program item's `kind` needed its own
+explicit case added, not just the shared resolver:
+- `SacramentProgramSection.tsx`'s `ItemRow` -- a plain "The Primary
+  Program. Nothing to fill in." line, same convention as Testimony's.
+- `lib/data/conducting.ts`'s `programItemRow` -- **this one mattered**:
+  Testimony's case used to share one `case "testimony": default:`
+  block, so a `"primary_program"` kind would have silently fallen into
+  that same `default` and announced "We now invite members of the ward
+  to bear their testimonies" for a Primary Program item. Split into its
+  own `case "primary_program":` with real wording ("We now invite the
+  Primary to present their program.") before this could ever ship.
+- `lib/data/public-view.ts`'s per-item loop -- its own explicit branch
+  (heading "Primary Program", no detail), same shape as the existing
+  Testimony branch right above it.
+
+**Deliberately left alone, flagged rather than silently glossed
+over -- a real naming overlap with an older, unrelated mechanism**:
+`meeting_elements` already has a *different* `primary_program` catalog
+row (migration 033, `resolution_kind = 'none'`), seeded only into the
+"Primary Program" `special_format`'s own fixed main-agenda-grid
+template (sort_order 120, between Sacrament Hymn and Closing Prayer) --
+a bare banner line with no content and no connection to the Teaching
+Program list at all. That row is completely untouched by this change.
+A meeting actually using the "Primary Program" special format will now
+show **two** Primary-Program-labeled things once this ships: that old,
+empty fixed banner line in the main grid, and this new, real Teaching
+Program item (which is where the actual add/pick/save action now
+happens). Not fixed or removed here, since dropping or repositioning
+that old template row is a `meeting_templates` content change this
+assistant has no live database access to make directly, and it wasn't
+what was asked -- flag this to the user and ask whether that old fixed
+line should be dropped from the "Primary Program" format's template now
+that this flexible version exists, the next time this comes up.
+
+**Also noticed, not fixed, matching an already-documented gap
+elsewhere in this file**: `app/meetings/[id]/archived/page.tsx`'s
+read-only Speakers/Music sections still read straight from
+`sacrament_speakers_adults/youth`/`sacrament_music` directly, not
+through `sacrament_program_items`'s real saved order or its
+placeholder kinds (Testimony isn't rendered there at all today either)
+-- so an archived meeting's read-only view won't show a Primary
+Program (or Testimony) line, same pre-existing staleness already
+flagged for `ward_business`/`stake_business` in that same file's own
+"Noticed in passing, not fixed" note (2026-10-11 Announcements entry
+above). Not a regression from this change -- Testimony has had the
+identical gap since 2026-09-09 and nobody has asked for it yet.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open any Sacrament Meeting's Planning page, add "Primary Program"
+from the Teaching Program dropdown, and confirm it shows up as its own
+line (addable/removable/reorderable, no fields to fill in), and that
+the Conducting script shows the new wording and the public program
+shows a plain "Primary Program" heading once one is added.
+
 **Rotation push changed to overwrite every time, not just fill blanks,
 2026-10-23** (the user's own request: "can we change the rotation push
 to overwrite every time we push and not just update what is blank?").

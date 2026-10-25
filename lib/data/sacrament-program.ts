@@ -16,8 +16,13 @@ import type { ProgramItemRow } from "@/lib/data/sacrament-program-shared";
  * matches the exact `slot` value already used in
  * sacrament_speakers_adults/youth.slot and sacrament_music.slot (e.g.
  * "speaker_3", "musical_number_5"), or the bare string "testimony" for
- * an open-testimony placeholder with no underlying data row at all.
- * The actual speaker/music data still lives in those existing tables --
+ * an open-testimony placeholder with no underlying data row at all --
+ * joined 2026-10-24 by an identical "primary_program" placeholder (the
+ * user's own request: a "Primary Program" item addable into the
+ * teaching portion of any Sacrament Meeting, not just ones using the
+ * separate, older "Primary Program" special_format's own fixed agenda
+ * line -- see lib/data/sacrament-constants.ts/migration 033). The
+ * actual speaker/music data still lives in those existing tables --
  * this table never duplicates it.
  *
  * The types/pure helpers (option lists, item-key parsing, resolving a
