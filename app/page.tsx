@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { getWardName } from "@/lib/data/ward-settings";
-import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
+import { getTodaysPublishedSacramentMeeting, getEarlyAccessSacramentMeeting } from "@/lib/data/meetings";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
 import { allMeetingFeatures } from "@/lib/data/meeting-features";
@@ -33,6 +33,15 @@ export default async function HomePage() {
   const isYouthLeader = hasFeature(profile, "youth_teaching_planning") || hasFeature(profile, "youth_activity_planning");
 
   const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
+  // Early-access second path (2026-10-24, see getEarlyAccessSacramentMeeting's
+  // own doc comment for the bug this fixes) -- only queried when
+  // today's own meeting isn't up yet, and only for someone who could
+  // actually use the result; a logged-out visitor or an account
+  // without the feature keeps seeing the exact same "Published on
+  // meeting day" comingSoon tile as before.
+  const canPreviewSacramentEarly = hasFeature(profile, "sacrament_program_view");
+  const earlyAccessSacramentMeeting =
+    !todaysSacramentMeeting && canPreviewSacramentEarly ? await getEarlyAccessSacramentMeeting() : null;
 
   // Resolves every meeting type this account should see a "My meetings"
   // tile for -- calling-based (meeting_type_members) unioned with
@@ -94,6 +103,12 @@ export default async function HomePage() {
                 title="Sacrament Meeting Program"
                 description="Today's program"
                 href={`/meetings/${todaysSacramentMeeting.id}/public`}
+              />
+            ) : earlyAccessSacramentMeeting ? (
+              <Tile
+                title="Sacrament Meeting Program"
+                description="Early preview -- not published yet"
+                href={`/meetings/${earlyAccessSacramentMeeting.id}/public`}
               />
             ) : (
               <Tile title="Sacrament Meeting Program" description="Published on meeting day" comingSoon />

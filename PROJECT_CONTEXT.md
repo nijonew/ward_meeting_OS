@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 080
+## Current migration number: 081
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -297,8 +297,16 @@ reconstructed from both:
 - `080` (new `rotation_members.calling_id`, nullable, additive -- lets a
   rotation cycle through callings instead of fixed people, see Known
   open items below): confirmed run.
+- `081` (ties the "Primary Program" special_format back to the new
+  Teaching Program item -- drops the old fixed, empty `primary_program`
+  banner line from that format's own template, pre-seeds the new
+  flexible item in its place via `sacrament_program_templates`, and
+  repairs any already-seeded non-archived meeting using that format the
+  same way, see Known open items below): **not yet run** -- ask the
+  user to confirm `081` is actually free before running it, per this
+  project's own repeated numbering-collision history.
 
-Next migration should be `081_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
+Next migration should be `082_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2014,18 +2022,71 @@ avoid confusing the two.
 
 ## Known open items
 
-**"Primary Program" added as a selectable Teaching Program item, 2026-10-24**
-(the user's own request: "Can we add a 'Primary Program' item that can
-be added into the teaching portion of sacrament meetings?"). The
-Teaching Program section (Speakers & Music,
+**Landing page's prominent Sacrament Meeting tile never actually
+honored early-access viewing, 2026-10-24** (the user's own report,
+right after the Primary Program work below: "I also need to have
+early access to viewing sacrament meetings back for those with that
+feature allowed for them. The access has been granted, but it seems
+to have been disabled as a whole."). Asked what exactly they were
+seeing -- "Tile shows grayed out" -- which pointed at the wrong one of
+two separate, same-ish-named tiles: the "This week" tier's prominent
+singular **"Sacrament Meeting Program"** tile (`app/page.tsx`'s Tier 0
+section, unconditional, no login needed), not the plural **"Sacrament
+Meeting Programs"** tile further down in the Administration-adjacent
+"My meetings" section (gated on `sacrament_program_view`, linking to
+`/dashboard?type=sacrament-meeting&readonly=1`).
+
+Root cause, confirmed by reading both: the prominent tile has only
+ever called `getTodaysPublishedSacramentMeeting()` -- strictly
+today-only (6 AM Mountain or later), with zero awareness of the
+viewer's own session or features at all. Granting someone
+`sacrament_program_view` was real and correctly recorded, but it could
+never visibly do anything from *this* tile's point of view, which
+looks from the outside exactly like "the feature has been disabled as
+a whole" -- the only place it was ever actually wired in was the
+second, much less prominent tile.
+
+Fix: new `getEarlyAccessSacramentMeeting()` (`lib/data/meetings.ts`) --
+the nearest upcoming (today or later), non-cancelled, non-archived
+Sacrament Meeting marked "ready for public viewing"
+(`sacrament_planning.ready_for_public`, the same flag
+`/meetings/[id]/public/page.tsx` itself already requires for early
+access). `app/page.tsx` now calls it as a second path, only when
+there's no meeting *today* yet and the viewer holds
+`sacrament_program_view` -- the prominent tile now links straight to
+that meeting ("Early preview -- not published yet") instead of showing
+"Coming soon" forever regardless of the grant. Purely additive: a
+logged-out visitor or an account without the feature sees the exact
+same tile behavior as before. The destination page
+(`/meetings/[id]/public`) already independently re-checks the same
+feature + flag on its own -- this only changes which meeting the tile
+*points at*, not who's allowed to see it. The second, plural tile is
+untouched and still useful for browsing every upcoming/past meeting at
+once, not just the nearest ready one.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check the "ready for public viewing" checkbox on an upcoming
+meeting's Planning page, confirm the account with `sacrament_program_view`
+granted sees that meeting's program via the prominent "This week" tile
+(not just the Administration-section one) before it's actually
+published, and that a logged-out visitor still sees "Coming soon" as
+before.
+
+**"Primary Program" added as a selectable Teaching Program item, then
+redesigned per the user's own feedback on how it actually renders,
+2026-10-24** (the original request: "Can we add a 'Primary Program'
+item that can be added into the teaching portion of sacrament
+meetings?"). The Teaching Program section (Speakers & Music,
 `components/planning/SacramentProgramSection.tsx`, built 2026-09-09)
 already lets an admin freely add/remove/reorder Youth Speaker 1-9,
 Speaker 1-9, Musical Number 1-9, Intermediate Hymn, and Testimony as
 individual lines on any Sacrament Meeting's agenda -- "Primary
 Program" is now a sixth option in that same dropdown, on every
-Sacrament Meeting regardless of `special_format`. No migration needed:
-`sacrament_program_items.item_key` (migration 046) is plain text with
-no catalog/CHECK constraint restricting its values.
+Sacrament Meeting regardless of `special_format`. No migration needed
+for the item type itself: `sacrament_program_items.item_key`
+(migration 046) is plain text with no catalog/CHECK constraint
+restricting its values.
 
 Built with the exact same shape as Testimony -- a one-shot placeholder
 with no underlying data row at all (the Primary organization performs
@@ -2039,62 +2100,81 @@ already-generic placeholder branch (no change needed there -- it
 already covers "any kind that isn't speaker/youth_speaker/musical_number/
 intermediate_hymn"). `unique (meeting_id, item_key)` already on that
 table keeps it one-shot the same way it already does for Testimony --
-no new constraint needed.
+no new constraint needed. Every other consumer of a program item's
+`kind` needed its own explicit case: `lib/data/conducting.ts`'s
+`programItemRow` (its own `case "primary_program":`, split out of a
+shared `case "testimony": default:` block it would otherwise have
+silently fallen into, wrongly announcing testimony wording) and
+`lib/data/public-view.ts`'s per-item loop (a heading "Primary Program",
+no detail).
 
-Every other consumer of a program item's `kind` needed its own
-explicit case added, not just the shared resolver:
-- `SacramentProgramSection.tsx`'s `ItemRow` -- a plain "The Primary
-  Program. Nothing to fill in." line, same convention as Testimony's.
-- `lib/data/conducting.ts`'s `programItemRow` -- **this one mattered**:
-  Testimony's case used to share one `case "testimony": default:`
-  block, so a `"primary_program"` kind would have silently fallen into
-  that same `default` and announced "We now invite members of the ward
-  to bear their testimonies" for a Primary Program item. Split into its
-  own `case "primary_program":` with real wording ("We now invite the
-  Primary to present their program.") before this could ever ship.
-- `lib/data/public-view.ts`'s per-item loop -- its own explicit branch
-  (heading "Primary Program", no detail), same shape as the existing
-  Testimony branch right above it.
+**Display reworked the same day, right after the user saw the first
+pass render** (a screenshot showing the item as a bordered box with
+"PRIMARY PROGRAM" as a small-caps label heading, then "The Primary
+Program. Nothing to fill in." as its own line underneath -- the exact
+same template every other placeholder/field kind in this list uses).
+The user's own correction: "It should be its own item, without a
+section heading 'primary program' and then again 'Primary program.
+Nothing to Fill in.' ... It should just be a line of text centered on
+the page (still with the ability to move it up or down or remove like
+any other item) that states 'Presentation of the Primary Program.'"
+`SacramentProgramSection.tsx`'s `ItemRow` now special-cases this one
+kind: the small-caps label span is skipped entirely for
+`primary_program` (the header row's own flex alignment switches from
+`justify-between` to `justify-end` so the move/remove controls still
+sit correctly at the top-right with nothing on the left), and its body
+line reads "Presentation of the Primary Program." centered
+(`text-center`), in normal ink color rather than the muted "nothing to
+fill in" caption style Testimony still uses -- this is meant to read
+as real agenda content once added, not an instructional placeholder
+note. Move/remove/reorder are completely unaffected, same controls
+every item already has.
 
-**Deliberately left alone, flagged rather than silently glossed
-over -- a real naming overlap with an older, unrelated mechanism**:
-`meeting_elements` already has a *different* `primary_program` catalog
-row (migration 033, `resolution_kind = 'none'`), seeded only into the
-"Primary Program" `special_format`'s own fixed main-agenda-grid
-template (sort_order 120, between Sacrament Hymn and Closing Prayer) --
-a bare banner line with no content and no connection to the Teaching
-Program list at all. That row is completely untouched by this change.
-A meeting actually using the "Primary Program" special format will now
-show **two** Primary-Program-labeled things once this ships: that old,
-empty fixed banner line in the main grid, and this new, real Teaching
-Program item (which is where the actual add/pick/save action now
-happens). Not fixed or removed here, since dropping or repositioning
-that old template row is a `meeting_templates` content change this
-assistant has no live database access to make directly, and it wasn't
-what was asked -- flag this to the user and ask whether that old fixed
-line should be dropped from the "Primary Program" format's template now
-that this flexible version exists, the next time this comes up.
+**Also fixed the same day, per the user's own correction of this
+assistant's own prior summary of the OLD mechanism** ("I thought the
+old primary program items only related to a template that could be
+created and designated as a primary program. That seems to have been
+lost"): `meeting_elements` already had a *different*, older
+`primary_program` catalog row (migration 033, corrected by 036,
+`resolution_kind = 'none'`) seeded only into the "Primary Program"
+`special_format`'s own fixed main-agenda-grid template (sort_order
+140, between Sacrament Hymn and Closing Hymn) -- a bare, empty banner
+line, completely disconnected from the new Teaching Program item.
+Before this fix, a meeting actually using that special_format would
+have shown **two** separate Primary-Program-labeled things: the old
+empty fixed banner, and the new real item (which an admin would then
+have had to remember to add by hand, on top of just designating the
+meeting's Format) -- exactly the "designating a meeting as Primary
+Program no longer actually produces the Primary Program content"
+disconnect the user was describing.
 
-**Also noticed, not fixed, matching an already-documented gap
-elsewhere in this file**: `app/meetings/[id]/archived/page.tsx`'s
-read-only Speakers/Music sections still read straight from
-`sacrament_speakers_adults/youth`/`sacrament_music` directly, not
-through `sacrament_program_items`'s real saved order or its
-placeholder kinds (Testimony isn't rendered there at all today either)
--- so an archived meeting's read-only view won't show a Primary
-Program (or Testimony) line, same pre-existing staleness already
-flagged for `ward_business`/`stake_business` in that same file's own
-"Noticed in passing, not fixed" note (2026-10-11 Announcements entry
-above). Not a regression from this change -- Testimony has had the
-identical gap since 2026-09-09 and nobody has asked for it yet.
+**Migration `081` (not yet run) ties them back together**: drops the
+old fixed banner line from the "Primary Program" format's own default
+template (so a brand-new meeting created with that Format no longer
+gets it), and pre-seeds the new Teaching Program item in its place via
+`sacrament_program_templates` -- the exact same `format_key -> item_key`
+pattern migration 047 already established for Testimony Meeting
+(`'testimony_meeting' -> 'testimony'`). Also repairs any
+already-seeded, non-archived meeting currently using that format the
+same way (there may be none in production yet -- both repair steps are
+no-ops if so). The `meeting_elements` catalog row itself is left
+completely untouched, on purpose -- deleting it outright would cascade-
+delete any **archived** meeting's own already-finalized
+`meeting_planned_elements` row referencing it, destroying real
+historical record; this migration only ever touches the template and
+non-archived meetings. Confirmed no BOM in the file (checked with
+`xxd`, same precaution as migration 079's own BOM bug).
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
-database-access gap as everything else in this project -- ask the user
-to open any Sacrament Meeting's Planning page, add "Primary Program"
-from the Teaching Program dropdown, and confirm it shows up as its own
-line (addable/removable/reorderable, no fields to fill in), and that
-the Conducting script shows the new wording and the public program
-shows a plain "Primary Program" heading once one is added.
+database-access gap as everything else in this project -- **ask the
+user to confirm migration number `081` is actually free before running
+it**, per this project's own repeated numbering-collision history, then
+check: creating a brand-new Sacrament Meeting with Format = "Primary
+Program" seeds the real Teaching Program item automatically (not the
+old empty banner line); the Teaching Program item itself renders as
+one centered "Presentation of the Primary Program." line with no
+label heading, still movable/removable; and the Conducting script
+still reads its own separate spoken wording correctly for that item.
 
 **Rotation push changed to overwrite every time, not just fill blanks,
 2026-10-23** (the user's own request: "can we change the rotation push

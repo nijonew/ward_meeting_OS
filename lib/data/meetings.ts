@@ -226,6 +226,58 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
 }
 
 /**
+ * The nearest upcoming (today or later), non-cancelled, non-archived
+ * Sacrament Meeting that's been marked "ready for public viewing"
+ * (`sacrament_planning.ready_for_public`) -- backs the landing page's
+ * prominent "This week" tile's early-access case, added 2026-10-24.
+ *
+ * **Bug found and fixed**: the user's own report -- granting a calling
+ * `sacrament_program_view` "has been granted, but it seems to have
+ * been disabled as a whole." Root cause: that feature had only ever
+ * been wired into a second, separate tile ("Sacrament Meeting
+ * Programs," plural, deep in the Administration section, linking to
+ * `/dashboard?type=sacrament-meeting&readonly=1`). The prominent "This
+ * week" tile everyone actually looks at (singular "Sacrament Meeting
+ * Program") only ever called `getTodaysPublishedSacramentMeeting`
+ * above -- strictly today-only, with zero awareness of the viewer's
+ * own features -- so granting the feature never visibly did anything
+ * from that tile's point of view, which is exactly what "disabled as
+ * a whole" looks like from the outside. This gives that same tile a
+ * second path for when there's no meeting *today* yet: a
+ * `sacrament_program_view` holder now sees the next ready-for-public
+ * meeting here too, linking to the same `/meetings/[id]/public` page,
+ * which already independently re-checks this exact feature + flag --
+ * this only changes which meeting the tile *links to*, not who's
+ * allowed to see it.
+ */
+export async function getEarlyAccessSacramentMeeting(): Promise<Meeting | null> {
+  const { dateIso } = getMountainTimeNow();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select(`${MEETING_SELECT_COLUMNS}, sacrament_planning(ready_for_public)`)
+    .gte("date", dateIso)
+    .eq("cancelled", false)
+    .neq("stage", "archived")
+    .order("date", { ascending: true });
+
+  if (error || !data) return null;
+
+  type Row = Parameters<typeof mapMeetingRow>[0] & {
+    sacrament_planning: { ready_for_public: boolean | null }[] | { ready_for_public: boolean | null } | null;
+  };
+
+  for (const row of data as unknown as Row[]) {
+    const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
+    if (meetingType?.slug !== "sacrament-meeting") continue;
+    const planning = Array.isArray(row.sacrament_planning) ? row.sacrament_planning[0] : row.sacrament_planning;
+    if (planning?.ready_for_public) return mapMeetingRow(row);
+  }
+  return null;
+}
+
+/**
  * Finds the meeting of a given type on a given date, or creates one
  * (stage 'template', rotations applied same as any other meeting
  * creation path) if it doesn't exist yet -- so planning can happen

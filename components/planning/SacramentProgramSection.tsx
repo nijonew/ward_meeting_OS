@@ -86,8 +86,21 @@ function ItemRow({
 
   return (
     <li className="rounded border border-rule/60 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{item.label}</span>
+      <div
+        className={[
+          "flex flex-wrap items-center gap-2",
+          item.kind === "primary_program" ? "justify-end" : "justify-between",
+        ].join(" ")}
+      >
+        {/* Primary Program renders as a single centered line with no
+         *  label heading above it (2026-10-24, the user's own request
+         *  after seeing the first pass: "without a section heading
+         *  'primary program' and then again 'Primary program. Nothing
+         *  to Fill in.'... just a line of text centered on the page") --
+         *  every other kind keeps its small-caps label. */}
+        {item.kind !== "primary_program" && (
+          <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{item.label}</span>
+        )}
         <span className="flex items-center gap-3">
           <button type="button" onClick={() => move("up")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
             &uarr;
@@ -189,7 +202,9 @@ function ItemRow({
       )}
 
       {item.kind === "testimony" && <p className="mt-2 text-sm text-ink-muted">Open testimony. Nothing to fill in.</p>}
-      {item.kind === "primary_program" && <p className="mt-2 text-sm text-ink-muted">The Primary Program. Nothing to fill in.</p>}
+      {item.kind === "primary_program" && (
+        <p className="mt-2 text-center text-sm text-ink">Presentation of the Primary Program.</p>
+      )}
     </li>
   );
 }
