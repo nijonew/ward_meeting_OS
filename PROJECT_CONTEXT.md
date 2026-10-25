@@ -2033,6 +2033,38 @@ avoid confusing the two.
 
 ## Known open items
 
+**The public page's soonest-to-latest announcement sort now also
+applies to how announcements order within a meeting, 2026-10-25** --
+the user's own request: "I would like for the sort we discussed for
+announcements to also apply to the order in which they appear in
+meetings." New `compareAnnouncementsBySchedule()`
+(`lib/data/announcements.ts`) factors the per-item date/time
+comparator `groupAndSortAnnouncements` already used (soonest
+`start_date`/`start_time` first, dateless last) out into its own
+exported function, reused in two places that previously sorted a
+different, disconnected-from-the-actual-event way:
+- `getAnnouncementsByPlannedElement` (`lib/data/sacrament-announcements.ts`)
+  -- Sacrament Meeting's own Announcements block (Planning,
+  Conducting, Archived) was sorted alphabetically by title; now
+  soonest-to-latest, same as the public page.
+- `getAnnouncementsForMeetingReview` (`lib/data/meeting-review.ts`) --
+  Bishopric Meeting/Ward Council/Youth Council's Review section was
+  sorted `created_at DESC` (newest-submitted first); now the same
+  schedule-based order. `start_date`/`start_time` are fetched only to
+  sort by -- `ReviewSection.tsx` doesn't display a schedule line at
+  all, so they're dropped again before returning, no display change
+  there.
+`groupAndSortAnnouncements` itself (the public page's own grouping +
+sort) is unchanged in behavior, just calls the newly-extracted
+function instead of repeating the same comparator inline.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check that a Sacrament Meeting with more than one pulled
+announcement now lists them soonest-event-first (not alphabetically),
+and that a Bishopric Meeting/Ward Council/Youth Council's own Review
+section does the same.
+
 **Announcement auto-archive now checks the time of day, not just the
 date, 2026-10-25** -- the user's own report: "there is an event that
 happened earlier today that is still showing up. I would love for

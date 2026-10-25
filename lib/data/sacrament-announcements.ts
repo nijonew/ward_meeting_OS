@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { sweepPastAnnouncements } from "@/lib/data/announcements";
+import { sweepPastAnnouncements, compareAnnouncementsBySchedule } from "@/lib/data/announcements";
 import { SACRAMENT_MEETING_ANNOUNCEMENT_LABEL } from "@/lib/data/announcement-constants";
 
 /**
@@ -137,7 +137,13 @@ export async function getAnnouncementsByPlannedElement(meetingId: string): Promi
     if (list) list.push(announcement);
     else result.set(row.planned_element_id, [announcement]);
   }
-  for (const list of result.values()) list.sort((a, b) => a.title.localeCompare(b.title));
+  // Soonest-to-latest by event date/time, same as the public page's
+  // own ordering (2026-10-25, the user's own request: "I would like
+  // for the sort we discussed for announcements to also apply to the
+  // order in which they appear in meetings") -- was alphabetical by
+  // title, which had no relationship to when each one is actually
+  // happening.
+  for (const list of result.values()) list.sort(compareAnnouncementsBySchedule);
   return result;
 }
 

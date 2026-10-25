@@ -245,6 +245,32 @@ export function formatAnnouncementScheduleLine(
   return text;
 }
 
+/**
+ * Soonest-date-to-latest, dateless last -- the one shared comparator
+ * behind every announcement ordering in this app: the public page's
+ * own `groupAndSortAnnouncements` (below) and, as of 2026-10-25, the
+ * order announcements appear *in a meeting* too (Sacrament Meeting's
+ * own Announcements block, `getAnnouncementsByPlannedElement` in
+ * lib/data/sacrament-announcements.ts; Bishopric Meeting/Ward
+ * Council/Youth Council's Review section,
+ * `getAnnouncementsForMeetingReview` in lib/data/meeting-review.ts) --
+ * the user's own request: "I would like for the sort we discussed for
+ * announcements to also apply to the order in which they appear in
+ * meetings." Both of those previously sorted a different way (title
+ * alphabetically, or newest-submitted-first) with no relationship to
+ * when the announcement is actually happening.
+ */
+export function compareAnnouncementsBySchedule<T extends { start_date: string | null; start_time: string | null }>(
+  a: T,
+  b: T
+): number {
+  if (!a.start_date && !b.start_date) return 0;
+  if (!a.start_date) return 1;
+  if (!b.start_date) return -1;
+  if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+  return (a.start_time ?? "").localeCompare(b.start_time ?? "");
+}
+
 export interface AnnouncementGroup<T> {
   /** The shared title every item in this group has in common -- taken
    *  from whichever member sorts first within the group (its own
@@ -290,13 +316,7 @@ export function groupAndSortAnnouncements<T extends { title: string; start_date:
     // Dated items first (soonest first), dateless items last -- so
     // `sorted[0].start_date` below is the group's own earliest date,
     // or null only when nothing in the group has one at all.
-    const sorted = [...items].sort((a, b) => {
-      if (!a.start_date && !b.start_date) return 0;
-      if (!a.start_date) return 1;
-      if (!b.start_date) return -1;
-      if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
-      return (a.start_time ?? "").localeCompare(b.start_time ?? "");
-    });
+    const sorted = [...items].sort(compareAnnouncementsBySchedule);
     return { title: sorted[0].title, items: sorted };
   });
 

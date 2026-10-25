@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { sweepPastAnnouncements } from "@/lib/data/announcements";
+import { sweepPastAnnouncements, compareAnnouncementsBySchedule } from "@/lib/data/announcements";
 import { ANNOUNCEMENT_WHERE, MEETING_TYPE_ANNOUNCEMENT_LABEL, MULTI_SELECT_SEPARATOR } from "@/lib/data/announcement-constants";
 import type { MeetingTypeSlug } from "@/lib/types";
 
@@ -55,6 +55,16 @@ function whereAnnouncedIncludes(raw: string | null, label: string, allValues: re
  * Announcements block (lib/data/sacrament-announcements.ts), which is a
  * genuinely different, explicit-pull design. Read-only everywhere it
  * renders.
+ *
+ * **Sorted soonest-to-latest by event date, 2026-10-25** (the user's
+ * own request: "I would like for the sort we discussed for
+ * announcements to also apply to the order in which they appear in
+ * meetings") -- was `created_at DESC` (newest-submitted first), the
+ * exact same disconnected-from-the-actual-event-date sort the public
+ * page itself had before `compareAnnouncementsBySchedule` was built
+ * for it. `start_date`/`start_time` are fetched only to sort by --
+ * `ReviewSection.tsx` doesn't display a schedule line, so they're
+ * dropped again before returning.
  */
 export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeSlug): Promise<ReviewAnnouncement[]> {
   if (!isCollaborativeType(meetingType)) return [];
@@ -64,12 +74,19 @@ export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeS
   const supabase = await createClient();
   const { data } = await supabase
     .from("announcements")
-    .select("id, title, body, where_announced")
-    .eq("status", "published")
-    .order("created_at", { ascending: false });
+    .select("id, title, body, where_announced, start_date, start_time")
+    .eq("status", "published");
 
-  return ((data ?? []) as { id: string; title: string; body: string; where_announced: string | null }[])
+  return ((data ?? []) as {
+    id: string;
+    title: string;
+    body: string;
+    where_announced: string | null;
+    start_date: string | null;
+    start_time: string | null;
+  }[])
     .filter((row) => whereAnnouncedIncludes(row.where_announced, label, ANNOUNCEMENT_WHERE))
+    .sort(compareAnnouncementsBySchedule)
     .map((row) => ({ id: row.id, title: row.title, body: row.body }));
 }
 
