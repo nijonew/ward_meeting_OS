@@ -2038,6 +2038,39 @@ avoid confusing the two.
 
 ## Known open items
 
+**A real "Clear" button added to every date/time field in Table
+Admin, 2026-10-25** -- the user's own report, right after the
+Announcements recurrence work above shipped: "I need a way to remove
+the time or date of an announcement in announcement management."
+Nothing was actually broken at the data layer -- `sanitizePatch`
+(`lib/admin/table-data.ts`) already converts an empty string to
+`null` for any non-text column, so a cleared date/time field was
+always going to save correctly as `null` -- the real gap was that a
+native `<input type="date">`/`<input type="time">` has no reliable,
+discoverable way to clear itself once set: the little "x" some
+browsers show is hover-only (invisible on touch/trackpad) and
+inconsistent across browsers, and selecting the text and pressing
+Delete doesn't reliably work either.
+
+`AdminCellInput` (`components/admin/AdminTableEditor.tsx`) now renders
+a small "&times;" Clear button next to any date/time cell that
+currently has a value, calling `onChange("")` -- a generic fix at the
+one shared cell-rendering function every Table Admin page uses, not
+an Announcements-specific patch, so it applies to every `date`/`time`
+column across every table (Meeting dates, Sacrament Music event
+dates, the new Announcement recurrence work's own Start/End
+Date/Time, etc.), matching this component's own established "no
+per-table logic" principle.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only -- this
+working copy still has no `.env.local` (confirmed again before
+skipping a live preview), the same standing environment gap as
+everything else in this project. Ask the user to open `/announcements`
+(or `/admin/announcements`), confirm the Clear button shows up next
+to a filled-in Start/End Date or Time, and that clicking it then
+saving actually blanks the field (not just visually, re-load the page
+to confirm it stuck).
+
 **Announcements gained a real recurring-schedule shape, a public-page
 redesign, and a genuinely automatic Sacrament Meeting auto-pull,
 2026-10-25 (migration `083`, not yet run).** The user's own report,

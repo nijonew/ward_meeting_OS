@@ -509,6 +509,41 @@ function AdminCellInput({
 
   const inputType = column.type === "number" ? "number" : column.type === "date" ? "date" : column.type === "time" ? "time" : "text";
 
+  // Native date/time inputs have no reliable, discoverable way to
+  // clear a value once set -- the little "x" some browsers show is
+  // hover-only (invisible on touch/trackpad) and inconsistent across
+  // browsers, and selecting the text and pressing Delete doesn't
+  // always work either. A real "Clear" button next to the input
+  // (2026-10-25, the user's own request: "I need a way to remove the
+  // time or date of an announcement") fixes this for every date/time
+  // column in Table Admin, not just Announcements' -- onChange("")
+  // already saves correctly as `null` (`sanitizePatch`,
+  // lib/admin/table-data.ts, converts an empty string to null for
+  // every non-text column type). Only shown once there's actually a
+  // value to clear.
+  if (inputType === "date" || inputType === "time") {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type={inputType}
+          value={value == null ? "" : String(value)}
+          onChange={(e) => onChange(e.target.value)}
+          className={INPUT_CLASS}
+        />
+        {value != null && String(value) !== "" && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            title={`Clear ${inputType}`}
+            className="text-xs text-ink-muted hover:text-danger"
+          >
+            &times;
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <input
       type={inputType}
