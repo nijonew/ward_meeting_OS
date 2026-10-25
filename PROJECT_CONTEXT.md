@@ -2033,6 +2033,62 @@ avoid confusing the two.
 
 ## Known open items
 
+**Agenda elements can now be added, removed, reordered, and slot-
+counted directly from the Planning page, for every meeting type,
+2026-10-25** -- the user's own request: "make the elements of all
+non-sacrament meeting much like the sacrament meeting where elements
+can be added, removed, reordered in planning and not just in template
+forms." Checking the actual code against that premise surfaced a real
+discrepancy, settled directly with the user via `AskUserQuestion`
+before building anything: **Sacrament Meeting's own core elements
+also required leaving Planning for the separate Agenda Elements page**
+(`/meetings/[id]/template`) before this -- true for all four meeting
+types, not just the three non-Sacrament ones. Only Teaching Program
+(Speakers & Music), Ward Business, Visiting Authorities, and
+Announcements were ever genuinely inline -- those are separate
+add/remove "pool" sections, not the core element list itself.
+Confirmed scope: bring add/remove/reorder inline into Planning for
+**all four** meeting types, and keep the standalone Agenda Elements
+page as a fallback rather than removing it (matches this app's own
+established "bespoke inline UI for everyday use, the fuller page
+still there for less common edits" pattern).
+
+New `components/planning/AgendaElementsManager.tsx` -- a collapsed-
+by-default section (expanded automatically when a meeting has zero
+elements yet, since there's nothing else useful to do there until one
+exists) rendered right inside the existing "Agenda" card on
+`app/meetings/[id]/planning/page.tsx`, above the agenda grid(s). Reuses
+the exact same four server actions the standalone page already calls
+(`addTemplateElement`/`removeTemplateElement`/`setTemplateSlotCount`/
+`moveTemplateElement`, `app/meetings/[id]/template-actions.ts`) --
+every one of those already revalidated both `/meetings/[id]/template`
+*and* `/meetings/[id]/planning` from the start, so no changes were
+needed there at all, just a new UI surface calling the same writes.
+
+**Deliberately plain `type="button"` + `useTransition` calls, never
+real `<form>`s** -- the standalone page's own version of this UI uses
+real per-row `<form action={...}>` tags, which is fine there since
+that page has no other wrapping form, but this component renders as a
+sibling of the agenda grid's own `<form>`(s) on the Planning page, and
+HTML forbids nested forms -- the exact same constraint Ward Business/
+RABNM/Visiting Authorities/Speakers & Music already solved the same
+way elsewhere on this same page.
+
+`getApplicableElements(meetingTypeId)` (`lib/data/meeting-elements.ts`,
+already existed, used only by the standalone page before this) is now
+also called from the Planning page itself to compute the "available
+to add" list, filtered by the same "add once, except `announcements`"
+rule the standalone page already enforces.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open a Bishopric Meeting/Ward Council/Youth Council/Sacrament
+Meeting's own Planning page, expand "Manage Agenda Elements," and
+confirm adding, removing, reordering, and (for a repeatable element)
+setting the slot count all work and immediately reflect in the agenda
+grid above/below without a page reload, and that the standalone
+`/meetings/[id]/template` page still works unchanged as a fallback.
+
 **`/rotations`' Rotation Order cards (and the applied-assignment grid
 above them) now sort by meeting, in meeting order, 2026-10-25** --
 the user's own request: "sort the 'rotation' categories on the page

@@ -4,6 +4,7 @@ import {
   getMeetingWithType,
   getTemplateElements,
   getPlannedElements,
+  getApplicableElements,
   getRoleAssignments,
   seedPlannedElementsForMeeting,
   type TemplateElementRow,
@@ -34,6 +35,7 @@ import {
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
+import { AgendaElementsManager } from "@/components/planning/AgendaElementsManager";
 import { CombinedAgendaGrids } from "@/components/planning/CombinedAgendaGrids";
 import { SacramentProgramSection } from "@/components/planning/SacramentProgramSection";
 import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
@@ -249,6 +251,14 @@ export default async function PlanningViewPage({
       ? resolvedPlannedElements
       : await getTemplateElements(meetingWithType.meetingTypeId, isSacrament ? sacramentData?.planning?.special_format ?? "standard" : null);
 
+  // Inline Agenda Elements management (2026-10-25) -- every catalog
+  // element for this meeting type that isn't already on this specific
+  // meeting's own agenda, same "add once, except announcements" rule
+  // the standalone /meetings/[id]/template page already enforces.
+  const applicableElements = await getApplicableElements(meetingWithType.meetingTypeId);
+  const includedElementIds = new Set(templateElements.map((e) => e.element_id));
+  const availableElements = applicableElements.filter((e) => !includedElementIds.has(e.id) || e.key === "announcements");
+
   // Every person-picker on this page falls back to "the whole ward" by
   // default (`allPeople`/`people`, below) -- restricted to this meeting
   // type's own attendees for Bishopric Meeting/Ward Council/Youth
@@ -422,25 +432,21 @@ export default async function PlanningViewPage({
 
       {templateElements.length === 0 ? (
         <div className="rounded border border-rule bg-surface p-6">
-          <p className="text-sm text-ink-muted">
-            No agenda elements yet. Add some in the{" "}
-            <a href={`/meetings/${meetingId}/template`} className="underline">
-              agenda editor
-            </a>
-            .
-          </p>
+          <p className="text-sm text-ink-muted">No agenda elements yet. Add one below.</p>
+          <AgendaElementsManager meetingId={meetingId} included={templateElements} available={availableElements} />
         </div>
       ) : (
         <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Agenda</h2>
           <p className="mt-1 text-xs text-ink-muted">
             Every element on this meeting&rsquo;s agenda, in order. Edit any line, then save once.
-            Add, remove, or reorder the lines themselves in the{" "}
+            Add, remove, or reorder the lines themselves below, or in the full{" "}
             <a href={`/meetings/${meetingId}/template`} className="underline">
               agenda editor
             </a>
             .
           </p>
+          <AgendaElementsManager meetingId={meetingId} included={templateElements} available={availableElements} />
           <div className="mt-4">
             {isSacrament ? (
               <CombinedAgendaGrids
