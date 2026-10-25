@@ -482,8 +482,10 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     requiredFeature: "table_admin_sacrament_rabnm_planning",
     columns: [
       { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_PLANNING_TYPES] },
+      { column: "baby_name", label: "Baby's Name", type: "text" },
       { column: "detail", label: "Detail", type: "text" },
       { column: "event_date", label: "Event Date", type: "date" },
+      { column: "planned_meeting_date", label: "Planned For", type: "date" },
       { column: "announced_meeting_id", label: "Announced In Meeting", type: "foreign_key", foreignKey: MEETING_FK("sacrament-meeting") },
     ],
   },

@@ -37,12 +37,20 @@ export async function addRabnmPlanningItem(formData: FormData): Promise<ActionRe
 
   const detail = String(formData.get("detail") ?? "").trim() || null;
   const eventDate = String(formData.get("event_date") ?? "").trim() || null;
+  const plannedMeetingDate = String(formData.get("planned_meeting_date") ?? "").trim() || null;
+  const babyName = String(formData.get("baby_name") ?? "").trim() || null;
   const personIds = formData.getAll("person_ids").map(String).filter(Boolean);
 
   const supabase = await createClient();
   const { data: row, error: insertError } = await supabase
     .from("sacrament_rabnm_planning")
-    .insert({ type, detail, event_date: eventDate })
+    .insert({
+      type,
+      detail,
+      event_date: eventDate,
+      planned_meeting_date: plannedMeetingDate,
+      baby_name: babyName,
+    })
     .select("id")
     .single();
   if (insertError || !row) return { error: insertError?.message ?? "Could not add this item." };

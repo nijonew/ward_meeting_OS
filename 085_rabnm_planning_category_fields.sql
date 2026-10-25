@@ -1,0 +1,37 @@
+-- 085_rabnm_planning_category_fields.sql
+--
+-- /rabnm-planning's add-row form was the same generic 3 fields (Person(s),
+-- Detail, Event Date) for all 5 categories -- the user's own follow-up
+-- request, 2026-10-25: "I would still like to see the page broken up by
+-- category so that we can customize the fields a bit." Confirmed the
+-- per-category field proposal, with two changes: Baby Blessing's own
+-- date field is the baby's birth date (not a separate "blessing date"),
+-- and every category also gets a plain "planned for" date -- the user's
+-- own words: "all fields should have a date field to specify the date of
+-- the meeting in which it will be announced/performed."
+--
+-- Two new, generically-usable columns on sacrament_rabnm_planning:
+--
+-- - `planned_meeting_date` -- a plain informational date, not a real FK
+--   to `meetings` the way `announced_meeting_id` is. This is a planning
+--   aid ("we're aiming for this week") filled in before a pool entry is
+--   actually pulled into a real meeting via Ward Business -- pulling it
+--   in for real still goes through the existing announced_meeting_id
+--   mechanism, unchanged. Applies to all 5 categories.
+-- - `baby_name` -- Baby Blessing specifically needs to name the baby
+--   being blessed as its own field, distinct from "Parents" (the
+--   existing person_ids list) and "Performed by" (the existing `detail`
+--   column, already read by lib/data/conducting-rows.ts's rabnmPrompt()
+--   for baby_blessing's own spoken wording -- unchanged by this
+--   migration). A newborn usually has no `people` row yet, so this is
+--   plain text, not a person reference.
+--
+-- No CHECK constraint tying either column to a specific type -- both are
+-- simply unused (null) for a category that doesn't need them, same
+-- reasoning as every other admin-facing column in this app's history
+-- that's deliberately left un-constrained at the DB level.
+--
+-- Idempotent: `add column if not exists`.
+
+alter table sacrament_rabnm_planning add column if not exists planned_meeting_date date;
+alter table sacrament_rabnm_planning add column if not exists baby_name text;

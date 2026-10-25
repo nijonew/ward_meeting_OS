@@ -2038,6 +2038,75 @@ avoid confusing the two.
 
 ## Known open items
 
+**RABNM Planning pool gained per-category fields, migration `085`,
+2026-10-25** -- the user's own follow-up right after confirming the
+rest of this session's outstanding-work checklist: "I would still
+like to see the page broken up by category so that we can customize
+the fields a bit. All categories would show up always and we can
+then add to the category as needed." `/rabnm-planning` already
+rendered all 5 categories unconditionally (Recognitions, Advancements,
+Baptisms, New Members, Baby Blessings), but every one shared the
+identical generic 3-field add-row form (Person(s), Detail, Event
+Date) -- this gives each category its own labeled fields instead.
+
+Presented a per-category field proposal and confirmed it directly
+with the user before building, with two changes from their own
+follow-up: Baby Blessing's own date field is the baby's **birth**
+date, not a separate "blessing date"; and -- the user's own words --
+"all fields should have a date field to specify the date of the
+meeting in which it will be announced/performed," added to every
+category as "Planned For."
+
+Final field set, all still backed by the same two existing columns
+(`detail`/`event_date`, migration 082) with only the on-screen label
+changing per category, plus two new columns this migration adds:
+- **Recognitions**: Person(s) (multi) &middot; "What's being
+  recognized" &middot; Date &middot; Planned For.
+- **Advancements**: Person (single -- a plain `<select>`, not
+  `MultiPersonSelect`, since one advancement is normally one person;
+  still submits through the same `person_ids` field name/
+  `formData.getAll()` the server action already reads, so no
+  action-level change was needed for this one) &middot; "New office"
+  &middot; Ordination date &middot; Planned For.
+- **Baptisms**: Person(s) (multi -- siblings are often baptized
+  together) &middot; Notes &middot; Baptism date &middot; Planned For.
+- **New Members**: Person(s) (multi) &middot; "Moved from" &middot;
+  Date of record &middot; Planned For.
+- **Baby Blessings**: new `baby_name` column (plain text -- a newborn
+  usually has no `people` row yet, so this can't be a person
+  reference the way every other field here is) &middot; Parents
+  (multi, the existing `person_ids` mechanism) &middot; "Performed
+  by" (the existing `detail` column, unchanged -- already read by
+  `lib/data/conducting-rows.ts`'s `rabnmPrompt()` for this exact
+  wording, "blessed today by `<detail>`") &middot; Birth date
+  &middot; Planned For.
+
+**`planned_meeting_date` (new column, all 5 categories) is
+deliberately a plain informational date, not a real FK to
+`meetings`** -- it's a planning aid ("we're aiming for this week"),
+filled in before a row is actually pulled into a real meeting.
+Pulling a row into a specific Sacrament Meeting's Ward Business still
+goes through the existing `announced_meeting_id` mechanism
+(`pullRabnmPlanningIntoMeeting`), completely unchanged by this --
+nothing reads `planned_meeting_date` to drive any automatic behavior,
+it's purely something an admin can see while planning ahead.
+
+No CHECK constraint on either new column, same reasoning as every
+other admin-facing vocabulary/field column in this project's own
+history. `lib/admin/registry.ts`'s `sacrament_rabnm_planning` entry
+gained both new columns too, so the raw Table Admin grid fallback
+stays in sync with the real schema.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project --
+**confirm migration number `085` is actually free before running it**,
+per this project's own repeated numbering-collision history, then ask
+the user to check `/rabnm-planning`: each of the 5 categories shows
+its own labeled fields (Baby Blessing included, with its new Baby's
+Name field), adding a row works and shows the right columns back,
+and the new Table Admin `sacrament_rabnm_planning` grid shows the two
+new columns too.
+
 **Pool-pattern consolidation, logic only, 2026-10-25** -- prompted by
 a reflective question the user asked after fixing two instances of
 the identical bug this same day (the Announcements exclusion fix and

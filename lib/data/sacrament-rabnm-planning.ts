@@ -8,6 +8,14 @@ export interface RabnmPlanningRow {
   type: RabnmPlanningType;
   detail: string | null;
   event_date: string | null;
+  /** Migration 085 -- a plain informational "we're aiming for this
+   *  week" date, filled in before the row is actually pulled into a
+   *  real meeting via Ward Business (which still uses
+   *  announced_meeting_id, unchanged). */
+  planned_meeting_date: string | null;
+  /** Migration 085 -- Baby Blessing only; a newborn usually has no
+   *  `people` row yet, so this is plain text rather than a person. */
+  baby_name: string | null;
   people: { id: string; name: string }[];
 }
 
@@ -31,7 +39,9 @@ export async function getRabnmPlanningPool(): Promise<Record<RabnmPlanningType, 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sacrament_rabnm_planning")
-    .select("id, type, detail, event_date, sacrament_rabnm_planning_people(people(id, name))")
+    .select(
+      "id, type, detail, event_date, planned_meeting_date, baby_name, sacrament_rabnm_planning_people(people(id, name))"
+    )
     .is("announced_meeting_id", null)
     .order("created_at", { ascending: true });
 
@@ -51,6 +61,8 @@ export async function getRabnmPlanningPool(): Promise<Record<RabnmPlanningType, 
       type: string;
       detail: string | null;
       event_date: string | null;
+      planned_meeting_date: string | null;
+      baby_name: string | null;
       sacrament_rabnm_planning_people: unknown;
     };
     const type = r.type as RabnmPlanningType;
@@ -60,6 +72,8 @@ export async function getRabnmPlanningPool(): Promise<Record<RabnmPlanningType, 
       type,
       detail: r.detail,
       event_date: r.event_date,
+      planned_meeting_date: r.planned_meeting_date,
+      baby_name: r.baby_name,
       people: peopleFromJoin(r.sacrament_rabnm_planning_people),
     });
   }
