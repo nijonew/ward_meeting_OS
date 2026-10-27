@@ -6,6 +6,7 @@ import {
   removeTemplateElement,
   setTemplateSlotCount,
   moveTemplateElement,
+  saveMeetingAsTemplate,
   type ActionResult,
 } from "@/app/meetings/[id]/template-actions";
 import type { MeetingElement, TemplateElementRow } from "@/lib/data/meeting-elements";
@@ -139,6 +140,9 @@ export function AgendaElementsManager({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const [savingTemplate, startSaveTemplate] = useTransition();
+  const [templateResult, setTemplateResult] = useState<string | null>(null);
+
   const add = () => {
     if (!selected) return;
     setError(null);
@@ -146,6 +150,17 @@ export function AgendaElementsManager({
       const result = await addTemplateElement(meetingId, selected);
       if ("error" in result) setError(result.error);
       else setSelected("");
+    });
+  };
+
+  const saveAsTemplate = () => {
+    if (!window.confirm("Save this meeting's current elements as the standing default for every future meeting of this type/format?")) {
+      return;
+    }
+    setTemplateResult(null);
+    startSaveTemplate(async () => {
+      const result = await saveMeetingAsTemplate(meetingId);
+      setTemplateResult("error" in result ? result.error : "Saved as the new default template.");
     });
   };
 
@@ -191,6 +206,23 @@ export function AgendaElementsManager({
                 {pending ? "Adding..." : "Add"}
               </button>
               {error && <span className="text-[11px] text-danger">{error}</span>}
+            </div>
+          )}
+
+          {included.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule/40 pt-3">
+              <button
+                type="button"
+                onClick={saveAsTemplate}
+                disabled={savingTemplate}
+                className="rounded border border-rule px-2 py-1 text-xs text-ink hover:bg-ink/5 disabled:opacity-50"
+              >
+                {savingTemplate ? "Saving..." : "Save as Template"}
+              </button>
+              <span className="text-[11px] text-ink-muted">
+                Makes this meeting&rsquo;s current elements the default for every future meeting of this type/format.
+              </span>
+              {templateResult && <span className="text-[11px] text-ink-muted">{templateResult}</span>}
             </div>
           )}
         </div>

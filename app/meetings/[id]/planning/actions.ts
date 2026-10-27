@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getMeetingWithType, mergeFormatTemplateIntoMeeting } from "@/lib/data/meeting-elements";
+import { mergeSacramentProgramTemplateIntoMeeting } from "@/lib/data/sacrament-program";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -40,6 +42,21 @@ async function requireSacramentPlanning(): Promise<ActionResult | null> {
  * doesn't render a field submits nothing for it, so they're never
  * actually touched from here), and one less place to update if Hidden
  * Notes or similar ever needs a home again.
+ *
+ * **Picking a Format now actually does something, 2026-10-27** -- the
+ * user's own question, after realizing meetings mostly auto-generate
+ * now rather than being created through the one place Format used to
+ * matter: "If they don't change the format to Primary Program format
+ * if selected... then what do they do?" Before this, saving a new
+ * Format just upserted the label with no further effect on the
+ * meeting at all. Now, whenever `special_format` is actually submitted
+ * (this form's only field), it also safely merges that format's own
+ * template -- both the core agenda elements and, for Sacrament
+ * Meeting, the Speakers & Music list -- into this meeting, adding
+ * whatever's missing without ever touching or removing anything
+ * already there (confirmed directly with the user: additive, not
+ * destructive). See `mergeFormatTemplateIntoMeeting`/
+ * `mergeSacramentProgramTemplateIntoMeeting` for the full story.
  */
 export async function savePlanningInfo(meetingId: string, formData: FormData): Promise<ActionResult> {
   const denied = await requireSacramentPlanning();
@@ -63,7 +80,17 @@ export async function savePlanningInfo(meetingId: string, formData: FormData): P
     return { error: error.message };
   }
 
+  if (formData.has("special_format")) {
+    const formatKey = String(payload.special_format ?? "standard");
+    const meetingWithType = await getMeetingWithType(meetingId);
+    if (meetingWithType) {
+      await mergeFormatTemplateIntoMeeting(meetingId, meetingWithType.meetingTypeId, formatKey);
+      await mergeSacramentProgramTemplateIntoMeeting(meetingId, formatKey);
+    }
+  }
+
   revalidatePath(`/meetings/${meetingId}/planning`);
+  revalidatePath(`/meetings/${meetingId}/template`);
   return { success: true };
 }
 

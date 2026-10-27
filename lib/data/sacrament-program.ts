@@ -91,3 +91,32 @@ export async function seedSacramentProgramItemsForMeeting(meetingId: string, for
     console.error(`seedSacramentProgramItemsForMeeting: meeting ${meetingId} failed:`, error.message);
   }
 }
+
+/**
+ * Safe-merge counterpart to `seedSacramentProgramItemsForMeeting` --
+ * adds whatever Speakers & Music items the given format's template
+ * includes that this meeting doesn't already have, without removing
+ * anything already there. Companion to `mergeFormatTemplateIntoMeeting`
+ * (lib/data/meeting-elements.ts), same 2026-10-27 fix -- picking a new
+ * Format on the Planning page now actually does something, safely.
+ */
+export async function mergeSacramentProgramTemplateIntoMeeting(meetingId: string, formatKey: string): Promise<void> {
+  const supabase = await createClient();
+
+  const [{ data: template }, current] = await Promise.all([
+    supabase.from("sacrament_program_templates").select("item_key, sort_order").eq("format_key", formatKey),
+    getSacramentProgramItems(meetingId),
+  ]);
+  if (!template || template.length === 0) return;
+
+  const currentItemKeys = new Set(current.map((row) => row.itemKey));
+  const missing = template.filter((row) => !currentItemKeys.has(row.item_key));
+  if (missing.length === 0) return;
+
+  const { error } = await supabase
+    .from("sacrament_program_items")
+    .insert(missing.map((row) => ({ meeting_id: meetingId, item_key: row.item_key, sort_order: row.sort_order })));
+  if (error) {
+    console.error(`mergeSacramentProgramTemplateIntoMeeting: meeting ${meetingId} failed:`, error.message);
+  }
+}

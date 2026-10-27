@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
 import { getMeetingById } from "@/lib/data/meetings";
+import { getMeetingWithType } from "@/lib/data/meeting-elements";
 
 export type ActionResult = { success: true } | { error: string };
 
@@ -103,6 +104,103 @@ export async function setTemplateSlotCount(
 
   revalidatePath(`/meetings/${meetingId}/template`);
   revalidatePath(`/meetings/${meetingId}/planning`);
+  return { success: true };
+}
+
+/**
+ * The reverse direction from `mergeFormatTemplateIntoMeeting`
+ * (`app/meetings/[id]/planning/actions.ts`) -- takes this meeting's
+ * own CURRENT agenda and makes it the new standing default template
+ * for its type (and, for Sacrament Meeting, its own current Format),
+ * so every future meeting created with that type/format starts from
+ * it. Built 2026-10-27, the user's own follow-up once the real
+ * behavior of the Format control was clarified: "Yes, build both" --
+ * this one and the merge-on-Format-change fix above, as two separate
+ * controls, since they're genuinely opposite directions (template →
+ * meeting vs. meeting → template).
+ *
+ * Overwrites the shared `meeting_templates` rows for this
+ * meeting_type_id (+ format_key, for Sacrament Meeting) outright --
+ * delete-then-insert from this meeting's own `meeting_planned_elements`,
+ * same shape `seedPlannedElementsForMeeting` already reads. For
+ * Sacrament Meeting, also does the same for `sacrament_program_templates`
+ * from this meeting's own `sacrament_program_items` -- the Speakers &
+ * Music list is just as much "this meeting's shape" as the core
+ * agenda elements are, and the motivating example for this whole
+ * feature (Primary Program) is specifically a Program item, not a
+ * core element. Never touches any OTHER already-existing meeting --
+ * only the shared template, which only affects a meeting created
+ * *after* this runs.
+ */
+export async function saveMeetingAsTemplate(meetingId: string): Promise<ActionResult> {
+  const denied = await requireTemplateFeature(meetingId);
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const meeting = await getMeetingById(meetingId);
+  const meetingWithType = await getMeetingWithType(meetingId);
+  if (!meeting || !meetingWithType) return { error: "Could not load this meeting." };
+
+  const isSacrament = meeting.meetingType === "sacrament-meeting";
+  let formatKey: string | null = null;
+  if (isSacrament) {
+    const { data: planning } = await supabase
+      .from("sacrament_planning")
+      .select("special_format")
+      .eq("meeting_id", meetingId)
+      .maybeSingle();
+    formatKey = (planning as { special_format: string | null } | null)?.special_format ?? "standard";
+  }
+
+  const { data: currentElements } = await supabase
+    .from("meeting_planned_elements")
+    .select("element_id, sort_order, slot_count")
+    .eq("meeting_id", meetingId);
+
+  let deleteTemplates = supabase
+    .from("meeting_templates")
+    .delete()
+    .eq("meeting_type_id", meetingWithType.meetingTypeId);
+  deleteTemplates = formatKey ? deleteTemplates.eq("format_key", formatKey) : deleteTemplates.is("format_key", null);
+  const { error: deleteError } = await deleteTemplates;
+  if (deleteError) return { error: deleteError.message };
+
+  if (currentElements && currentElements.length > 0) {
+    const { error: insertError } = await supabase.from("meeting_templates").insert(
+      currentElements.map((row) => ({
+        meeting_type_id: meetingWithType.meetingTypeId,
+        format_key: formatKey,
+        element_id: row.element_id,
+        sort_order: row.sort_order,
+        slot_count: row.slot_count,
+      }))
+    );
+    if (insertError) return { error: insertError.message };
+  }
+
+  if (isSacrament && formatKey) {
+    const { data: currentItems } = await supabase
+      .from("sacrament_program_items")
+      .select("item_key, sort_order")
+      .eq("meeting_id", meetingId);
+
+    const { error: deleteItemsError } = await supabase
+      .from("sacrament_program_templates")
+      .delete()
+      .eq("format_key", formatKey);
+    if (deleteItemsError) return { error: deleteItemsError.message };
+
+    if (currentItems && currentItems.length > 0) {
+      const { error: insertItemsError } = await supabase
+        .from("sacrament_program_templates")
+        .insert(currentItems.map((row) => ({ format_key: formatKey, item_key: row.item_key, sort_order: row.sort_order })));
+      if (insertItemsError) return { error: insertItemsError.message };
+    }
+  }
+
+  revalidatePath(`/meetings/${meetingId}/template`);
+  revalidatePath(`/meetings/${meetingId}/planning`);
+  revalidatePath("/admin/meeting-templates");
   return { success: true };
 }
 

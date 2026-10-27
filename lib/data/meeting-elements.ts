@@ -174,6 +174,50 @@ export async function seedPlannedElementsForMeeting(
   }
 }
 
+/**
+ * Safe-merge counterpart to `seedPlannedElementsForMeeting` -- adds
+ * whatever elements the given format's template includes that this
+ * meeting doesn't already have, without ever removing or altering
+ * anything already on the meeting's own agenda. Built 2026-10-27 for
+ * the Format control at the top of Planning: picking a new Format
+ * there used to just save a label with no further effect at all (the
+ * user's own question, after pointing out meetings mostly auto-generate
+ * now rather than being created through the one place Format used to
+ * matter: "If they don't change the format to Primary Program format
+ * if selected... then what do they do?"). Confirmed directly with the
+ * user: a safe, additive merge, not a destructive replace -- picking a
+ * format on a meeting that already has real data filled in should
+ * never silently delete any of it.
+ */
+export async function mergeFormatTemplateIntoMeeting(
+  meetingId: string,
+  meetingTypeId: string,
+  formatKey: string | null
+): Promise<void> {
+  const supabase = await createClient();
+
+  const [template, current] = await Promise.all([
+    getTemplateElements(meetingTypeId, formatKey),
+    getPlannedElements(meetingId),
+  ]);
+
+  const currentElementIds = new Set(current.map((row) => row.element_id));
+  const missing = template.filter((row) => !currentElementIds.has(row.element_id));
+  if (missing.length === 0) return;
+
+  const { error } = await supabase.from("meeting_planned_elements").insert(
+    missing.map((row) => ({
+      meeting_id: meetingId,
+      element_id: row.element_id,
+      sort_order: row.sort_order,
+      slot_count: row.slot_count,
+    }))
+  );
+  if (error) {
+    console.error(`mergeFormatTemplateIntoMeeting: meeting ${meetingId} failed:`, error.message);
+  }
+}
+
 export interface RoleAssignmentValue {
   assigned_to_id: string | null;
   /** Only ever populated for sacrament_assignments (Chorister/Organist's

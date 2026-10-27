@@ -2038,6 +2038,80 @@ avoid confusing the two.
 
 ## Known open items
 
+**The Format control at the top of Planning now actually does
+something, plus a new "Save as Template" action -- both directions,
+2026-10-27.** The user's own question, right after confirming the
+Primary Program migration (081) item on the outstanding-work list:
+"I am unclear what the dropdown and save buttons mean in the planning
+view at the top of the agenda. If they don't change the format to
+Primary Program format if selected, or change the template of the
+selected meeting type default to the elements in the current meeting,
+thus updating the template, then what do they do?" Checked
+`savePlanningInfo` directly -- confirmed it was a plain `upsert` of
+`sacrament_planning.special_format`, nothing else. No re-seed of this
+meeting's own elements, no effect on the shared template either. Since
+meetings now mostly auto-generate weeks ahead (always seeded
+"standard" at creation, per the 2026-10-16 auto-generation work) rather
+than being created manually with a chosen Format, this control had
+quietly become almost pointless for the real workflow -- there was no
+way left to say "this particular Sunday should actually run as Primary
+Program" and have anything happen.
+
+Confirmed via `AskUserQuestion`: build both of the two directions the
+user's own question implied, as two separate controls, since they're
+opposites:
+
+1. **Apply a format to this meeting** (template &rarr; meeting) --
+   picking a new Format and saving now also merges that format's own
+   template into this meeting: new `mergeFormatTemplateIntoMeeting`
+   (`lib/data/meeting-elements.ts`) adds whatever core elements the
+   new format's template includes that this meeting doesn't already
+   have, and new `mergeSacramentProgramTemplateIntoMeeting`
+   (`lib/data/sacrament-program.ts`) does the same for the Speakers &
+   Music list (`sacrament_program_items`) -- the motivating example,
+   Primary Program, is specifically a Program item, not a core
+   element, so this needed covering too. **Confirmed safe merge, not
+   destructive replace** -- adds what's missing, never removes or
+   alters anything already on the meeting, so picking a format on a
+   meeting that already has real data filled in can't silently delete
+   any of it. Both called from `savePlanningInfo`
+   (`app/meetings/[id]/planning/actions.ts`) whenever `special_format`
+   is actually submitted -- the Format form's only field, so this adds
+   no new entry point, just gives the existing one a real effect.
+2. **Save as Template** (meeting &rarr; template) -- a new button
+   inside "Manage Agenda Elements" (`AgendaElementsManager.tsx`,
+   shown once at least one element is on the meeting), calling new
+   `saveMeetingAsTemplate` (`app/meetings/[id]/template-actions.ts`).
+   Takes this meeting's *current* `meeting_planned_elements` (and, for
+   Sacrament Meeting, its current `sacrament_program_items`) and
+   **replaces** (delete-then-insert) the shared `meeting_templates`
+   rows for this meeting type (+ `special_format`, for Sacrament
+   Meeting) -- so every future auto-generated meeting of that type/
+   format starts from exactly this meeting's own hand-arranged shape.
+   Deliberately destructive at the template level (that's the whole
+   point -- it's a real "make this the new default"), but never
+   touches any other already-existing meeting, only what a *future*
+   one gets seeded with. Confirms via `window.confirm` first, same
+   convention as every other impactful action in this app (Delete
+   Meeting, etc.).
+
+Available on every meeting type, not just Sacrament Meeting --
+Bishopric Meeting/Ward Council/Youth Council have no Format concept
+(`formatKey` resolves to `null` for them, matching `getTemplateElements`'s
+own convention), so "Save as Template" there just means "this type's
+one shared template," with no per-format split.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: on a Sacrament Meeting, picking a different Format and
+saving adds that format's missing elements (and Teaching Program
+items, e.g. the Primary Program item) without removing anything
+already filled in; "Save as Template" (any meeting type) replaces that
+type's/format's shared template with the current meeting's own
+element list, confirmed by then creating a brand-new meeting of the
+same type/format and checking it seeds with the saved shape; and that
+neither action ever changes any *other* already-existing meeting.
+
 **`sacrament_program_view` widened into a real "prepare a printed
 program" tier: always sees the nearest two Sacrament Meetings,
 regardless of `ready_for_public`, 2026-10-27.** Direct follow-up to
