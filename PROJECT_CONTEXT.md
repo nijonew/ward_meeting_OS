@@ -2038,6 +2038,81 @@ avoid confusing the two.
 
 ## Known open items
 
+**Review section split into two real, independent elements for
+Bishopric Meeting/Ward Council/Youth Council, migration `087`, not
+yet run, 2026-10-27.** The user's own report: "I want to separate
+'review' elements in non-sacrament meetings. It looks like previous
+minutes and announcements have been lumped together and I want them
+to be separate." Confirmed via `AskUserQuestion`: make them two real,
+independent agenda elements -- addable/removable/reorderable
+individually, same as every other element now is (per the 2026-10-25
+inline Agenda Elements work) -- not just a visual split.
+
+Checked the actual code before building: Review's content
+(Announcements, Previous Meeting Minutes) had always been one
+hardcoded block, `components/planning/ReviewSection.tsx`, rendered
+unconditionally wherever a "Review" section divider appeared --
+completely outside the normal per-element system every other agenda
+line goes through. It was never in `section.elements` at all, so it
+could never be reordered, removed on its own, or separated.
+
+Two new `meeting_elements` catalog rows, `resolution_kind = 'none'`
+(read-only -- both are synthesized from existing data the same way as
+before, nothing new is saved through them): `review_announcements`
+("Announcements") and `previous_meeting_minutes` ("Previous Meeting
+Minutes"). Deliberately **not** reusing Sacrament Meeting's own
+`"announcements"` key -- that one means a genuinely different
+mechanism (an explicit pull from a standing pool via
+`sacrament_announcement_pulls`), not this type's live
+`where_announced` read, and `buildAgendaRows`'s existing
+`isSacrament && key === "announcements"` dispatch would collide with
+it otherwise.
+
+**Anchored relative to `review_section`'s own sort_order, not
+spiritual_thought's position** (unlike migration 078's own anchor
+choice) -- more robust to any drift since, and simpler to reason
+about: `review_section` and `discussion_section` landed only 1
+sort_order unit apart in that migration (a plain integer column, no
+room for anything between them), so migration `087` first shifts
+`discussion_section` and its own three Discussion-section topics
+(`focus_on_people`/`upcoming_combined_activities`/
+`recent_successful_activities`) by +10 -- a pure relative shift, safe
+regardless of their exact current absolute values -- in both
+`meeting_templates` and already-seeded non-archived
+`meeting_planned_elements`, then inserts the two new elements at
+`review_section`'s own sort_order +1/+2. Each scope (per meeting type
+for templates, per meeting for planned elements) is skipped entirely
+-- shift included -- if `review_announcements` already exists there,
+so the whole migration is safely re-runnable.
+
+New `review_announcements`/`previous_meeting_minutes` `AgendaRow`
+kinds (`lib/data/agenda-rows.ts`), two new `AgendaRowInputs` fields
+(`reviewAnnouncements`/`previousMinutes`, both already being fetched
+on both pages -- just newly threaded into `buildAgendaRows` instead of
+feeding a hardcoded component), and matching render cases in
+`AgendaGridForm.tsx` (Planning) and `archived/page.tsx`'s own
+`renderElement` (the read-only view). **A real simplification fell
+out of this**: both pages' own special-cased "if section.label ===
+'Review'" branch is gone entirely -- now that Review's content is
+just real elements like any other section, the existing generic
+per-section rendering (already used for Devotional/Closing/the
+unlabeled lead-in) handles it correctly with no special case needed.
+`ReviewSection.tsx` itself is deleted outright, not left unlinked --
+nothing references it anymore.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project --
+**confirm migration number `087` is actually free before running it**,
+per this project's own repeated numbering-collision history, then ask
+the user to check: a Bishopric Meeting/Ward Council/Youth Council's
+Planning page shows Announcements and Previous Meeting Minutes as two
+separate rows under Review (not one bundled block), each independently
+reorderable/removable via "Manage Agenda Elements" without affecting
+the other; the archived/read-only view shows the same two rows
+correctly; and that Discussion's own section (and its topics, for Ward
+Council/Youth Council) still land in the right order relative to
+Review after the +10 shift.
+
 **The Format control at the top of Planning now actually does
 something, plus a new "Save as Template" action -- both directions,
 2026-10-27.** The user's own question, right after confirming the

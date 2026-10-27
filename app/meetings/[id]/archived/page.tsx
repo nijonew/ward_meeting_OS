@@ -19,7 +19,6 @@ import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { getAnnouncementsByPlannedElement, type PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import { splitIntoSections } from "@/lib/data/agenda-rows";
 import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
-import { ReviewSection } from "@/components/planning/ReviewSection";
 import { getTitlePrefixesForAssignments, formatTitleLastName } from "@/lib/data/person-display";
 
 /**
@@ -313,6 +312,36 @@ export default async function ArchivedMeetingPage({
       );
     }
 
+    // Review section content, split into two real elements (2026-10-27)
+    // -- see lib/data/agenda-rows.ts's matching row kinds for the full
+    // story. Both catalogued as resolution_kind 'none', so without this
+    // the generic switch below would just show the bare label.
+    if (!isSacrament && el.key === "review_announcements") {
+      return (
+        <Row key={el.id} label={el.label}>
+          {reviewAnnouncements.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {reviewAnnouncements.map((a) => (
+                <div key={a.id}>
+                  <Plain>{a.title}</Plain>
+                  {a.body && <Note>{a.body}</Note>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty />
+          )}
+        </Row>
+      );
+    }
+    if (!isSacrament && el.key === "previous_meeting_minutes") {
+      return (
+        <Row key={el.id} label={el.label}>
+          {previousMinutes ? <Note>{previousMinutes.text}</Note> : <Empty />}
+        </Row>
+      );
+    }
+
     switch (el.resolution_kind) {
       case "person_role": {
         const name = personName(people, roleAssignments[el.key]?.assigned_to_id, el.key, titlePrefixByKey);
@@ -444,20 +473,12 @@ export default async function ArchivedMeetingPage({
           <h2 className="font-display text-xl">Agenda</h2>
           <div className="mt-4 flex flex-col gap-6">
             {collaborativeSections.map((section, i) => {
-              if (section.label === "Review") {
-                return (
-                  <div key={`section-${i}`} className="border-t-2 border-rule pt-4 first:border-t-0 first:pt-0">
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">Review</span>
-                    <div className="mt-3">
-                      <ReviewSection announcements={reviewAnnouncements} previousMinutes={previousMinutes} />
-                    </div>
-                    {section.elements.length > 0 && (
-                      <div className="mt-3 flex flex-col gap-2">{section.elements.map(renderElement)}</div>
-                    )}
-                  </div>
-                );
-              }
-
+              // Review's own content used to need its own special case
+              // here (a hardcoded ReviewSection block) -- now that
+              // Announcements and Previous Meeting Minutes are real
+              // elements (2026-10-27), this generic branch already
+              // renders them correctly in order, same as any other
+              // section.
               const rendered = section.elements.map(renderElement).filter(Boolean);
               if (rendered.length === 0) return null;
 

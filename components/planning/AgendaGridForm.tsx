@@ -348,6 +348,47 @@ export function AgendaGridForm({
                 );
               }
 
+              if (row.kind === "review_announcements") {
+                return (
+                  <tr key={row.id} className="border-t border-rule/60 align-top">
+                    <th scope="row" className="w-40 px-2 py-2 text-left align-top font-display text-sm font-normal text-ink sm:w-48">
+                      {row.label}
+                    </th>
+                    <td className="px-2 py-1.5">
+                      {row.items.length > 0 ? (
+                        <ul className="flex flex-col gap-2">
+                          {row.items.map((a) => (
+                            <li key={a.id} className="text-sm">
+                              <span className="text-ink">{a.title}</span>
+                              {a.body && <p className="mt-0.5 text-ink-muted">{a.body}</p>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-ink-muted/50">None</p>
+                      )}
+                    </td>
+                  </tr>
+                );
+              }
+
+              if (row.kind === "previous_meeting_minutes") {
+                return (
+                  <tr key={row.id} className="border-t border-rule/60 align-top">
+                    <th scope="row" className="w-40 px-2 py-2 text-left align-top font-display text-sm font-normal text-ink sm:w-48">
+                      {row.label}
+                    </th>
+                    <td className="px-2 py-1.5">
+                      {row.minutes ? (
+                        <p className="whitespace-pre-wrap text-sm text-ink">{row.minutes.text}</p>
+                      ) : (
+                        <p className="text-sm text-ink-muted/50">None</p>
+                      )}
+                    </td>
+                  </tr>
+                );
+              }
+
               return (
                 <tr key={row.id} className="border-t border-rule/60 align-top">
                   <th

@@ -63,8 +63,9 @@ function whereAnnouncedIncludes(raw: string | null, label: string, allValues: re
  * exact same disconnected-from-the-actual-event-date sort the public
  * page itself had before `compareAnnouncementsBySchedule` was built
  * for it. `start_date`/`start_time` are fetched only to sort by --
- * `ReviewSection.tsx` doesn't display a schedule line, so they're
- * dropped again before returning.
+ * the `review_announcements` row kind (lib/data/agenda-rows.ts)
+ * doesn't display a schedule line, so they're dropped again before
+ * returning.
  */
 export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeSlug): Promise<ReviewAnnouncement[]> {
   if (!isCollaborativeType(meetingType)) return [];

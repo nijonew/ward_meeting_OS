@@ -7,6 +7,7 @@ import type { VisitingAuthorityRow } from "@/lib/data/visiting-authorities";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
 import type { CallableRabnmItem } from "@/lib/data/sacrament-rabnm-planning";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
+import type { ReviewAnnouncement, PreviousMeetingMinutes } from "@/lib/data/meeting-review";
 import { slotLabel } from "@/lib/data/sacrament-constants";
 
 /**
@@ -200,7 +201,21 @@ export type AgendaRow =
       label: string;
       items: PulledAnnouncement[];
       pullable: PulledAnnouncement[];
-    };
+    }
+  /** Bishopric Meeting/Ward Council/Youth Council's Review section,
+   *  split into two real, independent elements (2026-10-27, the user's
+   *  own report: "previous minutes and announcements have been lumped
+   *  together and I want them to be separate") -- previously one
+   *  hardcoded block (ReviewSection.tsx) always rendered together,
+   *  outside the normal per-element system entirely. Both are
+   *  read-only, synthesized from existing data the same way as before
+   *  -- nothing here is saved through the grid. Deliberately a
+   *  different key than Sacrament Meeting's own `"announcements"` --
+   *  that one means a genuinely different mechanism (an explicit pull
+   *  from a standing pool), not this type's live `where_announced`
+   *  read. */
+  | { kind: "review_announcements"; id: string; label: string; items: ReviewAnnouncement[] }
+  | { kind: "previous_meeting_minutes"; id: string; label: string; minutes: PreviousMeetingMinutes | null };
 
 /** Music types that only ever have one per meeting -- rendered as a
  *  single row with no slot. */
@@ -253,6 +268,12 @@ export interface AgendaRowInputs {
    *  vacant -- the row is simply left blank, same as any other
    *  unassigned role. */
   defaultPresidingId: string | null;
+  /** Review section content for Bishopric Meeting/Ward Council/Youth
+   *  Council -- see the `review_announcements`/`previous_meeting_minutes`
+   *  row kinds' own comment above. Empty/null for Sacrament Meeting,
+   *  which has neither element in its own catalog. */
+  reviewAnnouncements: ReviewAnnouncement[];
+  previousMinutes: PreviousMeetingMinutes | null;
 }
 
 /** How many rows a repeatable element gets: what the meeting's own
@@ -283,6 +304,8 @@ export function buildAgendaRows({
   eligibilityByKey,
   allPeople,
   defaultPresidingId,
+  reviewAnnouncements,
+  previousMinutes,
 }: AgendaRowInputs): AgendaRow[] {
   const rows: AgendaRow[] = [];
 
@@ -337,6 +360,18 @@ export function buildAgendaRows({
         items: announcementsByPlannedElement.get(el.id) ?? [],
         pullable: pullableAnnouncements,
       });
+      continue;
+    }
+
+    // Review section content, split into two real elements (2026-10-27)
+    // -- see these two row kinds' own comment above. Not Sacrament
+    // Meeting -- that type has neither element in its catalog.
+    if (!isSacrament && key === "review_announcements") {
+      rows.push({ kind: "review_announcements", id: el.id, label: el.label, items: reviewAnnouncements });
+      continue;
+    }
+    if (!isSacrament && key === "previous_meeting_minutes") {
+      rows.push({ kind: "previous_meeting_minutes", id: el.id, label: el.label, minutes: previousMinutes });
       continue;
     }
 

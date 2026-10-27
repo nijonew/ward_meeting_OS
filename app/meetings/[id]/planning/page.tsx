@@ -20,7 +20,6 @@ import { meetingFeature } from "@/lib/data/meeting-features";
 import { getEligiblePeopleByElementKey, getMeetingAttendeePeople } from "@/lib/data/rotations";
 import { buildAgendaRows, splitIntoSections, type AgendaRow } from "@/lib/data/agenda-rows";
 import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
-import { ReviewSection } from "@/components/planning/ReviewSection";
 import { getSacramentProgramItems, resolveProgramItems } from "@/lib/data/sacrament-program";
 import { getHymnalIndex } from "@/lib/data/hymnal";
 import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
@@ -392,6 +391,8 @@ export default async function PlanningViewPage({
     eligibilityByKey,
     allPeople: people,
     defaultPresidingId,
+    reviewAnnouncements,
+    previousMinutes,
   };
 
   const openingRows: AgendaRow[] = isSacrament
@@ -483,38 +484,20 @@ export default async function PlanningViewPage({
             ) : (
               <div className="flex flex-col gap-6">
                 {collaborativeSections.map((section, i) => {
-                  // Review and Discussion get real, named treatment
-                  // (synthesized content / the agenda_items split);
-                  // every other section (Devotional, Closing, and the
-                  // unlabeled lead-in before this meeting's first
-                  // divider -- e.g. one created before migration 078
-                  // seeded one) is just its own grid of ordinary rows,
-                  // still agenda_items-aware so a not-yet-migrated
-                  // meeting keeps working exactly as it did before.
-                  if (section.label === "Review") {
-                    return (
-                      <div key={`section-${i}`} className="border-t-2 border-rule pt-6 first:border-t-0 first:pt-0">
-                        <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
-                          Review
-                        </span>
-                        <div className="mt-3">
-                          <ReviewSection announcements={reviewAnnouncements} previousMinutes={previousMinutes} />
-                        </div>
-                        {section.elements.length > 0 && (
-                          <div className="mt-4">
-                            <AgendaGridForm
-                              meetingId={meetingId}
-                              roleTable={roleTable}
-                              rows={buildAgendaRows({ elements: section.elements, ...rowInputs })}
-                              people={people}
-                              hymnalIndex={hymnalIndex}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
+                  // Discussion gets real, named treatment (the
+                  // agenda_items split); every other section
+                  // (Devotional, Review, Closing, and the unlabeled
+                  // lead-in before this meeting's first divider -- e.g.
+                  // one created before migration 078 seeded one) is
+                  // just its own grid of ordinary rows, still
+                  // agenda_items-aware so a not-yet-migrated meeting
+                  // keeps working exactly as it did before. Review's
+                  // own content (Announcements, Previous Meeting
+                  // Minutes) used to need its own special case here --
+                  // now that both are real elements (2026-10-27,
+                  // review_announcements/previous_meeting_minutes),
+                  // this generic branch already renders them correctly
+                  // in order, same as any other element.
                   const itemsIndex = section.elements.findIndex((el) => el.key === "agenda_items");
                   const before = itemsIndex === -1 ? section.elements : section.elements.slice(0, itemsIndex);
                   const after = itemsIndex === -1 ? [] : section.elements.slice(itemsIndex + 1);
