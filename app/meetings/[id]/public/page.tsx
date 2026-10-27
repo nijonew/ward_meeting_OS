@@ -1,5 +1,5 @@
 import { getPublicSacramentView } from "@/lib/data/public-view";
-import { getMeetingById } from "@/lib/data/meetings";
+import { getMeetingById, getNextTwoSacramentMeetingIds } from "@/lib/data/meetings";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { isSacramentMeetingPubliclyVisible } from "@/lib/data/timezone";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
@@ -73,8 +73,21 @@ export default async function PublicViewPage({
     // was going public a few hours early every evening).
     if (!isSacramentMeetingPubliclyVisible(meeting.date)) {
       const canPreviewEarly = hasFeature(profile, "sacrament_program_view");
-      const readyForPublic = canPreviewEarly ? (await getSacramentPlanningData(meetingId)).planning?.ready_for_public : false;
-      if (!canPreviewEarly || !readyForPublic) {
+      if (!canPreviewEarly) {
+        return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
+      }
+
+      // Two independent early-access paths, both additive (2026-10-27,
+      // the user's own clarification of the 2026-10-24 fix above):
+      // `ready_for_public` still works for a meeting further out an
+      // admin wants to flag early, and -- new -- the nearest two
+      // upcoming Sacrament Meetings are always viewable regardless of
+      // that flag, "an in-between type of access to allow someone to
+      // prepare a printed program." Neither check short-circuits the
+      // other; either one being true is enough.
+      const readyForPublic = (await getSacramentPlanningData(meetingId)).planning?.ready_for_public ?? false;
+      const withinNextTwo = (await getNextTwoSacramentMeetingIds()).has(meetingId);
+      if (!readyForPublic && !withinNextTwo) {
         return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
       }
     }

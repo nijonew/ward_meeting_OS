@@ -2038,6 +2038,57 @@ avoid confusing the two.
 
 ## Known open items
 
+**`sacrament_program_view` widened into a real "prepare a printed
+program" tier: always sees the nearest two Sacrament Meetings,
+regardless of `ready_for_public`, 2026-10-27.** Direct follow-up to
+the 2026-10-24 early-access tile fix below -- confirmed via
+`AskUserQuestion` that what was actually wanted is broader than what
+got built. The user's own words: "I would like for someone who is
+given this access to have a view of the upcoming two sundays current
+public (non-planning) view even if the check box is not checked for
+public viewing. The public will still have the checkbox gate and see
+it only on the sunday of the meeting, and those who have access to
+plan meetings will have full access to all meetings any time. this is
+an in-between type of access to allow someone to prepare a printed
+program." Confirmed "the upcoming two Sundays" means exactly the next
+two real Sacrament Meetings (not a 14-day window -- a gap like General/
+Stake Conference pushes the real second one further out, and the
+count still means two meetings, not however many fall in a date range).
+
+Three tiers, now genuinely distinct: the general public still only
+sees a meeting on its own day (and only once `ready_for_public` opens
+early access further out); `sacrament_program_view` now sees the
+nearest two meetings unconditionally, plus still gets the
+`ready_for_public` early-access path for anything beyond those two;
+`sacrament_planning` (full planning access) is unaffected, still
+any meeting, any stage, any time.
+
+New `getNextTwoSacramentMeetingIds()` (`lib/data/meetings.ts`) --
+the ids of the two nearest upcoming (today or later), non-cancelled,
+non-archived Sacrament Meetings. `/meetings/[id]/public/page.tsx`'s
+own gate now checks this **in addition to**, not instead of,
+`ready_for_public` -- deliberately additive, so a meeting further out
+an admin wants to flag early still works exactly as before; the new
+check only ever widens access, never narrows it. `getEarlyAccessSacramentMeeting()`
+(the landing page's own "This week" tile early-access path) dropped
+its own `ready_for_public` filter entirely -- the nearest upcoming
+meeting it returns is always one of the two the destination page now
+unconditionally allows, so there was no reason left for this specific
+tile-picking function to also require the flag; a meeting further out
+still marked ready stays reachable through the existing plural
+"Sacrament Meeting Programs" tile's own dashboard listing, same as
+before.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: an account holding only `sacrament_program_view` can open
+both of the next two upcoming Sacrament Meetings' public views with
+`ready_for_public` left unchecked on both; a logged-out visitor still
+only sees whichever of those two is actually today, and only from
+6 AM Mountain; and a meeting further out that's deliberately checked
+`ready_for_public` is still reachable for this same account via the
+"Sacrament Meeting Programs" tile.
+
 **Bug found and fixed 2026-10-27: pushing Chorister/Organist on
 `/rotations` reported success but changed nothing visible -- a data
 typo, not a code bug (migration `086`, not yet run).** The user's own

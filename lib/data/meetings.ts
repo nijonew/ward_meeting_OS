@@ -227,28 +227,38 @@ export async function getTodaysPublishedSacramentMeeting(): Promise<Meeting | nu
 
 /**
  * The nearest upcoming (today or later), non-cancelled, non-archived
- * Sacrament Meeting that's been marked "ready for public viewing"
- * (`sacrament_planning.ready_for_public`) -- backs the landing page's
- * prominent "This week" tile's early-access case, added 2026-10-24.
+ * Sacrament Meeting -- backs the landing page's prominent "This week"
+ * tile's early-access case, added 2026-10-24.
  *
- * **Bug found and fixed**: the user's own report -- granting a calling
- * `sacrament_program_view` "has been granted, but it seems to have
- * been disabled as a whole." Root cause: that feature had only ever
- * been wired into a second, separate tile ("Sacrament Meeting
- * Programs," plural, deep in the Administration section, linking to
- * `/dashboard?type=sacrament-meeting&readonly=1`). The prominent "This
- * week" tile everyone actually looks at (singular "Sacrament Meeting
- * Program") only ever called `getTodaysPublishedSacramentMeeting`
- * above -- strictly today-only, with zero awareness of the viewer's
- * own features -- so granting the feature never visibly did anything
- * from that tile's point of view, which is exactly what "disabled as
- * a whole" looks like from the outside. This gives that same tile a
- * second path for when there's no meeting *today* yet: a
- * `sacrament_program_view` holder now sees the next ready-for-public
- * meeting here too, linking to the same `/meetings/[id]/public` page,
- * which already independently re-checks this exact feature + flag --
- * this only changes which meeting the tile *links to*, not who's
- * allowed to see it.
+ * **Bug found and fixed, 2026-10-24**: the user's own report --
+ * granting a calling `sacrament_program_view` "has been granted, but
+ * it seems to have been disabled as a whole." Root cause: that
+ * feature had only ever been wired into a second, separate tile
+ * ("Sacrament Meeting Programs," plural, deep in the Administration
+ * section, linking to `/dashboard?type=sacrament-meeting&readonly=1`).
+ * The prominent "This week" tile everyone actually looks at (singular
+ * "Sacrament Meeting Program") only ever called
+ * `getTodaysPublishedSacramentMeeting` above -- strictly today-only,
+ * with zero awareness of the viewer's own features -- so granting the
+ * feature never visibly did anything from that tile's point of view,
+ * which is exactly what "disabled as a whole" looks like from the
+ * outside. This gives that same tile a second path for when there's
+ * no meeting *today* yet.
+ *
+ * **No longer filtered by `ready_for_public`, 2026-10-27** -- the
+ * user's own clarification of what this tile should actually do:
+ * "someone who is given this access [should] have a view of the
+ * upcoming two sundays... even if the check box is not checked."
+ * `/meetings/[id]/public`'s own gate now allows the nearest two
+ * Sacrament Meetings unconditionally for `sacrament_program_view`
+ * (see `getNextTwoSacramentMeetingIds`) -- the nearest meeting this
+ * function returns is always one of those two, so there's no reason
+ * left for this specific function to also require the flag. A meeting
+ * further out that an admin has deliberately flagged `ready_for_public`
+ * is still reachable (and still viewable) via the plural "Sacrament
+ * Meeting Programs" tile's own dashboard listing -- that flag's own
+ * effect on the destination page is unchanged, only this tile-picking
+ * function stopped checking it.
  */
 export async function getEarlyAccessSacramentMeeting(): Promise<Meeting | null> {
   const { dateIso } = getMountainTimeNow();
@@ -256,7 +266,7 @@ export async function getEarlyAccessSacramentMeeting(): Promise<Meeting | null> 
 
   const { data, error } = await supabase
     .from("meetings")
-    .select(`${MEETING_SELECT_COLUMNS}, sacrament_planning(ready_for_public)`)
+    .select(MEETING_SELECT_COLUMNS)
     .gte("date", dateIso)
     .eq("cancelled", false)
     .neq("stage", "archived")
@@ -264,17 +274,57 @@ export async function getEarlyAccessSacramentMeeting(): Promise<Meeting | null> 
 
   if (error || !data) return null;
 
-  type Row = Parameters<typeof mapMeetingRow>[0] & {
-    sacrament_planning: { ready_for_public: boolean | null }[] | { ready_for_public: boolean | null } | null;
-  };
+  for (const row of data) {
+    const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
+    if (meetingType?.slug !== "sacrament-meeting") continue;
+    return mapMeetingRow(row);
+  }
+  return null;
+}
 
+/**
+ * The ids of the two nearest upcoming (today or later), non-cancelled,
+ * non-archived Sacrament Meetings -- a second, unconditional path into
+ * `/meetings/[id]/public` for `sacrament_program_view`, alongside the
+ * existing `ready_for_public` flag (2026-10-27, the user's own words,
+ * clarifying the early-access tile fix above wasn't quite what they
+ * meant): "I would like for someone who is given this access to have
+ * a view of the upcoming two sundays current public (non-planning)
+ * view even if the check box is not checked for public viewing...
+ * this is an in-between type of access to allow someone to prepare a
+ * printed program." Deliberately additive -- `ready_for_public` still
+ * works too, for a meeting further out an admin wants to flag early;
+ * this just means the nearest two never need that flag at all.
+ *
+ * "Next two" is a fixed count, not a 14-day window (confirmed with
+ * the user) -- a gap like General/Stake Conference pushes the real
+ * second Sunday further out, and the count still means exactly two
+ * real Sacrament Meetings, not however many happen to fall in a date
+ * range.
+ */
+export async function getNextTwoSacramentMeetingIds(): Promise<Set<string>> {
+  const { dateIso } = getMountainTimeNow();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id, meeting_types(slug)")
+    .gte("date", dateIso)
+    .eq("cancelled", false)
+    .neq("stage", "archived")
+    .order("date", { ascending: true });
+
+  if (error || !data) return new Set();
+
+  type Row = { id: string; meeting_types: { slug?: string }[] | { slug?: string } | null };
+  const ids: string[] = [];
   for (const row of data as unknown as Row[]) {
     const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
     if (meetingType?.slug !== "sacrament-meeting") continue;
-    const planning = Array.isArray(row.sacrament_planning) ? row.sacrament_planning[0] : row.sacrament_planning;
-    if (planning?.ready_for_public) return mapMeetingRow(row);
+    ids.push(row.id);
+    if (ids.length === 2) break;
   }
-  return null;
+  return new Set(ids);
 }
 
 /**
