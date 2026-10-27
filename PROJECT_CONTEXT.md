@@ -2038,6 +2038,59 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-27: pushing Chorister/Organist on
+`/rotations` reported success but changed nothing visible -- a data
+typo, not a code bug (migration `086`, not yet run).** The user's own
+report, right after confirming the meeting-order sort fix above: "I
+tried to update the rotation for chorister and organist in sacrament
+meetings and it didn't push. It said it did but a refresh of the page
+did not show the update in the assignment grid. The order on the
+rotation cards did keep the update." The push's own "Filled N
+meetings" message showed a real nonzero count, and Table Admin's raw
+`/admin/sacrament_assignments` grid -- bypassing this app's own
+`/rotations` page entirely -- also showed no change, ruling out a
+caching/revalidation theory before chasing anything else.
+
+Traced the whole write/read path (`pushRotationToUpcomingMeetings`,
+the `apply_rotation_assignment` RPC, `getAssignmentGrid`'s own read
+query) and found nothing wrong in any of it -- the RPC writes the
+assignment row and advances the rotation's pointer atomically in one
+function call, so a real "Filled N" result with no error necessarily
+means N rows were genuinely inserted somewhere. Asked the user to
+check the literal `element_key` value for these two rows in Table
+Admin's `/admin/rotations` grid directly, which surfaced the real
+cause: both are stored as **`"Chorister"`/`"Organist"` (capitalized)**,
+not the lowercase `"chorister"`/`"organist"` every other code path in
+this app uses -- the catalog (`ASSIGNMENT_ROLES`,
+`lib/data/sacrament-constants.ts`), the Assignment Grid's own column
+keys (`GRID_COLUMN_KEYS_BY_TYPE`), and every other read of
+`sacrament_assignments.role` anywhere else.
+
+`pushRotationToUpcomingMeetings` writes/deletes role rows keyed by
+whatever `rotation.element_key` literally is -- it has no reason to
+second-guess that string. Because these two rows held a capitalized
+value, the push's own delete step (`.eq("role", "Chorister")`) could
+never touch the real, already-correct lowercase row (so the old
+assignment just sat there, unchanged, which is exactly what "a refresh
+did not show the update" was actually seeing), and its insert created
+a brand-new, orphaned `"Chorister"`/`"Organist"` row that nothing else
+in the app ever reads -- invisible to both the grid and, since the
+user filtered on lowercase, to their own Table Admin check too.
+
+Migration `086` corrects both `rotations.element_key` values to
+lowercase (scoped to Sacrament Meeting's own rotations specifically)
+and deletes the orphaned capitalized-role rows the broken push(es)
+already created in `sacrament_assignments` -- dead data nothing reads,
+left behind by the bug. No application code needed to change -- the
+bug was bad data, not bad logic.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project --
+**confirm migration number `086` is actually free before running it**
+(and that `085` from earlier this session is too, if not already run),
+then ask the user to try the Chorister/Organist push again and confirm
+the Assignment Grid now reflects it after a refresh.
+
 **RABNM Planning pool gained per-category fields, migration `085`,
 2026-10-25** -- the user's own follow-up right after confirming the
 rest of this session's outstanding-work checklist: "I would still
