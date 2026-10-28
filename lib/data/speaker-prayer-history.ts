@@ -19,6 +19,28 @@ export interface DueEntry {
   last_date: string | null; // null = never on record
 }
 
+export interface PersonWithAgeGroup {
+  id: string;
+  name: string;
+  age_group: "adult" | "youth" | "child" | null;
+}
+
+/**
+ * Active people plus their `age_group` (migration 029) -- splits
+ * "Due to Speak" into separate Adult/Youth lists (2026-10-27, the
+ * user's own vision: "a separate list by date of adults, and another
+ * for youth of when they spoke last"). A plain `.eq("active", true)`
+ * fetch here rather than widening the shared `getActivePeople()`
+ * (`lib/data/people.ts`) -- that one's `PersonOption` shape is used by
+ * every person picker in the app, and age_group has no reason to be
+ * there just for this one page's own need.
+ */
+export async function getActivePeopleWithAgeGroup(): Promise<PersonWithAgeGroup[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("people").select("id, name, age_group").eq("active", true).order("name");
+  return (data ?? []) as PersonWithAgeGroup[];
+}
+
 /**
  * Every prayer/speaker assignment from ARCHIVED sacrament meetings, plus
  * every row in `speaker_prayer_history_import` (migration 079,
@@ -152,7 +174,34 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
     });
   }
 
-  return entries.sort((a, b) => b.date.localeCompare(a.date));
+  // Ongoing dedup against overlap, not just the one-time import-time
+  // check (2026-10-27, the user's own vision for this page: "combine
+  // the imported names/dates/info with the data from all recorded
+  // sacrament meetings... removing any duplicates/overlap on dates").
+  // Migration 079's own import only skipped a date already covered by
+  // a real archived meeting *as of the import* -- a meeting that
+  // archives *later*, for a date someone already logged by hand here,
+  // would otherwise show up twice forever. A meeting-sourced entry
+  // always wins; the matching import-sourced row is dropped from the
+  // merged list (not deleted from the table -- it's still real data,
+  // just superseded by the authoritative meeting record for display).
+  const meetingSourcedKeys = new Set(
+    entries
+      .filter((e) => e.meeting_id !== null && e.person_id)
+      .map((e) => `${e.person_id}::${e.date}::${roleCategory(e.role)}`)
+  );
+  const deduped = entries.filter(
+    (e) => e.meeting_id !== null || !e.person_id || !meetingSourcedKeys.has(`${e.person_id}::${e.date}::${roleCategory(e.role)}`)
+  );
+
+  return deduped.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** Opening/Closing Prayer and the bare "Prayer" import role are all the
+ *  same category for dedup/grouping purposes; Speaker and Youth Speaker
+ *  are the other. */
+function roleCategory(role: HistoryEntry["role"]): "speaker" | "prayer" {
+  return role === "Speaker" || role === "Youth Speaker" ? "speaker" : "prayer";
 }
 
 export interface SpeakingPrayingNote {
