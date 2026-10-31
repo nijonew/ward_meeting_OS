@@ -2038,6 +2038,82 @@ avoid confusing the two.
 
 ## Known open items
 
+**Real, pre-existing data-loss bug found and fixed 2026-10-30: a
+calling-eligible person picker on a meeting's Planning page could
+silently show "Unassigned" for someone who was actually still
+assigned, and a later "Save All Changes" would make that permanent.**
+The user's own report, right after testing `/admin/person-callings` on
+a real account: they reassigned a calling the test account's real
+holder already had, to test the test account's own access, and the
+original holder then "did not show up in a meeting in which they
+previously showed up based on that rotation." Investigated via a
+sub-agent, read-only, confirmed directly against the actual code (not
+guessed): `/admin/person-callings` only ever writes
+`callings.current_holder_id` -- it never touches any meeting's own
+assignment data -- so the real assignment itself was never directly
+altered by that save. The actual bug is in how a meeting's own
+Planning page *displays* that assignment afterward.
+
+Root cause: `getEligiblePeopleByElementKey`/`getEligiblePeopleForElement`
+(`lib/data/rotations.ts`) compute a `person_role` element's eligible-
+people list fresh from whoever currently holds the relevant calling(s)
+-- correct and by design. The Assignment Rotations grid
+(`/rotations`, `AssignmentGridForm.tsx`) already has a documented
+safeguard for exactly this: "the currently-assigned person always
+stays selectable even if a calling change since means they're no
+longer 'eligible'" -- it merges the real assignee back into that
+cell's own option list if a calling change dropped them out of it.
+**The Planning page's own person-picker (`PersonSelect`, local to
+`components/planning/AgendaGridForm.tsx`) had no such merge at all**
+-- it rendered exactly `row.eligiblePeople` as the `<select>`'s hard-
+coded option list, with the real assignee's id as `defaultValue` and
+no check that the two actually matched. A plain HTML `<select>` whose
+`defaultValue` doesn't match any of its own `<option>`s silently falls
+back to the FIRST option -- here, "Unassigned" -- so the real assignee
+visually disappears from the field the instant a calling change
+narrows them out of eligibility, with the underlying database row
+completely untouched. The genuinely dangerous part: `saveAgendaGrid`
+(`app/meetings/[id]/agenda-actions.ts`) deletes a role's existing row
+first and only reinserts one if a person is actually submitted -- so
+if an admin then clicks "Save All Changes" for *any* reason (even
+editing a completely unrelated field on the same grid), that now-
+blank-looking field submits an empty value and the real assignment is
+permanently deleted. `SpeakerPersonOrGuestField.tsx` (Chorister,
+Organist, and Visiting Authorities -- also calling-eligible lists) had
+the identical unguarded pattern.
+
+Fix: both `PersonSelect` and `SpeakerPersonOrGuestField` now carry the
+exact same safeguard `AssignmentGridForm.tsx` already established --
+if the current value isn't already in the eligible list handed to the
+`<select>`, it's added back as a synthetic extra option (labeled "...
+(no longer eligible)", with a real name resolved from a new `allPeople`
+prop threaded down from each caller's own full active-people list, not
+a generic placeholder). Every call site across `AgendaGridForm.tsx`
+(the three `PersonSelect` uses, the two Chorister/Organist
+`SpeakerPersonOrGuestField` uses, and `VisitingAuthoritiesField`) and
+`SacramentProgramSection.tsx`'s own Speaker/Youth Speaker use were
+updated to pass this new `allPeople` prop.
+
+**This bug predates this session entirely** -- it's not a side effect
+of anything built recently; it's always been possible to trigger by
+any calling change that narrows a `person_role` element's eligibility
+(e.g. a counselor calling changing hands, not just the brand-new
+`/admin/person-callings` page). `/admin/person-callings` just made it
+easy to reproduce on demand. Confirmed via `tsc`/`eslint`/`next build
+--webpack` only, same no-live-database-access gap as everything else
+in this project -- ask the user to check two things: (1) that a
+calling-eligible person picker on a Planning page now correctly keeps
+showing a real assignee even after a calling change makes them "no
+longer eligible" (labeled as such, still editable/replaceable), and
+(2) **whether the specific person/meeting from their own report had
+already been saved over** while the dropdown looked blank -- if they
+clicked "Save All Changes" on that grid after noticing the person
+missing (even for an unrelated field), that role's real assignment may
+already be gone from the database and will need to be manually
+re-added now that the picker correctly shows them again. If they only
+ever viewed the page without saving, the original data should still be
+completely intact.
+
 **Bug found and fixed 2026-10-30: `column "role_source" does not
 exist`, hit on both Calling Planning's own grid save and
 `/admin/person-callings` -- migration `088`, not yet run.** The user's

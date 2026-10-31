@@ -119,6 +119,7 @@ function ItemRow({
           <SpeakerPersonOrGuestField
             key={personFieldKey}
             people={people}
+            allPeople={people}
             defaultPersonId={item.personId}
             defaultGuestName={item.guestName}
           />

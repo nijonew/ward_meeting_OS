@@ -24,6 +24,7 @@ import type { PersonOption } from "@/lib/data/people";
  */
 export function SpeakerPersonOrGuestField({
   people,
+  allPeople,
   defaultPersonId,
   defaultGuestName,
   personFieldName = "person_id",
@@ -34,6 +35,14 @@ export function SpeakerPersonOrGuestField({
   personToggleLabel = "Choose from People instead",
 }: {
   people: PersonOption[];
+  /** The full active-people list, used only to resolve a real name for
+   *  `defaultPersonId` when it's not already in `people` (e.g. this
+   *  role's own calling-eligible list narrowed them out after a
+   *  calling change elsewhere) -- see the option-building logic below
+   *  for why the currently-assigned person has to stay selectable
+   *  regardless. For a caller whose `people` is already unrestricted,
+   *  this can just be the same list. */
+  allPeople: PersonOption[];
   defaultPersonId: string;
   defaultGuestName: string;
   personFieldName?: string;
@@ -44,6 +53,26 @@ export function SpeakerPersonOrGuestField({
   personToggleLabel?: string;
 }) {
   const [showGuest, setShowGuest] = useState(Boolean(defaultGuestName) && !defaultPersonId);
+
+  // Always keep the currently-assigned person selectable even if a
+  // calling change since makes them no longer "eligible" for this
+  // specific role (2026-10-30, found while investigating the user's
+  // own report: reassigning a calling made someone "not show up" in a
+  // meeting they were actually still assigned to). A plain <select>
+  // with no matching <option> for its own current value silently
+  // falls back to the FIRST option -- here, the person picker's own
+  // placeholder -- which then looks exactly like nothing is assigned.
+  // A later "Save All Changes" would make that real: saveAgendaGrid
+  // deletes the existing role row and only reinserts one if a person/
+  // guest is actually submitted, so an unassigned-looking field that
+  // was never really unassigned gets permanently wiped on save.
+  const personOptions =
+    defaultPersonId && !people.some((p) => p.id === defaultPersonId)
+      ? [
+          ...people,
+          { id: defaultPersonId, name: `${allPeople.find((p) => p.id === defaultPersonId)?.name ?? "Unknown"} (no longer eligible)` },
+        ]
+      : people;
 
   if (showGuest) {
     return (
@@ -71,7 +100,7 @@ export function SpeakerPersonOrGuestField({
         className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
       >
         <option value="">{personPlaceholder}</option>
-        {people.map((p) => (
+        {personOptions.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
           </option>

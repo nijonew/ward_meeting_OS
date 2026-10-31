@@ -17,16 +17,42 @@ const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm te
 function PersonSelect({
   name,
   people,
+  allPeople,
   defaultValue,
 }: {
   name: string;
   people: PersonOption[];
+  /** The full active-people list, used only to resolve a real name for
+   *  `defaultValue` when it's not already in `people` -- see the
+   *  option-building logic below. */
+  allPeople: PersonOption[];
   defaultValue: string;
 }) {
+  // Always keep the currently-assigned person selectable even if a
+  // calling change since makes them no longer "eligible" for this
+  // specific role (2026-10-30, same fix as AssignmentGridForm.tsx's
+  // own per-cell merge -- found while investigating the user's own
+  // report: reassigning a calling made someone "not show up" in a
+  // meeting they were actually still assigned to). Without this, a
+  // plain <select> with no matching <option> for its own current
+  // value silently falls back to "Unassigned" -- which then looks
+  // exactly like the assignment is gone, and a later "Save All
+  // Changes" would make that real: saveAgendaGrid deletes the
+  // existing role row and only reinserts one if a person is actually
+  // submitted, so an unassigned-looking field that was never really
+  // unassigned gets permanently wiped on save.
+  const options =
+    defaultValue && !people.some((p) => p.id === defaultValue)
+      ? [
+          ...people,
+          { id: defaultValue, name: `${allPeople.find((p) => p.id === defaultValue)?.name ?? "Unknown"} (no longer eligible)` },
+        ]
+      : people;
+
   return (
     <select name={name} defaultValue={defaultValue} className={INPUT}>
       <option value="">Unassigned</option>
-      {people.map((p) => (
+      {options.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
         </option>
@@ -156,9 +182,11 @@ function MusicCell({
  */
 function VisitingAuthoritiesField({
   row,
+  allPeople,
   onDirty,
 }: {
   row: Extract<AgendaRow, { kind: "visiting_authorities" }>;
+  allPeople: PersonOption[];
   onDirty: () => void;
 }) {
   const [rowCount, setRowCount] = useState(Math.max(row.rows.length, 1));
@@ -180,6 +208,7 @@ function VisitingAuthoritiesField({
           <div key={i} className="flex flex-wrap items-center gap-2">
             <SpeakerPersonOrGuestField
               people={row.eligiblePeople}
+              allPeople={allPeople}
               defaultPersonId={existing?.personId ?? ""}
               defaultGuestName={existing?.guestName ?? ""}
               personFieldName={`${row.fieldPrefix}${FIELD_SEPARATOR}${i}${FIELD_SEPARATOR}person_id`}
@@ -399,7 +428,7 @@ export function AgendaGridForm({
                   </th>
                   <td className="px-2 py-1.5">
                     {row.kind === "person" && (
-                      <PersonSelect name={row.field} people={row.eligiblePeople} defaultValue={row.value} />
+                      <PersonSelect name={row.field} people={row.eligiblePeople} allPeople={people} defaultValue={row.value} />
                     )}
 
                     {row.kind === "text" && (
@@ -418,6 +447,7 @@ export function AgendaGridForm({
                           <PersonSelect
                             name={row.personField}
                             people={people}
+                            allPeople={people}
                             defaultValue={row.personValue}
                           />
                         </div>
@@ -439,6 +469,7 @@ export function AgendaGridForm({
                           <PersonSelect
                             name={row.personField}
                             people={people}
+                            allPeople={people}
                             defaultValue={row.personValue}
                           />
                         </div>
@@ -468,6 +499,7 @@ export function AgendaGridForm({
                           <SpeakerPersonOrGuestField
                             key={`${row.choristerValue}::${row.choristerGuestValue}`}
                             people={row.choristerEligible}
+                            allPeople={people}
                             defaultPersonId={row.choristerValue}
                             defaultGuestName={row.choristerGuestValue}
                             personFieldName={row.choristerPersonField}
@@ -484,6 +516,7 @@ export function AgendaGridForm({
                           <SpeakerPersonOrGuestField
                             key={`${row.organistValue}::${row.organistGuestValue}`}
                             people={row.organistEligible}
+                            allPeople={people}
                             defaultPersonId={row.organistValue}
                             defaultGuestName={row.organistGuestValue}
                             personFieldName={row.organistPersonField}
@@ -499,7 +532,7 @@ export function AgendaGridForm({
                     {row.kind === "stake_business" && <StakeBusinessCell row={row} />}
 
                     {row.kind === "visiting_authorities" && (
-                      <VisitingAuthoritiesField row={row} onDirty={() => setDirty(true)} />
+                      <VisitingAuthoritiesField row={row} allPeople={people} onDirty={() => setDirty(true)} />
                     )}
                   </td>
                 </tr>
