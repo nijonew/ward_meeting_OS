@@ -7,38 +7,15 @@ export interface HistoryEntry {
   person_name: string; // resolved name, or the guest's name for non-ward speakers
   role: "Opening Prayer" | "Closing Prayer" | "Speaker" | "Youth Speaker" | "Prayer";
   topic: string | null;
+  /** The person's `age_group` (migration 029), when known -- used to
+   *  split an import-sourced "Speaker" row (which carries no adult/
+   *  youth distinction of its own, unlike a real meeting's separate
+   *  Speaker/Youth Speaker tables) into the right history list. */
+  age_group: "adult" | "youth" | "child" | null;
   /** Set only for a speaker_prayer_history_import row -- lets the page
    *  show a delete control only where one applies (an archived-meeting-
    *  sourced entry is owned by that meeting, not this table). */
   historyImportId?: string;
-}
-
-export interface DueEntry {
-  person_id: string;
-  person_name: string;
-  last_date: string | null; // null = never on record
-}
-
-export interface PersonWithAgeGroup {
-  id: string;
-  name: string;
-  age_group: "adult" | "youth" | "child" | null;
-}
-
-/**
- * Active people plus their `age_group` (migration 029) -- splits
- * "Due to Speak" into separate Adult/Youth lists (2026-10-27, the
- * user's own vision: "a separate list by date of adults, and another
- * for youth of when they spoke last"). A plain `.eq("active", true)`
- * fetch here rather than widening the shared `getActivePeople()`
- * (`lib/data/people.ts`) -- that one's `PersonOption` shape is used by
- * every person picker in the app, and age_group has no reason to be
- * there just for this one page's own need.
- */
-export async function getActivePeopleWithAgeGroup(): Promise<PersonWithAgeGroup[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("people").select("id, name, age_group").eq("active", true).order("name");
-  return (data ?? []) as PersonWithAgeGroup[];
 }
 
 /**
@@ -99,14 +76,16 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
           .in("meeting_id", meetingIds)
           .eq("confirmed", true)
       : Promise.resolve({ data: [] }),
-    supabase.from("people").select("id, name"),
+    supabase.from("people").select("id, name, age_group"),
     // Historical/manually-logged entries (migration 079, 2026-10-21) --
     // not tied to a real meeting row at all, read alongside the
     // archived-meeting data above rather than replacing it.
     supabase.from("speaker_prayer_history_import").select("id, person_id, role, occurred_on, notes"),
   ]);
 
-  const nameById = new Map(((peopleRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+  const peopleRows = (peopleRes.data ?? []) as { id: string; name: string; age_group: "adult" | "youth" | "child" | null }[];
+  const nameById = new Map(peopleRows.map((p) => [p.id, p.name]));
+  const ageGroupById = new Map(peopleRows.map((p) => [p.id, p.age_group]));
 
   const entries: HistoryEntry[] = [];
 
@@ -119,6 +98,7 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
       person_name: nameById.get(row.assigned_to_id) ?? "Unknown",
       role: row.role === "opening_prayer" ? "Opening Prayer" : "Closing Prayer",
       topic: null,
+      age_group: ageGroupById.get(row.assigned_to_id) ?? null,
     });
   }
 
@@ -136,6 +116,7 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
       person_name: row.speaker_id ? nameById.get(row.speaker_id) ?? "Unknown" : `${row.guest_speaker_name} (guest)`,
       role: "Speaker",
       topic: row.topic,
+      age_group: row.speaker_id ? ageGroupById.get(row.speaker_id) ?? null : null,
     });
   }
 
@@ -153,6 +134,7 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
       person_name: row.speaker_id ? nameById.get(row.speaker_id) ?? "Unknown" : `${row.guest_speaker_name} (guest)`,
       role: "Youth Speaker",
       topic: row.topic,
+      age_group: row.speaker_id ? ageGroupById.get(row.speaker_id) ?? null : null,
     });
   }
 
@@ -170,6 +152,7 @@ export async function getSpeakerPrayerHistory(): Promise<HistoryEntry[]> {
       person_name: nameById.get(row.person_id) ?? "Unknown",
       role: row.role === "speaker" ? "Speaker" : "Prayer",
       topic: row.notes,
+      age_group: ageGroupById.get(row.person_id) ?? null,
       historyImportId: row.id,
     });
   }
@@ -213,8 +196,8 @@ export interface SpeakingPrayingNote {
  * The Notes Database's informational flags (migration 079, 2026-10-21 --
  * "Inactive," "Won't Speak," "Won't Pray," "Lives outside of ward," etc.)
  * -- purely informational, shown as a small flag next to a person's name
- * on the Due to Speak/Due for a Prayer lists. Never used to filter who
- * shows up on those lists, per the user's own explicit decision.
+ * on the history lists. Never used to filter who shows up on those lists,
+ * per the user's own explicit decision.
  */
 export async function getSpeakingPrayingNotes(): Promise<Map<string, SpeakingPrayingNote>> {
   const supabase = await createClient();
@@ -226,32 +209,4 @@ export async function getSpeakingPrayingNotes(): Promise<Map<string, SpeakingPra
     }
   }
   return result;
-}
-
-/**
- * For each active person, their most recent date in a given set of
- * history entries -- sorted so people who've never had a turn (or had
- * one longest ago) show first. This is the "who's due" view.
- */
-export function buildDueList(
-  entries: HistoryEntry[],
-  activePeople: { id: string; name: string }[]
-): DueEntry[] {
-  const lastByPerson = new Map<string, string>();
-  for (const e of entries) {
-    if (!e.person_id) continue;
-    const existing = lastByPerson.get(e.person_id);
-    if (!existing || e.date > existing) {
-      lastByPerson.set(e.person_id, e.date);
-    }
-  }
-
-  return activePeople
-    .map((p) => ({ person_id: p.id, person_name: p.name, last_date: lastByPerson.get(p.id) ?? null }))
-    .sort((a, b) => {
-      if (a.last_date === b.last_date) return a.person_name.localeCompare(b.person_name);
-      if (a.last_date === null) return -1;
-      if (b.last_date === null) return 1;
-      return a.last_date.localeCompare(b.last_date);
-    });
 }

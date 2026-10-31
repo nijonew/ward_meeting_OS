@@ -4,13 +4,11 @@ import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import {
   getSpeakerPrayerHistory,
-  buildDueList,
   getSpeakingPrayingNotes,
-  getActivePeopleWithAgeGroup,
-  type DueEntry,
   type HistoryEntry,
   type SpeakingPrayingNote,
 } from "@/lib/data/speaker-prayer-history";
+import { getActivePeople } from "@/lib/data/people";
 import { AddEntryForm } from "@/components/speaker-prayer-history/AddEntryForm";
 import { DeleteEntryButton } from "@/components/speaker-prayer-history/DeleteEntryButton";
 
@@ -23,36 +21,18 @@ function formatDate(iso: string) {
   });
 }
 
-function DueListCard({
-  title,
-  due,
-  notesByPerson,
-  noteKey,
-}: {
-  title: string;
-  due: DueEntry[];
-  notesByPerson: Map<string, SpeakingPrayingNote>;
-  noteKey: "speaking_note" | "praying_note";
-}) {
-  return (
-    <div className="rounded border border-rule bg-surface p-6">
-      <h2 className="font-display text-xl">{title}</h2>
-      <ul className="mt-3 flex flex-col gap-1.5">
-        {due.length === 0 && <li className="text-sm text-ink-muted">Nobody in this group yet.</li>}
-        {due.slice(0, 15).map((d) => (
-          <li key={d.person_id} className="flex items-center justify-between text-sm">
-            <span className="text-ink">
-              {d.person_name}
-              {notesByPerson.get(d.person_id)?.[noteKey] && (
-                <span className="ml-1.5 text-[10px] text-ink-muted/70">({notesByPerson.get(d.person_id)?.[noteKey]})</span>
-              )}
-            </span>
-            <span className="text-xs text-ink-muted">{d.last_date ? formatDate(d.last_date) : "Never"}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+/**
+ * A meeting-sourced "Youth Speaker" row already means youth (it comes
+ * from the separate `sacrament_speakers_youth` table) -- role wins over
+ * `age_group` there. An import-sourced row is always labeled plain
+ * "Speaker" regardless of age (migration 079's source sheet had no
+ * adult/youth distinction of its own), so those fall back to the
+ * person's own `age_group`; an unknown age (a guest, or no age set)
+ * defaults to the Adults list rather than being silently dropped.
+ */
+function speakerBucket(entry: HistoryEntry): "adult" | "youth" {
+  if (entry.role === "Youth Speaker") return "youth";
+  return entry.age_group === "youth" ? "youth" : "adult";
 }
 
 function HistoryListCard({
@@ -110,7 +90,7 @@ export default async function SpeakerPrayerHistoryPage() {
 
   const [entries, people, notesByPerson] = await Promise.all([
     getSpeakerPrayerHistory(),
-    getActivePeopleWithAgeGroup(),
+    getActivePeople(),
     getSpeakingPrayingNotes(),
   ]);
 
@@ -119,21 +99,12 @@ export default async function SpeakerPrayerHistoryPage() {
     (e) => e.role === "Opening Prayer" || e.role === "Closing Prayer" || e.role === "Prayer"
   );
 
-  // Three "due" lists, not two (2026-10-27, the user's own vision):
-  // speakers split by age_group (Adults, Youth), prayers left as one
-  // list -- this ward's prayer assignment has no age distinction of
-  // its own to split by, and the user's own wording ("a similar list
-  // for prayers," singular) confirmed it shouldn't be split either.
-  const adultPeople = people.filter((p) => p.age_group === "adult");
-  const youthPeople = people.filter((p) => p.age_group === "youth");
-  const dueToSpeakAdults = buildDueList(speakerEntries, adultPeople);
-  const dueToSpeakYouth = buildDueList(speakerEntries, youthPeople);
-  const dueToPray = buildDueList(prayerEntries, people);
-
-  // Full History split into two, by category, rather than one combined
-  // chronological list (2026-10-27, the user's own vision: "I want
-  // separate lists for prayer and speakers").
-  const speakerHistory = speakerEntries;
+  // Three history lists, no due lists (2026-10-30, the user's own
+  // correction of the earlier due-list design: "I would rather not
+  // have due lists, just history lists for speakers (Adults), Speakers
+  // (Youth), and prayers. No need for due lists.").
+  const speakerAdultHistory = speakerEntries.filter((e) => speakerBucket(e) === "adult");
+  const speakerYouthHistory = speakerEntries.filter((e) => speakerBucket(e) === "youth");
   const prayerHistory = prayerEntries;
 
   return (
@@ -148,8 +119,7 @@ export default async function SpeakerPrayerHistoryPage() {
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Speaker &amp; Prayer History</h1>
         <p className="mt-2 text-sm text-ink-muted">
           Sourced from archived sacrament meetings, plus the ward&rsquo;s own imported history and anything
-          logged by hand below. Speakers and sacrament-meeting prayers don&rsquo;t rotate automatically, so
-          this is here to help spot who&rsquo;s due for a turn.
+          logged by hand below.
         </p>
       </section>
 
@@ -163,18 +133,11 @@ export default async function SpeakerPrayerHistoryPage() {
       )}
 
       {entries.length > 0 && (
-        <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <DueListCard title="Due to Speak (Adults)" due={dueToSpeakAdults} notesByPerson={notesByPerson} noteKey="speaking_note" />
-            <DueListCard title="Due to Speak (Youth)" due={dueToSpeakYouth} notesByPerson={notesByPerson} noteKey="speaking_note" />
-            <DueListCard title="Due for a Prayer" due={dueToPray} notesByPerson={notesByPerson} noteKey="praying_note" />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <HistoryListCard title="Speaker History" entries={speakerHistory} notesByPerson={notesByPerson} noteKey="speaking_note" />
-            <HistoryListCard title="Prayer History" entries={prayerHistory} notesByPerson={notesByPerson} noteKey="praying_note" />
-          </div>
-        </>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <HistoryListCard title="Speakers (Adults)" entries={speakerAdultHistory} notesByPerson={notesByPerson} noteKey="speaking_note" />
+          <HistoryListCard title="Speakers (Youth)" entries={speakerYouthHistory} notesByPerson={notesByPerson} noteKey="speaking_note" />
+          <HistoryListCard title="Prayers" entries={prayerHistory} notesByPerson={notesByPerson} noteKey="praying_note" />
+        </div>
       )}
 
       <div className="rounded border border-rule bg-surface p-6">

@@ -2039,73 +2039,81 @@ avoid confusing the two.
 ## Known open items
 
 **Speaker & Prayer History redesigned around the user's own vision --
-two separate category histories, three "due" lists by date, and
-stronger ongoing dedup, 2026-10-27. No migration needed.** The user's
-own words: "I want to work on my vision for the prayer and speaking
-list. I want separate lists for prayer and speakers. They will
-include name, date spoken/prayed, notes about the individual. I want
-to combine the imported names/dates/info with the data from all
-recorded sacrament meetings in the app (removing any duplicates/
-overlap on dates). Then I want a separate list by date of adults, and
-another for youth of when they spoke last. I also want a similar list
-for prayers. So essentially a history recorded, and then 3 lists by
-date so that we know who has not spoken or prayed recently."
+three plain history lists (Speakers Adults/Youth/Prayers), no due
+lists, and stronger ongoing dedup, 2026-10-27/30. No migration
+needed.** The user's own original request: "I want to work on my
+vision for the prayer and speaking list. I want separate lists for
+prayer and speakers. They will include name, date spoken/prayed,
+notes about the individual. I want to combine the imported names/
+dates/info with the data from all recorded sacrament meetings in the
+app (removing any duplicates/overlap on dates). Then I want a
+separate list by date of adults, and another for youth of when they
+spoke last. I also want a similar list for prayers. So essentially a
+history recorded, and then 3 lists by date so that we know who has
+not spoken or prayed recently." First pass (2026-10-27) built this as
+3 "Due" lists (computed per-person last-turn dates, sorted longest-
+overdue-first) plus 2 History lists -- read at the time as the
+literal "3 lists by date" the user asked for. **The user's own
+follow-up, 2026-10-30, corrected that reading**: "I would rather not
+have due lists, just history lists for speakers (Adults), Speakers
+(Youth), and prayers. No need for due lists." The real "3 lists" was
+always meant to be the history itself split three ways, not a
+separate due-list layer on top of it -- the due-list machinery (`DueEntry`/
+`buildDueList()`/`DueListCard`/`getActivePeopleWithAgeGroup()`) was
+pure overbuild once that was clarified, and is gone outright now, not
+left unlinked.
 
-Nothing here needed a new column or table -- every piece the user
-described was already on hand: `people.age_group` (migration 029)
-already splits adult from youth, and `people.speaking_note`/
+Nothing here needed a new column or table either pass -- every piece
+the user described was already on hand: `people.age_group` (migration
+029) already splits adult from youth, and `people.speaking_note`/
 `praying_note` (migration 079) already hold the per-individual notes.
 This was a real logic and page-layout rework, not a schema change.
 
-- **Ongoing dedup, not just a one-time import-time check.** Migration
-  079's own bulk import only skipped a date already covered by a real
-  archived meeting *as of the import*. A meeting that archives
-  *later*, for a date someone already logged by hand on this page,
-  would otherwise show up twice forever -- the user's own "removing
-  any duplicates/overlap on dates" asked for this to keep holding, not
-  just hold once. `getSpeakerPrayerHistory()`
-  (`lib/data/speaker-prayer-history.ts`) now builds a `Set` of
-  `person_id::date::category` keys from every meeting-sourced entry
-  and filters out any import-sourced row that matches one -- a real
-  meeting record always wins; the superseded import row is dropped
-  from the merged list for display, never deleted from the table
-  (it's still real data, just no longer the authoritative copy for
-  that date). New `roleCategory()` helper treats Opening/Closing
-  Prayer and the bare "Prayer" import role as one category, Speaker/
-  Youth Speaker as the other, for both this dedup and the two-history
-  split below.
-- **Three "due" lists, not two** -- the user's own explicit count.
-  New `PersonWithAgeGroup`/`getActivePeopleWithAgeGroup()`
-  (`lib/data/speaker-prayer-history.ts`, a plain `people` query
-  selecting `age_group` too -- deliberately its own function rather
-  than widening the shared `PersonOption`/`getActivePeople()`
-  (`lib/data/people.ts`), which every other person-picker in the app
-  uses and has no reason to carry `age_group`). The page splits that
-  list into adult/youth subsets and calls the existing `buildDueList()`
-  three times: Due to Speak (Adults), Due to Speak (Youth), Due for a
-  Prayer -- prayers are deliberately NOT split by age, matching the
-  user's own singular "a similar list for prayers."
-- **Full History split into Speaker History and Prayer History**,
-  replacing the one combined chronological list -- same underlying
-  deduped `entries`, just filtered by `roleCategory()` into two cards
-  instead of one. Each row still shows name, date, and (new) the
-  person's own speaking/praying note inline, not just on the Due
-  lists -- satisfies "notes about the individual" wherever a person's
-  history actually appears, not only on the due-list side.
-- `app/speaker-prayer-history/page.tsx` gained two small local
-  components, `DueListCard`/`HistoryListCard`, to avoid repeating the
-  same card markup five times (three due lists + two histories); the
-  page's own container widened from `max-w-3xl` to `max-w-5xl` so
-  three due-list cards have room to sit side by side.
+- **Ongoing dedup, not just a one-time import-time check** (unchanged
+  by the 2026-10-30 simplification). Migration 079's own bulk import
+  only skipped a date already covered by a real archived meeting *as
+  of the import*. A meeting that archives *later*, for a date someone
+  already logged by hand on this page, would otherwise show up twice
+  forever -- the user's own "removing any duplicates/overlap on
+  dates" asked for this to keep holding, not just hold once.
+  `getSpeakerPrayerHistory()` (`lib/data/speaker-prayer-history.ts`)
+  builds a `Set` of `person_id::date::category` keys from every
+  meeting-sourced entry and filters out any import-sourced row that
+  matches one -- a real meeting record always wins; the superseded
+  import row is dropped from the merged list for display, never
+  deleted from the table (it's still real data, just no longer the
+  authoritative copy for that date). `roleCategory()` treats Opening/
+  Closing Prayer and the bare "Prayer" import role as one category,
+  Speaker/Youth Speaker as the other, for this dedup.
+- **Three history lists, final design**: Speakers (Adults), Speakers
+  (Youth), Prayers (unsplit by age, matching the user's own singular
+  "a similar list for prayers" from the original request). Each
+  `HistoryEntry` now carries the person's own `age_group` (sourced
+  from the same `people` lookup `getSpeakerPrayerHistory()` already
+  joins against, not a separate query) -- new `speakerBucket()`
+  helper (`app/speaker-prayer-history/page.tsx`) resolves the split: a
+  meeting-sourced "Youth Speaker" row is always youth (it comes from
+  the dedicated `sacrament_speakers_youth` table, so role wins
+  outright); an import-sourced row is always labeled the plain
+  "Speaker" role regardless of age (migration 079's source sheet had
+  no adult/youth distinction of its own), so those fall back to the
+  person's own `age_group`, defaulting to Adults when unknown (a
+  guest, or no age on record) rather than being silently dropped from
+  every list. Each row still shows name, date, topic, and the
+  person's own speaking/praying note inline.
+- Reverted the person-list fetch back to the shared `getActivePeople()`
+  (`lib/data/people.ts`) for the "Log a Missed or Pre-App Turn" form's
+  picker -- the dedicated `getActivePeopleWithAgeGroup()`/
+  `PersonWithAgeGroup` only ever existed to drive the now-removed due
+  lists, so keeping it around unused would have left dead code behind.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
 database-access gap as everything else in this project -- ask the user
-to open `/speaker-prayer-history` and confirm: three due lists show
-(Adults/Youth split correctly by each person's own `age_group`,
-Prayer left as one list), Speaker History and Prayer History show as
-two separate cards with name/date/notes each, and a person's own
-speaking/praying note (if any) shows next to their name in both the
-due lists and the new history lists.
+to open `/speaker-prayer-history` and confirm: no due lists remain,
+three history cards show (Speakers Adults, Speakers Youth, Prayers),
+a known youth speaker's turns land in the Youth list even for an
+older imported row, and a person's own speaking/praying note (if any)
+still shows next to their name on every row.
 
 **Review section split into two real, independent elements for
 Bishopric Meeting/Ward Council/Youth Council, migration `087`, not
