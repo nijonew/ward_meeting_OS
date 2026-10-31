@@ -2038,6 +2038,124 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-31: Ward Business's New Members/Callings/
+Releases/Baby Blessing entries "vanished" from tomorrow's Sacrament
+Meeting -- a real bug this assistant introduced the same morning, not
+something that happened on its own.** The user's own report: "I had
+entered a considerable number of items into the ward business section
+in subsections new members, callings, releases, baby blessing for
+tomorrow's sacrament meeting and those are all now vanished from the
+agenda."
+
+Root cause: the Conducting script rewrite earlier the same morning
+(migration `093`, `sacrament_rabnm.baby_name`) added that column to
+both `getSacramentPlanningData`'s own SELECT (`lib/data/sacrament-planning.ts`)
+and every INSERT through `insertSacramentRabnmLink`
+(`lib/data/sacrament-rabnm-linking.ts`) -- but the matching migration
+had been committed, not actually run against the live database yet.
+Since `sacrament_rabnm` is the one table behind **all four** Ward
+Business categories the user named, every query against it started
+failing at the database level the moment that code deployed. The read
+path had a second, compounding bug on top of that: it silently
+swallowed the error and fell back to an empty list
+(`(rabnmRes.data ?? []) as unknown[]`) instead of surfacing it, so the
+whole Ward Business section just rendered empty -- exactly "vanished,"
+with no error anywhere to explain why.
+
+**Fix**: the user ran the pending migration (`alter table
+sacrament_rabnm add column if not exists baby_name text` -- purely
+additive, touches no existing rows) and confirmed every entered item
+reappeared immediately. Nothing was actually lost -- this was a
+read-path failure, not data loss; the rows had been sitting in
+`sacrament_rabnm` the whole time, just invisible. No code change was
+needed for this part, since the underlying bug was "the migration
+hadn't run yet," not a logic error.
+
+**Not yet done, flagged for a follow-up**: the silent-error-swallowing
+pattern in `getSacramentPlanningData` (and likely elsewhere -- this is
+a common shape across this app's own data-layer functions, `.data ??
+[]` with no check of `.error` first) should be hardened so a future
+schema mismatch surfaces as a visible error instead of quietly hiding
+real data again. Promised to the user, not yet built -- ask before
+assuming it's wanted broadly vs. just on this one function, since a
+sweeping change to every "swallow the error, fall back to an empty
+list" call site across the app would be a much bigger change than
+this one incident calls for on its own.
+
+**Ward Business's RABNM-planning categories each became their own
+top-level subsection, 2026-10-31, migration-free.** The user's own
+request, right after the bug above was confirmed fixed: "Lets make
+each individual Recognitions, Advancements, Baptisms, New Members &
+Baby Blessings their own subsections of ward business instead of
+sub-subsections under ['Recognitions, Advancements, Baptisms, New
+Members & Baby Blessings']." Before this, Ward Business had exactly
+three top-level subsections -- Releases, Callings, and one combined
+RABNM block (`RabnmPlanningSection`, built 2026-10-24) that bundled
+all five categories together behind a single `<optgroup>`-grouped
+dropdown. Now there are seven top-level subsections -- Releases,
+Callings, and each of Recognitions/Advancements/Baptisms/New Members/
+Baby Blessings independently -- all seven reorderable relative to each
+other via the same existing Move Up/Down subsection control
+(`SectionHeading`, migration 091) that Releases/Callings already had.
+
+No migration needed -- this only changes which STRING VALUES are
+stored in `ward_settings.ward_business_section_order` (still the same
+`text[]` column), not the schema. `WARD_BUSINESS_SECTION_KEYS`
+(`lib/data/ward-settings.ts`) grew from `["release", "new_calling",
+"rabnm"]` to seven keys, the five new ones matching `RabnmPlanningType`'s
+own values exactly (the same strings already stored on
+`sacrament_rabnm.type` -- no new vocabulary invented).
+`normalizeWardBusinessSectionOrder` -- already the one place a stored
+order gets reconciled against the current key list on every read --
+now also expands a previously-stored `"rabnm"` entry into the five new
+keys **in place**, at the exact position `"rabnm"` itself held, rather
+than letting its own generic "unknown key dropped, missing keys
+appended at the end" rule silently move all five to the end of
+whatever custom order a ward had already set up. A ward that never
+touched the subsection order at all is unaffected either way, since
+the five new keys land in the same fixed relative position regardless.
+
+`RabnmPlanningSection` (one combined block, one grouped dropdown) is
+deleted outright, replaced by `RabnmCategorySection` -- the same shape
+as `CallingPlanningSection` (Releases/Callings' own component): one
+existing-items table scoped to just that category, one plain dropdown
+of just that category's own not-yet-announced candidates, no
+`<optgroup>` needed since there's only ever one category per instance
+now. The existing-items table's old leading "Type" column is gone too
+-- it was only ever needed when five categories shared one table;
+every row in a single category's own table is already that type.
+`moveWardBusinessItem`'s (migration 090) `type` parameter widened from
+`"release" | "new_calling"` to also accept a `RabnmPlanningType` --
+the underlying query already just filters `sacrament_rabnm.type` by
+whatever string it's given, so this is a type-signature widening with
+no logic change, done for forward-compatibility; no Move Up/Down
+control was actually added to the five new subsections' own existing
+items in this pass, since the user's request was specifically about
+promoting them to subsections, not about reordering within one --
+flag if that's wanted too, since the groundwork (a real per-type
+`sort_order`, already maintained by `insertSacramentRabnmLink` for
+every category) is already there.
+
+**Deliberately left unchanged**: the archived/read-only view
+(`app/meetings/[id]/archived/page.tsx`) already rendered every
+`sacrament_rabnm` row individually by its own type, never grouped by
+the old combined "rabnm" concept at all -- no change needed there. The
+Conducting script (`lib/data/conducting-rows.ts`, rewritten this same
+morning) already uses its own fixed, prescriptive Ward Business order
+independent of `ward_business_section_order` entirely (a deliberate
+choice from that same rewrite) -- also unaffected.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open a Sacrament Meeting's Planning page and confirm: Ward Business
+now shows seven subsections (Releases, Callings, Recognitions,
+Advancements, Baptisms, New Members, Baby Blessings), each with its
+own Add dropdown and existing-items list; Move Up/Down on each
+subsection's own heading reorders all seven relative to each other,
+ward-wide; and (if the ward had already customized the old three-way
+order) the five new subsections land where the old combined RABNM
+block used to sit, not at the very end.
+
 **Performance pass, part 2, 2026-10-31: a second, deeper round of the
 same N+1/sequential-round-trip audit**, after the user asked "what was
 done to review and improve performance... if there is more to do

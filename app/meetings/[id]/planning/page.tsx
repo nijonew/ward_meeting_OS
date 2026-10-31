@@ -215,7 +215,7 @@ export default async function PlanningViewPage({
     // reasoning, small enough (every not-yet-announced pool row,
     // ward-wide) to fetch unconditionally.
     isSacrament ? getCallableRabnmPlanningItems() : Promise.resolve([]),
-    // Which order Ward Business's three subsections render in (migration
+    // Which order Ward Business's subsections render in (migration
     // 091) -- a ward-wide preference, not per-meeting.
     isSacrament ? getWardBusinessSectionOrder() : Promise.resolve([...WARD_BUSINESS_SECTION_KEYS]),
     // Announcements' own inline picker (2026-10-11) -- same reasoning

@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { insertSacramentRabnmLink, removeSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
 import { clearPoolExclusion } from "@/lib/data/pool-sweep";
+import type { RabnmPlanningType } from "@/lib/data/sacrament-rabnm-planning";
 import {
   normalizeWardBusinessSectionOrder,
   type WardBusinessSectionKey,
@@ -202,13 +203,19 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
 }
 
 /**
- * Moves one Ward Business line (a Calling Planning-sourced Calling or
- * Release) up or down within its own list -- the user's own request,
- * 2026-10-30: "I would like to be able to re-order individual lines in
- * callings/releases in sacrament meeting to the order I would like to
- * have them announced." Scoped by `type` ("release" | "new_calling")
- * so Callings and Releases reorder independently, matching
- * WardBusinessField.tsx's own existing split of the two lists.
+ * Moves one Ward Business line up or down within its own list -- the
+ * user's own request, 2026-10-30: "I would like to be able to
+ * re-order individual lines in callings/releases in sacrament meeting
+ * to the order I would like to have them announced." Scoped by `type`
+ * so each of Ward Business's now-seven subsections (Releases,
+ * Callings, and the five RABNM-planning categories, split out
+ * 2026-10-31 -- see ward-settings.ts's own doc comment) reorders
+ * independently, matching WardBusinessField.tsx's own split of the
+ * lists. `type` was originally just `"release" | "new_calling"`;
+ * widened to also accept a `RabnmPlanningType` once the five RABNM
+ * categories became their own subsections too -- the underlying query
+ * already just filters `sacrament_rabnm.type` by whatever string it's
+ * given, so no logic changed, only what's allowed to be passed in.
  *
  * Same swap-adjacent-sort_order shape as every other Move Up/Down
  * action in this app (moveTemplateElement, moveRotationMember,
@@ -219,7 +226,7 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
 export async function moveWardBusinessItem(
   meetingId: string,
   itemId: string,
-  type: "release" | "new_calling",
+  type: "release" | "new_calling" | RabnmPlanningType,
   direction: "up" | "down"
 ): Promise<ActionResult> {
   const denied = await requireRabnmFeature();
@@ -268,10 +275,12 @@ export async function moveWardBusinessItem(
 }
 
 /**
- * Moves one of Ward Business's three subsections (Releases, Callings,
- * RABNM) up or down in a single ward-wide display order -- the user's
- * own request, 2026-10-30: "I would like to be able to adjust the
- * order of subsections in the ward business section." Stored on
+ * Moves one of Ward Business's subsections (Releases, Callings, and --
+ * since 2026-10-31 -- each of the five RABNM-planning categories
+ * individually, see ward-settings.ts's own doc comment) up or down in
+ * a single ward-wide display order -- the user's own request,
+ * 2026-10-30: "I would like to be able to adjust the order of
+ * subsections in the ward business section." Stored on
  * `ward_settings` (a singleton row, same as the ward's own display
  * name), not per-meeting -- see WARD_BUSINESS_SECTION_KEYS's own doc
  * comment. Only revalidates this one meeting's own Planning page --

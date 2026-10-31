@@ -253,7 +253,7 @@ export interface AgendaRowInputs {
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
   callableRabnm: CallableRabnmItem[];
-  /** Which order Ward Business's three subsections render in (migration
+  /** Which order Ward Business's subsections render in (migration
    *  091) -- see the `ward_business` row kind's own comment above. */
   wardBusinessSectionOrder: WardBusinessSectionKey[];
   /** Already pulled into this meeting, grouped by which specific

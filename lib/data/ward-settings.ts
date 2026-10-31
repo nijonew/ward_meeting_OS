@@ -32,28 +32,66 @@ export const getWardName = cache(async (): Promise<string> => {
 });
 
 /**
- * The order Ward Business's three subsections (Releases, Callings, and
- * the RABNM-planning pool) render in on a Sacrament Meeting's Planning
- * page -- migration 091, the user's own request: "I would like to be
- * able to adjust the order of subsections in the ward business
- * section." A single ward-wide preference, same singleton-row shape as
- * the ward's own display name, not a per-meeting setting -- there's no
- * real reason one meeting would want a different subsection order than
- * another.
+ * The order Ward Business's subsections render in on a Sacrament
+ * Meeting's Planning page -- migration 091, the user's own request: "I
+ * would like to be able to adjust the order of subsections in the ward
+ * business section." A single ward-wide preference, same singleton-row
+ * shape as the ward's own display name, not a per-meeting setting --
+ * there's no real reason one meeting would want a different subsection
+ * order than another.
+ *
+ * **Split from 3 keys into 7, 2026-10-31** (the user's own request:
+ * "Lets make each individual Recognitions, Advancements, Baptisms, New
+ * Members & Baby Blessings their own subsections of ward business
+ * instead of sub-subsections under [the combined RABNM block]") -- the
+ * single `"rabnm"` key, which rendered all five RABNM-planning
+ * categories bundled into one subsection, is retired in favor of one
+ * key per category, each now a real top-level subsection alongside
+ * Releases/Callings (see WardBusinessField.tsx). The five new keys
+ * match `RabnmPlanningType`'s own values exactly (lib/data/sacrament-rabnm-planning.ts)
+ * -- the same strings already stored on `sacrament_rabnm.type` for
+ * every row pulled from that pool, so no new vocabulary was invented.
  */
-export const WARD_BUSINESS_SECTION_KEYS = ["release", "new_calling", "rabnm"] as const;
+export const WARD_BUSINESS_SECTION_KEYS = [
+  "release",
+  "new_calling",
+  "recognition",
+  "advancement",
+  "baptism",
+  "new_member",
+  "baby_blessing",
+] as const;
 export type WardBusinessSectionKey = (typeof WARD_BUSINESS_SECTION_KEYS)[number];
+
+/** The five keys retired `"rabnm"` expands into, in this fixed order,
+ *  wherever `"rabnm"` itself used to sit in a previously-stored order
+ *  -- see normalizeWardBusinessSectionOrder below. */
+const RABNM_SPLIT_KEYS: WardBusinessSectionKey[] = [
+  "recognition",
+  "advancement",
+  "baptism",
+  "new_member",
+  "baby_blessing",
+];
 
 /** Keeps only recognized keys, in their stored order, then appends any
  *  missing key at the end -- so a key this app doesn't know about
  *  (stale data, or a future one not yet added here) never gets lost
  *  silently, and a brand-new key added to the fixed list above always
- *  has somewhere to render even before anyone's ever reordered it. */
+ *  has somewhere to render even before anyone's ever reordered it.
+ *
+ *  A stored `"rabnm"` entry (from before the 2026-10-31 split above)
+ *  is expanded into `RABNM_SPLIT_KEYS` in place, at the exact position
+ *  `"rabnm"` itself held -- rather than letting the generic "unknown
+ *  key gets dropped, missing keys get appended at the end" rule below
+ *  silently move all five to the end of whatever custom order a ward
+ *  had already set up for Releases/Callings/RABNM. */
 export function normalizeWardBusinessSectionOrder(
   stored: string[] | null | undefined
 ): WardBusinessSectionKey[] {
   const valid = new Set<string>(WARD_BUSINESS_SECTION_KEYS);
-  const kept = (stored ?? []).filter((k): k is WardBusinessSectionKey => valid.has(k));
+  const expanded = (stored ?? []).flatMap((k) => (k === "rabnm" ? RABNM_SPLIT_KEYS : [k]));
+  const kept = expanded.filter((k): k is WardBusinessSectionKey => valid.has(k));
   const missing = WARD_BUSINESS_SECTION_KEYS.filter((k) => !kept.includes(k));
   return [...kept, ...missing];
 }

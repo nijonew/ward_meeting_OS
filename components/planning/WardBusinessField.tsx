@@ -12,8 +12,7 @@ import {
 } from "@/app/meetings/[id]/ward-business-actions";
 import type { RabnmRow } from "@/lib/data/sacrament-planning";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
-import type { CallableRabnmItem } from "@/lib/data/sacrament-rabnm-planning";
-import { RABNM_PLANNING_TYPES } from "@/lib/data/sacrament-constants";
+import type { CallableRabnmItem, RabnmPlanningType } from "@/lib/data/sacrament-rabnm-planning";
 import type { WardBusinessSectionKey } from "@/lib/data/ward-settings";
 
 const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
@@ -100,7 +99,8 @@ function ExistingRow({
 }
 
 /**
- * Shared heading row for each of Ward Business's three subsections,
+ * Shared heading row for each of Ward Business's subsections (seven
+ * since 2026-10-31 -- see WardBusinessField's own doc comment below),
  * with Move Up/Down controls to reorder the SUBSECTIONS themselves
  * (migration 091, the user's own request: "I would like to be able to
  * adjust the order of subsections in the ward business section") --
@@ -251,20 +251,24 @@ function CallingPlanningSection({
 }
 
 /**
- * The third Ward Business block, added 2026-10-24 -- the user's own
- * request to restore planning-ahead access to the five smaller RABNM
- * subsections (Recognitions/Advancements/Baptisms/New Members/Baby
- * Blessings, migration 082), which had no planning-view UI at all since
- * the 2026-10-03 rework collapsed everything down to Callings/Releases.
- * Deliberately one combined dropdown (an <optgroup> per category),
- * Teaching-Program-style, rather than five separate pickers like
- * Callings/Releases get -- the user's own explicit choice between the
- * two options presented ("keep those two categories... and just add a
- * new dropdown below them for the RABNM categories"). The standing pool
- * itself is managed from its own page, /rabnm-planning -- this is only
- * the pull-into-this-meeting half.
+ * One of Ward Business's five RABNM-planning subsections (Recognitions/
+ * Advancements/Baptisms/New Members/Baby Blessings) -- each its own
+ * top-level subsection as of 2026-10-31, the user's own request: "Lets
+ * make each individual Recognitions, Advancements, Baptisms, New
+ * Members & Baby Blessings their own subsections of ward business
+ * instead of sub-subsections under ['Recognitions, Advancements,
+ * Baptisms, New Members & Baby Blessings']." Previously all five were
+ * bundled into one combined block (`RabnmPlanningSection`, built
+ * 2026-10-24) with a single `<optgroup>`-per-category dropdown; now
+ * each category gets its own existing-items table and its own plain
+ * dropdown, scoped to just that category's own candidates -- no
+ * `<optgroup>` needed since there's only ever one category here. The
+ * existing-items table drops the old leading "Type" column too, for
+ * the same reason -- every row in it is already the same type. The
+ * standing pool itself is still managed from its own page,
+ * /rabnm-planning -- this is only the pull-into-this-meeting half.
  */
-function RabnmPlanningSection({
+function RabnmCategorySection({
   meetingId,
   existing,
   candidates,
@@ -276,12 +280,6 @@ function RabnmPlanningSection({
   const [selected, setSelected] = useState("");
   const [pending, startPull] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  const byType = new Map<string, string>(RABNM_PLANNING_TYPES.map((t) => [t.value, t.label]));
-  const grouped = RABNM_PLANNING_TYPES.map((t) => ({
-    label: t.label,
-    items: candidates.filter((c) => c.type === t.value),
-  })).filter((g) => g.items.length > 0);
 
   const pull = () => {
     if (!selected) return;
@@ -303,7 +301,6 @@ function RabnmPlanningSection({
           <tbody>
             {existing.map((item) => (
               <tr key={item.id} className="border-t border-rule/40 align-top">
-                <td className="py-1.5 pr-3 text-ink-muted">{byType.get(item.type) ?? item.type}</td>
                 <ExistingRabnmCells item={item} meetingId={meetingId} />
               </tr>
             ))}
@@ -313,18 +310,14 @@ function RabnmPlanningSection({
         <p className="mt-2 text-sm text-ink-muted">None yet.</p>
       )}
 
-      {grouped.length > 0 && (
+      {candidates.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select value={selected} onChange={(e) => setSelected(e.target.value)} className={SELECT}>
-            <option value="">Add to Ward Business&hellip;</option>
-            {grouped.map((g) => (
-              <optgroup key={g.label} label={g.label}>
-                {g.items.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </optgroup>
+            <option value="">Add&hellip;</option>
+            {candidates.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
             ))}
           </select>
           <button
@@ -342,9 +335,15 @@ function RabnmPlanningSection({
   );
 }
 
-/** Just the two trailing <td>s of ExistingRabnmRow's row -- split out so
- *  RabnmPlanningSection can prepend its own Type <td> to the same <tr>
- *  without duplicating the Remove-button logic. */
+/** A RABNM-planning row's own two <td>s (people + detail, Remove) --
+ *  split out on its own so a future caller could still prepend an
+ *  extra leading <td> to the same <tr> without duplicating the
+ *  Remove-button logic, the same way the original combined
+ *  `RabnmPlanningSection` once did for its own Type column (removed
+ *  2026-10-31 once each category became its own subsection and that
+ *  column stopped being useful -- every row in one category's table is
+ *  already the same type). `RabnmCategorySection` renders this as the
+ *  whole row today, with nothing prepended. */
 function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
   const [removing, startRemove] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -402,6 +401,20 @@ function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: st
  * database and is simply not rendered here anymore -- Table Admin's
  * own `sacrament_rabnm` grid (already registered as a raw-data
  * fallback) remains the way to manage one if that's ever needed.
+ *
+ * **Seven subsections, not three, 2026-10-31** (the user's own
+ * request: "Lets make each individual Recognitions, Advancements,
+ * Baptisms, New Members & Baby Blessings their own subsections of
+ * ward business instead of sub-subsections under ['Recognitions,
+ * Advancements, Baptisms, New Members & Baby Blessings']") -- the
+ * single combined RABNM block added 2026-10-24 (`RabnmPlanningSection`)
+ * is gone, replaced by five independent `RabnmCategorySection`
+ * instances, one per category, each a real top-level subsection
+ * alongside Releases/Callings -- same Move Up/Down subsection-reorder
+ * control (`SectionHeading`) as every other subsection here. See
+ * ward-settings.ts's own doc comment for how a ward's previously
+ * saved subsection order migrates automatically (the old `"rabnm"`
+ * entry expands into the five new keys in place).
  */
 export function WardBusinessField({
   meetingId,
@@ -420,8 +433,20 @@ export function WardBusinessField({
 }) {
   const releaseItems = items.filter((i) => i.type === "release");
   const callingItems = items.filter((i) => i.type === "new_calling");
-  const rabnmPlanningTypeKeys = new Set<string>(RABNM_PLANNING_TYPES.map((t) => t.value));
-  const rabnmItems = items.filter((i) => rabnmPlanningTypeKeys.has(i.type) || Boolean(i.rabnm_planning_id));
+
+  // One of Ward Business's five RABNM-planning categories -- splits
+  // `items`/`callableRabnm` (both still fetched ward-wide/per-meeting
+  // unfiltered, same as before 2026-10-31) down to just this one type.
+  const rabnmSection = (type: RabnmPlanningType, title: string) => ({
+    title,
+    node: (
+      <RabnmCategorySection
+        meetingId={meetingId}
+        existing={items.filter((i) => i.type === type)}
+        candidates={callableRabnm.filter((c) => c.type === type)}
+      />
+    ),
+  });
 
   // One entry per subsection, keyed the same way as WARD_BUSINESS_SECTION_KEYS
   // (ward-settings.ts) -- rendered below in whatever order `sectionOrder`
@@ -435,10 +460,11 @@ export function WardBusinessField({
       title: "Callings",
       node: <CallingPlanningSection kind="calling" meetingId={meetingId} existing={callingItems} candidates={callableCallings} />,
     },
-    rabnm: {
-      title: "Recognitions, Advancements, Baptisms, New Members & Baby Blessings",
-      node: <RabnmPlanningSection meetingId={meetingId} existing={rabnmItems} candidates={callableRabnm} />,
-    },
+    recognition: rabnmSection("recognition", "Recognitions"),
+    advancement: rabnmSection("advancement", "Advancements"),
+    baptism: rabnmSection("baptism", "Baptisms"),
+    new_member: rabnmSection("new_member", "New Members"),
+    baby_blessing: rabnmSection("baby_blessing", "Baby Blessings"),
   };
 
   return (
