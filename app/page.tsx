@@ -109,7 +109,11 @@ export default async function HomePage() {
                 href={`/meetings/${earlyAccessSacramentMeeting.id}/public`}
               />
             ) : (
-              <Tile title="Sacrament Meeting Program" comingSoon />
+              <Tile
+                title="Sacrament Meeting Program"
+                comingSoon
+                disabledLabel="Available on the day of the meeting"
+              />
             )}
           <Tile title="Announcements" href="/announcements/public" />
           {/* Requires login (2026-10-07, the user's own request) --
