@@ -2038,6 +2038,48 @@ avoid confusing the two.
 
 ## Known open items
 
+**Table Admin's generic grid gained a single "Save All Changes" button,
+2026-10-30, replacing its own per-row Save button.** The user's own
+request: "I would like to have a save all changes button on all pages
+with tables rather than row-by-row saving." Checked first rather than
+assuming a big cross-app change was needed: every other "favorite grid
+format" page (Assignment Rotations, Calling Planning, Teaching
+Calendar, Youth Activities, Calling Features, Assign Callings) already
+saves everything at once -- `AdminTableEditor.tsx` (`components/admin/AdminTableEditor.tsx`)
+was the one real holdout, still a Save button per row. Since that one
+component is shared by every `/admin/[table]` page *and* Manage
+Announcements (`/announcements`) *and* Sacrament Meeting Music Planning
+(`/music`) -- confirmed via a grep for every real caller -- fixing it
+once covers "all pages with tables" in a single change, no per-page
+work needed.
+
+New `saveAll()` replaces the old per-row `saveRow()`: sends every dirty
+row's own `onUpdate` call concurrently (`Promise.all` -- each row is
+still its own request under the hood, since `onUpdate` takes one row
+at a time; batching every row into a single server-side call would
+mean changing that prop's own contract across all three callers,
+out of scope for what was asked), then clears drafts only for the
+rows that actually succeeded. A failure on one row never discards
+another row's successful save -- the exact bug class just fixed in
+Calling Planning's own grid save earlier the same day, applied here
+too: a mixed result reports "Saved N of M row(s). `<count>` failed:
+`<reasons>`" rather than aborting or silently losing anything. The
+per-row Delete button is unchanged -- still its own immediate action,
+same as every sibling grid's Delete, unrelated to Save All Changes.
+The top-of-grid error banner (previously duplicated what a per-row
+save error already showed inline) is gone -- there's now exactly one
+error/success location, next to the new Save All Changes button,
+matching every other grid's own single-feedback-location convention.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check any `/admin/[table]` page (plus `/announcements` and `/music`,
+which share this same component) and confirm: editing several rows and
+clicking "Save All Changes" saves all of them in one click, Delete
+still acts immediately per row, and a deliberately-forced failure on
+one row (if one ever happens) still saves every other row rather than
+losing the whole batch.
+
 **Bug found and fixed 2026-10-30: a Calling Planning grid save could
 abort entirely because of the roster sync added hours earlier.** The
 user's own report: editing several rows and clicking Save All Changes

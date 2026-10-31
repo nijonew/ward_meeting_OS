@@ -68,12 +68,35 @@ const INPUT_CLASS = "w-full min-w-[6rem] max-w-[16rem] rounded border border-rul
 
 /**
  * Generic spreadsheet-style grid for one table: every row's cells are
- * editable inline, "Save" only lights up once a row is actually dirty,
- * "Delete" asks for confirmation, and a blank row at the bottom adds a
- * new one. Which columns exist and how each renders (text/select/FK
- * dropdown/etc.) comes entirely from the table's AdminColumnConfig --
- * this component has no per-table logic of its own.
+ * editable inline, one "Save All Changes" button (below the table)
+ * saves every edited row at once, "Delete" asks for confirmation and
+ * acts immediately (unrelated to Save -- same as every other grid in
+ * this app), and a blank row at the bottom adds a new one. Which
+ * columns exist and how each renders (text/select/FK dropdown/etc.)
+ * comes entirely from the table's AdminColumnConfig -- this component
+ * has no per-table logic of its own.
  *
+ * **One "Save All Changes" button, not one per row, 2026-10-30** (the
+ * user's own request: "I would like to have a save all changes button
+ * on all pages with tables rather than row-by-row saving"). This was
+ * the one grid left with a per-row Save button -- every sibling
+ * "favorite grid format" page (Assignment Rotations, Calling Planning,
+ * Teaching Calendar, Youth Activities, Calling Features, Assign
+ * Callings) already saves everything at once. Since this component is
+ * shared by every `/admin/[table]` page *and* Manage Announcements
+ * (`/announcements`) and Music Planning (`/music`), this one change
+ * covers all of them. `saveAll()` sends every dirty row's own `onUpdate`
+ * call concurrently (`Promise.all` -- each is still its own request,
+ * since `onUpdate` takes one row at a time; batching them into a single
+ * server-side call would mean changing that prop's contract across all
+ * three callers, out of scope for what was asked), clears drafts only
+ * for the rows that actually succeeded, and -- matching the
+ * Calling-Planning save-failure fix from earlier the same day -- never
+ * lets one row's failure discard another row's successful save: a
+ * mixed result reports "Saved N of M; row(s) failed: ..." rather than
+ * aborting or silently losing anything.
+ *
+
  * **Sort/filter/zebra striping extended to every Table Admin table,
  * 2026-10-12** (the user's own request: "Can we also get the zebra
  * striping, sorting, and filtering on all tables in table admin?").
@@ -125,8 +148,13 @@ export function AdminTableEditor({
   const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
   const [newRow, setNewRow] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
+  // Set only on a fully successful Save All Changes; cleared the
+  // instant any field is edited again (setValue/setNewRowValue), same
+  // "Saved." lifecycle every other grid in this app already uses.
+  const [justSaved, setJustSaved] = useState(false);
   const [pending, startTransition] = useTransition();
   const { sort, setSort, filters, setFilters } = usePersistedSortFilter<string>(`table-admin-${table}-sort-filter`);
+  const anyDirty = Object.keys(drafts).length > 0;
 
   const toggleSort = (columnKey: string) => {
     setSort((prev) => {
@@ -141,7 +169,6 @@ export function AdminTableEditor({
   // (via each action's revalidatePath) once the transition resolves --
   // `rows` below is always the latest server state.
   const valueFor = (row: AdminRow, column: string) => drafts[row.id]?.[column] ?? row[column];
-  const isDirty = (id: string) => Boolean(drafts[id]);
 
   // Resolves any column's value to the display text sort/filter/the
   // column-filter checklist all compare against -- select/foreign_key
@@ -252,6 +279,7 @@ export function AdminTableEditor({
 
   const setValue = (row: AdminRow, column: AdminColumnConfig, value: unknown) => {
     const special = resolveSpecial(column, value);
+    setJustSaved(false);
     setDrafts((prev) => ({
       ...prev,
       [row.id]: { ...(prev[row.id] ?? {}), [column.column]: special ? null : value, ...(special?.patch ?? {}) },
@@ -260,24 +288,50 @@ export function AdminTableEditor({
 
   const setNewRowValue = (column: AdminColumnConfig, value: unknown) => {
     const special = resolveSpecial(column, value);
+    setJustSaved(false);
     setNewRow((prev) => ({ ...prev, [column.column]: special ? null : value, ...(special?.patch ?? {}) }));
   };
 
-  const saveRow = (row: AdminRow) => {
-    const patch = drafts[row.id];
-    if (!patch) return;
+  /**
+   * Saves every dirty row at once. Each row's `onUpdate` call still
+   * goes out as its own request (see this component's own top comment
+   * for why), run concurrently rather than one-at-a-time for speed --
+   * but a failure on one row never discards another row's success:
+   * drafts are cleared only for the ids that actually saved, and any
+   * failures are reported together rather than the first one aborting
+   * the rest (the exact bug class just fixed in Calling Planning's own
+   * grid save, applied here too).
+   */
+  const saveAll = () => {
+    const dirtyIds = Object.keys(drafts);
+    if (dirtyIds.length === 0) return;
     setError(null);
+    setJustSaved(false);
     startTransition(async () => {
-      const result = await onUpdate(table, row.id, patch);
-      if (result.error) {
-        setError(result.error);
-        return;
+      const outcomes = await Promise.all(
+        dirtyIds.map(async (id) => ({ id, result: await onUpdate(table, id, drafts[id]) }))
+      );
+      const succeededIds = outcomes.filter((o) => !o.result.error).map((o) => o.id);
+      const failures = outcomes.filter((o) => o.result.error).map((o) => o.result.error as string);
+
+      if (succeededIds.length > 0) {
+        setDrafts((prev) => {
+          const next = { ...prev };
+          for (const id of succeededIds) delete next[id];
+          return next;
+        });
       }
-      setDrafts((prev) => {
-        const next = { ...prev };
-        delete next[row.id];
-        return next;
-      });
+
+      if (failures.length > 0) {
+        const uniqueFailures = Array.from(new Set(failures));
+        setError(
+          succeededIds.length > 0
+            ? `Saved ${succeededIds.length} of ${dirtyIds.length} row(s). ${failures.length} failed: ${uniqueFailures.join("; ")}`
+            : uniqueFailures.join("; ")
+        );
+      } else {
+        setJustSaved(true);
+      }
     });
   };
 
@@ -304,7 +358,6 @@ export function AdminTableEditor({
 
   return (
     <div className="rounded border border-rule bg-surface p-6">
-      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
       <DualScrollbar>
       <table className="w-full text-sm">
         <thead>
@@ -363,24 +416,14 @@ export function AdminTableEditor({
                 </td>
               ))}
               <td className="whitespace-nowrap py-2">
-                <span className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!isDirty(row.id) || pending}
-                    onClick={() => saveRow(row)}
-                    className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => removeRow(row)}
-                    className="text-xs text-danger/70 hover:text-danger"
-                  >
-                    Delete
-                  </button>
-                </span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => removeRow(row)}
+                  className="text-xs text-danger/70 hover:text-danger"
+                >
+                  Delete
+                </button>
               </td>
             </tr>
           ))}
@@ -415,6 +458,19 @@ export function AdminTableEditor({
       </table>
       </DualScrollbar>
       {rows.length > 0 && visibleCount === 0 && <p className="mt-3 text-sm text-ink-muted">No rows match the current filters.</p>}
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!anyDirty || pending}
+          onClick={saveAll}
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? "Saving..." : "Save All Changes"}
+        </button>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        {!pending && !anyDirty && justSaved && !error && <p className="text-sm text-success">Saved.</p>}
+      </div>
     </div>
   );
 }
