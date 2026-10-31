@@ -2038,6 +2038,77 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-30: a Calling Planning grid save could
+abort entirely because of the roster sync added hours earlier.** The
+user's own report: editing several rows and clicking Save All Changes
+produced an error, and "none of the changes worked" -- their own guess
+was a "Declined" row, but "Declined" is just a plain stored value with
+no special handling anywhere, so it couldn't have been the real cause
+on its own.
+
+Traced the regression back to the Calling Planning -> roster sync
+entry above, confirmed by reading `CallingPlanningGridForm.tsx`'s own
+dirty-reset logic (`if (state.success && dirty) setDirty(false)`): an
+`{ error }`-only result leaves `dirty` true and skips `revalidatePath`,
+so the grid keeps showing its pre-save values with no sign that some
+rows actually did persist underneath -- a confusing, inconsistent
+result, not an honest failure. The real defect: `saveCallingPlanningGrid`'s
+per-row loop updates `calling_planning` for a row, then immediately
+calls `syncCallingRosterFromPlanning` and returns out of the *whole*
+function on that row's first sync failure (most likely the pre-existing
+`enforce_calling_handoff` trigger, migration 057, blocking an
+unauthorized reassignment of a `requires_self_handoff`-flagged calling
+-- though the fix doesn't depend on that specific guess being right).
+Since each row's own `calling_planning` UPDATE already committed
+*before* its sync check, rows before the failing one in the same batch
+had already silently saved, the failing row's own fields had too, and
+only the rows after it never got touched -- exactly the "some silently
+did, some silently didn't, reported as total failure" result the user
+hit.
+
+**Fix, scoped to the regression itself, not a bigger rewrite**: a
+roster-sync failure for one row no longer blocks or aborts anything
+else. `saveCallingPlanningGrid` now collects sync failures into a
+`syncWarnings` list (naming each blocked calling by its real name,
+batch-fetched once up front, not per row) instead of returning early,
+and keeps processing every remaining row regardless -- every row's own
+real edits (Status, Notes, Candidates, dates) always save now,
+independent of whether its roster sync succeeded. If any warnings
+accumulated, the final result is `{ success: true, error: "Saved.
+Couldn't update the roster for: <calling> (<reason>) -- fix by hand at
+/admin/person-callings or /callings." }` -- a real success with a named
+caveat, not a failure. `pushCallingToSacramentMeeting`'s own identical
+sync call got the same treatment (the push itself has already
+committed by that point, so a sync problem shouldn't make the push
+look like it failed either). Both `CallingPlanningGridForm.tsx` and
+`PushCallingForm.tsx` now render `state.error` in plain ink instead of
+danger-red whenever `state.success` is also true, so "Saved, but..."
+visibly reads as a partial success -- the existing dirty-reset logic
+already handled this correctly with no change needed.
+
+**Deliberately left as a separate, pre-existing, narrower limitation,
+not fixed here**: the per-row `calling_planning` UPDATE loop itself
+still isn't wrapped in one transaction across the whole batch -- if one
+row's own update fails for an unrelated reason (not the roster sync),
+rows processed earlier in that same save still silently persist while
+later rows don't. This predates this session's own roster-sync
+addition and isn't new; true atomicity would mean moving the whole
+grid save into a Postgres function, mirroring `delete_meeting_cascade`'s
+own "one atomic function, not a sequence of separate app-level calls"
+precedent (migration 054 and its amendments in 077/082/083/084) -- a
+larger, separate change, not pursued here since it wasn't the reported
+regression.
+
+No migration needed -- pure application-code fix over the same tables/
+columns already in use. Confirmed via `tsc`/`eslint`/`next build
+--webpack` only, same no-live-database-access gap as everything else in
+this project -- ask the user to retry the batch of edits that
+previously failed and confirm every row's own edits now save regardless
+of the roster sync's outcome, and that a genuinely blocked roster sync
+(e.g. the self-handoff trigger) now shows as "Saved. Couldn't update
+the roster for: `<calling>`..." rather than losing every other row's
+edits in the same batch.
+
 **People's Login Account became a read-only indicator, a new "Assign
 Callings" checklist page links people to callings many-at-a-time, and
 Calling Planning now writes back to the real roster on completion --

@@ -136,6 +136,29 @@ export async function saveCallingPlanningGrid(_prevState: unknown, formData: For
     byRow.set(parsed.planningId, patch);
   }
 
+  // Calling names for every row being saved, fetched once up front
+  // (not per-row) so a roster-sync warning below can name the calling
+  // in plain language instead of a raw uuid.
+  const callingIds = Array.from(new Set(Array.from(byRow.values()).map((p) => p.calling_id).filter((id): id is string => Boolean(id))));
+  const { data: callingRows } = callingIds.length > 0
+    ? await supabase.from("callings").select("id, name").in("id", callingIds)
+    : { data: [] as { id: string; name: string }[] };
+  const callingNameById = new Map((callingRows ?? []).map((c) => [c.id, c.name]));
+
+  // Roster-sync failures for individual rows are collected here instead
+  // of aborting the whole save (2026-10-30 bug fix, the user's own
+  // report: "I got an error and none of the changes worked"). Before
+  // this, a single row's sync problem -- most likely the pre-existing
+  // enforce_calling_handoff trigger (migration 057) blocking an
+  // unauthorized reassignment of a protected calling -- would `return`
+  // immediately, aborting every row not yet processed in this same
+  // batch, while rows already processed had already silently committed.
+  // That's a confusing, inconsistent result, not an honest failure --
+  // the admin's own real edits (Notes, Status, Candidates, etc.) should
+  // never be lost just because a secondary roster write couldn't go
+  // through for one specific calling.
+  const syncWarnings: string[] = [];
+
   for (const [planningId, patch] of byRow) {
     // calling_status/release_status/calling_id are required columns --
     // never null them out even if a <select> somehow submitted blank.
@@ -151,7 +174,9 @@ export async function saveCallingPlanningGrid(_prevState: unknown, formData: For
 
     // Keeps the real roster in step with this row's own status, the
     // user's own request (2026-10-30) -- see syncCallingRosterFromPlanning's
-    // own doc comment for the full design.
+    // own doc comment for the full design. A failure here no longer
+    // blocks this row's own already-saved fields, or any other row in
+    // this same batch -- see this function's own comment above.
     const syncError = await syncCallingRosterFromPlanning({
       calling_id: patch.calling_id,
       calling_status: patch.calling_status,
@@ -159,13 +184,24 @@ export async function saveCallingPlanningGrid(_prevState: unknown, formData: For
       release_person_id: patch.release_person_id ?? null,
       release_status: patch.release_status,
     });
-    if (syncError) return syncError;
+    if (syncError) {
+      const callingName = callingNameById.get(patch.calling_id) ?? "a calling";
+      syncWarnings.push(`${callingName} (${syncError.error})`);
+    }
   }
 
   revalidatePath("/calling-planning");
   revalidatePath("/admin/people");
   revalidatePath("/admin/callings");
   revalidatePath("/callings");
+
+  if (syncWarnings.length > 0) {
+    return {
+      success: true,
+      error: `Saved. Couldn't update the roster for: ${syncWarnings.join("; ")} -- fix by hand at /admin/person-callings or /callings.`,
+    };
+  }
+
   return { success: true };
 }
 
@@ -278,7 +314,12 @@ export async function pushCallingToSacramentMeeting(
   // Release can reach "Complete" through this push too (calling_status
   // itself never does, per the 2026-10-13 no-auto-advance fix above) --
   // same roster sync the grid's own save applies, so either write path
-  // keeps the real roster in step.
+  // keeps the real roster in step. A failure here is downgraded to a
+  // warning, not a hard error (2026-10-30 bug fix, same reasoning as
+  // saveCallingPlanningGrid's own identical change) -- by this point
+  // the actual push (the sacrament_rabnm insert + calling_planning
+  // update) has already committed, so a roster-sync problem shouldn't
+  // make the push itself look like it failed.
   const syncError = await syncCallingRosterFromPlanning({
     calling_id: callingId,
     calling_status: String(planning.calling_status ?? ""),
@@ -286,7 +327,11 @@ export async function pushCallingToSacramentMeeting(
     release_person_id: planning.release_person_id,
     release_status: statusUpdates.release_status ?? String(planning.release_status ?? ""),
   });
-  if (syncError) return syncError;
+  let syncWarning: string | null = null;
+  if (syncError) {
+    const { data: callingRow } = await supabase.from("callings").select("name").eq("id", callingId).maybeSingle();
+    syncWarning = `Pushed, but couldn't update the roster for ${callingRow?.name ?? "this calling"} (${syncError.error}) -- fix by hand at /admin/person-callings or /callings.`;
+  }
 
   // Clears any standing exclusion for whichever side(s) were just
   // pushed (2026-10-25, migration 084) -- a manual push here is a
@@ -305,5 +350,5 @@ export async function pushCallingToSacramentMeeting(
   revalidatePath("/admin/people");
   revalidatePath("/admin/callings");
   revalidatePath("/callings");
-  return { success: true };
+  return syncWarning ? { success: true, error: syncWarning } : { success: true };
 }

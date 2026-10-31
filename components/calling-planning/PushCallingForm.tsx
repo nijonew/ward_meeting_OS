@@ -50,7 +50,11 @@ export function PushCallingForm({
           {pending ? "Adding..." : "Add to Sacrament Meeting"}
         </button>
       </form>
-      {state.error && <p className="mt-1 text-xs text-danger">{state.error}</p>}
+      {/* A roster-sync warning can arrive alongside success (2026-10-30
+          bug fix, see pushCallingToSacramentMeeting's own comment) --
+          renders as a plain caution note, not danger-red, so it never
+          reads as "the push itself failed" when it actually succeeded. */}
+      {state.error && <p className={`mt-1 text-xs ${state.success ? "text-ink" : "text-danger"}`}>{state.error}</p>}
       {!pending && state.success && !state.error && <p className="mt-1 text-xs text-success">Added.</p>}
     </div>
   );

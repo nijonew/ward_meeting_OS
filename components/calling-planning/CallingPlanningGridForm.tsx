@@ -491,7 +491,14 @@ export function CallingPlanningGridForm({
         >
           {pending ? "Saving..." : "Save All Changes"}
         </button>
-        {state.error && <p className="text-sm text-danger">{state.error}</p>}
+        {/* A row's own edits can now save successfully even when its
+            roster sync couldn't (2026-10-30 bug fix, see
+            saveCallingPlanningGrid's own comment) -- `state.error` can
+            be set alongside `state.success` in exactly that case, so it
+            renders as a plain caution note rather than danger-red,
+            which would otherwise read as "nothing was saved" when the
+            opposite is true. */}
+        {state.error && <p className={`text-sm ${state.success ? "text-ink" : "text-danger"}`}>{state.error}</p>}
         {!pending && !dirty && state.success && !state.error && <p className="text-sm text-success">Saved.</p>}
       </div>
     </form>
