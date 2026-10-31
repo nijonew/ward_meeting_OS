@@ -2,15 +2,26 @@ import { createClient } from "@/lib/supabase/server";
 import type { MeetingTypeSlug } from "@/lib/types";
 import type { PersonOption } from "@/lib/data/people";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import { UNLISTED_CALLING_VALUE } from "@/lib/data/rotations-shared";
+
+export { UNLISTED_CALLING_VALUE } from "@/lib/data/rotations-shared";
 
 export interface RotationMember {
   id: string; // rotation_members row id
   person_id: string | null;
   calling_id: string | null;
-  /** Display name -- the calling's current holder (title+last name) if
-   *  calling-based, the plain person name otherwise, or "<Calling> --
-   *  vacant" when calling-based and nobody currently holds it. */
-  person_name: string;
+  /**
+   * What to show for this member -- never a person's name (2026-10-31,
+   * the user's own request: "I don't want rotations to ever say
+   * anyone's name"). A calling-based member shows that calling's own
+   * name, plus "(vacant)" when nobody currently holds it -- a status
+   * flag about the CALLING, not an identity disclosure, so it stays. A
+   * legacy person-based member (from before this redesign -- new ones
+   * can no longer be added, see addRotationMember) shows a plain notice
+   * instead of who it is, since there's no calling to name for it at
+   * all; Remove it and add the right calling in its place.
+   */
+  display_label: string;
   sort_order: number;
 }
 
@@ -32,7 +43,7 @@ export async function getAllRotations(): Promise<RotationRow[]> {
   const { data, error } = await supabase
     .from("rotations")
     .select(
-      "id, meeting_type_id, element_key, next_index, eligibility_source, eligibility_calling_names, meeting_types(name), rotation_members(id, person_id, calling_id, sort_order, people(name), callings(name, title_prefix, current_holder_id, people:current_holder_id(name)))"
+      "id, meeting_type_id, element_key, next_index, eligibility_source, eligibility_calling_names, meeting_types(name), rotation_members(id, person_id, calling_id, sort_order, callings(name, current_holder_id))"
     )
     .order("element_key");
 
@@ -53,11 +64,7 @@ export async function getAllRotations(): Promise<RotationRow[]> {
             person_id: string | null;
             calling_id: string | null;
             sort_order: number;
-            people: { name?: string }[] | { name?: string } | null;
-            callings:
-              | { name?: string; title_prefix?: string | null; current_holder_id?: string | null; people: { name?: string }[] | { name?: string } | null }[]
-              | { name?: string; title_prefix?: string | null; current_holder_id?: string | null; people: { name?: string }[] | { name?: string } | null }
-              | null;
+            callings: { name?: string; current_holder_id?: string | null }[] | { name?: string; current_holder_id?: string | null } | null;
           }[]
         | null;
     };
@@ -66,30 +73,20 @@ export async function getAllRotations(): Promise<RotationRow[]> {
       .map((m) => {
         if (m.calling_id) {
           const calling = Array.isArray(m.callings) ? m.callings[0] : m.callings;
-          const holder = calling ? (Array.isArray(calling.people) ? calling.people[0] : calling.people) : null;
-          // Inlined rather than importing lib/data/person-display.ts's
-          // shared formatter here -- that module itself imports
-          // fixedCallingNamesForKey from this file, and a formatting
-          // one-liner isn't worth introducing the circular import.
-          const displayName = holder?.name
-            ? calling?.title_prefix
-              ? `${calling.title_prefix} ${holder.name.trim().split(/\s+/).pop()}`
-              : holder.name
-            : `${calling?.name ?? "Calling"} -- vacant`;
+          const name = calling?.name ?? "Calling";
           return {
             id: m.id,
             person_id: null,
             calling_id: m.calling_id,
-            person_name: displayName,
+            display_label: calling?.current_holder_id ? name : `${name} (vacant)`,
             sort_order: m.sort_order,
           };
         }
-        const person = Array.isArray(m.people) ? m.people[0] : m.people;
         return {
           id: m.id,
           person_id: m.person_id,
           calling_id: null,
-          person_name: person?.name ?? "Unknown",
+          display_label: "Unlisted (person-based) — remove and add a calling instead",
           sort_order: m.sort_order,
         };
       })
@@ -154,6 +151,53 @@ export async function computeEligiblePersonIds(
             const r = row as { callings: { current_holder_id: string | null }[] | { current_holder_id: string | null } | null };
             const calling = Array.isArray(r.callings) ? r.callings[0] : r.callings;
             return calling?.current_holder_id ?? null;
+          })
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+  }
+
+  return [];
+}
+
+/**
+ * Calling-returning sibling of computeEligiblePersonIds, for
+ * syncRotationMembership below -- resolves a rotation's configured
+ * source down to the CALLINGS themselves (never reduced to a current
+ * holder), so syncing a rotation adds calling-based members, not a
+ * snapshot of whoever happens to hold them today. 'manual' has no
+ * computable source here either, same as computeEligiblePersonIds.
+ */
+async function computeEligibleCallingIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eligibilitySource: "standing_attendees" | "calling_names" | "manual",
+  eligibilityCallingNames: string[] | null,
+  meetingTypeId: string
+): Promise<string[]> {
+  if (eligibilitySource === "calling_names") {
+    const names = eligibilityCallingNames ?? [];
+    const { data } = await supabase.from("callings").select("id").in("name", names).eq("active", true);
+    return ((data ?? []) as { id: string }[]).map((c) => c.id);
+  }
+
+  if (eligibilitySource === "standing_attendees") {
+    // Relationship-embedding select, not a direct `.eq("calling_id", ...)`
+    // filter -- same reasoning as computeEligiblePersonIds's own
+    // identical branch below: avoids needing to assume this table's FK
+    // column is literally named `calling_id`.
+    const { data } = await supabase
+      .from("meeting_type_members")
+      .select("callings!inner(id, active)")
+      .eq("meeting_type_id", meetingTypeId)
+      .eq("callings.active", true);
+
+    return Array.from(
+      new Set(
+        ((data ?? []) as unknown[])
+          .map((row) => {
+            const r = row as { callings: { id: string }[] | { id: string } | null };
+            const calling = Array.isArray(r.callings) ? r.callings[0] : r.callings;
+            return calling?.id ?? null;
           })
           .filter((id): id is string => Boolean(id))
       )
@@ -261,10 +305,25 @@ function resolveSingleHolder(holders: Map<string, string[]>, name: string): { pe
 }
 
 /**
- * Finds eligible people for a rotation based on its configured source, and
- * replaces its membership list with them (preserving existing sort order
- * for anyone still eligible, appending anyone new at the end, and
- * dropping anyone no longer eligible).
+ * Finds eligible CALLINGS for a rotation's configured source, and
+ * replaces its calling-based membership with them (preserving existing
+ * sort order for a calling still eligible, appending a newly-eligible
+ * one at the end, dropping one no longer eligible). Never touches a
+ * legacy person-based member row -- those only ever came from before
+ * this redesign (addRotationMember can no longer create one) and are
+ * removed by hand, via the regular Remove button, whenever an admin
+ * gets to them.
+ *
+ * **Rewritten 2026-10-31** (the user's own request: "I don't want
+ * rotations to ever say anyone's name... I want only rotations by
+ * calling"). Previously resolved each eligible calling down to its
+ * CURRENT holder and synced that as a snapshot person_id row -- which
+ * both put a name on this page and meant the rotation silently stopped
+ * tracking the calling itself the moment that person's calling changed
+ * (sync would need to be clicked again to catch up). Now syncs the
+ * CALLING rows directly; the holder is resolved fresh every time the
+ * rotation is actually applied to a meeting (resolveRotationMemberIds),
+ * never stored.
  */
 export async function syncRotationMembership(rotationId: string): Promise<{ error?: string }> {
   const supabase = await createClient();
@@ -284,7 +343,7 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
     return {};
   }
 
-  const eligiblePersonIds = await computeEligiblePersonIds(
+  const eligibleCallingIds = await computeEligibleCallingIds(
     supabase,
     rotation.eligibility_source,
     rotation.eligibility_calling_names,
@@ -293,32 +352,34 @@ export async function syncRotationMembership(rotationId: string): Promise<{ erro
 
   const { data: existingMembers } = await supabase
     .from("rotation_members")
-    .select("person_id, sort_order")
+    .select("calling_id, sort_order")
     .eq("rotation_id", rotationId)
+    .not("calling_id", "is", null)
     .order("sort_order");
 
-  const existing = (existingMembers ?? []) as { person_id: string; sort_order: number }[];
-  const existingIds = new Set(existing.map((m) => m.person_id));
-  const eligibleIds = new Set(eligiblePersonIds);
+  const existing = (existingMembers ?? []) as { calling_id: string; sort_order: number }[];
+  const existingIds = new Set(existing.map((m) => m.calling_id));
+  const eligibleIds = new Set(eligibleCallingIds);
 
-  // Drop anyone no longer eligible.
-  const toRemove = existing.filter((m) => !eligibleIds.has(m.person_id)).map((m) => m.person_id);
+  // Drop any calling no longer eligible.
+  const toRemove = existing.filter((m) => !eligibleIds.has(m.calling_id)).map((m) => m.calling_id);
   if (toRemove.length > 0) {
     const { error: removeError } = await supabase
       .from("rotation_members")
       .delete()
       .eq("rotation_id", rotationId)
-      .in("person_id", toRemove);
+      .in("calling_id", toRemove);
     if (removeError) return { error: removeError.message };
   }
 
-  // Add anyone newly eligible, at the end of the existing order.
-  const toAdd = eligiblePersonIds.filter((id) => !existingIds.has(id));
+  // Add any newly eligible calling, at the end of the existing order.
+  const toAdd = eligibleCallingIds.filter((id) => !existingIds.has(id));
   if (toAdd.length > 0) {
     const startOrder = existing.length > 0 ? Math.max(...existing.map((m) => m.sort_order)) + 1 : 0;
-    const rows = toAdd.map((personId, i) => ({
+    const rows = toAdd.map((callingId, i) => ({
       rotation_id: rotationId,
-      person_id: personId,
+      calling_id: callingId,
+      person_id: null,
       sort_order: startOrder + i,
     }));
     const { error: addError } = await supabase.from("rotation_members").insert(rows);
@@ -968,21 +1029,46 @@ export async function applyRotationsToNewMeeting(meetingId: string, meetingTypeI
 // are actually varying month to month, since those roles have no
 // membership list of their own to inspect on the regular /rotations
 // cards below.
+//
+// **Shows calling, never a resolved person, 2026-10-31** (the user's
+// own request, in these exact words: "I don't want rotations to ever
+// say anyone's name. ... when the meeting agenda itself calls the
+// person into the meeting they look at the rotation, see the calling,
+// and then list the person in the calling"). The underlying write is
+// unchanged -- every role still needs a real person on the actual
+// agenda, and that's still what's stored here -- only the grid's own
+// display and editing surface changed, from "pick a person" to "pick a
+// calling, resolved to its current holder at save time."
 
 export interface GridColumn {
   key: string;
   label: string;
-  /** Who could even be assigned here, by calling -- computed fresh from
-   *  callings/meeting_type_members each time (see computeEligiblePersonIds),
-   *  not the possibly-stale rotation_members list. Empty for a column
-   *  with no calling-based eligibility rule configured at all (falls
-   *  back to showing everyone, in the page). */
-  eligiblePeople: PersonOption[];
+  /** The callings that could fill this role -- this element's own
+   *  calling-based rotation membership, or the fixed Presiding/
+   *  Conducting calling list -- never a resolved person. Empty for a
+   *  column with no calling-based rotation configured at all. */
+  eligibleCallings: { id: string; name: string }[];
 }
 
+// UNLISTED_CALLING_VALUE itself is imported/re-exported at the top of
+// this file, from rotations-shared.ts, not declared here -- see that
+// file's own comment for why a client component (AssignmentGridForm)
+// needs to import it from there instead of from this module directly.
+// Meaning: a cell holding this value has a real assignment that
+// doesn't resolve to any calling this column tracks -- a stale manual
+// override, or a leftover person-based rotation member (see
+// RotationMember.display_label). Kept distinct from "" (genuinely
+// unassigned) so saving a cell nobody touched can never silently CLEAR
+// a real assignment this page simply has no calling to show for it
+// (2026-10-31, the user's own request: "I don't want rotations to ever
+// say anyone's name" -- this is the one case the grid can't honor that
+// without also risking data loss, so it's shown as an explicit,
+// unnamed placeholder instead of guessed at).
+
 export interface GridCell {
-  assignedToId: string | null;
-  assignedToName: string | null;
+  /** One of this column's own eligibleCallings' ids, "" (unassigned), or
+   *  UNLISTED_CALLING_VALUE. */
+  callingId: string;
 }
 
 export interface GridRow {
@@ -1068,81 +1154,82 @@ export async function personOptionsByIds(
 }
 
 /**
- * The eligible-people list for every column of a meeting type's grid,
- * computed fresh from callings each call -- "only those who could be
- * assigned in that rotation by virtue of their calling" (the user's
- * own words, 2026-09-06), not everyone active in the ward. Conducting
- * (Sacrament Meeting) is fixed-by-calling rather than rotation-table-
- * driven, so it's handled separately, straight from the same three
- * callings applyFixedSacramentRoles itself reads.
+ * The eligible-CALLINGS list for every column of a meeting type's grid,
+ * computed fresh each call -- "only the callings that could be assigned
+ * in that rotation" (generalizing the user's own original words,
+ * 2026-09-06, "only those who could be assigned... by virtue of their
+ * calling," to the 2026-10-31 calling-only redesign -- see this file's
+ * own doc comments on RotationMember/syncRotationMembership for the
+ * full history). Conducting (Sacrament Meeting) is fixed-by-calling
+ * rather than rotation-table-driven, so it's handled separately,
+ * straight from the same three callings applyFixedSacramentRoles itself
+ * reads. Every other column's list is exactly that element's own
+ * calling-based rotation_members -- not the broader
+ * meeting_type_members set ("everyone who attends this meeting type"),
+ * which is a different, wider thing (see getCallingsForMeetingType,
+ * lib/data/callings.ts, used instead for the "Add a calling..." picker
+ * on /rotations itself).
  */
-async function eligiblePeopleByColumn(
+async function eligibleCallingsByColumn(
   meetingTypeSlug: MeetingTypeSlug,
   meetingTypeId: string,
   columns: { key: string; label: string }[]
-): Promise<Record<string, PersonOption[]>> {
+): Promise<Record<string, { id: string; name: string; current_holder_id: string | null }[]>> {
   const supabase = await createClient();
-  const result: Record<string, PersonOption[]> = {};
+  const result: Record<string, { id: string; name: string; current_holder_id: string | null }[]> = {};
 
   if (meetingTypeSlug === "sacrament-meeting") {
     const { data } = await supabase
       .from("callings")
-      .select("name, current_holder_id, people:current_holder_id(name)")
+      .select("id, name, current_holder_id")
       .in("name", CONDUCTING_CALLING_ORDER)
       .eq("active", true);
-    const rows = (data ?? []) as unknown as { name: string; current_holder_id: string | null; people: { name?: string }[] | { name?: string } | null }[];
+    const rows = (data ?? []) as { id: string; name: string; current_holder_id: string | null }[];
 
-    // Unlike resolveSingleHolder's own narrowing (used by the two
-    // auto-assignment functions above, which can only ever write ONE
-    // person into a single-value field), this is building the
-    // dropdown's own list of pickable options -- so if a calling name
-    // currently resolves to more than one distinct holder (two active
-    // `callings` rows sharing a name -- see holdersByCallingName's own
-    // doc comment), the right answer here is to show BOTH as separate
-    // options, not collapse to one. Previously used a plain
-    // `new Map(rows.map((r) => [r.name, r]))`, which silently dropped
-    // whichever row didn't come back last for a given name -- found
-    // 2026-10-31 after the user added a test second holder for
-    // "Bishopric First Counselor" and the real one stopped showing up
-    // as a pickable option in this exact dropdown.
-    const seenPersonIds = new Set<string>();
-    const options: PersonOption[] = [];
+    // Every matching row shown as its own option, not collapsed to one
+    // per name -- same reasoning as the old eligiblePeopleByColumn's own
+    // fix (2026-10-31): two active `callings` rows can share a name
+    // (this app's own convention for "more than one simultaneous
+    // holder," e.g. "Stake High Councilor (<area>)"), and a plain
+    // name-keyed Map would silently drop whichever one the query didn't
+    // return last.
+    const ordered: typeof rows = [];
     for (const name of CONDUCTING_CALLING_ORDER) {
-      for (const row of rows.filter((r) => r.name === name)) {
-        if (!row.current_holder_id || seenPersonIds.has(row.current_holder_id)) continue;
-        seenPersonIds.add(row.current_holder_id);
-        const person = Array.isArray(row.people) ? row.people[0] : row.people;
-        options.push({ id: row.current_holder_id, name: person?.name ?? "Unknown" });
-      }
+      ordered.push(...rows.filter((r) => r.name === name));
     }
-    result["conducting"] = options;
+    result["conducting"] = ordered;
   }
 
   const remaining = columns.filter((c) => !result[c.key]);
   if (remaining.length > 0) {
     const { data: rotationRows } = await supabase
       .from("rotations")
-      .select("element_key, eligibility_source, eligibility_calling_names")
-      .eq("meeting_type_id", meetingTypeId);
-    const byKey = new Map(
-      ((rotationRows ?? []) as { element_key: string; eligibility_source: "standing_attendees" | "calling_names" | "manual"; eligibility_calling_names: string[] | null }[]).map(
-        (r) => [r.element_key, r]
-      )
-    );
+      .select("element_key, rotation_members(calling_id, sort_order, callings(id, name, current_holder_id))")
+      .eq("meeting_type_id", meetingTypeId)
+      .in(
+        "element_key",
+        remaining.map((c) => c.key)
+      );
+
+    for (const row of (rotationRows ?? []) as unknown[]) {
+      const r = row as {
+        element_key: string;
+        rotation_members:
+          | {
+              calling_id: string | null;
+              sort_order: number;
+              callings: { id: string; name: string; current_holder_id: string | null }[] | { id: string; name: string; current_holder_id: string | null } | null;
+            }[]
+          | null;
+      };
+      result[r.element_key] = (r.rotation_members ?? [])
+        .filter((m) => m.calling_id && m.callings)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((m) => (Array.isArray(m.callings) ? m.callings[0] : m.callings)!);
+    }
 
     for (const col of remaining) {
-      const rotation = byKey.get(col.key);
-      if (!rotation || rotation.eligibility_source === "manual") {
-        result[col.key] = [];
-        continue;
-      }
-      const ids = await computeEligiblePersonIds(
-        supabase,
-        rotation.eligibility_source,
-        rotation.eligibility_calling_names,
-        meetingTypeId
-      );
-      result[col.key] = await personOptionsByIds(supabase, ids);
+      if (!result[col.key]) result[col.key] = [];
     }
   }
 
@@ -1151,11 +1238,29 @@ async function eligiblePeopleByColumn(
 
 /**
  * One row per upcoming meeting of the given type (today through
- * throughDateISO), one cell per applicable role -- the actual assigned
- * person right now, whatever put it there (a fixed-by-calling rule, the
- * generic rotation pointer, or a manual override). Meetings with none
- * created yet in that window simply won't appear -- run Generate
- * Meetings / Meeting Schedule first if a date is missing.
+ * throughDateISO), one cell per applicable role -- which CALLING
+ * currently holds the actual assignment, whatever put it there (a
+ * fixed-by-calling rule, the generic rotation pointer, or a manual
+ * override). Never a resolved person's name. Meetings with none created
+ * yet in that window simply won't appear -- run Generate Meetings /
+ * Meeting Schedule first if a date is missing.
+ *
+ * **Rewritten 2026-10-31** (the user's own request: "I don't want
+ * rotations to ever say anyone's name... when the meeting agenda itself
+ * calls the person into the meeting they look at the rotation, see the
+ * calling, and then list the person in the calling"). Each cell still
+ * ultimately resolves to a real person underneath -- the actual agenda,
+ * the Conducting script, and the public program all need one -- this
+ * grid just no longer SHOWS it: a cell's own column already knows which
+ * callings are eligible for that role (eligibleCallingsByColumn), each
+ * carrying its current holder's id, so the cell's displayed value is
+ * simply "which of those callings currently holds the real assignment"
+ * -- see UNLISTED_CALLING_VALUE for the one case that can't be
+ * expressed that way. saveAssignmentGrid (app/rotations/actions.ts)
+ * does the matching write-side resolution: a submitted calling id is
+ * looked up by its own primary key, never by name, so two callings
+ * sharing a name (this app's own "more than one simultaneous holder"
+ * convention) can never be confused with each other here.
  *
  * **Bug found and fixed 2026-10-21** (the user's own report: pushing
  * rotations left "about half" updated and the other half not, and
@@ -1190,9 +1295,27 @@ export async function getAssignmentGrid(
 
   const { data: meetingType } = await supabase.from("meeting_types").select("id").eq("slug", meetingTypeSlug).single();
   const eligibleByColumn = meetingType
-    ? await eligiblePeopleByColumn(meetingTypeSlug, meetingType.id as string, columnKeys)
+    ? await eligibleCallingsByColumn(meetingTypeSlug, meetingType.id as string, columnKeys)
     : {};
-  const columns: GridColumn[] = columnKeys.map((c) => ({ ...c, eligiblePeople: eligibleByColumn[c.key] ?? [] }));
+  const columns: GridColumn[] = columnKeys.map((c) => ({
+    ...c,
+    eligibleCallings: (eligibleByColumn[c.key] ?? []).map((r) => ({ id: r.id, name: r.name })),
+  }));
+
+  // Reverse lookup, per column: the currently-assigned PERSON's id ->
+  // which of that column's own eligible callings they currently hold
+  // (if any) -- built once here so every row below is a plain map
+  // lookup, not its own query.
+  const callingIdByHolder: Record<string, Map<string, string>> = {};
+  for (const key of Object.keys(eligibleByColumn)) {
+    const map = new Map<string, string>();
+    for (const calling of eligibleByColumn[key]) {
+      if (calling.current_holder_id && !map.has(calling.current_holder_id)) {
+        map.set(calling.current_holder_id, calling.id);
+      }
+    }
+    callingIdByHolder[key] = map;
+  }
 
   // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
   // a plain UTC "today" would drop tonight's own meeting from this
@@ -1214,26 +1337,22 @@ export async function getAssignmentGrid(
   const roleColumnKeys = columnKeys.filter((c) => !PERSON_AND_TEXT_ROTATION_KEYS.has(c.key)).map((c) => c.key);
   const noteColumnKeys = columnKeys.filter((c) => PERSON_AND_TEXT_ROTATION_KEYS.has(c.key)).map((c) => c.key);
 
-  const byMeeting = new Map<string, Record<string, GridCell>>();
+  // Which person (if any) is actually assigned right now, per meeting +
+  // role key -- read exactly as before, just without the name join,
+  // since the cell's own displayed value is a calling, not a name.
+  const assignedPersonId = new Map<string, Record<string, string | null>>();
 
   if (roleColumnKeys.length > 0) {
     const { data: assignmentRows } = await supabase
       .from(table)
-      .select("meeting_id, role, assigned_to_id, people(name)")
+      .select("meeting_id, role, assigned_to_id")
       .in("meeting_id", meetingIds)
       .in("role", roleColumnKeys);
 
-    for (const row of (assignmentRows ?? []) as unknown[]) {
-      const r = row as {
-        meeting_id: string;
-        role: string;
-        assigned_to_id: string | null;
-        people: { name?: string }[] | { name?: string } | null;
-      };
-      const person = Array.isArray(r.people) ? r.people[0] : r.people;
-      const cells = byMeeting.get(r.meeting_id) ?? {};
-      cells[r.role] = { assignedToId: r.assigned_to_id, assignedToName: person?.name ?? null };
-      byMeeting.set(r.meeting_id, cells);
+    for (const row of (assignmentRows ?? []) as { meeting_id: string; role: string; assigned_to_id: string | null }[]) {
+      const values = assignedPersonId.get(row.meeting_id) ?? {};
+      values[row.role] = row.assigned_to_id;
+      assignedPersonId.set(row.meeting_id, values);
     }
   }
 
@@ -1242,30 +1361,31 @@ export async function getAssignmentGrid(
   if (noteColumnKeys.length > 0) {
     const { data: noteRows } = await supabase
       .from("meeting_element_notes")
-      .select("meeting_id, element_key, person_id, person:person_id(name)")
+      .select("meeting_id, element_key, person_id")
       .in("meeting_id", meetingIds)
       .in("element_key", noteColumnKeys);
 
-    for (const row of (noteRows ?? []) as unknown[]) {
-      const r = row as {
-        meeting_id: string;
-        element_key: string;
-        person_id: string | null;
-        person: { name?: string }[] | { name?: string } | null;
-      };
-      if (!r.person_id) continue;
-      const person = Array.isArray(r.person) ? r.person[0] : r.person;
-      const cells = byMeeting.get(r.meeting_id) ?? {};
-      cells[r.element_key] = { assignedToId: r.person_id, assignedToName: person?.name ?? null };
-      byMeeting.set(r.meeting_id, cells);
+    for (const row of (noteRows ?? []) as { meeting_id: string; element_key: string; person_id: string | null }[]) {
+      if (!row.person_id) continue;
+      const values = assignedPersonId.get(row.meeting_id) ?? {};
+      values[row.element_key] = row.person_id;
+      assignedPersonId.set(row.meeting_id, values);
     }
   }
 
-  const rows: GridRow[] = meetings.map((m) => ({
-    meetingId: m.id,
-    date: m.date,
-    cells: byMeeting.get(m.id) ?? {},
-  }));
+  const rows: GridRow[] = meetings.map((m) => {
+    const assigned = assignedPersonId.get(m.id) ?? {};
+    const cells: Record<string, GridCell> = {};
+    for (const col of columnKeys) {
+      const personId = assigned[col.key] ?? null;
+      let callingId = "";
+      if (personId) {
+        callingId = callingIdByHolder[col.key]?.get(personId) ?? UNLISTED_CALLING_VALUE;
+      }
+      cells[col.key] = { callingId };
+    }
+    return { meetingId: m.id, date: m.date, cells };
+  });
 
   return { columns, rows };
 }

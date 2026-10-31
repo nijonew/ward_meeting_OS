@@ -3,8 +3,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAllRotations, getAssignmentGrid, gridColumnsFor, type RotationRow } from "@/lib/data/rotations";
-import { getActivePeople, type PersonOption } from "@/lib/data/people";
-import { getActiveCallings, type CallingOption } from "@/lib/data/callings";
+import { getCallingsForMeetingType, type CallingOption } from "@/lib/data/callings";
 import { PushRotationForm } from "@/components/rotations/PushRotationForm";
 import { PushFixedRolesForm } from "@/components/rotations/PushFixedRolesForm";
 import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
@@ -103,7 +102,7 @@ function TypeTab({ slug, active, label }: { slug: MeetingTypeSlug; active: boole
   );
 }
 
-function RotationCard({ rotation, people, callings }: { rotation: RotationRow; people: PersonOption[]; callings: CallingOption[] }) {
+function RotationCard({ rotation, callings }: { rotation: RotationRow; callings: CallingOption[] }) {
   const sync = async () => {
     "use server";
     await syncRotation(rotation.id);
@@ -113,11 +112,9 @@ function RotationCard({ rotation, people, callings }: { rotation: RotationRow; p
     await addRotationMember(rotation.id, formData);
   };
 
-  const memberIds = new Set(rotation.members.map((m) => m.person_id).filter((id): id is string => Boolean(id)));
-  const availablePeople = people.filter((p) => !memberIds.has(p.id));
   const callingMemberIds = new Set(rotation.members.map((m) => m.calling_id).filter((id): id is string => Boolean(id)));
   const availableCallings = callings.filter((c) => !callingMemberIds.has(c.id));
-  const nextUpName = rotation.members[rotation.next_index % Math.max(rotation.members.length, 1)]?.person_name;
+  const nextUpLabel = rotation.members[rotation.next_index % Math.max(rotation.members.length, 1)]?.display_label;
 
   return (
     <div className="rounded border border-rule bg-surface p-6">
@@ -140,7 +137,7 @@ function RotationCard({ rotation, people, callings }: { rotation: RotationRow; p
       ) : (
         <>
           <p className="mt-4 text-xs text-ink-muted">
-            Next up: <span className="text-ink">{nextUpName}</span>
+            Next up: <span className="text-ink">{nextUpLabel}</span>
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
             {rotation.members.map((m, idx) => {
@@ -162,7 +159,7 @@ function RotationCard({ rotation, people, callings }: { rotation: RotationRow; p
                   className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-1.5 text-sm"
                 >
                   <span className={idx === rotation.next_index % rotation.members.length ? "text-ink" : "text-ink-muted"}>
-                    {m.person_name}
+                    {m.display_label}
                   </span>
                   <span className="flex items-center gap-2">
                     <form action={moveUp}>
@@ -192,26 +189,8 @@ function RotationCard({ rotation, people, callings }: { rotation: RotationRow; p
         </>
       )}
 
-      {availablePeople.length > 0 && (
-        <form action={addMember} className="mt-4 flex items-center gap-2">
-          <select name="person_id" defaultValue="" className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
-            <option value="" disabled>
-              Add someone&hellip;
-            </option>
-            {availablePeople.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper hover:bg-accent-deep">
-            Add
-          </button>
-        </form>
-      )}
-
       {availableCallings.length > 0 && (
-        <form action={addMember} className="mt-2 flex items-center gap-2">
+        <form action={addMember} className="mt-4 flex items-center gap-2">
           <select name="calling_id" defaultValue="" className="flex-1 rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink">
             <option value="" disabled>
               Add a calling&hellip;
@@ -256,14 +235,19 @@ export default async function RotationsPage({
     : "sacrament-meeting";
   const throughDate = rawThrough || defaultThroughDate();
 
-  const [rotations, people, callings, grid] = await Promise.all([
-    getAllRotations(),
-    getActivePeople(),
-    getActiveCallings(),
-    getAssignmentGrid(selectedType, throughDate),
-  ]);
+  const [rotations, grid] = await Promise.all([getAllRotations(), getAssignmentGrid(selectedType, throughDate)]);
 
   const visibleRotations = sortRotationsByMeeting(rotations.filter((r) => !FIXED_BY_CALLING_KEYS.has(r.element_key)));
+
+  // Each rotation's "Add a calling..." picker is scoped to callings
+  // actually linked to ITS OWN meeting type (2026-10-31, the user's own
+  // request: "I want only the callings associated with the meetings in
+  // the dropdowns to create the rotations") -- one small batched fetch
+  // per distinct meeting type among the visible rotations (at most 4),
+  // not a single global calling list.
+  const distinctMeetingTypeIds = Array.from(new Set(visibleRotations.map((r) => r.meeting_type_id)));
+  const callingListsByType = await Promise.all(distinctMeetingTypeIds.map((id) => getCallingsForMeetingType(id)));
+  const callingsByMeetingType = new Map(distinctMeetingTypeIds.map((id, i) => [id, callingListsByType[i]]));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -335,7 +319,7 @@ export default async function RotationsPage({
 
       <div className="flex flex-col gap-4">
         {visibleRotations.map((r) => (
-          <RotationCard key={r.id} rotation={r} people={people} callings={callings} />
+          <RotationCard key={r.id} rotation={r} callings={callingsByMeetingType.get(r.meeting_type_id) ?? []} />
         ))}
       </div>
     </main>

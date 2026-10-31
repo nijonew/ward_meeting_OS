@@ -2042,6 +2042,153 @@ avoid confusing the two.
 
 ## Known open items
 
+**`/rotations` redesigned to never show a resolved person's name, and
+rotation membership is calling-only going forward -- no migration
+needed, pure application code, 2026-10-31.** Direct follow-up to the
+duplicated-calling-name bug fix just below -- the user's own words,
+once that fix was confirmed: "I don't want rotations to ever say
+anyone's name. I want all names removed from the rotations page. Then
+I want calling names only when selecting the rotation. and I want only
+the callings associated with the meetings in the dropdowns to create
+the rotations. Then, when the meeting agenda itself calls the person
+into the meeting they look at the rotation, see the calling, and then
+list the person in the calling. This means that we need to distinguish
+each calling even if more than one person holds the calling... what do
+you suggest to distinguish between the two calling lines?"
+
+**Distinguishing two callings that share a name** (e.g. two
+Choristers): give them genuinely distinct `callings.name` values, the
+same convention this app already uses for "more than one simultaneous
+holder" (the "Stake High Councilor (`<area>`)" seats) -- "Chorister
+(1st Hour)"/"Chorister (2nd Hour)," or a plain "Chorister 1"/"Chorister
+2" if nothing real distinguishes them. This is a data fix the user
+makes directly in Callings/Table Admin, not something code can do --
+two rows sharing one literal name are inherently indistinguishable to
+a human picking between them in a dropdown, even though the database
+itself tells them apart by id.
+
+Two scope questions were confirmed via `AskUserQuestion` before
+touching any code, since guessing wrong meant rebuilding a page-sized
+change twice:
+1. **The applied-assignment grid (meetings × roles) stays** --
+   kept, not removed, but its cells now pick a CALLING, never a
+   resolved person.
+2. **The "Add a calling..." rotation-member picker is scoped to
+   callings already linked to that rotation's own meeting type**, via
+   the existing `meeting_type_members` table (the same mapping that
+   already controls "who attends this meeting type" elsewhere in the
+   app) -- not every active calling in the ward roster.
+
+**What actually changed, by file:**
+- **`lib/data/rotations.ts`**: `RotationMember.person_name` renamed to
+  `display_label` and its resolution rewritten -- a calling-based
+  member now shows only that calling's own name (plus "(vacant)" when
+  nobody currently holds it -- a status flag about the CALLING, not an
+  identity disclosure, so it stays), never a resolved holder. A legacy
+  person-based member (new ones can no longer be created, see below)
+  shows a plain "Unlisted (person-based) — remove and add a
+  calling instead" notice instead of who it is -- there's no calling to
+  name for it at all. `getAllRotations()`'s own query dropped both
+  `people(name)` joins entirely, not just the display logic -- the data
+  layer itself no longer fetches a person's name for this page.
+  `syncRotationMembership` (the "Sync from callings/standing attendees"
+  button) is rewritten from the ground up: it used to resolve each
+  eligible calling down to its CURRENT holder and snapshot that as a
+  `person_id` row -- which both put a name on this page and meant the
+  rotation silently stopped tracking the calling itself the moment that
+  person's own calling changed. New `computeEligibleCallingIds` (a
+  calling-returning sibling of the existing `computeEligiblePersonIds`,
+  which is untouched and still backs the meeting agenda's own
+  calling-scoped person pickers -- see below) syncs the CALLING rows
+  directly; the holder is resolved fresh every time the rotation is
+  actually applied to a meeting, never stored. The applied-assignment
+  grid's own `eligiblePeopleByColumn` became `eligibleCallingsByColumn`
+  (same per-column resolution -- that role's own rotation membership,
+  or the fixed Presiding/Conducting calling list -- now returning
+  calling rows instead of resolved people), and `getAssignmentGrid`
+  itself now resolves each cell to "which of this column's own eligible
+  callings currently holds the real assignment" via a reverse
+  `person id → calling id` lookup, rather than reading/returning a
+  person's name at all. New `UNLISTED_CALLING_VALUE` sentinel covers
+  the one case that reverse lookup can't resolve (a stale override, or
+  a leftover person-based rotation member) -- shown as an explicit,
+  unnamed placeholder ("Currently assigned (not a tracked calling)")
+  rather than guessed at, so leaving a cell untouched on save can never
+  silently clear a real assignment the grid simply has no calling to
+  show for it.
+- **`app/rotations/actions.ts`**: `addRotationMember` can no longer
+  create a person-based member at all -- the `person_id` branch is
+  gone outright (re-checked server-side, not just hidden from the
+  page, matching this app's own established "a direct POST can't
+  resurrect a removed path" convention). `saveAssignmentGrid` rewritten
+  to match the grid's own new cell values: each submitted value is now
+  a calling id (or "", or `UNLISTED_CALLING_VALUE`), resolved to that
+  calling's CURRENT holder by its own primary key in one batched query
+  -- **never by name**, which is exactly what would have reintroduced
+  the duplicate-calling-name bug this same session already fixed once.
+  A calling that turns out vacant at save time clears the cell (same
+  outcome as picking "Unassigned") and is counted in a new
+  `clearedVacant` result field, surfaced inline ("N cell(s) left
+  unassigned because the selected calling currently has no holder").
+- **`lib/data/callings.ts`**: new `getCallingsForMeetingType(meetingTypeId)`
+  -- every active calling linked to that meeting type via
+  `meeting_type_members`, the scoping mechanism for decision 2 above.
+- **`app/rotations/page.tsx`**: the "Add someone..." person-picker form
+  is gone from `RotationCard`; only "Add a calling..." remains, now
+  scoped per-rotation via `getCallingsForMeetingType` (one small
+  batched fetch across the distinct meeting types actually present,
+  not a single global calling list). Member rows and "Next up" both
+  render `display_label` instead of a resolved name.
+- **`components/rotations/AssignmentGridForm.tsx`**: `PersonCell`
+  replaced by `CallingCell` -- same shape, but lists `eligibleCallings`
+  instead of people, and only shows the `UNLISTED_CALLING_VALUE` option
+  on a cell that's actually currently in that state (so it doesn't
+  clutter every other dropdown with a confusing extra choice).
+
+**Real build failure found and fixed along the way, not just a type
+error**: `next build` failed outright once `AssignmentGridForm.tsx`
+needed `UNLISTED_CALLING_VALUE` as an actual runtime value rather than
+just a type -- switching from `import type { ... }` to a real value
+import pulled the whole server-only `lib/data/rotations.ts` (which
+imports `next/headers` via `createClient`) into this client
+component's own bundle, since a type-only import erases at compile
+time but a value import doesn't. Same bug class, same fix, this app
+already has a precedent for (`lib/data/sacrament-program.ts` vs.
+`sacrament-program-shared.ts`): new **`lib/data/rotations-shared.ts`**,
+a pure file with no `createClient` import, holding just the one
+constant -- `rotations.ts` imports/re-exports it for every server
+consumer, `AssignmentGridForm.tsx` imports it directly from the shared
+file instead.
+
+**Deliberately not done, and not something code can finish on its
+own**: any already-existing person-based `rotation_members` row from
+before this redesign is left exactly as it was -- still fully
+functional (still resolves and gets applied to meetings the same way
+it always has), just now displayed as the generic "Unlisted
+(person-based)" notice instead of a name. Converting one over means
+removing it (the existing Remove button, unchanged) and adding the
+right calling in its place, by hand, rotation by rotation -- this
+assistant has no live database access to see which rotations still
+hold one or to guess which calling should replace it. Ask the user
+whether any specific rotation's own conversion should be scoped out as
+its own follow-up task once they've identified which one(s).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (the first
+build attempt caught the real client-bundle bug above; the corrected
+version built clean), same no-live-database-access gap as everything
+else in this project -- ask the user to open `/rotations` for each
+meeting type and confirm: no row, card, or grid cell anywhere on the
+page shows a person's name; the applied-assignment grid's own
+dropdowns list callings (with "Currently assigned (not a tracked
+calling)" showing up only where a cell's existing value genuinely
+doesn't map to one); "Add a calling..." only offers callings already
+linked to that rotation's own meeting type; and that applying/pushing
+a rotation to a meeting (or creating a new one) still correctly
+resolves to the calling's real current holder on the actual agenda,
+exactly as before this change -- only this page's own display and
+editing surface changed, not what ultimately gets written for a
+meeting.
+
 **Bug found and fixed 2026-10-31: a duplicated calling name could
 silently steal Presiding/Conducting's real auto-assignment -- no
 migration needed, pure application code.** The user's own report:
