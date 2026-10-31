@@ -2085,11 +2085,19 @@ the identical unguarded pattern.
 Fix: both `PersonSelect` and `SpeakerPersonOrGuestField` now carry the
 exact same safeguard `AssignmentGridForm.tsx` already established --
 if the current value isn't already in the eligible list handed to the
-`<select>`, it's added back as a synthetic extra option (labeled "...
-(no longer eligible)", with a real name resolved from a new `allPeople`
-prop threaded down from each caller's own full active-people list, not
-a generic placeholder). Every call site across `AgendaGridForm.tsx`
-(the three `PersonSelect` uses, the two Chorister/Organist
+`<select>`, it's added back as a synthetic extra option, with a real
+name resolved from a new `allPeople` prop threaded down from each
+caller's own full active-people list, not a generic placeholder.
+**Shown as the plain name only, same day** (the user's own immediate
+follow-up, right after confirming the fix worked and their data was
+intact: "we don't need that label! why the label?") -- the synthetic
+option had carried a "... (no longer eligible)" qualifier, copied
+directly from `AssignmentGridForm.tsx`'s own original version of this
+exact merge; dropped from all three places at once (the two new ones
+plus that original) for consistency, since the user's own framing was
+a blanket "we don't need that label," not specific to just the new
+pickers. Every call site across `AgendaGridForm.tsx` (the three
+`PersonSelect` uses, the two Chorister/Organist
 `SpeakerPersonOrGuestField` uses, and `VisitingAuthoritiesField`) and
 `SacramentProgramSection.tsx`'s own Speaker/Youth Speaker use were
 updated to pass this new `allPeople` prop.

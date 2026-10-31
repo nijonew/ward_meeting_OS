@@ -65,12 +65,15 @@ export function SpeakerPersonOrGuestField({
   // A later "Save All Changes" would make that real: saveAgendaGrid
   // deletes the existing role row and only reinserts one if a person/
   // guest is actually submitted, so an unassigned-looking field that
-  // was never really unassigned gets permanently wiped on save.
+  // was never really unassigned gets permanently wiped on save. Shown
+  // as a plain name, no "(no longer eligible)" qualifier -- the user's
+  // own follow-up, right after this fix shipped: "we don't need that
+  // label."
   const personOptions =
     defaultPersonId && !people.some((p) => p.id === defaultPersonId)
       ? [
           ...people,
-          { id: defaultPersonId, name: `${allPeople.find((p) => p.id === defaultPersonId)?.name ?? "Unknown"} (no longer eligible)` },
+          { id: defaultPersonId, name: allPeople.find((p) => p.id === defaultPersonId)?.name ?? "Unknown" },
         ]
       : people;
 

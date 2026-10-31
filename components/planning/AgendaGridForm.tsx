@@ -40,12 +40,14 @@ function PersonSelect({
   // Changes" would make that real: saveAgendaGrid deletes the
   // existing role row and only reinserts one if a person is actually
   // submitted, so an unassigned-looking field that was never really
-  // unassigned gets permanently wiped on save.
+  // unassigned gets permanently wiped on save. Shown as a plain name,
+  // no "(no longer eligible)" qualifier -- the user's own follow-up,
+  // right after this fix shipped: "we don't need that label."
   const options =
     defaultValue && !people.some((p) => p.id === defaultValue)
       ? [
           ...people,
-          { id: defaultValue, name: `${allPeople.find((p) => p.id === defaultValue)?.name ?? "Unknown"} (no longer eligible)` },
+          { id: defaultValue, name: allPeople.find((p) => p.id === defaultValue)?.name ?? "Unknown" },
         ]
       : people;
 

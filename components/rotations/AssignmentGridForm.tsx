@@ -116,10 +116,16 @@ export function AssignmentGridForm({
                   // even if they no longer show up as eligible (a
                   // calling changed since) -- restricting the list to
                   // "who could be assigned" shouldn't silently blank
-                  // out who actually IS assigned.
+                  // out who actually IS assigned. Shown as a plain
+                  // name, no "(no longer eligible)" qualifier -- this
+                  // page originally had that label; dropped 2026-10-30
+                  // (the user's own request, made after the identical
+                  // label appeared on the Planning page's own pickers
+                  // once this same merge was copied there: "we don't
+                  // need that label").
                   const options =
                     cell?.assignedToId && !c.eligiblePeople.some((p) => p.id === cell.assignedToId)
-                      ? [...c.eligiblePeople, { id: cell.assignedToId, name: `${cell.assignedToName ?? "Unknown"} (no longer eligible)` }]
+                      ? [...c.eligiblePeople, { id: cell.assignedToId, name: cell.assignedToName ?? "Unknown" }]
                       : c.eligiblePeople;
                   return (
                     <td key={c.key} className="px-2 py-1.5 align-top">
