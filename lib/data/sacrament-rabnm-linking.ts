@@ -36,6 +36,20 @@ export interface RabnmLinkSpec {
 export async function insertSacramentRabnmLink(spec: RabnmLinkSpec): Promise<{ id: string } | { error: string }> {
   const supabase = await createClient();
 
+  // New rows always land at the end of their own (meeting, type) list
+  // -- Callings and Releases each get their own independent order,
+  // matching WardBusinessField.tsx's existing split by type. Reordering
+  // from there is what the Move Up/Down controls are for.
+  const { data: maxRow } = await supabase
+    .from("sacrament_rabnm")
+    .select("sort_order")
+    .eq("meeting_id", spec.meetingId)
+    .eq("type", spec.type)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sortOrder = (maxRow?.sort_order ?? 0) + 10;
+
   const { data: rabnm, error: rabnmError } = await supabase
     .from("sacrament_rabnm")
     .insert({
@@ -44,6 +58,7 @@ export async function insertSacramentRabnmLink(spec: RabnmLinkSpec): Promise<{ i
       calling_id: spec.callingId ?? null,
       detail: spec.detail ?? null,
       event_date: spec.eventDate ?? null,
+      sort_order: sortOrder,
       [spec.linkColumn]: spec.linkId,
     })
     .select("id")

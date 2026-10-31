@@ -66,6 +66,12 @@ const NOTE_BOX = "rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm
 const ROW = "rounded border border-rule/60 p-3";
 const LABEL = "font-mono text-[11px] uppercase tracking-wider text-ink-muted/70";
 
+// Same release-before-new-calling grouping Conducting already applies
+// (lib/data/conducting-rows.ts, 2026-10-15) -- kept here as its own
+// copy rather than imported, since that file's version is a local
+// const inside a larger function, not an exported constant.
+const RABNM_ORDER_WEIGHT: Record<string, number> = { release: 0, new_calling: 1 };
+
 function personName(
   people: PersonOption[],
   id: string | null | undefined,
@@ -534,7 +540,13 @@ export default async function ArchivedMeetingPage({
         <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Recognitions / Advancements / Baptisms / New Members</h2>
           <div className="mt-4 flex flex-col gap-2">
-            {sacramentData.rabnm.map((r) => (
+            {/* Releases before new callings, matching Conducting's own
+             *  2026-10-15 ordering rule -- within each group, the
+             *  already-sort_order-sorted input (sacrament-planning.ts)
+             *  stays in order, since Array.prototype.sort is stable. */}
+            {[...sacramentData.rabnm]
+              .sort((a, b) => (RABNM_ORDER_WEIGHT[a.type] ?? 2) - (RABNM_ORDER_WEIGHT[b.type] ?? 2))
+              .map((r) => (
               <div key={r.id} className={ROW}>
                 <p className={LABEL}>{r.type.replace(/_/g, " ")}</p>
                 <Plain>{[r.calling_name, ...r.people].filter(Boolean).join(" · ") || "None"}</Plain>

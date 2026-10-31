@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 084
+## Current migration number: 090
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2037,6 +2037,63 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Callings/Releases lines in Sacrament Meeting's Ward Business are now
+reorderable, migration `090`, 2026-10-30.** The user's own request,
+right after confirming migration `089` and the "save multiple items at
+once" fix both work: "I would like to be able to re-order individual
+lines in callings/releases in sacrament meeting to the order I would
+like to have them announced." `sacrament_rabnm` -- the table backing
+these lines -- had no ordering column at all before this; every reader
+(`getSacramentPlanningData`, the one query shared by Planning,
+Conducting, and Archived) returned rows in whatever order Postgres
+happened to hand back.
+
+New `sacrament_rabnm.sort_order` (migration `090`, nullable, idempotent
+backfill scoped per `(meeting_id, type)` via `row_number() * 10` --
+Callings and Releases each get their own independent sequence,
+matching `WardBusinessField.tsx`'s own existing split of the two lists
+by type). `insertSacramentRabnmLink` (`lib/data/sacrament-rabnm-linking.ts`,
+the one chokepoint every new row goes through -- Calling Planning's
+pull, RABNM Planning's pull, the Sacrament Meeting push) now looks up
+`max(sort_order)` for that same `(meeting_id, type)` pair and inserts
+10 past it, so a freshly-pulled item always lands at the end of its own
+list. `getSacramentPlanningData` (`lib/data/sacrament-planning.ts`)
+gained `.order("sort_order", { ascending: true })` -- fixing the one
+shared base query fixes all three downstream consumers at once:
+Planning's `WardBusinessField` (its own `.filter()` by type preserves
+the new order), Conducting's existing release-before-calling
+`RABNM_ORDER_WEIGHT` stable sort (which now has a correctly pre-ordered
+array to sort on top of, since `Array.prototype.sort` is stable), and
+Archived -- which previously rendered `sacramentData.rabnm` with no
+grouping of its own at all, a found inconsistency with Conducting, now
+closed by giving it the identical `RABNM_ORDER_WEIGHT` sort.
+
+New `moveWardBusinessItem(meetingId, itemId, type, direction)`
+(`app/meetings/[id]/ward-business-actions.ts`) mirrors the established
+swap-adjacent-`sort_order` Move Up/Down shape used everywhere else in
+this app (`moveTemplateElement`, `moveRotationMember`,
+`moveProgramItem`) -- fetch this meeting's own rows of that type in
+`sort_order` order, find the target, swap its `sort_order` with its
+neighbor's, or silently no-op at a boundary. Scoped by `type` so
+Callings and Releases reorder independently. `WardBusinessField.tsx`'s
+`ExistingRow` gained Move Up/Down buttons (plain `type="button"` +
+`useTransition`, same convention as `AgendaElementsManager.tsx`'s own
+Up/Down controls -- never a real `<form>`, since this row sits inside
+the bigger agenda grid's own form), with `isFirst`/`isLast` computed
+per row within its own list (Releases or Callings) to disable the
+button at a boundary.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `090` is actually free before running it**, per this
+project's own repeated numbering-collision history, then ask the user
+to check: Ward Business's Callings and Releases lines on a Sacrament
+Meeting's Planning page each show working Move Up/Down controls that
+reorder only within their own list; the new order is reflected in the
+Conducting script's own announcement order and in the Archived view
+once the meeting archives; a brand-new pulled item lands at the end of
+its own list; and reordering one list never affects the other.
 
 **Bug found and fixed 2026-10-30: a stale `candidate_person_ids` entry
 could block the Calling Planning roster sync with a cryptic Postgres

@@ -197,6 +197,72 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
   return { success: true };
 }
 
+/**
+ * Moves one Ward Business line (a Calling Planning-sourced Calling or
+ * Release) up or down within its own list -- the user's own request,
+ * 2026-10-30: "I would like to be able to re-order individual lines in
+ * callings/releases in sacrament meeting to the order I would like to
+ * have them announced." Scoped by `type` ("release" | "new_calling")
+ * so Callings and Releases reorder independently, matching
+ * WardBusinessField.tsx's own existing split of the two lists.
+ *
+ * Same swap-adjacent-sort_order shape as every other Move Up/Down
+ * action in this app (moveTemplateElement, moveRotationMember,
+ * moveProgramItem) -- fetch this meeting's own rows of this type in
+ * order, find the target, swap its sort_order with its neighbor's, or
+ * silently no-op at a boundary.
+ */
+export async function moveWardBusinessItem(
+  meetingId: string,
+  itemId: string,
+  type: "release" | "new_calling",
+  direction: "up" | "down"
+): Promise<ActionResult> {
+  const denied = await requireRabnmFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+
+  const { data: rows, error: fetchError } = await supabase
+    .from("sacrament_rabnm")
+    .select("id, sort_order")
+    .eq("meeting_id", meetingId)
+    .eq("type", type)
+    .order("sort_order", { ascending: true });
+
+  if (fetchError || !rows) {
+    return { error: fetchError?.message ?? "Could not load Ward Business items." };
+  }
+
+  const index = rows.findIndex((r) => r.id === itemId);
+  if (index === -1) {
+    return { error: "Item not found on this meeting." };
+  }
+
+  const swapIndex = direction === "up" ? index - 1 : index + 1;
+  if (swapIndex < 0 || swapIndex >= rows.length) {
+    return { success: true };
+  }
+
+  const current = rows[index];
+  const swap = rows[swapIndex];
+
+  const { error: error1 } = await supabase
+    .from("sacrament_rabnm")
+    .update({ sort_order: swap.sort_order })
+    .eq("id", current.id);
+  if (error1) return { error: error1.message };
+
+  const { error: error2 } = await supabase
+    .from("sacrament_rabnm")
+    .update({ sort_order: current.sort_order })
+    .eq("id", swap.id);
+  if (error2) return { error: error2.message };
+
+  revalidateBoth(meetingId);
+  return { success: true };
+}
+
 function revalidateRabnmPlanning(meetingId: string) {
   revalidatePath(`/meetings/${meetingId}/planning`);
   revalidatePath("/rabnm-planning");

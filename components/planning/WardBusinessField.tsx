@@ -7,6 +7,7 @@ import {
   removeCallingPlanningFromMeeting,
   pullRabnmPlanningIntoMeeting,
   removeRabnmPlanningFromMeeting,
+  moveWardBusinessItem,
 } from "@/app/meetings/[id]/ward-business-actions";
 import type { RabnmRow } from "@/lib/data/sacrament-planning";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
@@ -19,9 +20,31 @@ const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink
  *  pull (removeCallingPlanningFromMeeting) when `calling_planning_id`
  *  is set, or falls back to the plain deleteRabnmItem for an older row
  *  predating this rework (a manually-added "Other"/Presidency Change
- *  item from before 2026-10-03, which has no such link). */
-function ExistingRow({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
+ *  item from before 2026-10-03, which has no such link).
+ *
+ * Move Up/Down (2026-10-30, the user's own request: "I would like to
+ * be able to re-order individual lines in callings/releases... to the
+ * order I would like to have them announced") -- same plain
+ * `type="button"` + `useTransition` convention as
+ * AgendaElementsManager.tsx's own Up/Down controls, never a real
+ * `<form>`, since this row sits inside the bigger agenda grid's own
+ * form. `isFirst`/`isLast` disable the button at a boundary, scoped to
+ * this row's own list (Releases or Callings reorder independently). */
+function ExistingRow({
+  item,
+  meetingId,
+  type,
+  isFirst,
+  isLast,
+}: {
+  item: RabnmRow;
+  meetingId: string;
+  type: "release" | "new_calling";
+  isFirst: boolean;
+  isLast: boolean;
+}) {
   const [removing, startRemove] = useTransition();
+  const [moving, startMove] = useTransition();
 
   const remove = () =>
     startRemove(async () => {
@@ -32,14 +55,37 @@ function ExistingRow({ item, meetingId }: { item: RabnmRow; meetingId: string })
       }
     });
 
+  const move = (direction: "up" | "down") =>
+    startMove(async () => {
+      await moveWardBusinessItem(meetingId, item.id, type, direction);
+    });
+
   return (
     <tr className="border-t border-rule/40">
       <td className="py-1.5 pr-3">{item.people.length > 0 ? item.people.join(", ") : "—"}</td>
       <td className="py-1.5 pr-3 text-ink-muted">{item.calling_name ?? "—"}</td>
       <td className="py-1.5 text-right">
-        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
-          {removing ? "Removing..." : "Remove"}
-        </button>
+        <span className="inline-flex items-center gap-2">
+          <button
+            type="button"
+            disabled={moving || isFirst}
+            onClick={() => move("up")}
+            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+          >
+            &uarr;
+          </button>
+          <button
+            type="button"
+            disabled={moving || isLast}
+            onClick={() => move("down")}
+            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+          >
+            &darr;
+          </button>
+          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+            {removing ? "Removing..." : "Remove"}
+          </button>
+        </span>
       </td>
     </tr>
   );
@@ -73,6 +119,10 @@ function CallingPlanningSection({
   const [pending, startPull] = useTransition();
 
   const sortedCandidates = [...candidates].sort((a, b) => Number(b.ready) - Number(a.ready));
+  // sacrament_rabnm.type uses "new_calling", not "calling" -- kind is
+  // this component's own (calling | release) prop name, type is the
+  // real stored/moved-by value.
+  const itemType: "release" | "new_calling" = kind === "release" ? "release" : "new_calling";
 
   const pull = () => {
     if (!selected) return;
@@ -89,8 +139,15 @@ function CallingPlanningSection({
       {existing.length > 0 ? (
         <table className="mt-2 w-full text-sm">
           <tbody>
-            {existing.map((item) => (
-              <ExistingRow key={item.id} item={item} meetingId={meetingId} />
+            {existing.map((item, index) => (
+              <ExistingRow
+                key={item.id}
+                item={item}
+                meetingId={meetingId}
+                type={itemType}
+                isFirst={index === 0}
+                isLast={index === existing.length - 1}
+              />
             ))}
           </tbody>
         </table>

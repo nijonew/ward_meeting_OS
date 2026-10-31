@@ -117,7 +117,8 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
       .select(
         "id, type, detail, event_date, calling_planning_id, rabnm_planning_id, callings(name), sacrament_rabnm_people(people(name))"
       )
-      .eq("meeting_id", meetingId),
+      .eq("meeting_id", meetingId)
+      .order("sort_order", { ascending: true }),
   ]);
 
   return {
