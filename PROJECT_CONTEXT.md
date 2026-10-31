@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 091
+## Current migration number: 092
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2038,6 +2038,55 @@ avoid confusing the two.
 
 ## Known open items
 
+**Self-serve sign-up now asks for a first name, migration `092`, not
+yet run, 2026-10-30.** Built per the user's own follow-up confirming an
+idea they'd floated earlier the same day ("I am considering asking
+individuals to include a first name when they create a new log-in to
+help ensure we can identify them when we verify their request") --
+later confirmed directly: "please build the first name addition."
+
+`/auth/request-access`'s form gained a required "First Name" field,
+right above Email. `requestAccess` (`app/auth/actions.ts`) validates
+it's non-blank, then -- right after `signUp()` succeeds -- calls a new
+`set_signup_display_name(target_id, new_name)` RPC to write it onto the
+brand-new `profiles` row's own `display_name` column. That column has
+always existed and has always been blank (see the 2026-10-11 "submitted
+by showed an email" entry elsewhere in this file for the full history
+of why) -- Verify Logins (`components/admin/VerifyLoginRow.tsx`)
+already renders it (`profile.display_name || "(no name)"`), so this
+needed no UI change there at all, just something to actually populate
+it for the first time.
+
+**Why a RPC, not a plain `update`**: `requestAccess` runs through the
+ordinary anon-key client, with no active session yet at this point
+(email confirmation happens after signUp, not before) -- a direct
+`update profiles set display_name = ...` from that context would need
+an RLS policy this app doesn't have and shouldn't add just for this
+one field. A security-definer RPC is the same established pattern this
+app already uses for exactly this "the normal client can't do this,
+but the action is legitimate" situation (`archive_person`,
+`get_public_people_names`). **Deliberately narrow, not a general
+"rename any profile" RPC**: only succeeds for a profile that's both
+still unlinked (no `people` row points at it -- the same "needs
+verification" definition `lib/data/profile-verification.ts` already
+uses) and whose `display_name` is still null -- i.e. only in the one
+real moment this is meant for, right after a brand-new sign-up, before
+any admin has reviewed the account. Calling it again later, or for
+someone else's id, is a silent no-op, not an error.
+
+A failed RPC call is swallowed rather than surfaced to the person
+signing up -- their account was already created successfully by that
+point (the real thing that matters), and a missing name just means
+Verify Logins shows "(no name)" instead, same as before this feature
+existed.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `092` is actually free before running it**, per this
+project's own repeated numbering-collision history, then ask the user
+to try `/auth/request-access` end to end and confirm the new account
+shows the typed first name (not "(no name)") on `/admin/verify-logins`.
+
 **Six items from one sitting, 2026-10-30: a real gender field, an
 archive-instead-of-delete page for People, a Ward Business save bug,
 subsection reordering, announcement reordering, and a real public Ward
@@ -2225,17 +2274,12 @@ editing either already updates the other on the next load.
 onto that one link (pick a person, check off several callings at
 once) -- not a second data model.
 
-**Not built -- left as an open discussion point, 2026-10-30.** The
-user's own words: "I am considering asking individuals to include a
-first name when they create a new log-in to help ensure we can
-identify them when we verify their request." Phrased as something
-being weighed, not a request -- nothing was built. If this becomes a
-real ask: `/auth/request-access` (self-serve sign-up) currently only
-asks for email + password; adding a name field there would need a
-place to stage it until an admin actually links the account to a real
-`people` row at Verify Logins (there's no column on `profiles` this
-app treats as a real display name today -- see the 2026-10-11
-"submitted by showed an email" fix elsewhere in this file for why).
+~~**Not built -- left as an open discussion point.**~~ The user's own
+original words were phrased as something being weighed ("I am
+considering asking individuals to include a first name...") -- the
+very next message confirmed it as a real request ("please build the
+first name addition"), and it's now built -- see the migration `092`
+entry above.
 
 **Callings/Releases lines in Sacrament Meeting's Ward Business are now
 reorderable, migration `090`, 2026-10-30.** The user's own request,

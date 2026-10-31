@@ -38,6 +38,12 @@ const initialState: { error?: string; success?: boolean } = {};
  * matching to a person, granting access) is the same Verify Logins
  * flow regardless of how the account got created.
  *
+ * **First Name field, 2026-10-30** (migration 092, the user's own
+ * idea: "ask individuals to include a first name... to help ensure we
+ * can identify them when we verify their request") -- required, since
+ * Verify Logins otherwise has nothing but a bare email address to go
+ * on while deciding who a request actually belongs to.
+ *
  * **Replaced the inline success message with a real confirmation
  * screen, 2026-10-19** -- the same fix made to `/auth/reset-password`
  * the same day, for the identical reason (see that page's own comment
@@ -90,6 +96,14 @@ export default function RequestAccessPage() {
       </p>
 
       <form action={formAction} className="mt-6 flex flex-col gap-3">
+        <input
+          type="text"
+          name="firstName"
+          required
+          placeholder="First name"
+          autoComplete="given-name"
+          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+        />
         <input
           type="email"
           name="email"

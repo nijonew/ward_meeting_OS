@@ -61,12 +61,30 @@ export async function requestPasswordReset(_prevState: unknown, formData: FormDa
  * verification" -- a self-signed-up account shows up in the exact
  * same admin queue/banner an admin-invited-but-unverified one does.
  * Nothing new to build on the review side at all.
+ *
+ * **First name, 2026-10-30** (migration 092, the user's own idea: "ask
+ * individuals to include a first name... to help ensure we can
+ * identify them when we verify their request") -- required, since the
+ * whole point is identification; a blank one would defeat it.
+ * `set_signup_display_name` (a narrow security-definer RPC, see that
+ * migration's own comment) writes it onto the brand-new `profiles`
+ * row right after signUp() succeeds -- a plain client-side `update`
+ * would need an RLS policy this app doesn't have, since there's no
+ * active session yet at this point (email confirmation comes after).
+ * A failure here is swallowed rather than surfaced: the account itself
+ * was already created successfully by this point, and a missing name
+ * is a minor loss (Verify Logins just shows "(no name)" instead) next
+ * to telling a successful signup it failed.
  */
 export async function requestAccess(_prevState: unknown, formData: FormData) {
+  const firstName = String(formData.get("firstName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
 
+  if (!firstName) {
+    return { error: "Enter your first name." };
+  }
   if (!email) {
     return { error: "Enter your email address." };
   }
@@ -78,7 +96,7 @@ export async function requestAccess(_prevState: unknown, formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -88,6 +106,10 @@ export async function requestAccess(_prevState: unknown, formData: FormData) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  if (data.user) {
+    await supabase.rpc("set_signup_display_name", { target_id: data.user.id, new_name: firstName });
   }
 
   return { success: true };
