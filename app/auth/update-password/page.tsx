@@ -24,7 +24,7 @@ export default function UpdatePasswordPage() {
           required
           minLength={8}
           placeholder="New password (8+ characters)"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <input
           type="password"
@@ -32,7 +32,7 @@ export default function UpdatePasswordPage() {
           required
           minLength={8}
           placeholder="Confirm password"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <button
           type="submit"

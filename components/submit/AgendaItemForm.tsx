@@ -1,7 +1,10 @@
 "use client";
 
 const TIME_NEEDED_OPTIONS = ["1-2 Minutes", "3-5 Minutes", "6+ Minutes"];
-const INPUT_CLASS = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
+// text-base, not text-sm (2026-10-31, mobile-friendliness pass) -- same
+// fix as AnnouncementForm.tsx's identical constant: iOS Safari
+// auto-zooms the whole page on focus for any form control under 16px.
+const INPUT_CLASS = "rounded border border-rule bg-paper px-3 py-2 text-base text-ink";
 
 /**
  * Agenda item submission -- split out of the old combined SubmitForm

@@ -102,7 +102,7 @@ export default function RequestAccessPage() {
           required
           placeholder="First name"
           autoComplete="given-name"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <input
           type="email"
@@ -111,21 +111,21 @@ export default function RequestAccessPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <input
           type="password"
           name="password"
           required
           placeholder="Choose a password"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <input
           type="password"
           name="confirm"
           required
           placeholder="Confirm password"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <button
           type="submit"

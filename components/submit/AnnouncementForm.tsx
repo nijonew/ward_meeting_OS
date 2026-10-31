@@ -10,7 +10,11 @@ import {
 } from "@/lib/data/announcement-constants";
 import { RecurrenceToggle } from "@/components/submit/RecurrenceFields";
 
-const INPUT_CLASS = "rounded border border-rule bg-paper px-3 py-2 text-sm text-ink";
+// text-base, not text-sm (2026-10-31, mobile-friendliness pass) -- iOS
+// Safari auto-zooms the whole page on focus for any form control whose
+// font-size is under 16px, which text-sm's 14px triggers on every
+// field in this form.
+const INPUT_CLASS = "rounded border border-rule bg-paper px-3 py-2 text-base text-ink";
 const LABEL_CLASS = "text-xs text-ink-muted";
 
 /** Renders a fieldset of checkboxes sharing one `name` -- FormData's

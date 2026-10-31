@@ -57,7 +57,17 @@ export async function AppHeader({ tag }: { tag?: string }) {
           {unverifiedCount} login{unverifiedCount === 1 ? "" : "s"} need{unverifiedCount === 1 ? "s" : ""} verification &rarr;
         </Link>
       )}
-      <header className="flex items-baseline justify-between border-b border-rule pb-6">
+      {/* flex-col on mobile, flex-row from sm up (2026-10-31, mobile-
+          friendliness pass) -- the right-hand cluster can carry a long
+          tag (e.g. "Recognitions & Advancements Planning") plus a
+          "signed in as" name plus Sign out, which never wrapped and
+          had no responsive breakpoint at all: on a narrow phone it
+          would either overflow the viewport (dragging the whole page
+          into horizontal scroll) or crush the wordmark down to
+          nothing. Stacking the two rows, and letting the cluster wrap
+          with flex-wrap, keeps everything on screen without changing
+          anything about the existing side-by-side layout at sm+. */}
+      <header className="flex flex-col gap-2 border-b border-rule pb-6 sm:flex-row sm:items-baseline sm:justify-between">
         <Link
           href="/"
           prefetch={false}
@@ -65,7 +75,7 @@ export async function AppHeader({ tag }: { tag?: string }) {
         >
           {wardName} Ward
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           {tag && <span className="font-mono text-xs uppercase tracking-wider text-ink-muted">{tag}</span>}
           {whoAmI && (
             <span className="text-xs text-ink-muted" title={`Features: ${featureList}`}>

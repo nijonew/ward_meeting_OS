@@ -43,14 +43,14 @@ export function LoginForm() {
           name="email"
           required
           placeholder="you@example.com"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <input
           type="password"
           name="password"
           required
           placeholder="Password"
-          className="rounded border border-rule bg-surface px-3 py-2 text-sm"
+          className="rounded border border-rule bg-surface px-3 py-2 text-base"
         />
         <button
           type="submit"

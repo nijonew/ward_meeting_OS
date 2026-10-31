@@ -2038,6 +2038,74 @@ avoid confusing the two.
 
 ## Known open items
 
+**Mobile-friendliness audit, 2026-10-31.** The user's own question,
+right after the performance pass below shipped: "Is there a way to
+make this app more mobile phone friendly?" This assistant has no way
+to actually render the app in a browser (no `.env.local` in this
+working copy, same standing gap as everything else in this project),
+so this was a static code read-through, not a visual check -- three
+real, concrete issues found and fixed; everything else checked (the
+landing page, public Announcements, `/events`, the Conducting script
+view, and every "favorite grid format" admin table's own horizontal-
+scroll handling) was already sound. The dense admin grids themselves
+(Table Admin, Calling Planning, Assignment Rotations, etc.) were left
+alone on purpose -- those are genuinely wide, multi-column tables built
+for someone sitting at a desk, already properly contained in their own
+`overflow-x-auto` wrapper (confirmed by checking each one directly)
+rather than dragging the whole page into horizontal scroll, which is
+an acceptable, expected degradation on a phone (a swipe, not a break),
+not something this pass tried to redesign into stacked cards.
+
+1. **`AppHeader` (renders on nearly every page) had no responsive
+   breakpoint at all** -- a single non-wrapping `flex items-baseline
+   justify-between` row carrying the ward-name wordmark on the left and,
+   on the right, an optional `tag` (several of which are genuinely long
+   -- "Recognitions & Advancements Planning," "All-Youth Activity
+   Cancellations"), a "signed in as" name, and the Sign out button, all
+   in one unbroken line with no `flex-wrap`. On a ~375px phone this
+   would either overflow the viewport (dragging the *entire page* into
+   horizontal scroll, not just the header) or crush the wordmark down
+   to nothing. Now `flex-col` below the `sm` breakpoint (wordmark on its
+   own line, the right-hand cluster below it, itself `flex-wrap`) and
+   the original side-by-side `flex-row` unchanged at `sm:` and up --
+   zero visual change on desktop/tablet.
+2. **The public Sacrament Meeting program's own agenda-line rows**
+   (`app/meetings/[id]/public/page.tsx` -- the single page most ward
+   members actually open on a phone, every Sunday morning) had the
+   identical non-wrapping `flex justify-between` shape for a line's
+   `heading` (e.g. a musical number's title) next to its `detail` (e.g.
+   several performers' names) -- each span could still wrap its own
+   text in most browsers, but with no `flex-wrap` on the row itself, a
+   sufficiently long pair of strings had no guaranteed way to drop
+   cleanly onto two lines. Given `flex-wrap` on the public Announcements
+   page's own identical heading+schedule row already exists for exactly
+   this reason, this page's row gained the same treatment for
+   consistency, defensively, before anyone could actually hit it going
+   wrong.
+3. **Every member-facing form input renders at `text-sm` (14px), which
+   triggers iOS Safari's whole-page auto-zoom on focus** for any form
+   control under 16px -- a well-known, specifically-iOS annoyance, not
+   a hard break, but still bad enough to be worth a one-line fix across
+   every field anyone actually fills in on a phone: sign in, request
+   access (sign up), reset password, set a new password (4 files, 9
+   `<input>`s sharing one identical class string), and both Submit an
+   Announcement and Submit an Agenda Item (2 files, each with its own
+   local `INPUT_CLASS` constant covering every input/select/textarea in
+   that form). All now render at `text-base` (16px) instead --
+   deliberately scoped to just these member-facing forms, not every
+   `text-sm` input across the entire app (the dense admin grids are, by
+   design, out of scope for this pass, per the opening note above).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only -- this is a
+static-analysis-only audit with no way to visually confirm any of it
+without a live deploy. Ask the user to check, on an actual phone: any
+page with a long `tag` (e.g. `/rabnm-planning`, `/youth-activity-
+cancellations`) no longer pushes the page into horizontal scroll; the
+public Sacrament Meeting program reads cleanly for a meeting with a
+long musical-number title or several performer names on one line;
+and tapping into the email/password field on `/login` (or any of the
+submit/sign-up forms) no longer triggers iOS's jarring auto-zoom.
+
 **Performance pass, 2026-10-31: an N+1/sequential-round-trip audit
 across the app, following the user's own "this is not a quick app"
 report.** No migration needed -- pure application-code changes over

@@ -104,7 +104,13 @@ export default async function PublicViewPage({
       {view.items.map((item, i) => (
         <div
           key={i}
-          className="flex items-baseline justify-between gap-4 border-b border-rule/40 py-2 last:border-0"
+          // flex-wrap (2026-10-31, mobile-friendliness pass) -- a long
+          // heading (a musical number's title) next to a long detail
+          // (several performer names) had no way to drop onto its own
+          // line on a narrow phone screen, same fix already applied to
+          // the public Announcements page's identical heading+detail
+          // row (app/announcements/public/page.tsx).
+          className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule/40 py-2 last:border-0"
         >
           <span className="text-ink">{item.heading}</span>
           {item.detail && <span className="text-right text-ink-muted">{item.detail}</span>}
