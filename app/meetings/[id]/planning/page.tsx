@@ -128,15 +128,16 @@ export default async function PlanningViewPage({
     redirect(`/meetings/${meetingId}/archived`);
   }
 
-  const meetingWithType = await getMeetingWithType(meetingId);
-  if (!meetingWithType) {
-    return <p className="text-ink-muted">Could not load this meeting.</p>;
-  }
-
   const isSacrament = meeting.meetingType === "sacrament-meeting";
   const isBishopric = meeting.meetingType === "bishopric-meeting";
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
+
+  // Doesn't need anything from either sweep below, so its own fetch
+  // runs concurrently with them instead of blocking on it first
+  // (2026-10-31, chasing the user's own "this app is extremely slow"
+  // report).
+  const meetingWithTypePromise = getMeetingWithType(meetingId);
 
   // Auto-adds every "To be Announced" Calling Planning item (calling
   // and release sides independently) to whichever Sacrament Meeting is
@@ -151,8 +152,11 @@ export default async function PlanningViewPage({
   // function's own doc comment), regardless of which Sacrament Meeting
   // is actually being viewed here, so it's safe to call unconditionally.
   if (isSacrament) {
-    await autoAnnounceReadyCallingPlanningItems();
-    // Auto-fills this meeting's Announcements block with every
+    // Both sweeps touch entirely different tables for independent
+    // purposes (calling_planning/sacrament_rabnm vs.
+    // announcements/sacrament_announcement_pulls), so they run
+    // together rather than one after the other. The second one is:
+    // auto-fills this meeting's Announcements block with every
     // "Sacrament Meeting"-flagged announcement currently in its active
     // window (2026-10-25, migration 083) -- see that function's own
     // doc comment. Unlike the sweep above, this isn't scoped to a
@@ -160,7 +164,12 @@ export default async function PlanningViewPage({
     // should land in every applicable meeting, so it needs to run
     // fresh against whichever meeting's Planning page is actually
     // being viewed.
-    await autoPullSacramentAnnouncements(meetingId, meeting.date);
+    await Promise.all([autoAnnounceReadyCallingPlanningItems(), autoPullSacramentAnnouncements(meetingId, meeting.date)]);
+  }
+
+  const meetingWithType = await meetingWithTypePromise;
+  if (!meetingWithType) {
+    return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
   const [
@@ -177,6 +186,11 @@ export default async function PlanningViewPage({
     wardBusinessSectionOrder,
     announcementsByPlannedElement,
     pullableAnnouncements,
+    applicableElements,
+    attendeePeople,
+    bishopricData,
+    councilNotes,
+    agendaItems,
   ] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
@@ -211,6 +225,17 @@ export default async function PlanningViewPage({
     // comment.
     isSacrament ? getAnnouncementsByPlannedElement(meetingId) : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
     isSacrament ? getPullableAnnouncements(meetingId) : Promise.resolve([]),
+    // These five only need meetingId/meetingWithType.meetingTypeId --
+    // none of them reads back anything the two sweeps above wrote, or
+    // anything else in this same array -- so they're folded into this
+    // one wave instead of five more sequential awaits further down
+    // (2026-10-31, chasing the user's own "this app is extremely slow"
+    // report).
+    getApplicableElements(meetingWithType.meetingTypeId),
+    isSacrament ? Promise.resolve([]) : getMeetingAttendeePeople(meetingWithType.meetingTypeId),
+    isBishopric ? getBishopricMeetingData(meetingId) : Promise.resolve(null),
+    isCouncil ? getCouncilNotes(meetingId) : Promise.resolve(null),
+    getAgendaItemsForMeeting(meetingId),
   ]);
 
   // Meetings created before the per-meeting agenda existed, or created
@@ -259,7 +284,7 @@ export default async function PlanningViewPage({
   // element for this meeting type that isn't already on this specific
   // meeting's own agenda, same "add once, except announcements" rule
   // the standalone /meetings/[id]/template page already enforces.
-  const applicableElements = await getApplicableElements(meetingWithType.meetingTypeId);
+  // (`applicableElements` itself was fetched above, in the main wave.)
   const includedElementIds = new Set(templateElements.map((e) => e.element_id));
   const availableElements = applicableElements.filter((e) => !includedElementIds.has(e.id) || e.key === "announcements");
 
@@ -274,15 +299,9 @@ export default async function PlanningViewPage({
   // (getEligiblePeopleByElementKey) and was never part of this ask.
   // Falls back to every active person if no calling currently maps to
   // this meeting type at all, rather than showing an empty dropdown.
-  const attendeePeople = isSacrament ? [] : await getMeetingAttendeePeople(meetingWithType.meetingTypeId);
+  // (`attendeePeople`/`bishopricData`/`councilNotes`/`agendaItems`
+  // were all fetched above, in the main wave.)
   const people = !isSacrament && attendeePeople.length > 0 ? attendeePeople : activePeople;
-
-  const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
-  const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
-  // agenda_items is a general catalog element any meeting type's template
-  // can include -- fetched independently of meeting type so it works
-  // everywhere, not just Bishopric Meeting.
-  const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
   // Bishopric Meeting/Ward Council/Youth Council's own sectioned agenda
   // (2026-10-19) -- Devotional/Review/Discussion/Closing, split on the

@@ -2038,6 +2038,109 @@ avoid confusing the two.
 
 ## Known open items
 
+**Performance pass, 2026-10-31: an N+1/sequential-round-trip audit
+across the app, following the user's own "this is not a quick app"
+report.** No migration needed -- pure application-code changes over
+existing tables. Scoped to real, measurable wins with no correctness
+risk; deliberately did NOT touch the two places this audit found a
+sequential loop that's sequential *on purpose* --
+`pushRotationToUpcomingMeetings`'s per-meeting
+`apply_rotation_assignment` RPC loop and `applyRotationsToNewMeeting`'s
+own per-rotation loop both advance a shared rotation pointer that two
+calls for the same rotation can't safely race for; parallelizing
+either would risk the exact class of rotation-assignment bug this
+project has already hit more than once (see the migration `086`
+Chorister/Organist entry below). Four real fixes, in order of reach:
+
+1. **Table Admin, Manage Announcements, and Sacrament Meeting Music
+   Planning** (`/admin/[table]`, `/announcements`, `/music`) each ran
+   the same shape of sequential chain on every load: fetch rows, THEN
+   resolve select-with-live-options columns, THEN resolve foreign-key
+   option lists, THEN (two of the three) resolve scoped-FK/reverse-
+   lookup options -- four to five round trips end to end, even though
+   most of those steps never actually depend on each other's results.
+   New shared `resolveColumnsWithLiveOptions`/`resolveForeignKeyOptions`
+   (`lib/admin/table-data.ts`) replace three near-identical inline
+   copies of this logic (one per page) with one real implementation,
+   and all three pages now run "fetch rows + resolve columns + resolve
+   FK options" as a single `Promise.all` wave, then (where applicable)
+   "resolve scoped-FK options + resolve reverse-lookup options" as a
+   second wave once rows are known -- two waves instead of four or
+   five sequential steps. `/announcements`' own bespoke "find the one
+   foreign_key column, fetch its options" logic is now just a special
+   case of the new general helper (announcements has exactly one
+   foreign_key column, so the result is identical) rather than its own
+   copy.
+2. **Creating a Sacrament Meeting always did up to four sequential
+   round trips** (insert `sacrament_planning`, apply rotations, seed
+   planned elements, seed Teaching Program items) **where none of the
+   four actually reads back what another just wrote** -- confirmed
+   directly (`seedSacramentProgramItemsForMeeting` takes its format as
+   a plain argument, never looks it up from the row `sacrament_planning`
+   just inserted). Fixed at all three real creation sites to run as one
+   parallel wave per meeting instead: `/meetings/new`'s own
+   `createMeeting` action, `getOrCreateMeetingId`
+   (`lib/data/meetings.ts`, Table Admin's `createIfMissing` calendar
+   picker), and `generateMeetingsFromRules`'s own per-row loop
+   (`lib/data/meeting-schedule.ts`, bulk Generate) -- the last one still
+   awaits each row before starting the next, which is what actually
+   matters for correctness (two meetings of the same type can't safely
+   race for the same rotation's pointer inside `applyRotationsToNewMeeting`),
+   it just no longer serializes the other three independent calls
+   *within* one row.
+3. **"Fill Presiding/Conducting for upcoming meetings starting
+   `<date>`"** (`pushFixedSacramentRolesToUpcomingMeetings`,
+   `lib/data/rotations.ts`) used to do up to 4 sequential round trips
+   *per meeting in range* (a delete-then-insert for each of Presiding/
+   Conducting) -- unlike the generic rotation push, this one has no
+   shared-pointer constraint at all (Presiding/Conducting are resolved
+   fresh from each meeting's own date against a calling list fetched
+   once up front), so every meeting's assignments can be computed in
+   memory first and written in exactly 3 queries total regardless of
+   how many meetings are in range: up to 2 batched deletes (one per
+   role) and 1 batched insert. The sibling `applyFixedSacramentRoles`
+   (runs once per new meeting, inside `applyRotationsToNewMeeting`)
+   got the same "batch the up-to-2 inserts into one call" treatment.
+4. **The Sacrament Meeting/Bishopric Meeting/Ward Council/Youth
+   Council Planning page** (`app/meetings/[id]/planning/page.tsx`,
+   the single most expensive page in the app, and the one open on the
+   most clicks per week) had three separate inefficiencies stacked on
+   top of each other: `getMeetingWithType` was awaited before the two
+   "To be Announced"/announcement auto-pull sweeps, even though it
+   doesn't need anything either sweep writes; the two sweeps themselves
+   ran one after the other despite touching entirely different tables;
+   and five more fetches (`getApplicableElements`,
+   `getMeetingAttendeePeople`, `getBishopricMeetingData`,
+   `getCouncilNotes`, `getAgendaItemsForMeeting`) ran as five more
+   sequential awaits *after* the page's own main 13-way `Promise.all`,
+   even though every one of them only needs `meetingId`/
+   `meetingTypeId` and reads nothing any of the sweeps or the main
+   fetch wave wrote. Fixed: `getMeetingWithType`'s own fetch now starts
+   before the sweeps and is only awaited once needed (overlapping with
+   them instead of blocking them); the two sweeps now run together via
+   `Promise.all` instead of back to back; and the five extra fetches
+   are folded directly into the existing main `Promise.all`, which grew
+   from 13 entries to 18. The lazy-sweep-before-the-main-fetch ORDERING
+   itself is unchanged and still enforced -- both sweeps still fully
+   complete before the main wave starts, so this page's own first
+   render still reflects whatever either sweep just wrote, exactly as
+   documented where that behavior was originally built.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean, confirming it wasn't caused by anything touched here), same
+no-live-database-access gap as everything else in this project -- this
+assistant has no way to measure real-world latency before/after
+without a live deploy. Ask the user to deploy and compare: `/admin/`
+any table, `/announcements`, and `/music` should all feel noticeably
+snappier on load; creating a meeting (manually, via Table Admin's
+calendar picker, or via bulk Generate) and opening any meeting's
+Planning page should too; and "Fill Presiding/Conducting for upcoming
+meetings" should finish in roughly constant time regardless of how
+wide a date range it's run over, rather than visibly scaling with the
+number of meetings in range.
+
 **Gender toggle buttons, and a sweep removing explanatory subtitles/
 descriptions and the dashboard's "Planning" stage box, 2026-10-31. No
 migration needed.** Three requests in one message:

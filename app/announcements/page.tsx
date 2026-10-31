@@ -3,8 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { getGeneralSubmissions } from "@/lib/data/general-submissions";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
-import { getAdminRows, getMeetingFkOptions } from "@/lib/admin/table-data";
-import { getSelectOptions } from "@/lib/data/select-options";
+import { getAdminRows, resolveColumnsWithLiveOptions, resolveForeignKeyOptions } from "@/lib/admin/table-data";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { setSubmissionStatus, updateAnnouncementRow, insertAnnouncementRow, deleteAnnouncementRow } from "@/app/announcements/actions";
 
@@ -62,29 +61,20 @@ export default async function AnnouncementsInboxPage() {
     );
   }
 
-  const rows = await getAdminRows(config);
-
-  // Same resolution the generic /admin/[table] page does -- a select
-  // column with `optionsFrom` reads its live choices from
-  // admin_select_options instead of its hardcoded fallback. The
-  // announcements registry entry doesn't use optionsFrom today, but
-  // resolving it the same way here keeps this page from silently
-  // drifting if that ever changes.
-  const resolvedColumns = await Promise.all(
-    config.columns.map(async (c) => {
-      if (c.type === "select" && c.optionsFrom) {
-        return { ...c, options: await getSelectOptions(c.optionsFrom, c.options ?? []) };
-      }
-      return c;
-    })
-  );
-
-  const meetingColumn = resolvedColumns.find((c) => c.type === "foreign_key" && c.foreignKey);
-  const fkOptions = meetingColumn?.foreignKey
-    ? { [meetingColumn.column]: await getMeetingFkOptions(meetingColumn.foreignKey.meetingTypeSlug) }
-    : {};
-
-  const generalSubmissions = await getGeneralSubmissions();
+  // All four are independent of each other -- rows, live select
+  // options, this table's one foreign-key column's options, and the
+  // separate stray-agenda-items list all run concurrently instead of a
+  // sequential chain (2026-10-31, chasing the user's own "this app is
+  // extremely slow" report). resolveForeignKeyOptions generalizes what
+  // this page used to resolve by hand for just its one "meeting"
+  // column -- announcements has exactly one foreign_key column, so the
+  // result is identical.
+  const [rows, resolvedColumns, fkOptions, generalSubmissions] = await Promise.all([
+    getAdminRows(config),
+    resolveColumnsWithLiveOptions(config.columns),
+    resolveForeignKeyOptions(config.columns),
+    getGeneralSubmissions(),
+  ]);
   const strayAgendaItems = generalSubmissions.filter((item) => item.kind === "agenda_item");
 
   return (

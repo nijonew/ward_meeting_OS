@@ -387,12 +387,17 @@ export async function getOrCreateMeetingId(
     .single();
   if (error || !created) return null;
 
-  await applyRotationsToNewMeeting(created.id as string, meetingType.id as string, meetingTypeSlug);
-  await seedPlannedElementsForMeeting(
-    created.id as string,
-    meetingType.id as string,
-    meetingTypeSlug === "sacrament-meeting" ? "standard" : null
-  );
+  // Independent of each other for this one new meeting -- run as one
+  // parallel wave instead of two sequential round trips (2026-10-31,
+  // chasing the user's own "this app is extremely slow" report).
+  await Promise.all([
+    applyRotationsToNewMeeting(created.id as string, meetingType.id as string, meetingTypeSlug),
+    seedPlannedElementsForMeeting(
+      created.id as string,
+      meetingType.id as string,
+      meetingTypeSlug === "sacrament-meeting" ? "standard" : null
+    ),
+  ]);
 
   cache?.set(dateIso, created.id as string);
   return created.id as string;

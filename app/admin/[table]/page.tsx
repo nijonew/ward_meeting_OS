@@ -3,8 +3,13 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature, type Feature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
-import { getAdminRows, getForeignKeyOptions, getMeetingFkOptions, getScopedFkOptions, getReverseLookupValues } from "@/lib/admin/table-data";
-import { getSelectOptions } from "@/lib/data/select-options";
+import {
+  getAdminRows,
+  getScopedFkOptions,
+  getReverseLookupValues,
+  resolveColumnsWithLiveOptions,
+  resolveForeignKeyOptions,
+} from "@/lib/admin/table-data";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { updateRow, insertRow, deleteRow } from "./actions";
 
@@ -26,44 +31,30 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
     );
   }
 
-  const rows = await getAdminRows(config);
+  // Every one of these only needs `config` (not each other, and not
+  // `rows`), so they run as one concurrent wave instead of a strictly
+  // sequential chain (2026-10-31, chasing the user's own "this app is
+  // extremely slow" report) -- a select column's live options and a
+  // foreign-key column's option list are both independent of fetching
+  // this table's own rows.
+  const [rows, resolvedColumns, fkOptions] = await Promise.all([
+    getAdminRows(config),
+    resolveColumnsWithLiveOptions(config.columns),
+    resolveForeignKeyOptions(config.columns),
+  ]);
 
-  // A select column with `optionsFrom` reads its live choices from
-  // admin_select_options instead of its hardcoded `options` (used only
-  // as the fallback) -- resolve those now so the rest of this page and
-  // AdminTableEditor never need to know the difference.
-  const resolvedColumns = await Promise.all(
-    config.columns.map(async (c) => {
-      if (c.type === "select" && c.optionsFrom) {
-        return { ...c, options: await getSelectOptions(c.optionsFrom, c.options ?? []) };
-      }
-      return c;
-    })
-  );
-
-  // Every foreign_key column gets its full, unscoped option list (used
-  // directly for most columns, and as the fallback for a scoped column's
-  // "add new row" case, before any row exists to scope by).
-  const fkColumns = resolvedColumns.filter((c) => c.type === "foreign_key" && c.foreignKey);
-  const fkOptionEntries = await Promise.all(
-    fkColumns.map(async (c) => {
-      const fk = c.foreignKey!;
-      const options =
-        fk.table === "meetings"
-          ? await getMeetingFkOptions(fk.meetingTypeSlug)
-          : await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn);
-      return [c.column, options] as const;
-    })
-  );
-  const fkOptions = Object.fromEntries(fkOptionEntries);
-
-  // Columns with `scopedBy` additionally get a per-row-scope-value option
-  // list (e.g. release_person_id narrowed to each row's own calling).
-  const scopedFkOptions = await getScopedFkOptions(config, rows);
-
-  // reverse_lookup columns (e.g. People's "Calling") have no real column
-  // on this table to come back with `rows` -- resolved separately.
-  const reverseLookupValues = await getReverseLookupValues(config, rows);
+  // Both of these need `rows` (just fetched above), but not each other
+  // or the two columns/options above -- a second concurrent wave.
+  const [scopedFkOptions, reverseLookupValues] = await Promise.all([
+    // Columns with `scopedBy` additionally get a per-row-scope-value
+    // option list (e.g. release_person_id narrowed to each row's own
+    // calling).
+    getScopedFkOptions(config, rows),
+    // reverse_lookup columns (e.g. People's "Calling") have no real
+    // column on this table to come back with `rows` -- resolved
+    // separately.
+    getReverseLookupValues(config, rows),
+  ]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-12 sm:px-8">

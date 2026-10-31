@@ -85,18 +85,25 @@ export async function createMeeting(
   // form) rather than lazily on first Meeting Info save, so the correct
   // format-specific default template can be seeded immediately below.
   const specialFormat = isSacrament ? String(formData.get("special_format") ?? "standard") : "standard";
-  if (isSacrament) {
-    await supabase.from("sacrament_planning").insert({ meeting_id: data.id, special_format: specialFormat });
-  }
 
-  await applyRotationsToNewMeeting(data.id, meeting_type_id, meetingTypeSlug);
-  await seedPlannedElementsForMeeting(data.id, meeting_type_id, isSacrament ? specialFormat : null);
-  // Speakers & Music pre-fill by template (2026-09-10) -- see
-  // seedSacramentProgramItemsForMeeting's own comment. Sacrament-only,
-  // same as the special_format-driven seed just above.
+  // None of these four reads back what another just wrote for this
+  // same, single new meeting, so they run as one parallel wave instead
+  // of up to four sequential round trips (2026-10-31, chasing the
+  // user's own "this app is extremely slow" report) -- unlike bulk
+  // Generate (lib/data/meeting-schedule.ts), there's no second meeting
+  // here to race a shared rotation pointer against.
+  const sideEffects: PromiseLike<unknown>[] = [
+    applyRotationsToNewMeeting(data.id, meeting_type_id, meetingTypeSlug),
+    seedPlannedElementsForMeeting(data.id, meeting_type_id, isSacrament ? specialFormat : null),
+  ];
   if (isSacrament) {
-    await seedSacramentProgramItemsForMeeting(data.id, specialFormat);
+    sideEffects.push(supabase.from("sacrament_planning").insert({ meeting_id: data.id, special_format: specialFormat }));
+    // Speakers & Music pre-fill by template (2026-09-10) -- see
+    // seedSacramentProgramItemsForMeeting's own comment. Sacrament-only,
+    // same as the special_format-driven seed just above.
+    sideEffects.push(seedSacramentProgramItemsForMeeting(data.id, specialFormat));
   }
+  await Promise.all(sideEffects);
 
   // Straight to Planning (2026-10-03, "default to the planning view") --
   // skips the extra hop through the bare /meetings/[id] redirect.

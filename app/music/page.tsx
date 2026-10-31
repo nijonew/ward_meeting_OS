@@ -6,12 +6,11 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
 import {
   getAdminRows,
-  getForeignKeyOptions,
-  getMeetingFkOptions,
   getScopedFkOptions,
   getReverseLookupValues,
+  resolveColumnsWithLiveOptions,
+  resolveForeignKeyOptions,
 } from "@/lib/admin/table-data";
-import { getSelectOptions } from "@/lib/data/select-options";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { updateMusicRow, insertMusicRow, deleteMusicRow } from "@/app/music/actions";
 
@@ -81,33 +80,24 @@ export default async function MusicPage() {
     );
   }
 
-  const [people, rows] = await Promise.all([getActivePeople(), getAdminRows(config)]);
+  // Same resolution /admin/[table]/page.tsx does for every table, all
+  // run as one concurrent wave rather than a sequential chain
+  // (2026-10-31, chasing the user's own "this app is extremely slow"
+  // report) -- sacrament_music doesn't currently use any of
+  // select-with-live-options, scopedBy, or reverse_lookup columns, but
+  // resolving them the same way here keeps this page from silently
+  // drifting if that ever changes.
+  const [people, rows, resolvedColumns, fkOptions] = await Promise.all([
+    getActivePeople(),
+    getAdminRows(config),
+    resolveColumnsWithLiveOptions(config.columns),
+    resolveForeignKeyOptions(config.columns),
+  ]);
 
-  // Same resolution /admin/[table]/page.tsx does for every table --
-  // sacrament_music doesn't currently use any of select-with-live-options,
-  // scopedBy, or reverse_lookup columns, but resolving them the same way
-  // here keeps this page from silently drifting if that ever changes.
-  const resolvedColumns = await Promise.all(
-    config.columns.map(async (c) => {
-      if (c.type === "select" && c.optionsFrom) {
-        return { ...c, options: await getSelectOptions(c.optionsFrom, c.options ?? []) };
-      }
-      return c;
-    })
-  );
-
-  const fkColumns = resolvedColumns.filter((c) => c.type === "foreign_key" && c.foreignKey);
-  const fkOptionEntries = await Promise.all(
-    fkColumns.map(async (c) => {
-      const fk = c.foreignKey!;
-      const options =
-        fk.table === "meetings" ? await getMeetingFkOptions(fk.meetingTypeSlug) : await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn);
-      return [c.column, options] as const;
-    })
-  );
-  const fkOptions = Object.fromEntries(fkOptionEntries);
-  const scopedFkOptions = await getScopedFkOptions(config, rows);
-  const reverseLookupValues = await getReverseLookupValues(config, rows);
+  const [scopedFkOptions, reverseLookupValues] = await Promise.all([
+    getScopedFkOptions(config, rows),
+    getReverseLookupValues(config, rows),
+  ]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-12 sm:px-8">

@@ -210,21 +210,33 @@ export async function generateMeetingsFromRules(throughDateISO: string): Promise
     const isSacrament = slug === "sacrament-meeting";
 
     for (const row of (inserted ?? []) as { id: string }[]) {
-      // Bulk-generated meetings always start as "standard" -- cadence
-      // rules can't know about a future Stake Conference/General
-      // Conference Sunday; the user corrects special_format manually
-      // (via Meeting Info) for whichever real Sundays need it.
+      // These four calls are independent of each other for one and the
+      // same meeting -- none reads back what another just wrote -- so
+      // they run as one parallel wave per row instead of four
+      // sequential round trips (2026-10-31, chasing the user's own
+      // "this app is extremely slow" report, which matters most right
+      // here since a bulk Generate can create many meetings at once).
+      // The outer loop itself still awaits each row before starting the
+      // next, which is what actually matters for correctness --
+      // applyRotationsToNewMeeting advances a shared rotation pointer
+      // that two meetings of the same type can't safely race for, and
+      // that's a cross-ROW constraint, not a within-row one.
+      const sideEffects: PromiseLike<unknown>[] = [
+        applyRotationsToNewMeeting(row.id, rule.meeting_type_id, slug),
+        seedPlannedElementsForMeeting(row.id, rule.meeting_type_id, isSacrament ? "standard" : null),
+      ];
       if (isSacrament) {
-        await supabase.from("sacrament_planning").insert({ meeting_id: row.id, special_format: "standard" });
+        // Bulk-generated meetings always start as "standard" -- cadence
+        // rules can't know about a future Stake Conference/General
+        // Conference Sunday; the user corrects special_format manually
+        // (via Meeting Info) for whichever real Sundays need it.
+        sideEffects.push(supabase.from("sacrament_planning").insert({ meeting_id: row.id, special_format: "standard" }));
+        // Speakers & Music pre-fill by template (2026-09-10) -- same
+        // "standard" default every bulk-generated meeting already gets
+        // for special_format above.
+        sideEffects.push(seedSacramentProgramItemsForMeeting(row.id, "standard"));
       }
-      await applyRotationsToNewMeeting(row.id, rule.meeting_type_id, slug);
-      await seedPlannedElementsForMeeting(row.id, rule.meeting_type_id, isSacrament ? "standard" : null);
-      // Speakers & Music pre-fill by template (2026-09-10) -- same
-      // "standard" default every bulk-generated meeting already gets
-      // for special_format above.
-      if (isSacrament) {
-        await seedSacramentProgramItemsForMeeting(row.id, "standard");
-      }
+      await Promise.all(sideEffects);
       created += 1;
     }
   }

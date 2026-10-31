@@ -529,9 +529,20 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
     ((callingRows ?? []) as { name: string; current_holder_id: string | null }[]).map((c) => [c.name, c.current_holder_id])
   );
 
-  let filled = 0;
-  let overwritten = 0;
   let skippedVacant = 0;
+
+  // Unlike pushRotationToUpcomingMeetings' own per-meeting RPC loop
+  // (which must stay sequential -- each call atomically advances a
+  // shared rotation pointer that the next meeting's own assignment
+  // depends on), Presiding/Conducting are resolved fresh from each
+  // meeting's own date against `holderByCallingName`, already fetched
+  // once above -- no state carries from one meeting to the next, so
+  // there's nothing to lose by computing every meeting's assignments
+  // up front and writing them all in two batched queries instead of up
+  // to 4 sequential round trips per meeting (2026-10-31, chasing the
+  // user's own "this app is extremely slow" report).
+  const toInsert: { meeting_id: string; role: string; assigned_to_id: string }[] = [];
+  const toDeleteByRole: Record<string, string[]> = { presiding: [], conducting: [] };
 
   for (const meeting of meetings) {
     const monthIndex = new Date(`${meeting.date}T00:00:00`).getMonth() % 3;
@@ -545,25 +556,29 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
         skippedVacant += 1;
         continue;
       }
-      const hadExisting = existing.has(`${meeting.id}::${role}`);
-      if (hadExisting) {
-        const { error: deleteError } = await supabase
-          .from("sacrament_assignments")
-          .delete()
-          .eq("meeting_id", meeting.id)
-          .eq("role", role);
-        if (deleteError) return { error: deleteError.message };
-      }
-      const { error } = await supabase
-        .from("sacrament_assignments")
-        .insert({ meeting_id: meeting.id, role, assigned_to_id: personId });
-      if (error) return { error: error.message };
-      filled += 1;
-      if (hadExisting) overwritten += 1;
+      toInsert.push({ meeting_id: meeting.id, role, assigned_to_id: personId });
+      if (existing.has(`${meeting.id}::${role}`)) toDeleteByRole[role].push(meeting.id);
     }
   }
 
-  return { filled, overwritten, skippedVacant };
+  for (const role of ["presiding", "conducting"]) {
+    const meetingIdsForRole = toDeleteByRole[role];
+    if (meetingIdsForRole.length === 0) continue;
+    const { error: deleteError } = await supabase
+      .from("sacrament_assignments")
+      .delete()
+      .eq("role", role)
+      .in("meeting_id", meetingIdsForRole);
+    if (deleteError) return { error: deleteError.message };
+  }
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from("sacrament_assignments").insert(toInsert);
+    if (error) return { error: error.message };
+  }
+
+  const overwritten = toDeleteByRole.presiding.length + toDeleteByRole.conducting.length;
+  return { filled: toInsert.length, overwritten, skippedVacant };
 }
 
 /**
@@ -786,9 +801,17 @@ async function applyFixedSacramentRoles(
     { role: "conducting", personId: holderByCallingName.get(CONDUCTING_CALLING_ORDER[monthIndex]) },
   ];
 
-  for (const { role, personId } of roles) {
-    if (!personId) continue;
-    await supabase.from("sacrament_assignments").insert({ meeting_id: meetingId, role, assigned_to_id: personId });
+  // A brand-new meeting never has an existing row for either role, so
+  // both inserts can go in one batched call instead of two sequential
+  // ones -- a small win on its own, but this runs inside
+  // generateMeetingsFromRules' own per-meeting loop too, where it was
+  // compounding into a real delay the one time a bulk Generate actually
+  // creates several meetings at once.
+  const toInsert = roles
+    .filter((r) => r.personId)
+    .map((r) => ({ meeting_id: meetingId, role: r.role, assigned_to_id: r.personId as string }));
+  if (toInsert.length > 0) {
+    await supabase.from("sacrament_assignments").insert(toInsert);
   }
 }
 

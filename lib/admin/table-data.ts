@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
+import { getSelectOptions } from "@/lib/data/select-options";
 import type { MeetingTypeSlug } from "@/lib/types";
-import { decodeCreateMeetingValue, type AdminOption, type AdminTableConfig } from "./types";
+import { decodeCreateMeetingValue, type AdminColumnConfig, type AdminOption, type AdminTableConfig } from "./types";
 
 export type AdminRow = Record<string, unknown> & { id: string };
 type MutationResult = { success: true } | { error: string };
@@ -76,6 +77,57 @@ export async function getMeetingFkOptions(meetingTypeSlug?: string): Promise<Adm
     const label = meetingTypeSlug ? formattedDate : `${formattedDate} — ${meetingType?.name ?? "Meeting"}`;
     return { value: row.id, label, date: row.date };
   });
+}
+
+/**
+ * For every "select" column with `optionsFrom`, replaces its fallback
+ * `options` with the live admin_select_options list (lib/data/select-options.ts).
+ * Every other column passes through unchanged. Pulled out as its own
+ * function (2026-10-31, chasing the user's own "this app is extremely
+ * slow" report) so the three pages that render a config through
+ * AdminTableEditor (Table Admin itself, Manage Announcements,
+ * Sacrament Meeting Music Planning) can run this concurrently with
+ * `getAdminRows`/`resolveForeignKeyOptions` instead of each awaiting it
+ * as one more step in a strictly sequential chain -- a `select` column
+ * with `optionsFrom` never affects whether anything is a foreign key,
+ * so none of these three needs to wait on either of the others.
+ */
+export async function resolveColumnsWithLiveOptions(
+  columns: AdminColumnConfig[]
+): Promise<AdminColumnConfig[]> {
+  return Promise.all(
+    columns.map(async (c) => {
+      if (c.type === "select" && c.optionsFrom) {
+        return { ...c, options: await getSelectOptions(c.optionsFrom, c.options ?? []) };
+      }
+      return c;
+    })
+  );
+}
+
+/**
+ * Every foreign_key column's full, unscoped option list, keyed by
+ * column name -- one batched query per column, all in parallel. Reads
+ * straight from the raw column list, not a `resolveColumnsWithLiveOptions`
+ * result -- resolving a select column's live options never changes
+ * which columns are foreign keys, so the two can run concurrently
+ * instead of one waiting on the other for no reason.
+ */
+export async function resolveForeignKeyOptions(
+  columns: AdminColumnConfig[]
+): Promise<Record<string, AdminOption[]>> {
+  const fkColumns = columns.filter((c) => c.type === "foreign_key" && c.foreignKey);
+  const entries = await Promise.all(
+    fkColumns.map(async (c) => {
+      const fk = c.foreignKey!;
+      const options =
+        fk.table === "meetings"
+          ? await getMeetingFkOptions(fk.meetingTypeSlug)
+          : await getForeignKeyOptions(fk.table, fk.valueColumn, fk.labelColumn);
+      return [c.column, options] as const;
+    })
+  );
+  return Object.fromEntries(entries);
 }
 
 /**
