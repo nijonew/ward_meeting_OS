@@ -2041,7 +2041,7 @@ avoid confusing the two.
 **Six items from one sitting, 2026-10-30: a real gender field, an
 archive-instead-of-delete page for People, a Ward Business save bug,
 subsection reordering, announcement reordering, and a real public Ward
-Business section (migration `091`, not yet run).** The user's own
+Business section (migration `091`, confirmed run).** The user's own
 message bundled all of these together, plus two items handled
 separately (see the two entries right after this one: the
 person-calling-table question was answered in chat, no code change;
@@ -2197,16 +2197,16 @@ request).
    heading on every program regardless of content.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
-database-access gap as everything else in this project -- **confirm
-migration number `091` is actually free before running it**, per this
-project's own repeated numbering-collision history, then ask the user
-to check: Table Admin's People grid shows a Gender dropdown and its
-Delete button now reads "Archive" (clearing the person's calling and
-login link, moving them to `/admin/archived-people`, where Restore and
-Delete Permanently both work); adding a RABNM item to Ward Business on
-a Sacrament Meeting's Planning page now sticks (or shows a real error
-if it doesn't); the three Ward Business subsections and a meeting's own
-pulled announcements both show working Move Up/Down controls, with the
+database-access gap as everything else in this project. **Migration
+`091` confirmed run, 2026-10-30** -- functional behavior not yet
+confirmed; ask the user to check: Table Admin's People grid shows a
+Gender dropdown and its Delete button now reads "Archive" (clearing
+the person's calling and login link, moving them to
+`/admin/archived-people`, where Restore and Delete Permanently both
+work); adding a RABNM item to Ward Business on a Sacrament Meeting's
+Planning page now sticks (or shows a real error if it doesn't); the
+three Ward Business subsections and a meeting's own pulled
+announcements both show working Move Up/Down controls, with the
 announcement order reflected in Conducting and Archived too; and that
 the public Sacrament Meeting program shows "Ward Business" -> "Naming
 and Blessing of Children" early in the program, only when a baby
