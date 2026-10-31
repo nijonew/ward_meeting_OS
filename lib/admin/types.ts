@@ -203,6 +203,24 @@ export interface AdminTableConfig {
    * this existed.
    */
   sweepBeforeRead?: () => Promise<void>;
+  /**
+   * Marks this table as archive-instead-of-delete (2026-10-30, the
+   * user's own request for `people`: "when someone is deleted from the
+   * people page they should be added to a new archived people page").
+   * `archivedColumn` is the real column that marks a row archived --
+   * `getAdminRows` excludes any row where it's set, by default, so an
+   * archived row disappears from the everyday grid without actually
+   * being destroyed. `archiveRpc` is the name of a Postgres function
+   * (taking a single `target_id uuid` argument) that this table's
+   * Delete button calls instead of a real `DELETE` -- the function
+   * itself is responsible for setting `archivedColumn` and for any
+   * other side effects archiving this specific table should have
+   * (e.g. `archive_person` also clears the archived person's calling
+   * assignment(s) and login link). A table with neither set behaves
+   * exactly as before this existed -- a real, permanent delete.
+   */
+  archivedColumn?: string;
+  archiveRpc?: string;
 }
 
 /**

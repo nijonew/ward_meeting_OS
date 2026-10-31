@@ -384,11 +384,22 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "people",
     label: "People",
     description:
-      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. Age Group is a checkbox (checked = Youth, unchecked = Adult) rather than a three-way dropdown -- the rare \"Child\" row this column can still hold isn't settable from here; it shows unchecked like Adult does, and stays whatever it already is unless the checkbox is actually clicked. Login Account just shows whether one's linked -- link or change it at /admin/verify-logins instead, which confirms identity rather than offering a bare list of accounts. Calling is also read-only here -- assign/reassign callings for a person at /admin/person-callings instead, or edit who holds one calling at a time via /callings or Table Admin's own Callings grid. Attendance Status, Active, and Notes still exist on this table -- active still controls assignment-picker visibility -- but aren't editable from this grid anymore (2026-10-03, the user's own request); edit them directly in Supabase if ever needed.",
+      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. Age Group is a checkbox (checked = Youth, unchecked = Adult) rather than a three-way dropdown -- the rare \"Child\" row this column can still hold isn't settable from here; it shows unchecked like Adult does, and stays whatever it already is unless the checkbox is actually clicked. Login Account just shows whether one's linked -- link or change it at /admin/verify-logins instead, which confirms identity rather than offering a bare list of accounts. Calling is also read-only here -- assign/reassign callings for a person at /admin/person-callings instead, or edit who holds one calling at a time via /callings or Table Admin's own Callings grid. Attendance Status, Active, and Notes still exist on this table -- active still controls assignment-picker visibility -- but aren't editable from this grid anymore (2026-10-03, the user's own request); edit them directly in Supabase if ever needed. Delete here archives instead of truly deleting (2026-10-30) -- it clears the person's calling assignment(s) and login link and moves them off this list; see Admin -> Archived People to restore one, or delete one permanently.",
     requiredFeature: "table_admin_people",
     orderBy: { column: "name", ascending: true },
+    archivedColumn: "archived_at",
+    archiveRpc: "archive_person",
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
+      {
+        column: "gender",
+        label: "Gender",
+        type: "select",
+        options: [
+          { value: "male", label: "Male" },
+          { value: "female", label: "Female" },
+        ],
+      },
       {
         column: "age_group",
         label: "Age Group",

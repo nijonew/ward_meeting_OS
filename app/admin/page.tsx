@@ -51,6 +51,7 @@ export default async function AdminIndexPage() {
   const canManageTemplates = hasFeature(profile, "meeting_templates_admin");
   const canVerifyLogins = hasFeature(profile, "verify_logins");
   const canManageCallingFeatures = hasFeature(profile, "table_admin_callings");
+  const canManagePeople = hasFeature(profile, "table_admin_people");
   const allTables = Object.values(ADMIN_TABLES).filter((t) => hasFeature(profile, t.requiredFeature as Feature));
   // Alphabetical, per the user's own request (2026-10-03) -- only this
   // main list; "Sacrament Meeting Content" below and "Other Admin
@@ -91,7 +92,7 @@ export default async function AdminIndexPage() {
         </section>
       )}
 
-      {(canManageTemplates || canVerifyLogins || canManageCallingFeatures) && (
+      {(canManageTemplates || canVerifyLogins || canManageCallingFeatures || canManagePeople) && (
         <section>
           <h2 className="font-display text-xl">Other Admin Tools</h2>
           <p className="mt-1 text-xs text-ink-muted">
@@ -123,6 +124,13 @@ export default async function AdminIndexPage() {
               <li>
                 <Link href="/admin/verify-logins" className="block px-6 py-4 font-medium text-ink hover:bg-paper">
                   Verify Logins
+                </Link>
+              </li>
+            )}
+            {canManagePeople && (
+              <li>
+                <Link href="/admin/archived-people" className="block px-6 py-4 font-medium text-ink hover:bg-paper">
+                  Archived People
                 </Link>
               </li>
             )}

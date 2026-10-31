@@ -131,6 +131,7 @@ export function AdminTableEditor({
   onUpdate,
   onInsert,
   onDelete,
+  deleteLabel,
 }: {
   table: string;
   columns: AdminColumnConfig[];
@@ -144,6 +145,11 @@ export function AdminTableEditor({
   onUpdate: (table: string, id: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onInsert: (table: string, patch: Record<string, unknown>) => Promise<ActionResult>;
   onDelete: (table: string, id: string) => Promise<ActionResult>;
+  /** "Delete" by default -- pass "Archive" for a table whose `onDelete`
+   *  actually archives instead of truly deleting (2026-10-30, see
+   *  AdminTableConfig.archiveRpc), so the button is honest about what
+   *  clicking it actually does. */
+  deleteLabel?: string;
 }) {
   const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
   const [newRow, setNewRow] = useState<Record<string, unknown>>({});
@@ -336,7 +342,9 @@ export function AdminTableEditor({
   };
 
   const removeRow = (row: AdminRow) => {
-    if (!window.confirm("Delete this row? This cannot be undone.")) return;
+    const confirmMessage =
+      deleteLabel === "Archive" ? "Archive this row? It moves off this list but isn't deleted." : "Delete this row? This cannot be undone.";
+    if (!window.confirm(confirmMessage)) return;
     setError(null);
     startTransition(async () => {
       const result = await onDelete(table, row.id);
@@ -422,7 +430,7 @@ export function AdminTableEditor({
                   onClick={() => removeRow(row)}
                   className="text-xs text-danger/70 hover:text-danger"
                 >
-                  Delete
+                  {deleteLabel ?? "Delete"}
                 </button>
               </td>
             </tr>

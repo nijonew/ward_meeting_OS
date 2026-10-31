@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { sweepPastAnnouncements, compareAnnouncementsBySchedule } from "@/lib/data/announcements";
+import { sweepPastAnnouncements } from "@/lib/data/announcements";
 import { SACRAMENT_MEETING_ANNOUNCEMENT_LABEL } from "@/lib/data/announcement-constants";
 import { sweepPoolIntoMeeting } from "@/lib/data/pool-sweep";
 
@@ -122,13 +122,23 @@ export async function getPullableAnnouncements(meetingId: string): Promise<Pulle
 /** Already pulled into this meeting, grouped by which specific block
  *  (`meeting_planned_elements` row id) each one belongs to -- what
  *  Planning, Conducting, and the Archived view all render, one group
- *  per Announcements element actually on that meeting's agenda. */
+ *  per Announcements element actually on that meeting's agenda.
+ *
+ * **Manually orderable, 2026-10-30** (migration 091, the user's own
+ * request: "I need to be able to put announcements in order also in
+ * sacrament meetings") -- replaces the earlier soonest-to-latest
+ * automatic sort (2026-10-25) with a real per-row `sort_order`, same
+ * Move Up/Down mechanism as Ward Business's Callings/Releases
+ * (migration 090). Scoped per `planned_element_id` so a meeting with
+ * more than one Announcements block (migration 074) reorders each
+ * block independently. */
 export async function getAnnouncementsByPlannedElement(meetingId: string): Promise<Map<string, PulledAnnouncement[]>> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("sacrament_announcement_pulls")
-    .select(`planned_element_id, announcements(${ANNOUNCEMENT_COLUMNS})`)
-    .eq("meeting_id", meetingId);
+    .select(`planned_element_id, sort_order, announcements(${ANNOUNCEMENT_COLUMNS})`)
+    .eq("meeting_id", meetingId)
+    .order("sort_order", { ascending: true });
 
   const result = new Map<string, PulledAnnouncement[]>();
   for (const row of (data ?? []) as { planned_element_id: string; announcements: unknown }[]) {
@@ -138,14 +148,24 @@ export async function getAnnouncementsByPlannedElement(meetingId: string): Promi
     if (list) list.push(announcement);
     else result.set(row.planned_element_id, [announcement]);
   }
-  // Soonest-to-latest by event date/time, same as the public page's
-  // own ordering (2026-10-25, the user's own request: "I would like
-  // for the sort we discussed for announcements to also apply to the
-  // order in which they appear in meetings") -- was alphabetical by
-  // title, which had no relationship to when each one is actually
-  // happening.
-  for (const list of result.values()) list.sort(compareAnnouncementsBySchedule);
   return result;
+}
+
+/** New pulls always land at the end of their own block's list -- same
+ *  "compute max(sort_order) + 10" convention as
+ *  `insertSacramentRabnmLink` (migration 090). Scoped per
+ *  `planned_element_id`, not per meeting, since each Announcements
+ *  block on a meeting reorders independently. */
+export async function nextAnnouncementPullSortOrder(plannedElementId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: maxRow } = await supabase
+    .from("sacrament_announcement_pulls")
+    .select("sort_order")
+    .eq("planned_element_id", plannedElementId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (maxRow?.sort_order ?? 0) + 10;
 }
 
 /**
@@ -238,9 +258,10 @@ export async function autoPullSacramentAnnouncements(meetingId: string, meetingD
           return meetingDateIso >= row.start_date && meetingDateIso <= windowEnd;
         },
         insert: async (row, mtgId) => {
+          const sortOrder = await nextAnnouncementPullSortOrder(plannedElementId);
           const { error } = await supabase
             .from("sacrament_announcement_pulls")
-            .insert({ announcement_id: row.id, meeting_id: mtgId, planned_element_id: plannedElementId });
+            .insert({ announcement_id: row.id, meeting_id: mtgId, planned_element_id: plannedElementId, sort_order: sortOrder });
           return !error;
         },
       },

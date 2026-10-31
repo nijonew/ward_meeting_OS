@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { deleteRabnmItem } from "@/app/meetings/[id]/planning/actions";
 import {
   pullCallingPlanningIntoMeeting,
@@ -8,11 +8,13 @@ import {
   pullRabnmPlanningIntoMeeting,
   removeRabnmPlanningFromMeeting,
   moveWardBusinessItem,
+  moveWardBusinessSection,
 } from "@/app/meetings/[id]/ward-business-actions";
 import type { RabnmRow } from "@/lib/data/sacrament-planning";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
 import type { CallableRabnmItem } from "@/lib/data/sacrament-rabnm-planning";
 import { RABNM_PLANNING_TYPES } from "@/lib/data/sacrament-constants";
+import type { WardBusinessSectionKey } from "@/lib/data/ward-settings";
 
 const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 
@@ -45,20 +47,25 @@ function ExistingRow({
 }) {
   const [removing, startRemove] = useTransition();
   const [moving, startMove] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  const remove = () =>
+  const remove = () => {
+    setError(null);
     startRemove(async () => {
-      if (item.calling_planning_id) {
-        await removeCallingPlanningFromMeeting(meetingId, item.calling_planning_id);
-      } else {
-        await deleteRabnmItem(item.id, meetingId);
-      }
+      const result = item.calling_planning_id
+        ? await removeCallingPlanningFromMeeting(meetingId, item.calling_planning_id)
+        : await deleteRabnmItem(item.id, meetingId);
+      if ("error" in result) setError(result.error);
     });
+  };
 
-  const move = (direction: "up" | "down") =>
+  const move = (direction: "up" | "down") => {
+    setError(null);
     startMove(async () => {
-      await moveWardBusinessItem(meetingId, item.id, type, direction);
+      const result = await moveWardBusinessItem(meetingId, item.id, type, direction);
+      if ("error" in result) setError(result.error);
     });
+  };
 
   return (
     <tr className="border-t border-rule/40">
@@ -86,8 +93,69 @@ function ExistingRow({
             {removing ? "Removing..." : "Remove"}
           </button>
         </span>
+        {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </tr>
+  );
+}
+
+/**
+ * Shared heading row for each of Ward Business's three subsections,
+ * with Move Up/Down controls to reorder the SUBSECTIONS themselves
+ * (migration 091, the user's own request: "I would like to be able to
+ * adjust the order of subsections in the ward business section") --
+ * distinct from `ExistingRow`'s own Move Up/Down, which reorders
+ * individual LINES within one subsection. Pulled out of each section
+ * component so `WardBusinessField` can render the title+controls once,
+ * uniformly, for whichever section is in that position.
+ */
+function SectionHeading({
+  title,
+  meetingId,
+  sectionKey,
+  isFirst,
+  isLast,
+}: {
+  title: string;
+  meetingId: string;
+  sectionKey: WardBusinessSectionKey;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const [moving, startMove] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const move = (direction: "up" | "down") => {
+    setError(null);
+    startMove(async () => {
+      const result = await moveWardBusinessSection(meetingId, sectionKey, direction);
+      if ("error" in result) setError(result.error);
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{title}</p>
+      <span className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={moving || isFirst}
+          onClick={() => move("up")}
+          className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+        >
+          &uarr;
+        </button>
+        <button
+          type="button"
+          disabled={moving || isLast}
+          onClick={() => move("down")}
+          className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+        >
+          &darr;
+        </button>
+      </span>
+      {error && <p className="text-[11px] text-danger">{error}</p>}
+    </div>
   );
 }
 
@@ -103,13 +171,11 @@ function ExistingRow({
  * Changes".
  */
 function CallingPlanningSection({
-  title,
   kind,
   meetingId,
   existing,
   candidates,
 }: {
-  title: string;
   kind: "calling" | "release";
   meetingId: string;
   existing: RabnmRow[];
@@ -117,6 +183,7 @@ function CallingPlanningSection({
 }) {
   const [selected, setSelected] = useState("");
   const [pending, startPull] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const sortedCandidates = [...candidates].sort((a, b) => Number(b.ready) - Number(a.ready));
   // sacrament_rabnm.type uses "new_calling", not "calling" -- kind is
@@ -126,16 +193,19 @@ function CallingPlanningSection({
 
   const pull = () => {
     if (!selected) return;
+    setError(null);
     startPull(async () => {
-      await pullCallingPlanningIntoMeeting(meetingId, selected, kind);
+      const result = await pullCallingPlanningIntoMeeting(meetingId, selected, kind);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
       setSelected("");
     });
   };
 
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{title}</p>
-
       {existing.length > 0 ? (
         <table className="mt-2 w-full text-sm">
           <tbody>
@@ -173,6 +243,7 @@ function CallingPlanningSection({
           >
             {pending ? "Adding..." : "Add"}
           </button>
+          {error && <span className="text-[11px] text-danger">{error}</span>}
         </div>
       )}
     </div>
@@ -204,6 +275,7 @@ function RabnmPlanningSection({
 }) {
   const [selected, setSelected] = useState("");
   const [pending, startPull] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const byType = new Map<string, string>(RABNM_PLANNING_TYPES.map((t) => [t.value, t.label]));
   const grouped = RABNM_PLANNING_TYPES.map((t) => ({
@@ -213,18 +285,19 @@ function RabnmPlanningSection({
 
   const pull = () => {
     if (!selected) return;
+    setError(null);
     startPull(async () => {
-      await pullRabnmPlanningIntoMeeting(meetingId, selected);
+      const result = await pullRabnmPlanningIntoMeeting(meetingId, selected);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
       setSelected("");
     });
   };
 
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
-        Recognitions, Advancements, Baptisms, New Members &amp; Baby Blessings
-      </p>
-
       {existing.length > 0 ? (
         <table className="mt-2 w-full text-sm">
           <tbody>
@@ -262,6 +335,7 @@ function RabnmPlanningSection({
           >
             {pending ? "Adding..." : "Add"}
           </button>
+          {error && <span className="text-[11px] text-danger">{error}</span>}
         </div>
       )}
     </div>
@@ -273,15 +347,17 @@ function RabnmPlanningSection({
  *  without duplicating the Remove-button logic. */
 function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
   const [removing, startRemove] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  const remove = () =>
+  const remove = () => {
+    setError(null);
     startRemove(async () => {
-      if (item.rabnm_planning_id) {
-        await removeRabnmPlanningFromMeeting(meetingId, item.rabnm_planning_id);
-      } else {
-        await deleteRabnmItem(item.id, meetingId);
-      }
+      const result = item.rabnm_planning_id
+        ? await removeRabnmPlanningFromMeeting(meetingId, item.rabnm_planning_id)
+        : await deleteRabnmItem(item.id, meetingId);
+      if ("error" in result) setError(result.error);
     });
+  };
 
   return (
     <>
@@ -293,6 +369,7 @@ function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: st
         <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
           {removing ? "Removing..." : "Remove"}
         </button>
+        {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </>
   );
@@ -332,35 +409,52 @@ export function WardBusinessField({
   callableCallings,
   callableReleases,
   callableRabnm,
+  sectionOrder,
 }: {
   meetingId: string;
   items: RabnmRow[];
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
   callableRabnm: CallableRabnmItem[];
+  sectionOrder: WardBusinessSectionKey[];
 }) {
   const releaseItems = items.filter((i) => i.type === "release");
   const callingItems = items.filter((i) => i.type === "new_calling");
   const rabnmPlanningTypeKeys = new Set<string>(RABNM_PLANNING_TYPES.map((t) => t.value));
   const rabnmItems = items.filter((i) => rabnmPlanningTypeKeys.has(i.type) || Boolean(i.rabnm_planning_id));
 
+  // One entry per subsection, keyed the same way as WARD_BUSINESS_SECTION_KEYS
+  // (ward-settings.ts) -- rendered below in whatever order `sectionOrder`
+  // says, each with its own Move Up/Down heading (SectionHeading).
+  const sections: Record<WardBusinessSectionKey, { title: string; node: ReactNode }> = {
+    release: {
+      title: "Releases",
+      node: <CallingPlanningSection kind="release" meetingId={meetingId} existing={releaseItems} candidates={callableReleases} />,
+    },
+    new_calling: {
+      title: "Callings",
+      node: <CallingPlanningSection kind="calling" meetingId={meetingId} existing={callingItems} candidates={callableCallings} />,
+    },
+    rabnm: {
+      title: "Recognitions, Advancements, Baptisms, New Members & Baby Blessings",
+      node: <RabnmPlanningSection meetingId={meetingId} existing={rabnmItems} candidates={callableRabnm} />,
+    },
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <CallingPlanningSection
-        title="Releases"
-        kind="release"
-        meetingId={meetingId}
-        existing={releaseItems}
-        candidates={callableReleases}
-      />
-      <CallingPlanningSection
-        title="Callings"
-        kind="calling"
-        meetingId={meetingId}
-        existing={callingItems}
-        candidates={callableCallings}
-      />
-      <RabnmPlanningSection meetingId={meetingId} existing={rabnmItems} candidates={callableRabnm} />
+      {sectionOrder.map((key, index) => (
+        <div key={key}>
+          <SectionHeading
+            title={sections[key].title}
+            meetingId={meetingId}
+            sectionKey={key}
+            isFirst={index === 0}
+            isLast={index === sectionOrder.length - 1}
+          />
+          {sections[key].node}
+        </div>
+      ))}
     </div>
   );
 }

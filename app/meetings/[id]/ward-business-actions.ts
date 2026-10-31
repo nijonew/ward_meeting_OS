@@ -15,6 +15,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { insertSacramentRabnmLink, removeSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
 import { clearPoolExclusion } from "@/lib/data/pool-sweep";
+import {
+  normalizeWardBusinessSectionOrder,
+  type WardBusinessSectionKey,
+} from "@/lib/data/ward-settings";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -260,6 +264,54 @@ export async function moveWardBusinessItem(
   if (error2) return { error: error2.message };
 
   revalidateBoth(meetingId);
+  return { success: true };
+}
+
+/**
+ * Moves one of Ward Business's three subsections (Releases, Callings,
+ * RABNM) up or down in a single ward-wide display order -- the user's
+ * own request, 2026-10-30: "I would like to be able to adjust the
+ * order of subsections in the ward business section." Stored on
+ * `ward_settings` (a singleton row, same as the ward's own display
+ * name), not per-meeting -- see WARD_BUSINESS_SECTION_KEYS's own doc
+ * comment. Only revalidates this one meeting's own Planning page --
+ * every other meeting's Planning page re-reads `ward_settings` fresh
+ * on its own next load regardless, same as any other dynamic route in
+ * this app.
+ */
+export async function moveWardBusinessSection(
+  meetingId: string,
+  key: WardBusinessSectionKey,
+  direction: "up" | "down"
+): Promise<ActionResult> {
+  const denied = await requireRabnmFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const { data: settingsRow, error: fetchError } = await supabase
+    .from("ward_settings")
+    .select("id, ward_business_section_order")
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchError || !settingsRow) {
+    return { error: fetchError?.message ?? "Ward settings row not found." };
+  }
+
+  const order = normalizeWardBusinessSectionOrder(settingsRow.ward_business_section_order as string[] | null);
+  const index = order.indexOf(key);
+  if (index === -1) return { error: "Unknown Ward Business section." };
+
+  const swapIndex = direction === "up" ? index - 1 : index + 1;
+  if (swapIndex < 0 || swapIndex >= order.length) return { success: true };
+
+  const next = [...order];
+  [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+
+  const { error } = await supabase.from("ward_settings").update({ ward_business_section_order: next }).eq("id", settingsRow.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/meetings/${meetingId}/planning`);
   return { success: true };
 }
 

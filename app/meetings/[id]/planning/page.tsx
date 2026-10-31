@@ -32,6 +32,7 @@ import {
   type PulledAnnouncement,
 } from "@/lib/data/sacrament-announcements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
+import { getWardBusinessSectionOrder, WARD_BUSINESS_SECTION_KEYS } from "@/lib/data/ward-settings";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
 import { AgendaElementsManager } from "@/components/planning/AgendaElementsManager";
@@ -173,6 +174,7 @@ export default async function PlanningViewPage({
     visitingAuthorities,
     callablePlanningItems,
     callableRabnm,
+    wardBusinessSectionOrder,
     announcementsByPlannedElement,
     pullableAnnouncements,
   ] = await Promise.all([
@@ -199,6 +201,9 @@ export default async function PlanningViewPage({
     // reasoning, small enough (every not-yet-announced pool row,
     // ward-wide) to fetch unconditionally.
     isSacrament ? getCallableRabnmPlanningItems() : Promise.resolve([]),
+    // Which order Ward Business's three subsections render in (migration
+    // 091) -- a ward-wide preference, not per-meeting.
+    isSacrament ? getWardBusinessSectionOrder() : Promise.resolve([...WARD_BUSINESS_SECTION_KEYS]),
     // Announcements' own inline picker (2026-10-11) -- same reasoning
     // as Ward Business's, just for the `announcements` table instead.
     // A map (not a flat list) since a meeting can have more than one
@@ -386,6 +391,7 @@ export default async function PlanningViewPage({
     callableCallings: callablePlanningItems.callings,
     callableReleases: callablePlanningItems.releases,
     callableRabnm,
+    wardBusinessSectionOrder,
     announcementsByPlannedElement,
     pullableAnnouncements,
     eligibilityByKey,

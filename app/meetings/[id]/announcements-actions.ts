@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { clearPoolExclusion } from "@/lib/data/pool-sweep";
+import { nextAnnouncementPullSortOrder } from "@/lib/data/sacrament-announcements";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -59,9 +60,10 @@ export async function pullAnnouncementIntoMeeting(
   if (denied) return denied;
 
   const supabase = await createClient();
+  const sortOrder = await nextAnnouncementPullSortOrder(plannedElementId);
   const { error } = await supabase
     .from("sacrament_announcement_pulls")
-    .insert({ announcement_id: announcementId, meeting_id: meetingId, planned_element_id: plannedElementId });
+    .insert({ announcement_id: announcementId, meeting_id: meetingId, planned_element_id: plannedElementId, sort_order: sortOrder });
 
   if (error) {
     if (error.code === "23505") return { error: "That announcement is already in this meeting." };
@@ -110,6 +112,62 @@ export async function removeAnnouncementFromMeeting(meetingId: string, announcem
   await supabase
     .from("sacrament_announcement_exclusions")
     .upsert({ meeting_id: meetingId, announcement_id: announcementId }, { onConflict: "announcement_id,meeting_id", ignoreDuplicates: true });
+
+  revalidateBoth(meetingId);
+  return { success: true };
+}
+
+/**
+ * Moves one pulled announcement up or down within its own Announcements
+ * block -- the user's own request, 2026-10-30: "I need to be able to put
+ * announcements in order also in sacrament meetings." Scoped by
+ * `plannedElementId`, not just `meetingId`, so a meeting with more than
+ * one Announcements block (migration 074) reorders each one
+ * independently. Same swap-adjacent-sort_order shape as
+ * `moveWardBusinessItem` (migration 090).
+ */
+export async function moveAnnouncementPull(
+  meetingId: string,
+  announcementId: string,
+  plannedElementId: string,
+  direction: "up" | "down"
+): Promise<ActionResult> {
+  const denied = await requireSacramentPlanningFeature();
+  if (denied) return denied;
+
+  const supabase = await createClient();
+  const { data: rows, error: fetchError } = await supabase
+    .from("sacrament_announcement_pulls")
+    .select("announcement_id, sort_order")
+    .eq("planned_element_id", plannedElementId)
+    .order("sort_order", { ascending: true });
+
+  if (fetchError || !rows) {
+    return { error: fetchError?.message ?? "Could not load this block's announcements." };
+  }
+
+  const index = rows.findIndex((r) => r.announcement_id === announcementId);
+  if (index === -1) return { error: "Announcement not found on this block." };
+
+  const swapIndex = direction === "up" ? index - 1 : index + 1;
+  if (swapIndex < 0 || swapIndex >= rows.length) return { success: true };
+
+  const current = rows[index];
+  const swap = rows[swapIndex];
+
+  const { error: error1 } = await supabase
+    .from("sacrament_announcement_pulls")
+    .update({ sort_order: swap.sort_order })
+    .eq("planned_element_id", plannedElementId)
+    .eq("announcement_id", current.announcement_id);
+  if (error1) return { error: error1.message };
+
+  const { error: error2 } = await supabase
+    .from("sacrament_announcement_pulls")
+    .update({ sort_order: current.sort_order })
+    .eq("planned_element_id", plannedElementId)
+    .eq("announcement_id", swap.announcement_id);
+  if (error2) return { error: error2.message };
 
   revalidateBoth(meetingId);
   return { success: true };

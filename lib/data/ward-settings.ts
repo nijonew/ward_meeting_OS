@@ -30,3 +30,40 @@ export const getWardName = cache(async (): Promise<string> => {
     return "Ward";
   }
 });
+
+/**
+ * The order Ward Business's three subsections (Releases, Callings, and
+ * the RABNM-planning pool) render in on a Sacrament Meeting's Planning
+ * page -- migration 091, the user's own request: "I would like to be
+ * able to adjust the order of subsections in the ward business
+ * section." A single ward-wide preference, same singleton-row shape as
+ * the ward's own display name, not a per-meeting setting -- there's no
+ * real reason one meeting would want a different subsection order than
+ * another.
+ */
+export const WARD_BUSINESS_SECTION_KEYS = ["release", "new_calling", "rabnm"] as const;
+export type WardBusinessSectionKey = (typeof WARD_BUSINESS_SECTION_KEYS)[number];
+
+/** Keeps only recognized keys, in their stored order, then appends any
+ *  missing key at the end -- so a key this app doesn't know about
+ *  (stale data, or a future one not yet added here) never gets lost
+ *  silently, and a brand-new key added to the fixed list above always
+ *  has somewhere to render even before anyone's ever reordered it. */
+export function normalizeWardBusinessSectionOrder(
+  stored: string[] | null | undefined
+): WardBusinessSectionKey[] {
+  const valid = new Set<string>(WARD_BUSINESS_SECTION_KEYS);
+  const kept = (stored ?? []).filter((k): k is WardBusinessSectionKey => valid.has(k));
+  const missing = WARD_BUSINESS_SECTION_KEYS.filter((k) => !kept.includes(k));
+  return [...kept, ...missing];
+}
+
+export const getWardBusinessSectionOrder = cache(async (): Promise<WardBusinessSectionKey[]> => {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.from("ward_settings").select("ward_business_section_order").limit(1).maybeSingle();
+    return normalizeWardBusinessSectionOrder(data?.ward_business_section_order as string[] | null | undefined);
+  } catch {
+    return [...WARD_BUSINESS_SECTION_KEYS];
+  }
+});

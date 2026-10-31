@@ -360,6 +360,7 @@ export function AgendaGridForm({
                         callableCallings={row.callableCallings}
                         callableReleases={row.callableReleases}
                         callableRabnm={row.callableRabnm}
+                        sectionOrder={row.sectionOrder}
                       />
                     </td>
                   </tr>

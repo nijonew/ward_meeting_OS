@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 090
+## Current migration number: 091
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2037,6 +2037,205 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Six items from one sitting, 2026-10-30: a real gender field, an
+archive-instead-of-delete page for People, a Ward Business save bug,
+subsection reordering, announcement reordering, and a real public Ward
+Business section (migration `091`, not yet run).** The user's own
+message bundled all of these together, plus two items handled
+separately (see the two entries right after this one: the
+person-calling-table question was answered in chat, no code change;
+the "asking for a first name at sign-up" idea was left as a discussion
+point, not built, since it was phrased as "I am considering," not a
+request).
+
+1. **Gender field, not a checkbox.** The user's own words: "I would
+   like to add male/female toggles on the people table (not boolean
+   like the youth toggle)." New `people.gender` (plain text, no CHECK
+   constraint, same reasoning as every other admin-facing vocabulary
+   column in this project) -- rendered in Table Admin's People grid as
+   a real two-option `<select>` (Male/Female), deliberately not the
+   `booleanAsText` checkbox pattern Age Group uses, per the user's own
+   explicit "not boolean" feedback. Starts blank for every existing
+   and new row, same as Age Group already does.
+
+2. **Archive instead of delete, for People -- a new generic Table
+   Admin capability, not a People-only special case.** The user's own
+   words: "When someone is deleted from the people page they should be
+   added to a new archived people page." Two new, genuinely generic
+   `AdminTableConfig` fields (`lib/admin/types.ts`): `archivedColumn`
+   (excludes a row from the everyday grid by default once it's set --
+   `getAdminRows`, `lib/admin/table-data.ts`) and `archiveRpc` (the
+   name of a Postgres function the table's own Delete button calls
+   instead of a real `DELETE` -- `deleteAdminRow`, same file).
+   `AdminTableEditor.tsx` gained an optional `deleteLabel` prop so the
+   button reads "Archive" (with matching confirm-dialog wording)
+   instead of "Delete" whenever a table declares `archiveRpc` --
+   wired from `/admin/[table]/page.tsx`. People's own registry entry
+   sets `archivedColumn: "archived_at"`/`archiveRpc: "archive_person"`.
+
+   New `archive_person(target_id uuid)` Postgres function -- per the
+   user's own confirmed choice ("Auto-clear both calling(s) and login
+   link"): clears `callings.current_holder_id` wherever this person
+   currently holds one (vacating it, not reassigning it to anyone
+   else), clears `people.profile_id` (their login link), and sets
+   `people.archived_at = now()`. Never a real delete.
+
+   New `/admin/archived-people` page (`lib/data/archived-people.ts`,
+   `app/admin/archived-people/{page,actions}.tsx`,
+   `components/admin/ArchivedPersonRow.tsx`) -- lists everyone with
+   `archived_at` set, newest first, same `table_admin_people` gate as
+   the People grid itself. **Restore** clears `archived_at` only --
+   the calling/login link cleared at archive time are NOT restored
+   automatically, matching the user's own confirmed "auto-clear" choice
+   being a one-way action; re-link either by hand
+   (`/admin/person-callings`, `/admin/verify-logins`) once someone's
+   back. **Delete Permanently** -- kept per the user's own explicit
+   choice ("Yes, keep a real permanent-delete option... for genuine
+   duplicates/mistakes") -- is a plain, uncushioned `DELETE`, not a
+   cascade: `people.id` is referenced by several other tables (speakers,
+   assignments, rotation members, teaching assignments, and more) this
+   action makes no attempt to clean up first. A real foreign-key error
+   surfaces as-is rather than being swallowed -- that's the correct
+   outcome, not a bug to paper over: it means this person is still
+   genuinely referenced somewhere real, and the actual fix for that
+   case is the separate, much bigger "merge duplicate people" feature
+   (deliberately not built -- see this file's own paused research on
+   it), not this button. Linked from `/admin`'s "Other Admin Tools."
+
+3. **Bug found and fixed: adding something to Ward Business's RABNM
+   sub-section didn't stick, with no error shown at all.** The user's
+   own report: "When I go to add something in sacrament meetings to
+   the RABNM sub-section of the ward business section it doesn't
+   stick." Root cause, confirmed by reading the code: every pull/
+   remove/move handler in `WardBusinessField.tsx` (the RABNM-planning
+   pull, the Callings/Releases pull, and all three Remove buttons)
+   discarded its own server action's return value entirely -- the
+   exact same silent-failure bug class already found and fixed
+   multiple times elsewhere in this app (Delete Meeting, the
+   Announcements pull, Calling Planning's own pull) -- so a failed
+   pull (a feature check, a race, a real constraint) looked identical
+   to a successful one: the dropdown just cleared back to blank either
+   way, with nothing on screen ever saying it didn't land. All five
+   handlers now read the result and show the message inline, matching
+   `AnnouncementsField.tsx`'s own already-fixed pattern.
+
+4. **Ward Business's three subsections (Releases, Callings, RABNM) are
+   now reorderable.** The user's own words, same message as the bug
+   report above: "I would like to be able to adjust the order of
+   subsections in the ward business section." A single ward-wide
+   preference -- new `ward_settings.ward_business_section_order text[]`
+   (a singleton row, same shape as the ward's own display name; no
+   real reason one meeting would want a different subsection order
+   than another). New `WARD_BUSINESS_SECTION_KEYS`/
+   `normalizeWardBusinessSectionOrder`/`getWardBusinessSectionOrder`
+   (`lib/data/ward-settings.ts`) -- a stored order is filtered down to
+   recognized keys and has any missing key appended at the end, so a
+   stale or future key can never get silently lost. New
+   `moveWardBusinessSection` (`app/meetings/[id]/ward-business-actions.ts`)
+   swaps two adjacent keys in that array, same shape as every other
+   Move Up/Down action in this app. Threaded through as a new
+   `sectionOrder`/`wardBusinessSectionOrder` field across
+   `agenda-rows.ts`'s `ward_business` row kind, `planning/page.tsx`'s
+   fetch, and `AgendaGridForm.tsx`'s render dispatch, down to
+   `WardBusinessField.tsx` itself -- which now renders its three
+   subsections in whatever order that array says, each with its own
+   new `SectionHeading` wrapper (title + Move Up/Down), pulled out of
+   each section component so the heading rendering is uniform
+   regardless of which subsection is in that position. Distinct from
+   migration `090`'s own Move Up/Down, which reorders individual LINES
+   *within* one subsection, not the subsections themselves.
+
+5. **Announcements in Sacrament Meeting are now manually orderable,
+   replacing the automatic soonest-to-latest sort.** The user's own
+   words: "I need to be able to put announcements in order also in
+   sacrament meetings." New `sacrament_announcement_pulls.sort_order`
+   (idempotent backfill, keyed by the table's own real unique
+   `(announcement_id, meeting_id)` pair -- this join table has no
+   surrogate id of its own) replaces `compareAnnouncementsBySchedule`'s
+   automatic date/time sort (2026-10-25) in
+   `getAnnouncementsByPlannedElement` (`lib/data/sacrament-announcements.ts`)
+   -- every downstream reader (Planning, Conducting, Archived) picks
+   this up for free, since none of them re-sort what that one function
+   returns. New `nextAnnouncementPullSortOrder(plannedElementId)`
+   computes "end of this block's own list" for every new pull, both
+   the manual one (`pullAnnouncementIntoMeeting`) and the automatic
+   Sacrament-Meeting-flag sweep (`autoPullSacramentAnnouncements`) --
+   scoped per `planned_element_id`, not per meeting, since a meeting
+   can have more than one Announcements block (migration 074) and each
+   reorders independently. New `moveAnnouncementPull`
+   (`app/meetings/[id]/announcements-actions.ts`), same swap-adjacent
+   shape as `moveWardBusinessItem`; `AnnouncementsField.tsx`'s
+   `ExistingRow` gained the matching Move Up/Down controls.
+
+6. **The public Sacrament Meeting program gained a real "Ward
+   Business" section, scoped to Baby Blessings for now.** The user's
+   own words: "Add ward business as a general section of the public
+   sacrament meeting program. If there is a baby blessing it can be
+   included as a subsection labeled 'naming and blessing of
+   children.'" Confirmed via `AskUserQuestion`: just Baby Blessings --
+   Callings/Releases and every other RABNM category stay admin-only,
+   matching this app's own already-established privacy rule for those.
+
+   Two real bugs found while scoping this, both fixed in the same
+   edit: `lib/data/public-view.ts` had always pushed an unconditional,
+   permanently-empty "Ward Business" heading right after Chorister/
+   Organist (there was never anything real behind it -- Callings/
+   Releases have never been public), while the actual Baby Blessing
+   content rendered far later in the flat `items` array, after Teaching
+   Program and before Closing Hymn -- disconnected from its own
+   section heading, and positioned inconsistently with where this
+   app's own Vision document already places Ward Business in the
+   agenda ("Opening covers everything up through Recognize Music/Ward
+   Business/Stake Business" -- i.e. early, not near the end). Fixed by
+   moving the Baby Blessing render loop to right where the old empty
+   heading sat (early, right after Chorister/Organist), relabeling each
+   entry's heading from the generic "Baby Blessing" to "Naming and
+   Blessing of Children," and only pushing the "Ward Business" heading
+   at all when there's actually at least one baby blessing to show
+   under it (`rabnm.length > 0`) -- no more permanently-empty section
+   heading on every program regardless of content.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `091` is actually free before running it**, per this
+project's own repeated numbering-collision history, then ask the user
+to check: Table Admin's People grid shows a Gender dropdown and its
+Delete button now reads "Archive" (clearing the person's calling and
+login link, moving them to `/admin/archived-people`, where Restore and
+Delete Permanently both work); adding a RABNM item to Ward Business on
+a Sacrament Meeting's Planning page now sticks (or shows a real error
+if it doesn't); the three Ward Business subsections and a meeting's own
+pulled announcements both show working Move Up/Down controls, with the
+announcement order reflected in Conducting and Archived too; and that
+the public Sacrament Meeting program shows "Ward Business" -> "Naming
+and Blessing of Children" early in the program, only when a baby
+blessing is actually pulled in for that meeting.
+
+**Why a separate `/admin/person-callings` page when the tables are
+already linked, 2026-10-30 -- answered in chat, no code change.** The
+user's own question: "Why do I need a person-calling table. Can't we
+just link the people and calling tables and allow them to update each
+other?" Answered directly: there is no separate junction table at all
+-- `callings.current_holder_id` already IS the one real link straight
+to `people.id`, and both `/callings`/Table Admin's own Callings grid
+and `/admin/person-callings` read and write that exact same column, so
+editing either already updates the other on the next load.
+`/admin/person-callings` exists purely as a different, faster *view*
+onto that one link (pick a person, check off several callings at
+once) -- not a second data model.
+
+**Not built -- left as an open discussion point, 2026-10-30.** The
+user's own words: "I am considering asking individuals to include a
+first name when they create a new log-in to help ensure we can
+identify them when we verify their request." Phrased as something
+being weighed, not a request -- nothing was built. If this becomes a
+real ask: `/auth/request-access` (self-serve sign-up) currently only
+asks for email + password; adding a name field there would need a
+place to stage it until an admin actually links the account to a real
+`people` row at Verify Logins (there's no column on `profiles` this
+app treats as a real display name today -- see the 2026-10-11
+"submitted by showed an email" fix elsewhere in this file for why).
 
 **Callings/Releases lines in Sacrament Meeting's Ward Business are now
 reorderable, migration `090`, 2026-10-30.** The user's own request,

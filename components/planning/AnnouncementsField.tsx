@@ -1,13 +1,36 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { pullAnnouncementIntoMeeting, removeAnnouncementFromMeeting } from "@/app/meetings/[id]/announcements-actions";
+import {
+  pullAnnouncementIntoMeeting,
+  removeAnnouncementFromMeeting,
+  moveAnnouncementPull,
+} from "@/app/meetings/[id]/announcements-actions";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 
 const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 
-function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId: string }) {
+/** Move Up/Down (2026-10-30, the user's own request: "I need to be able
+ *  to put announcements in order also in sacrament meetings") -- same
+ *  plain `type="button"` + `useTransition` convention as
+ *  WardBusinessField.tsx's own reorder controls, scoped to this one
+ *  block (`plannedElementId`) so each Announcements block on a meeting
+ *  reorders independently. */
+function ExistingRow({
+  item,
+  meetingId,
+  plannedElementId,
+  isFirst,
+  isLast,
+}: {
+  item: PulledAnnouncement;
+  meetingId: string;
+  plannedElementId: string;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
   const [removing, startRemove] = useTransition();
+  const [moving, startMove] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const remove = () => {
@@ -18,14 +41,40 @@ function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId:
     });
   };
 
+  const move = (direction: "up" | "down") => {
+    setError(null);
+    startMove(async () => {
+      const result = await moveAnnouncementPull(meetingId, item.id, plannedElementId, direction);
+      if ("error" in result) setError(result.error);
+    });
+  };
+
   return (
     <tr className="border-t border-rule/40">
       <td className="py-1.5 pr-3">{item.title}</td>
       <td className="py-1.5 pr-3 text-ink-muted">{item.organization ?? "—"}</td>
       <td className="py-1.5 text-right">
-        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
-          {removing ? "Removing..." : "Remove"}
-        </button>
+        <span className="inline-flex items-center gap-2">
+          <button
+            type="button"
+            disabled={moving || isFirst}
+            onClick={() => move("up")}
+            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+          >
+            &uarr;
+          </button>
+          <button
+            type="button"
+            disabled={moving || isLast}
+            onClick={() => move("down")}
+            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+          >
+            &darr;
+          </button>
+          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+            {removing ? "Removing..." : "Remove"}
+          </button>
+        </span>
         {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </tr>
@@ -96,8 +145,15 @@ export function AnnouncementsField({
       {items.length > 0 ? (
         <table className="w-full text-sm">
           <tbody>
-            {items.map((item) => (
-              <ExistingRow key={item.id} item={item} meetingId={meetingId} />
+            {items.map((item, index) => (
+              <ExistingRow
+                key={item.id}
+                item={item}
+                meetingId={meetingId}
+                plannedElementId={plannedElementId}
+                isFirst={index === 0}
+                isLast={index === items.length - 1}
+              />
             ))}
           </tbody>
         </table>

@@ -9,6 +9,7 @@ import type { CallableRabnmItem } from "@/lib/data/sacrament-rabnm-planning";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 import type { ReviewAnnouncement, PreviousMeetingMinutes } from "@/lib/data/meeting-review";
 import { slotLabel } from "@/lib/data/sacrament-constants";
+import type { WardBusinessSectionKey } from "@/lib/data/ward-settings";
 
 /**
  * The planning view's agenda grid, built 2026-09-09 from the user's own
@@ -182,6 +183,9 @@ export type AgendaRow =
       callableCallings: CallableCallingItem[];
       callableReleases: CallableCallingItem[];
       callableRabnm: CallableRabnmItem[];
+      /** Which order the Releases/Callings/RABNM subsections render in
+       *  (migration 091) -- see ward-settings.ts's own doc comment. */
+      sectionOrder: WardBusinessSectionKey[];
     }
   /** Announcements, inline (2026-10-11, the user's own request: "I want
    *  to be able to select the announcements that need to be included in
@@ -249,6 +253,9 @@ export interface AgendaRowInputs {
   callableCallings: CallableCallingItem[];
   callableReleases: CallableCallingItem[];
   callableRabnm: CallableRabnmItem[];
+  /** Which order Ward Business's three subsections render in (migration
+   *  091) -- see the `ward_business` row kind's own comment above. */
+  wardBusinessSectionOrder: WardBusinessSectionKey[];
   /** Already pulled into this meeting, grouped by which specific
    *  Announcements block (`meeting_planned_elements` row id) each one
    *  belongs to -- a meeting can have more than one (migration 074,
@@ -299,6 +306,7 @@ export function buildAgendaRows({
   callableCallings,
   callableReleases,
   callableRabnm,
+  wardBusinessSectionOrder,
   announcementsByPlannedElement,
   pullableAnnouncements,
   eligibilityByKey,
@@ -344,6 +352,7 @@ export function buildAgendaRows({
         callableCallings,
         callableReleases,
         callableRabnm,
+        sectionOrder: wardBusinessSectionOrder,
       });
       continue;
     }

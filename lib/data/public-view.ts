@@ -165,7 +165,24 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
   if (chorister) items.push({ heading: "Chorister", detail: chorister });
   if (organist) items.push({ heading: "Organist", detail: organist });
 
-  items.push({ heading: "Ward Business", detail: null });
+  // Ward Business, as a real public section (2026-10-30, the user's
+  // own request: "Add ward business as a general section of the
+  // public sacrament meeting program"). Scoped to just Baby Blessings
+  // for now, per the user's own confirmed choice -- Callings/Releases
+  // and every other RABNM category stay admin-only, matching this
+  // app's own established privacy rule for those. Only shown at all
+  // when there's actually a baby blessing to report -- unlike before,
+  // when this heading rendered unconditionally with nothing under it.
+  if (rabnm.length > 0) {
+    items.push({ heading: "Ward Business", detail: null });
+    for (const item of rabnm) {
+      const childNames = (rabnmPeopleByRabnmId.get(item.id) ?? [])
+        .map((id) => nameById.get(id))
+        .filter((name): name is string => Boolean(name));
+      const detail = [childNames.join(", "), item.detail].filter(Boolean).join(" — ") || null;
+      items.push({ heading: "Naming and Blessing of Children", detail });
+    }
+  }
 
   const sacramentHymn = music.find((m) => m.type === "sacrament_hymn");
   items.push({
@@ -219,16 +236,6 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
         heading: "Musical Number",
         detail: [musicItem.piece_name, performer].filter(Boolean).join(" — ") || null,
       });
-    }
-  }
-
-  if (rabnm.length > 0) {
-    for (const item of rabnm) {
-      const childNames = (rabnmPeopleByRabnmId.get(item.id) ?? [])
-        .map((id) => nameById.get(id))
-        .filter((name): name is string => Boolean(name));
-      const detail = [childNames.join(", "), item.detail].filter(Boolean).join(" — ") || null;
-      items.push({ heading: "Baby Blessing", detail });
     }
   }
 

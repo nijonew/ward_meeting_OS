@@ -202,7 +202,6 @@ function ItemRow({
         </form>
       )}
 
-      {item.kind === "testimony" && <p className="mt-2 text-sm text-ink-muted">Open testimony. Nothing to fill in.</p>}
       {item.kind === "primary_program" && (
         <p className="mt-2 text-center text-sm text-ink">Presentation of the Primary Program.</p>
       )}

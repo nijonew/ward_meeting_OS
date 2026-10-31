@@ -14,7 +14,10 @@ export async function getAdminRows(config: AdminTableConfig): Promise<AdminRow[]
   // AdminColumnConfig.reverseLookup) -- selecting one would just error.
   const realColumns = config.columns.filter((c) => c.type !== "reverse_lookup");
   const columns = ["id", ...realColumns.map((c) => c.column)].join(", ");
-  const query = supabase.from(config.table).select(columns);
+  let query = supabase.from(config.table).select(columns);
+  // Archived rows (2026-10-30) are excluded from the everyday grid by
+  // default -- see AdminTableConfig.archivedColumn's own comment.
+  if (config.archivedColumn) query = query.is(config.archivedColumn, null);
   const { data, error } = config.orderBy
     ? await query.order(config.orderBy.column, { ascending: config.orderBy.ascending ?? true })
     : await query;
@@ -280,6 +283,14 @@ export async function insertAdminRow(
 
 export async function deleteAdminRow(config: AdminTableConfig, id: string): Promise<MutationResult> {
   const supabase = await createClient();
+  // Archive instead of delete (2026-10-30) -- see AdminTableConfig.archiveRpc's
+  // own comment. The RPC owns every side effect; this never falls back
+  // to a real delete for a table that declares one.
+  if (config.archiveRpc) {
+    const { error } = await supabase.rpc(config.archiveRpc, { target_id: id });
+    if (error) return { error: error.message };
+    return { success: true };
+  }
   const { error } = await supabase.from(config.table).delete().eq("id", id);
   if (error) return { error: error.message };
   return { success: true };
