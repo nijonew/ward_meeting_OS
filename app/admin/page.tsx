@@ -105,6 +105,13 @@ export default async function AdminIndexPage() {
                 </Link>
               </li>
             )}
+            {canManageCallingFeatures && (
+              <li>
+                <Link href="/admin/person-callings" className="block px-6 py-4 font-medium text-ink hover:bg-paper">
+                  Assign Callings
+                </Link>
+              </li>
+            )}
             {canManageTemplates && (
               <li>
                 <Link href="/admin/meeting-templates" className="block px-6 py-4 font-medium text-ink hover:bg-paper">

@@ -215,7 +215,7 @@ function sanitizePatch(config: AdminTableConfig, patch: Record<string, unknown>)
   const clean: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(patch)) {
     const colConfig = columnConfigs.get(key);
-    if (!colConfig || colConfig.type === "reverse_lookup") continue;
+    if (!colConfig || colConfig.type === "reverse_lookup" || colConfig.type === "presence_indicator") continue;
     const isTextType =
       colConfig.type === "text" ||
       colConfig.type === "long_text" ||

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { insertSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
+import { syncCallingRosterFromPlanning } from "@/lib/data/calling-planning";
 import { clearPoolExclusion } from "@/lib/data/pool-sweep";
 
 type ActionResult = { success: true } | { error: string };
@@ -147,9 +148,24 @@ export async function saveCallingPlanningGrid(_prevState: unknown, formData: For
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq("id", planningId);
     if (error) return { error: error.message };
+
+    // Keeps the real roster in step with this row's own status, the
+    // user's own request (2026-10-30) -- see syncCallingRosterFromPlanning's
+    // own doc comment for the full design.
+    const syncError = await syncCallingRosterFromPlanning({
+      calling_id: patch.calling_id,
+      calling_status: patch.calling_status,
+      candidate_person_ids: patch.candidate_person_ids ?? [],
+      release_person_id: patch.release_person_id ?? null,
+      release_status: patch.release_status,
+    });
+    if (syncError) return syncError;
   }
 
   revalidatePath("/calling-planning");
+  revalidatePath("/admin/people");
+  revalidatePath("/admin/callings");
+  revalidatePath("/callings");
   return { success: true };
 }
 
@@ -259,6 +275,19 @@ export async function pushCallingToSacramentMeeting(
 
   if (updateError) return { error: updateError.message };
 
+  // Release can reach "Complete" through this push too (calling_status
+  // itself never does, per the 2026-10-13 no-auto-advance fix above) --
+  // same roster sync the grid's own save applies, so either write path
+  // keeps the real roster in step.
+  const syncError = await syncCallingRosterFromPlanning({
+    calling_id: callingId,
+    calling_status: String(planning.calling_status ?? ""),
+    candidate_person_ids: candidateIds,
+    release_person_id: planning.release_person_id,
+    release_status: statusUpdates.release_status ?? String(planning.release_status ?? ""),
+  });
+  if (syncError) return syncError;
+
   // Clears any standing exclusion for whichever side(s) were just
   // pushed (2026-10-25, migration 084) -- a manual push here is a
   // deliberate "yes, announce this at this meeting after all," same
@@ -273,5 +302,8 @@ export async function pushCallingToSacramentMeeting(
 
   revalidatePath("/calling-planning");
   revalidatePath(`/meetings/${meetingId}/planning`);
+  revalidatePath("/admin/people");
+  revalidatePath("/admin/callings");
+  revalidatePath("/callings");
   return { success: true };
 }

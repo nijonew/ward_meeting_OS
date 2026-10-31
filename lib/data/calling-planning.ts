@@ -242,6 +242,69 @@ export async function getCallableCallingPlanningItems(): Promise<{
 }
 
 /**
+ * Keeps the real roster (`callings.current_holder_id`) in step with
+ * Calling Planning once a change is far enough along to be real -- the
+ * user's own request (2026-10-30): "I would like to have calling
+ * planning, people and callings all linked... so that a change to one
+ * affects the others," confirmed via follow-up to trigger "when the
+ * calling value in calling planning is to record or complete" (assign
+ * the one narrowed-down candidate) and "unassign based on the release
+ * completion" (clear it back to vacant).
+ *
+ * Idempotent and state-based, not edge-triggered -- re-applies every
+ * time a row's current status qualifies, not just the first time it
+ * crosses the threshold, so the roster can't quietly drift out of sync
+ * with whatever Calling Planning itself currently says is true. Release
+ * is applied before the assign so a presidency change -- a release and
+ * a new calling for the SAME calling_id both completing in the same
+ * save -- lands on "the new candidate," not "vacant." The release-side
+ * clear only ever fires while the roster still shows the person being
+ * released (`.eq("current_holder_id", releasePersonId)`), never
+ * unconditionally, so a holder someone else already assigned in the
+ * meantime can't be silently displaced by stale release data.
+ *
+ * A calling can have more than one real `callings` row sharing the same
+ * name if more than one person genuinely holds that kind of calling at
+ * once (this ward's existing "Stake High Councilor (<area>)" pattern)
+ * -- this only ever touches the ONE `calling_id` named on this planning
+ * row, same single-holder-per-row model as every other write to
+ * `current_holder_id` in this app (including /admin/person-callings).
+ * Called from both `saveCallingPlanningGrid` (the grid's own per-row
+ * save) and `pushCallingToSacramentMeeting` (which can also advance
+ * release_status to "complete") -- the one real write site for either
+ * status is already each caller's own, so this only ever observes
+ * whatever status the caller is about to persist, never decides it.
+ */
+export async function syncCallingRosterFromPlanning(row: {
+  calling_id: string;
+  calling_status: string;
+  candidate_person_ids: string[];
+  release_person_id: string | null;
+  release_status: string;
+}): Promise<{ error: string } | null> {
+  const supabase = await createClient();
+
+  if (row.release_status === "complete" && row.release_person_id) {
+    const { error } = await supabase
+      .from("callings")
+      .update({ current_holder_id: null })
+      .eq("id", row.calling_id)
+      .eq("current_holder_id", row.release_person_id);
+    if (error) return { error: error.message };
+  }
+
+  if ((row.calling_status === "to_record" || row.calling_status === "complete") && row.candidate_person_ids.length === 1) {
+    const { error } = await supabase
+      .from("callings")
+      .update({ current_holder_id: row.candidate_person_ids[0] })
+      .eq("id", row.calling_id);
+    if (error) return { error: error.message };
+  }
+
+  return null;
+}
+
+/**
  * Auto-populates the single nearest upcoming (not cancelled, not
  * archived) Sacrament Meeting's Ward Business with every calling_planning
  * row still marked "To be Announced" on either side -- the user's own

@@ -48,12 +48,6 @@ const PUBLISH_STATUSES = [
   { value: "published", label: "Published" },
 ];
 
-const PERSON_AGE_GROUPS = [
-  { value: "adult", label: "Adult" },
-  { value: "youth", label: "Youth" },
-  { value: "child", label: "Child" },
-];
-
 const SONGBOOKS = [
   { value: "hymns_for_home_and_church", label: "Hymns for Home and Church" },
   { value: "hymns_1985", label: "Hymns of The Church of Jesus Christ of Latter-day Saints" },
@@ -265,7 +259,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "callings",
     label: "Callings",
     description:
-      "\"Requires Self Handoff\" restricts reassigning this one calling (to a different real person, not vacating it) to whoever currently holds it -- used for Bishop succession, but works for any calling you flag this way. Which features this calling actually grants is set on the separate \"Calling Features\" table below, not here (2026-10-04) -- a calling can grant many features at once, which didn't fit as individual columns once the real feature list grew past a handful.",
+      "\"Requires Self Handoff\" restricts reassigning this one calling (to a different real person, not vacating it) to whoever currently holds it -- used for Bishop succession, but works for any calling you flag this way. Which features this calling actually grants is set on the separate \"Calling Features\" table below, not here (2026-10-04) -- a calling can grant many features at once, which didn't fit as individual columns once the real feature list grew past a handful. Current Holder is one row at a time here -- for everyday assignment, use /admin/person-callings instead (pick a person, check every calling they hold at once). If the same calling is held by more than one person, add a second row with the same name here rather than sharing one row -- current_holder_id is always single-valued per row.",
     requiredFeature: "table_admin_callings",
     orderBy: { column: "sort_order", ascending: true },
     columns: [
@@ -390,12 +384,17 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "people",
     label: "People",
     description:
-      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. Calling is read-only here (edit who holds a calling via /callings or Table Admin's own Callings grid instead). Attendance Status, Active, and Notes still exist on this table -- active still controls assignment-picker visibility -- but aren't editable from this grid anymore (2026-10-03, the user's own request); edit them directly in Supabase if ever needed.",
+      "Added as needed -- names only, no bulk import and no email/age/other details copied in from a church source. Age Group is a checkbox (checked = Youth, unchecked = Adult) rather than a three-way dropdown -- the rare \"Child\" row this column can still hold isn't settable from here; it shows unchecked like Adult does, and stays whatever it already is unless the checkbox is actually clicked. Login Account just shows whether one's linked -- link or change it at /admin/verify-logins instead, which confirms identity rather than offering a bare list of accounts. Calling is also read-only here -- assign/reassign callings for a person at /admin/person-callings instead, or edit who holds one calling at a time via /callings or Table Admin's own Callings grid. Attendance Status, Active, and Notes still exist on this table -- active still controls assignment-picker visibility -- but aren't editable from this grid anymore (2026-10-03, the user's own request); edit them directly in Supabase if ever needed.",
     requiredFeature: "table_admin_people",
     orderBy: { column: "name", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
-      { column: "age_group", label: "Age Group", type: "select", options: PERSON_AGE_GROUPS },
+      {
+        column: "age_group",
+        label: "Age Group",
+        type: "boolean",
+        booleanAsText: { trueValue: "youth", falseValue: "adult", checkboxLabel: "Youth" },
+      },
       {
         column: "calling",
         label: "Calling",
@@ -405,8 +404,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       {
         column: "profile_id",
         label: "Login Account",
-        type: "foreign_key",
-        foreignKey: { table: "profiles", valueColumn: "id", labelColumn: "display_name" },
+        type: "presence_indicator",
+        presenceIndicator: { trueLabel: "Has a login", falseLabel: "No login" },
       },
     ],
   },

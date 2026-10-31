@@ -2038,6 +2038,130 @@ avoid confusing the two.
 
 ## Known open items
 
+**People's Login Account became a read-only indicator, a new "Assign
+Callings" checklist page links people to callings many-at-a-time, and
+Calling Planning now writes back to the real roster on completion --
+all 2026-10-30, no migration needed.** The user's own request: "on the
+people page I don't need a dropdown for the log-in. Just an indicator
+whether the person listed has a log-in assigned. I would also like to
+have an assignable calling dropdown with the ability to assign
+multiple callings by checkbox and have it cross reference with the
+callings list. I would like to have calling planning, people and
+callings all linked by people and callings so that a change to one
+affects the others." Two real design questions were confirmed via
+`AskUserQuestion` before building anything, since both had consequences
+large enough to be worth asking rather than guessing:
+1. What should trigger the Calling Planning -> roster sync. Confirmed:
+   "when the calling value in calling planning is to record or
+   complete" (assign), and "unassign based on the release completion."
+2. Whether a single calling should ever have more than one
+   simultaneous holder. The user's own follow-up, after being shown
+   the real cost of building that (replacing `callings.current_holder_id`
+   with a join table and touching every place that assumes one holder
+   -- Presiding/Conducting resolution, rotation eligibility, the
+   Bishop-succession lock, Table Admin, title-prefix display):
+   "rather than a calling having multiple holders, can there be
+   multiple rows of the same calling with different individuals?"
+   Confirmed this is already exactly how the app already handles the
+   identical real case (`Stake High Councilor (<area>)`, one row per
+   seat) -- no schema change needed anywhere in this feature.
+
+**1. Login Account, People grid.** Was a plain `foreign_key` dropdown
+of every `profiles` row's `display_name` -- which is always null (no
+producer anywhere in this app, see the 2026-10-11 "submitted by showed
+an email" bug fix above), so every option in that dropdown had a blank
+label. New generic `AdminColumnType`, `"presence_indicator"`
+(`lib/admin/types.ts`) -- a read-only Yes/No display for a real column
+this grid shouldn't offer a bare dropdown over; the column (`profile_id`)
+still selects normally, only its type governs display (`presenceIndicator:
+{ trueLabel, falseLabel }`) and that it's excluded from any patch
+(`sanitizePatch`, `lib/admin/table-data.ts`) the same way `reverse_lookup`
+already is. `AdminTableEditor.tsx` renders it as plain text, same
+style as a `reverse_lookup` cell. People's own column now reads "Has a
+login"/"No login" -- actually linking or changing one still goes
+through `/admin/verify-logins`, which confirms identity rather than
+offering a bare account list.
+
+**2. "Assign Callings," new `/admin/person-callings`.** The inverse of
+the existing `/admin/calling-features` checklist (that one: one
+calling, many features, a real join table; this one: one person, many
+callings, each a single nullable FK on `callings.current_holder_id`)
+-- same dropdown-then-checklist shape, same diff-only save (only
+inserts/clears what actually changed, never delete-everything-then-
+reinsert). Pick a person, see every calling with whoever else
+currently holds it shown right next to its checkbox (so checking one
+away from someone else is never a surprise -- `current_holder_id` is
+single-valued per calling row), check/uncheck, Save. New
+`lib/data/person-callings.ts` (`getCallingAssignmentOptions`/
+`getPersonCallingIds`), `app/admin/person-callings/actions.ts`
+(`savePersonCallings`), `components/admin/PersonCallingsForm.tsx` (adds
+a plain client-side filter box over `CallingFeaturesForm.tsx`'s own
+pattern, since a ward's full calling list is longer than its feature
+list). Gated on `table_admin_callings`, same as the raw Callings grid
+this is a front end for -- linked from `/admin`'s "Other Admin Tools"
+section next to Calling Features, and both `people`'s and `callings`'
+own Table Admin descriptions now point here for everyday assignment.
+A write that would transfer a `requires_self_handoff`-flagged calling
+away from an unauthorized acting user is rejected outright by the
+existing `enforce_calling_handoff` trigger (migration 057) -- surfaced
+as a plain error on the page, not swallowed.
+
+**3. Calling Planning -> roster sync.** New `syncCallingRosterFromPlanning()`
+(`lib/data/calling-planning.ts`) -- idempotent and state-based, not
+edge-triggered: re-applies every time a row's current status
+qualifies, not just the first time it crosses the threshold, so the
+roster can't quietly drift from whatever Calling Planning itself
+currently says is true. Release is applied before the assign (within
+one row's own sync call) so a presidency change -- a release and a
+new calling for the SAME `calling_id`, both completing in the same
+save -- lands on "the new candidate," not "vacant"; the release-side
+clear only ever fires while the roster still shows the person actually
+being released (`.eq("current_holder_id", releasePersonId)`), never
+unconditionally, so a holder someone else already assigned in the
+meantime can't be silently displaced by stale release data. Called
+from both real write sites for these two status fields:
+`saveCallingPlanningGrid`'s own per-row save (`app/calling-planning/actions.ts`)
+and `pushCallingToSacramentMeeting` (which can independently advance
+`release_status` to "Complete"). Any Postgres error from either write
+(including the self-handoff trigger firing) is surfaced as the save's
+own error, not swallowed.
+
+**Follow-up the same day: People's Age Group became a checkbox too.**
+The user's own immediate follow-up: "can we update the adult/youth
+assignment to be a checkbox on the line in people rather than a
+dropdown?" New generic `AdminColumnConfig.booleanAsText` (paired with
+`type: "boolean"`) -- maps the checkbox to two real text values instead
+of an actual boolean column (`{ trueValue: "youth", falseValue: "adult",
+checkboxLabel: "Youth" }`), rendering a labeled checkbox
+(`AdminTableEditor.tsx`) instead of People's old three-option dropdown.
+`resolveDisplayText`'s existing boolean branch (`raw ? "Yes" : "No"`)
+is skipped for a `booleanAsText` column -- any non-empty text would
+otherwise read as truthy and sort/filter as "Yes" regardless of its
+real value -- falling through to the raw text itself ("youth"/"adult"/
+"child" are already readable as-is). **The rare "Child" value this
+column's own CHECK constraint still allows (migration 029) is no
+longer settable from this grid** -- it renders unchecked, same as
+Adult, and is left completely alone unless the checkbox is actually
+clicked (same "untouched field keeps its original value" rule this
+grid already follows for every other column); `PERSON_AGE_GROUPS`
+(the now-unused three-option list) was removed outright rather than
+left dead.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- ask the user to check: `/admin/people` shows "Has a
+login"/"No login" instead of a dropdown, and Age Group as a plain
+Youth checkbox; `/admin/person-callings` lets you pick a person, see
+their current callings pre-checked (with who else holds any other
+calling shown inline), check/uncheck, and save, with the change
+reflected on `/callings`/`/admin/callings`/`/calling-planning`; and
+that completing a calling change on `/calling-planning` (Calling
+Status reaching "To Record" or "Complete" with exactly one candidate,
+or Release Status reaching "Complete") updates that calling's real
+holder on the roster without being asked to separately.
+
 **Speaker & Prayer History redesigned around the user's own vision --
 three plain history lists (Speakers Adults/Youth/Prayers), no due
 lists, and stronger ongoing dedup, 2026-10-27/30. No migration

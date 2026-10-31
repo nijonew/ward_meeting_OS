@@ -153,7 +153,13 @@ export function AdminTableEditor({
     if (column.type === "reverse_lookup") {
       return reverseLookupValues?.[column.column]?.[row.id] ?? "";
     }
-    if (column.type === "boolean") return raw ? "Yes" : "No";
+    if (column.type === "presence_indicator") {
+      return raw ? column.presenceIndicator?.trueLabel ?? "Yes" : column.presenceIndicator?.falseLabel ?? "No";
+    }
+    // A booleanAsText column stores plain text ("youth"/"adult"), not a
+    // real boolean -- any non-empty string would otherwise read as
+    // truthy and sort/filter as "Yes" regardless of its actual value.
+    if (column.type === "boolean" && !column.booleanAsText) return raw ? "Yes" : "No";
     if (column.type === "select" || column.type === "select_with_other" || column.type === "foreign_key") {
       const opts = column.type === "foreign_key" ? (fkOptions[column.column] ?? []) : (column.options ?? []);
       const label = opts.find((o) => o.value === String(raw))?.label;
@@ -344,6 +350,8 @@ export function AdminTableEditor({
                     <span className="block max-w-[16rem] whitespace-normal break-words text-xs text-ink-muted">
                       {reverseLookupValues?.[c.column]?.[row.id] || "—"}
                     </span>
+                  ) : c.type === "presence_indicator" ? (
+                    <span className="block text-xs text-ink-muted">{cellText(row, c) || "—"}</span>
                   ) : (
                     <AdminCellInput
                       column={c}
@@ -380,7 +388,7 @@ export function AdminTableEditor({
           <tr className="border-t-2 border-rule">
             {columns.map((c) => (
               <td key={c.column} className="py-2 pr-3">
-                {c.type === "reverse_lookup" ? (
+                {c.type === "reverse_lookup" || c.type === "presence_indicator" ? (
                   <span className="text-xs text-ink-muted/50">—</span>
                 ) : (
                   <AdminCellInput
@@ -422,6 +430,20 @@ function AdminCellInput({
   options?: AdminOption[];
   onChange: (value: unknown) => void;
 }) {
+  if (column.type === "boolean" && column.booleanAsText) {
+    const { trueValue, falseValue, checkboxLabel } = column.booleanAsText;
+    return (
+      <label className="flex items-center gap-1.5 text-xs text-ink">
+        <input
+          type="checkbox"
+          checked={value === trueValue}
+          onChange={(e) => onChange(e.target.checked ? trueValue : falseValue)}
+        />
+        {checkboxLabel}
+      </label>
+    );
+  }
+
   if (column.type === "boolean") {
     return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
   }

@@ -19,7 +19,8 @@ export type AdminColumnType =
   | "select_with_other"
   | "multi_select"
   | "foreign_key"
-  | "reverse_lookup";
+  | "reverse_lookup"
+  | "presence_indicator";
 
 /**
  * "select_with_other" and "multi_select" (2026-10-18, the user's own
@@ -142,6 +143,34 @@ export interface AdminColumnConfig {
    * once. See getReverseLookupValues (table-data.ts).
    */
   reverseLookup?: { table: string; foreignKeyColumn: string; labelColumn: string };
+  /**
+   * For type: "boolean" only -- maps the checkbox to two real text
+   * values instead of an actual `boolean` column, e.g. People's Age
+   * Group (Youth checked, Adult unchecked instead of a three-option
+   * dropdown -- 2026-10-30, the user's own request: "can we update the
+   * adult/youth assignment to be a checkbox on the line in people
+   * rather than a dropdown"). `checkboxLabel` renders right next to
+   * the checkbox so a bare tick mark isn't ambiguous about what
+   * "checked" means. A row whose stored value is neither `trueValue`
+   * nor `falseValue` (e.g. an existing "child" row, under People's own
+   * three-value CHECK constraint) renders unchecked and is left
+   * completely alone unless the checkbox is actually clicked -- only
+   * then does it become `trueValue`/`falseValue`, same as any other
+   * untouched field on a row keeps its original stored value.
+   */
+  booleanAsText?: { trueValue: string; falseValue: string; checkboxLabel: string };
+  /**
+   * For type: "presence_indicator" only -- a read-only Yes/No display
+   * for a real column this grid shouldn't let you edit directly, e.g.
+   * People's "Login Account" column: `profile_id` is a real FK, but
+   * the only correct way to set it is Verify Logins' own
+   * identity-matching flow, not a bare dropdown of every login's
+   * (often-blank) display name. The column's own raw value still
+   * selects normally -- only its type governs display (truthy ->
+   * trueLabel, falsy -> falseLabel) and that it's dropped from any
+   * patch before it reaches the database (see sanitizePatch).
+   */
+  presenceIndicator?: { trueLabel: string; falseLabel: string };
 }
 
 export interface AdminTableConfig {
