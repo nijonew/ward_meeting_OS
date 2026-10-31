@@ -46,9 +46,10 @@ export async function restorePerson(id: string): Promise<ActionResult> {
  * key error surfaces as-is rather than being swallowed, which is the
  * correct outcome here: it means this specific person is still
  * genuinely referenced somewhere real, and deleting them anyway would
- * silently orphan that data -- the much bigger "merge duplicate people"
- * feature (deliberately not built yet) is the real fix for that case,
- * not this button.
+ * silently orphan that data -- **Merge Duplicate People**
+ * (`/admin/merge-people`, built 2026-10-31) is the real fix for that
+ * case, not this button: it re-points every one of those references
+ * onto whichever row survives before deleting the other.
  */
 export async function deletePersonPermanently(id: string): Promise<ActionResult> {
   const denied = await requirePeopleFeature();

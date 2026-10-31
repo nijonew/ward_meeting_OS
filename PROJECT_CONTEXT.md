@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 095
+## Current migration number: 096
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -322,8 +322,8 @@ reconstructed from both:
   callings sweep; amends `delete_meeting_cascade` again, see Known
   open items below): confirmed run.
 
-Next migration should be `096_*.sql`, pending that confirmation --
-migrations `085`-`095` exist as real files at the repo root but this
+Next migration should be `097_*.sql`, pending that confirmation --
+migrations `085`-`096` exist as real files at the repo root but this
 chronological list was never kept current past `084`; see Known open
 items below for each of their own individual write-ups instead.
 Migrations are plain `.sql` files at
@@ -2041,6 +2041,97 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**New: Merge Duplicate People -- migration `096`, not yet run,
+2026-10-31.** The user asked where this project had landed on "the
+tool to merge two people lines to a single line" -- checked, and the
+honest answer was nowhere: `PROJECT_CONTEXT.md` itself claimed "see
+this file's own paused research on it" (in the note explaining why
+Archived People's "Delete Permanently" doesn't attempt a merge, see
+`app/admin/archived-people/actions.ts`), but no such research actually
+existed anywhere in the file -- just two one-off manual-merge
+instructions for specific bulk-import name collisions, not a designed
+tool. Told the user this directly rather than guessing at a design that
+was never recorded; they said "Yes, design and build it."
+
+**Catalog-driven, not a hardcoded table list -- the one real design
+decision this needed.** `people.id` is referenced by a long list of
+other tables (speakers, assignments, rotation members, teaching
+assignments, calling planning, and more), but this app's own BASE
+schema predates its migration history entirely -- a grep across every
+migration file for `references people(id)` only turns up the handful
+of tables created after this repo's own history started
+(`youth_class_teachers`, `sacrament_visiting_authorities`,
+`speaker_prayer_history_import`, `sacrament_rabnm_planning`), nowhere
+near the real full list, the exact same situation as the many
+undocumented RLS policies/CHECK constraints this project has already
+hit repeatedly (migrations
+`038`/`041`/`063`/`067`/`068`/`069`/`075`/`078`). Rather than guess at
+(and likely miss) the rest, both new Postgres functions discover every
+foreign key pointing at `people(id)` from the database's own catalog
+(`information_schema`) at the moment they run, so they stay correct
+even against tables/columns this assistant has no live-database way to
+see. One real exception the catalog can't find on its own:
+`calling_planning.candidate_person_ids` is a plain `uuid[]` column, not
+a real foreign key -- Postgres cannot enforce an element-wise FK on an
+array column at all (migration `089`'s own note on this exact column)
+-- handled as an explicit special case in both functions, including a
+de-duplication pass in case a row somehow already named both people as
+candidates.
+
+**`list_people_references(person_id)`** (read-only) and
+**`merge_people(keep_id, remove_id)`** (migration `096`): the merge
+itself re-points every discovered reference from `remove_id` onto
+`keep_id`, then deletes the now-unreferenced `remove_id` row -- all
+inside one function, so it's atomic the same way `delete_meeting_cascade`
+(migration `054`) already is. A conflict on any one table (e.g. both
+people already have their own row for the exact same meeting + role,
+which a blind `UPDATE` would collide on as a unique-constraint
+violation) rolls back everything moved so far, never leaves a person
+half-merged -- surfaced as a real Postgres error, not swallowed, same
+"an honest failure beats silent corruption" principle Archived People's
+own permanent-delete already established for this exact class of
+problem. **`keep_id`'s own fields (gender, age_group, attendance,
+login link, notes) are never auto-merged** -- only references move;
+the admin reconciles any differing field values by hand in People
+first, since guessing which of two conflicting values is "right" is
+exactly the kind of silent data decision this app avoids making for
+the admin. One known edge case, flagged rather than special-cased:
+merging a person who currently holds a `requires_self_handoff`-flagged
+calling (migration `057`, e.g. Bishop) could be rejected by the
+existing `enforce_calling_handoff` trigger if the acting admin doesn't
+themselves hold that calling -- surfaces as a real error either way,
+never a silent skip; reassign that specific calling by hand first if
+it happens.
+
+**New `/admin/merge-people`** (gated on its own dedicated
+`merge_people` feature, migration `096` -- deliberately not folded
+into `table_admin_people`, given how much more this tool can touch in
+one click than an ordinary People-grid edit): pick "Keep" and "Remove"
+from every person in the ward (active or archived -- a duplicate pair
+can easily include an already-archived row), see both people's own
+fields side by side plus a live breakdown of exactly what will move
+(table, column, row count) via `list_people_references`, confirm
+through a `window.confirm` dialog naming both people and the total row
+count -- same "real confirmation before an irreversible action"
+convention as Delete Meeting and Archived People's own permanent
+delete, not a softer one just because this tool reaches further.
+Linked from `/admin`'s "Other Admin Tools," and Archived People's own
+"Delete Permanently" doc comment now points here as the real fix for
+the foreign-key-error case it was always meant to hand off to.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- this
+assistant has no way to test the actual merge against real duplicate
+data. **Confirm migration number `096` is actually free before running
+it**, per this project's own repeated numbering-collision history, then
+grant `merge_people` sparingly via `/admin/calling-features` and ask
+the user to try it on a real (or deliberately test) duplicate pair:
+confirm the reference breakdown looks right before confirming, that
+the merge actually succeeds and the duplicate disappears from People,
+and that whatever used to reference the removed person (an assignment,
+a rotation member, a calling-planning candidate, etc.) now correctly
+shows the kept person instead.
 
 **New: Meeting Reminder Email, a real email-sending tool for the
 Executive Secretary -- migration `095`, not yet run, 2026-10-31.** The

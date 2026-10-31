@@ -72,6 +72,7 @@ export type Feature =
   | "verify_logins"
   | "meeting_templates_admin"
   | "meeting_reminder_email"
+  | "merge_people"
   // Table Admin, one per table
   | "table_admin_ward_settings"
   | "table_admin_admin_select_options"
