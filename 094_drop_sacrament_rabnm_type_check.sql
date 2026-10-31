@@ -1,0 +1,32 @@
+-- 094_drop_sacrament_rabnm_type_check.sql
+--
+-- The user's own report: "new row for relation "sacrament_rabnm"
+-- violates check constraint "sacrament_rabnm_type_check"" entering a
+-- New Member item through /rabnm-planning's own pull-into-Ward-Business
+-- mechanism. Same situation this repo has now hit many times before
+-- (migrations 038, 041, 063, 067, 068, 069, 075, 078's own write-ups)
+-- -- an undocumented CHECK constraint on `sacrament_rabnm.type`,
+-- created directly in the Supabase SQL editor before this repo's
+-- migration history started, hardcoded against whatever vocabulary
+-- existed back then (presumably something like "release"/"new_calling"/
+-- "presidency_change"/"baptism"/"baby_blessing"/"mission_call"/
+-- "aaronic_priesthood"/"new_record") and never updated when migration
+-- 082 introduced RABNM_PLANNING_TYPES' own five category values
+-- (recognition/advancement/baptism/new_member/baby_blessing) as what a
+-- pool-pulled item's own `type` resolves to once pulled into a
+-- meeting. "new_member" (replacing the old "new_record") is almost
+-- certainly the specific value the stale constraint never allowed --
+-- the exact one the user's report named.
+--
+-- Dropped outright rather than recreated against an expanded list --
+-- this app's own real source of truth for which `type` values are
+-- valid is already the application code (RABNM_TYPES and
+-- RABNM_PLANNING_TYPES, lib/data/sacrament-constants.ts/
+-- lib/data/sacrament-rabnm-planning.ts, each constraining its own
+-- dropdown), not a DB-side CHECK duplicating that list in a second
+-- place that can silently drift out of sync the next time either
+-- vocabulary changes -- exactly what just happened here.
+--
+-- Idempotent: `drop constraint if exists` is safe to re-run.
+
+alter table sacrament_rabnm drop constraint if exists sacrament_rabnm_type_check;

@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 093
+## Current migration number: 094
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -322,7 +322,11 @@ reconstructed from both:
   callings sweep; amends `delete_meeting_cascade` again, see Known
   open items below): confirmed run.
 
-Next migration should be `085_*.sql`, pending that confirmation. Migrations are plain `.sql` files at
+Next migration should be `095_*.sql`, pending that confirmation --
+migrations `085`-`094` exist as real files at the repo root but this
+chronological list was never kept current past `084`; see Known open
+items below for each of their own individual write-ups instead.
+Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
@@ -2037,6 +2041,48 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Bug found and fixed 2026-10-31: entering a New Member item hit `new
+row for relation "sacrament_rabnm" violates check constraint
+"sacrament_rabnm_type_check"` -- migration `094`, not yet run.** The
+user's own report, right after the per-category Move Up/Down addition
+above shipped. This assistant has no live database access, so the
+diagnosis leans entirely on the error message itself plus this
+project's own extensive history with the identical bug class --
+migrations `038`/`041`/`063`/`067`/`068`/`069`/`075`/`078` are all the
+same story: an undocumented CHECK constraint, created directly in the
+Supabase SQL editor before this repo's migration history started,
+hardcoded against whatever vocabulary existed back then and never
+updated when the app's own vocabulary changed later.
+
+Here, `sacrament_rabnm.type` almost certainly still has a constraint
+written against whatever values existed before migration `082`
+introduced `RABNM_PLANNING_TYPES`' own five category values
+(`recognition`/`advancement`/`baptism`/`new_member`/`baby_blessing`,
+2026-10-24) as what a pool-pulled item's own `type` resolves to once
+pulled into a meeting -- `new_member` specifically replaced an older
+value (`"New Record"`, per that migration's own category-mapping
+note), so it's the one most likely to be missing from a stale
+constraint built before that rename, matching exactly which category
+the user hit it on.
+
+Migration `094` drops the constraint outright, not recreated against
+an expanded list -- same reasoning as every one of the seven prior
+incidents of this exact bug class: this app's own real source of truth
+for valid `sacrament_rabnm.type` values is already the application
+code (`RABNM_TYPES`/`RABNM_PLANNING_TYPES`, each constraining its own
+dropdown), not a DB-side CHECK duplicating that list in a second place
+that can silently drift the next time either vocabulary changes.
+
+Confirmed via `tsc`/`eslint` only -- this is a pure database migration,
+no application code changed, so there's nothing to build for this one.
+**Confirm migration number `094` is actually free before running it**,
+per this project's own repeated numbering-collision history, then ask
+the user to retry the exact New Member entry that failed and confirm
+it now succeeds -- and, while there, to also try one of each of the
+other four categories (Recognitions/Advancements/Baptisms/Baby
+Blessings) in case the same stale constraint is missing more than just
+this one value.
 
 **Bug found and fixed 2026-10-31: Ward Business's New Members/Callings/
 Releases/Baby Blessing entries "vanished" from tomorrow's Sacrament
