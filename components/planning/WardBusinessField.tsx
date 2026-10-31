@@ -69,7 +69,7 @@ function ExistingRow({
 
   return (
     <tr className="border-t border-rule/40">
-      <td className="py-1.5 pr-3">{item.people.length > 0 ? item.people.join(", ") : "—"}</td>
+      <td className="py-1.5 pr-3">{item.people.length > 0 ? item.people.map((p) => p.name).join(", ") : "—"}</td>
       <td className="py-1.5 pr-3 text-ink-muted">{item.calling_name ?? "—"}</td>
       <td className="py-1.5 text-right">
         <span className="inline-flex items-center gap-2">
@@ -362,7 +362,7 @@ function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: st
   return (
     <>
       <td className="py-1.5 pr-3">
-        {item.people.length > 0 ? item.people.join(", ") : "—"}
+        {item.people.length > 0 ? item.people.map((p) => p.name).join(", ") : "—"}
         {item.detail ? ` -- ${item.detail}` : ""}
       </td>
       <td className="py-1.5 text-right">

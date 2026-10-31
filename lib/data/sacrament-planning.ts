@@ -55,7 +55,16 @@ export interface RabnmRow {
   calling_name: string | null;
   detail: string | null;
   event_date: string | null;
-  people: string[];
+  /** Each attached person's id alongside their name (2026-10-31,
+   *  widened from a bare `string[]` of names) -- Conducting's own
+   *  pronoun resolution (New Members/Baptisms/single Callings/
+   *  Releases) needs the id to look up `people.gender`; every other
+   *  reader just needs `.map((p) => p.name)`. */
+  people: { id: string; name: string }[];
+  /** Migration 093 -- Baby Blessing only, carried through from the
+   *  planning pool's own `baby_name` (migration 085) for Conducting's
+   *  "family name" derivation. */
+  baby_name: string | null;
   /** Set only for a row created through the Calling Planning pull
    *  mechanism (migration 055, Ward Business rework 2026-10-03) --
    *  lets Ward Business tell "this came from Calling Planning, Remove
@@ -115,7 +124,7 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
     supabase
       .from("sacrament_rabnm")
       .select(
-        "id, type, detail, event_date, calling_planning_id, rabnm_planning_id, callings(name), sacrament_rabnm_people(people(name))"
+        "id, type, detail, event_date, baby_name, calling_planning_id, rabnm_planning_id, callings(name), sacrament_rabnm_people(people(id, name))"
       )
       .eq("meeting_id", meetingId)
       .order("sort_order", { ascending: true }),
@@ -158,10 +167,11 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         type: string;
         detail: string | null;
         event_date: string | null;
+        baby_name: string | null;
         calling_planning_id: string | null;
         rabnm_planning_id: string | null;
         callings: unknown;
-        sacrament_rabnm_people: { people: { name?: string } | null }[] | null;
+        sacrament_rabnm_people: { people: { id?: string; name?: string } | null }[] | null;
       };
       return {
         id: r.id,
@@ -169,11 +179,12 @@ export async function getSacramentPlanningData(meetingId: string): Promise<Sacra
         calling_name: relationName(r.callings),
         detail: r.detail,
         event_date: r.event_date,
+        baby_name: r.baby_name,
         calling_planning_id: r.calling_planning_id,
         rabnm_planning_id: r.rabnm_planning_id,
         people: (r.sacrament_rabnm_people ?? [])
-          .map((p) => p.people?.name)
-          .filter((name): name is string => Boolean(name)),
+          .map((p) => (p.people?.id && p.people?.name ? { id: p.people.id, name: p.people.name } : null))
+          .filter((p): p is { id: string; name: string } => Boolean(p)),
       };
     }),
   };

@@ -338,7 +338,7 @@ export async function pullRabnmPlanningIntoMeeting(meetingId: string, planningId
   const supabase = await createClient();
   const { data: planning, error: fetchError } = await supabase
     .from("sacrament_rabnm_planning")
-    .select("type, detail, event_date, announced_meeting_id, sacrament_rabnm_planning_people(person_id)")
+    .select("type, detail, event_date, baby_name, announced_meeting_id, sacrament_rabnm_planning_people(person_id)")
     .eq("id", planningId)
     .single();
 
@@ -355,6 +355,7 @@ export async function pullRabnmPlanningIntoMeeting(meetingId: string, planningId
     type: planning.type,
     detail: planning.detail,
     eventDate: planning.event_date,
+    babyName: planning.baby_name,
     personIds: personRows.map((p) => p.person_id),
     linkColumn: "rabnm_planning_id",
     linkId: planningId,

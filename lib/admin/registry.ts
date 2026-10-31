@@ -481,6 +481,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "calling_id", label: "Calling", type: "foreign_key", foreignKey: { table: "callings", valueColumn: "id", labelColumn: "name" } },
       { column: "detail", label: "Detail", type: "text" },
       { column: "event_date", label: "Event Date", type: "date" },
+      { column: "baby_name", label: "Baby's Name", type: "text" },
     ],
   },
 

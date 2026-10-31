@@ -19,6 +19,19 @@ export function formatTitleLastName(fullName: string, titlePrefix: string | null
 }
 
 /**
+ * "Title + FULL name" (e.g. "Elder John Smith"), not title + last name
+ * -- 2026-10-31, used only for Visiting Authorities, per the user's
+ * own explicit instruction when scoping the Conducting script
+ * rewrite: a visitor's full name reads more naturally than a bare
+ * last name the ward likely doesn't recognize on its own, unlike the
+ * ward's own leaders (formatTitleLastName, above), who everyone
+ * already knows by last name alone.
+ */
+export function formatTitleFullName(fullName: string, titlePrefix: string | null | undefined): string {
+  return titlePrefix ? `${titlePrefix} ${fullName}` : fullName;
+}
+
+/**
  * Batched resolver for a whole agenda's worth of role/person pairs at
  * once -- one query against `callings`, not one per person, matching this
  * project's own established N+1 performance discipline (see the
@@ -50,6 +63,16 @@ export async function getTitlePrefixesForAssignments(
 
   const distinctKeys = Array.from(new Set(pairs.map((p) => p.elementKey)));
   const exactNamesByKey = new Map<string, string[]>();
+  // Calling-name PREFIXES (e.g. "Stake High Councilor" -- matches every
+  // "Stake High Councilor (<area>)" seat at once) -- 2026-10-31, fixed
+  // alongside the Conducting rewrite: fixedCallingNamesForKey has
+  // always returned a `.prefixes` list too (see Visiting Authorities'
+  // own VISITING_AUTHORITY_CALLING_NAME_PREFIXES in rotations.ts), but
+  // this function never read it until now, so a prefix-only match
+  // (any High Councilor, who has no single exact calling name) could
+  // never resolve a title here -- only an exact match (Stake
+  // Presidency) could.
+  const prefixesByKey = new Map<string, string[]>();
   const callingIdsByKey = new Map<string, string[]>();
 
   const rotationKeys: string[] = [];
@@ -57,6 +80,7 @@ export async function getTitlePrefixesForAssignments(
     const fixed = fixedCallingNamesForKey(meetingTypeSlug, key);
     if (fixed) {
       exactNamesByKey.set(key, fixed.exact);
+      if (fixed.prefixes.length > 0) prefixesByKey.set(key, fixed.prefixes);
     } else {
       rotationKeys.push(key);
     }
@@ -79,25 +103,41 @@ export async function getTitlePrefixesForAssignments(
 
   const allExactNames = Array.from(new Set(Array.from(exactNamesByKey.values()).flat()));
   const allCallingIds = Array.from(new Set(Array.from(callingIdsByKey.values()).flat()));
+  const allPrefixes = Array.from(new Set(Array.from(prefixesByKey.values()).flat()));
 
-  if (allExactNames.length === 0 && allCallingIds.length === 0) return result;
+  if (allExactNames.length === 0 && allCallingIds.length === 0 && allPrefixes.length === 0) return result;
 
-  const orParts: string[] = [];
-  if (allExactNames.length > 0) orParts.push(`name.in.(${allExactNames.map((n) => `"${n}"`).join(",")})`);
-  if (allCallingIds.length > 0) orParts.push(`id.in.(${allCallingIds.join(",")})`);
+  type CallingLookupRow = { id: string; name: string; title_prefix: string | null; current_holder_id: string | null };
+  const callings: CallingLookupRow[] = [];
 
-  const { data: callingRows } = await supabase
-    .from("callings")
-    .select("id, name, title_prefix, current_holder_id")
-    .eq("active", true)
-    .or(orParts.join(","));
+  if (allExactNames.length > 0 || allCallingIds.length > 0) {
+    const orParts: string[] = [];
+    if (allExactNames.length > 0) orParts.push(`name.in.(${allExactNames.map((n) => `"${n}"`).join(",")})`);
+    if (allCallingIds.length > 0) orParts.push(`id.in.(${allCallingIds.join(",")})`);
 
-  const callings = (callingRows ?? []) as {
-    id: string;
-    name: string;
-    title_prefix: string | null;
-    current_holder_id: string | null;
-  }[];
+    const { data: callingRows } = await supabase
+      .from("callings")
+      .select("id, name, title_prefix, current_holder_id")
+      .eq("active", true)
+      .or(orParts.join(","));
+    callings.push(...((callingRows ?? []) as CallingLookupRow[]));
+  }
+
+  // One `ilike` query per distinct prefix, in parallel -- mirrors
+  // computeEligiblePersonIdsForFixedCalling's own identical pattern
+  // (lib/data/rotations.ts), just for title display instead of
+  // eligibility.
+  if (allPrefixes.length > 0) {
+    const prefixResults = await Promise.all(
+      allPrefixes.map((prefix) =>
+        supabase.from("callings").select("id, name, title_prefix, current_holder_id").eq("active", true).ilike("name", `${prefix}%`)
+      )
+    );
+    for (const res of prefixResults) {
+      callings.push(...((res.data ?? []) as CallingLookupRow[]));
+    }
+  }
+
   const callingsByName = new Map(callings.map((c) => [c.name, c]));
   const callingsById = new Map(callings.map((c) => [c.id, c]));
 
@@ -105,18 +145,27 @@ export async function getTitlePrefixesForAssignments(
     const key = `${elementKey}::${personId}`;
     if (result.has(key)) continue;
 
+    let titlePrefix: string | null = null;
+
     const names = exactNamesByKey.get(elementKey);
-    if (names) {
+    if (names && !titlePrefix) {
       const match = names.map((n) => callingsByName.get(n)).find((c) => c?.current_holder_id === personId);
-      if (match?.title_prefix) result.set(key, match.title_prefix);
-      continue;
+      if (match?.title_prefix) titlePrefix = match.title_prefix;
+    }
+
+    const prefixes = prefixesByKey.get(elementKey);
+    if (prefixes && !titlePrefix) {
+      const match = callings.find((c) => c.current_holder_id === personId && prefixes.some((p) => c.name.startsWith(p)));
+      if (match?.title_prefix) titlePrefix = match.title_prefix;
     }
 
     const ids = callingIdsByKey.get(elementKey);
-    if (ids) {
+    if (ids && !titlePrefix) {
       const match = ids.map((id) => callingsById.get(id)).find((c) => c?.current_holder_id === personId);
-      if (match?.title_prefix) result.set(key, match.title_prefix);
+      if (match?.title_prefix) titlePrefix = match.title_prefix;
     }
+
+    if (titlePrefix) result.set(key, titlePrefix);
   }
 
   return result;

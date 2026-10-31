@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/server";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getMeetingWithType, getTemplateElements, getPlannedElements, getRoleAssignments } from "@/lib/data/meeting-elements";
 import { getElementNotes } from "@/lib/data/meeting-element-notes";
@@ -8,6 +9,7 @@ import { getVisitingAuthorities } from "@/lib/data/visiting-authorities";
 import { getAnnouncementsByPlannedElement } from "@/lib/data/sacrament-announcements";
 import { buildConductingRows, type ConductingRow } from "@/lib/data/conducting-rows";
 import { getTitlePrefixesForAssignments } from "@/lib/data/person-display";
+import { getWardName } from "@/lib/data/ward-settings";
 
 export interface ConductingScript {
   meetingTitle: string;
@@ -101,7 +103,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
   const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) return null;
 
-  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcementsByPlannedElement] =
+  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcementsByPlannedElement, wardName] =
     await Promise.all([
       getPlannedElements(meetingId),
       getRoleAssignments(meetingId, "sacrament_assignments"),
@@ -111,7 +113,17 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
       getSacramentProgramItems(meetingId),
       getVisitingAuthorities(meetingId),
       getAnnouncementsByPlannedElement(meetingId),
+      getWardName(),
     ]);
+
+  // A lean, scoped lookup (just id + gender), rather than widening the
+  // shared getActivePeople()/PersonOption many unrelated call sites
+  // across this app already depend on -- gender resolution is only
+  // needed for a handful of Conducting's own pronoun choices (New
+  // Members, Baptisms, single Callings/Releases).
+  const supabase = await createClient();
+  const { data: genderRows } = await supabase.from("people").select("id, gender");
+  const genderById = new Map(((genderRows ?? []) as { id: string; gender: string | null }[]).map((p) => [p.id, p.gender]));
 
   const templateElements =
     plannedElements.length > 0
@@ -156,6 +168,14 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
       if (id) titlePairs.push({ elementKey: el.key, personId: id });
     }
   }
+  // Visiting Authorities get "title + FULL name" (2026-10-31, the
+  // user's own explicit instruction -- see formatTitleFullName) via
+  // this same batched lookup, not a separate call -- the
+  // "visiting_authorities" elementKey already resolves to Stake
+  // Presidency + High Council through fixedCallingNamesForKey.
+  for (const va of visitingAuthorities) {
+    if (va.personId) titlePairs.push({ elementKey: "visiting_authorities", personId: va.personId });
+  }
   const titlePrefixByKey = await getTitlePrefixesForAssignments("sacrament-meeting", titlePairs);
 
   const rowInputs = {
@@ -168,7 +188,19 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
     announcementsByPlannedElement,
     peopleById,
     titlePrefixByKey,
+    genderById,
   };
+
+  // Welcome (2026-10-31, the user's own supplied script) -- the long
+  // form (naming the Church by its full name) on the first Sunday of
+  // the month, confirmed directly with the user; every Sacrament
+  // Meeting date is already a Sunday, so day-of-month <= 7 is enough
+  // to detect "first Sunday" without real day-of-week math.
+  const dayOfMonth = Number(meeting.date.slice(8, 10));
+  const isFirstSunday = Number.isFinite(dayOfMonth) && dayOfMonth <= 7;
+  const welcomeWording = isFirstSunday
+    ? `Welcome to the Sacrament Meeting for the ${wardName} Ward of The Church of Jesus Christ of Latter-day Saints.`
+    : `Welcome to the Sacrament Meeting for the ${wardName} Ward.`;
 
   const rows: ConductingRow[] = [
     {
@@ -176,7 +208,7 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
       kind: "banner",
       label: "Title",
       value: null,
-      wording: "Welcome to today's Sacrament Meeting of The Church of Jesus Christ of Latter-day Saints.",
+      wording: welcomeWording,
     },
     { id: "opening-section", kind: "section", label: "Opening", value: null, wording: null },
     ...buildConductingRows({ elements: openingElements, ...rowInputs }),

@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 092
+## Current migration number: 093
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2037,6 +2037,162 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**The Conducting script's wording rewritten against a complete script
+the user supplied, migration `093`, not yet run, 2026-10-31.** The
+user pasted a full, detailed Conducting script covering Welcome,
+Introductions, Announcements, Ward Business (New Members,
+Advancements, Baptisms, Callings/Releases), Stake Business, Baby
+Blessing, and Closing -- the biggest rework of
+`lib/data/conducting-rows.ts` since it was first built, approved via a
+formal `/plan` first given how much of this is read aloud live in
+front of the ward every week. Four design points were confirmed
+directly via `AskUserQuestion` before planning: Welcome's long/short
+form picks by first-Sunday-of-the-month (computed from the meeting's
+own date); Announcements' two phrasings are keyed on 0-vs-1+ pulled;
+the sacrament-transition sentence is said exactly once (suppressed on
+Sacrament Hymn whenever Stake Business or Baby Blessing already said
+it); and Visiting Authorities get a real title lookup using **title +
+full name** (e.g. "Elder John Smith"), not the title + last-name
+convention (`formatTitleLastName`) used for the ward's own leaders --
+the user's own explicit clarification once the title-lookup question
+came up.
+
+**Three real prerequisites, not just wording changes**, found while
+researching this before writing the plan:
+- **`RabnmRow.people` widened from a bare `string[]` of names to
+  `{ id: string; name: string }[]`** (`lib/data/sacrament-planning.ts`)
+  -- New Members/Baptisms/single Callings/Releases all need a specific
+  person's `id` to look up `people.gender` for a pronoun, which a bare
+  name string can't provide. Three existing readers that assumed
+  `string[]` needed a one-line fix each (map to `.name` before
+  joining/spreading): `app/meetings/[id]/archived/page.tsx`,
+  `components/planning/WardBusinessField.tsx` (both
+  `ExistingRow`/`ExistingRabnmCells`), and this file's own
+  (fully-rewritten) `rabnmPrompt`.
+- **`getTitlePrefixesForAssignments` (`lib/data/person-display.ts`)
+  silently ignored calling-name PREFIXES.** It only ever checked
+  `fixedCallingNamesForKey(...).exact`, never `.prefixes` -- so a
+  Stake High Councilor (matched only by prefix,
+  `VISITING_AUTHORITY_CALLING_NAME_PREFIXES`, since each seat has its
+  own distinct real name like "Stake High Councilor (`<area>`)") could
+  never get a title through this function, only an exact match (Stake
+  Presidency) could. This had no visible effect before now, since
+  nothing ever called this function for Visiting Authorities at all
+  until this rewrite. Fixed to also run one `ilike` query per distinct
+  prefix and check prefix matches alongside exact/rotation matches.
+  New `formatTitleFullName` (same file) -- `${titlePrefix} ${fullName}`,
+  used only by Visiting Authorities; `formatTitleLastName` is
+  completely unchanged for everything else.
+- **Baby Blessing's "family name" had nowhere to come from.** The
+  announced `sacrament_rabnm` row never carried `baby_name` -- only
+  the pre-pull planning pool
+  (`sacrament_rabnm_planning.baby_name`, migration 085) did, and
+  `pullRabnmPlanningIntoMeeting` never copied it over. New
+  `sacrament_rabnm.baby_name` column (migration 093) + threaded
+  through `insertSacramentRabnmLink`'s `RabnmLinkSpec`
+  (`lib/data/sacrament-rabnm-linking.ts`) and the pull itself
+  (`app/meetings/[id]/ward-business-actions.ts`); also added to
+  `lib/admin/registry.ts`'s `sacrament_rabnm` entry for Table Admin's
+  own raw-data fallback. Conducting derives the family name as the
+  last word of `baby_name`, falling back to the generic "family" when
+  blank (older/blank rows, since this is brand-new data).
+
+**The wording itself, by section** (all in `lib/data/conducting-rows.ts`
+unless noted):
+- **Welcome** (`lib/data/conducting.ts`, the one hardcoded row, not
+  template-driven) -- long form naming the Church in full on the first
+  Sunday of the month, short form otherwise, using the real ward name
+  (`getWardName()`) instead of a hardcoded one.
+- **Introductions** (new) -- Presiding/Conducting stay value-only rows,
+  unchanged; a new banner row right after Conducting's own row
+  combines both names ("I am `<conducting>` and I will be conducting
+  today. `<presiding>` is presiding in this meeting.") -- both names
+  resolved once, up front, independent of template element order.
+- **Visiting Authorities** -- singular ("...on the stand with us
+  today") vs. plural ("...visiting with us today") by count, title +
+  full name per the confirmed design above.
+- **Announcements** -- 0 pulled: a standalone "refer to your programs"
+  cue (previously showed nothing at all for this case). 1+ pulled: an
+  intro banner, each announcement's own unchanged wording, then a
+  closing "see your programs for everything else" banner.
+- **Ward Business's intro banner** gets a real line now ("We would
+  like to thank `<organist>` and `<chorister>` for helping us with our
+  music today") -- `recognize_music`'s own separate thank-you wording
+  is suppressed (its value-only display is unchanged) so the same two
+  people aren't thanked twice back to back.
+- **Ward Business's own subsection order, for Conducting only**: a
+  fixed sequence -- New Member -> Advancement -> Baptism -> Release ->
+  New Calling -> Stake Business -> Baby Blessing -- replacing the old
+  `RABNM_ORDER_WEIGHT` (release-then-new_calling-then-everything-else).
+  **Deliberately does not follow** the admin-configurable Ward
+  Business subsection order (`ward_settings.ward_business_section_order`,
+  built the prior session) -- that setting is Planning's own editing
+  convenience; Conducting is a prescriptive script where Baby Blessing
+  specifically has to be last (it owns the sacrament-transition
+  sentence), so it keeps its own fixed order regardless.
+- **New Members / Baptisms** -- every item of that type this meeting
+  is now grouped into ONE sentence (not one row per item, which is
+  what happened before), with a real he/him/his, she/her/her, or
+  they/them/their pronoun for exactly one person (`pronounsFor`,
+  reading `people.gender`; unset/other defaults to they/them/their --
+  a documented default, not something asked about directly, since most
+  existing people rows predate the gender field).
+- **Releases**: 0 nothing, 1 the gendered singular sentence, 2-3 one
+  combined sentence, 4+ the "following ward members" sentence, exactly
+  the three tiers given. **Callings**: 0 nothing, 1 the gendered
+  singular sentence, 2+ one combined sentence -- the script's own
+  "(If more than one individual is being released)" sub-heading
+  *under Callings* is read as a copy-paste of "being called" and
+  implemented that way, flagged explicitly rather than silently
+  guessed at.
+- **Advancements** -- grouped by OFFICE (Deacon/Teacher/Priest), not
+  one sentence per row: `item.detail` ("New office," migration 085)
+  matched case-insensitively by substring; anything matching none of
+  the three falls back to a generic, office-less sentence rather than
+  being silently dropped. Deacon's own sentence is the only one that
+  mentions "receive the Aaronic Priesthood" (a first ordination into
+  it) -- Teacher/Priest don't, matching the user's script literally.
+- **Stake Business** -- "`<announcer>` will present stake business,"
+  plus the sacrament-transition sentence only when no baby blessing
+  exists this meeting. **Baby Blessing** -- always appends that same
+  transition sentence (assumed last); more than one blessing in the
+  same meeting joins every family name with "and."
+- **Sacrament Hymn** -- wording suppressed whenever Stake Business or
+  Baby Blessing already said the transition; otherwise says its own
+  version, reworded to match the script.
+- **Closing** -- a new fixed instructional banner ("Thank you for your
+  participation... share any reminders as needed") at the start of the
+  Closing section -- pure stage direction, no data field backs it, since
+  nothing anywhere holds "reminders" as real data. Closing Hymn/Prayer
+  reworded to match the script.
+- **Left unchanged, not mentioned in the user's script**: the
+  `recognition` RABNM category keeps the old generic `item.detail`
+  fallback (one row per item); `planning.recognitions`'s own free-text
+  "Recognize Authorities" cue (unrelated to Visiting Authorities)
+  stays exactly as it was, still injected after Conducting -- now
+  after the new Introductions row too.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- it took four
+attempts this time, not the usual one retry, before it cleared; same
+root cause as every other time this has happened in this project,
+confirmed unrelated since `tsc`/`eslint` were already clean before any
+retry), same no-live-database-access gap as everything else in this
+project -- **confirm migration number `093` is actually free before
+running it**, per this project's own repeated numbering-collision
+history, then ask the user to open a real meeting's Conducting script
+and check: Welcome reads correctly on a first-Sunday date vs. any
+other Sunday; Introductions names both Presiding and Conducting;
+Visiting Authorities shows "title + full name" correctly for both a
+Stake Presidency member and a High Councilor; Announcements reads the
+right phrasing for a meeting with 0 vs. 1+ pulled; Ward Business runs
+in the fixed New Member -> Advancement -> Baptism -> Release -> New
+Calling -> Stake Business -> Baby Blessing order regardless of the
+Planning-side subsection order; the sacrament-transition sentence is
+said exactly once no matter which of Stake Business/Baby
+Blessing/neither applies; and Closing reads correctly.
 
 **Self-serve sign-up now asks for a first name, migration `092`, not
 yet run, 2026-10-30.** Built per the user's own follow-up confirming an

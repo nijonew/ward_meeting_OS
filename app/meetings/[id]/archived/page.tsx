@@ -549,7 +549,7 @@ export default async function ArchivedMeetingPage({
               .map((r) => (
               <div key={r.id} className={ROW}>
                 <p className={LABEL}>{r.type.replace(/_/g, " ")}</p>
-                <Plain>{[r.calling_name, ...r.people].filter(Boolean).join(" · ") || "None"}</Plain>
+                <Plain>{[r.calling_name, ...r.people.map((p) => p.name)].filter(Boolean).join(" · ") || "None"}</Plain>
                 {r.detail && <Note>{r.detail}</Note>}
               </div>
             ))}

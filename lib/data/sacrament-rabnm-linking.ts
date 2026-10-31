@@ -20,6 +20,10 @@ export interface RabnmLinkSpec {
   callingId?: string | null;
   detail?: string | null;
   eventDate?: string | null;
+  /** Migration 093 -- Baby Blessing only, carried straight through
+   *  from the planning pool's own `baby_name` (migration 085) so
+   *  Conducting can still derive a family name after the pull. */
+  babyName?: string | null;
   personIds: string[];
   /** Which pool this row came from -- `calling_planning_id` (Calling
    *  Planning) or `rabnm_planning_id` (RABNM Planning). */
@@ -58,6 +62,7 @@ export async function insertSacramentRabnmLink(spec: RabnmLinkSpec): Promise<{ i
       calling_id: spec.callingId ?? null,
       detail: spec.detail ?? null,
       event_date: spec.eventDate ?? null,
+      baby_name: spec.babyName ?? null,
       sort_order: sortOrder,
       [spec.linkColumn]: spec.linkId,
     })
