@@ -2038,6 +2038,56 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-30: a stale `candidate_person_ids` entry
+could block the Calling Planning roster sync with a cryptic Postgres
+error, and had no way to be seen or removed through the UI at all --
+migration `089`, not yet run.** The user's own report, right after
+confirming migration 088 fixed the `role_source` error: saving a
+Calling Planning status change returned "Saved. Couldn't update the
+roster for: Ward Assistant Executive Secretary (insert or update on
+table "callings" violates foreign key constraint
+"callings_current_holder_id_fkey")".
+
+Root cause: `calling_planning.candidate_person_ids` is a plain
+`uuid[]` column (migration 044) -- Postgres cannot enforce element-
+wise foreign keys on an array column, so nothing has ever stopped a
+person referenced there from later being deleted from `people`,
+leaving a silently dangling id behind. This had no real consequence
+until today's own roster-sync feature (`syncCallingRosterFromPlanning`)
+started actually *using* a row's one narrowed-down candidate to write
+to `callings.current_holder_id`, a real, FK-enforced column -- hitting
+a stale id there is a genuine constraint violation, not a bug in the
+sync logic itself. Worse: `MultiPersonSelect.tsx` (the Candidates
+field's chip-style picker) only ever rendered a chip for an id it
+could resolve to a real person -- a stale id was completely invisible,
+with no way to select it and click "Remove," even though its hidden
+`<input>` was still being submitted (and re-saved) on every grid save.
+
+Three-part fix:
+1. **Migration `089`** -- one-time cleanup, strips any person id out
+   of every `calling_planning.candidate_person_ids` array that no
+   longer corresponds to a real `people` row. Idempotent.
+2. **`syncCallingRosterFromPlanning` now pre-checks** that the
+   narrowed-down candidate still exists before attempting the write,
+   returning a plain-language, actionable message ("the selected
+   candidate no longer exists as a real person record -- remove and
+   re-add them in Candidates, then save again") instead of a raw
+   constraint name, in case this ever happens again after today's
+   cleanup (e.g. once people actually start getting deleted/merged
+   more routinely).
+3. **`MultiPersonSelect.tsx` now renders a chip for every selected id,
+   always** -- a stale one that can't resolve to a real person shows
+   as "(missing person record)," a normal removable chip like any
+   other, so a future occurrence is fixable right there in the UI
+   without needing another one-time migration.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `089` is actually free before running it**, per this
+project's own repeated numbering-collision history, then ask the user
+to run it and confirm the same "Ward Assistant Executive Secretary"
+calling status save now succeeds with no roster warning at all.
+
 **Real, pre-existing data-loss bug found and fixed 2026-10-30: a
 calling-eligible person picker on a meeting's Planning page could
 silently show "Unassigned" for someone who was actually still

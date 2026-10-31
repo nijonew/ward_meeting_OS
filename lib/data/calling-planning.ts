@@ -294,9 +294,23 @@ export async function syncCallingRosterFromPlanning(row: {
   }
 
   if ((row.calling_status === "to_record" || row.calling_status === "complete") && row.candidate_person_ids.length === 1) {
+    const candidateId = row.candidate_person_ids[0];
+    // Pre-check the candidate still exists before attempting the write
+    // (2026-10-30, found from the user's own report: a stale candidate
+    // id -- candidate_person_ids is a plain uuid[] with no real
+    // database-enforced foreign key, see migration 089's own comment
+    // -- produced a raw "violates foreign key constraint
+    // callings_current_holder_id_fkey" message instead of something
+    // an admin could actually act on). Same root cause either way;
+    // this just gives it a plain-language, fixable message.
+    const { data: candidate } = await supabase.from("people").select("id").eq("id", candidateId).maybeSingle();
+    if (!candidate) {
+      return { error: "the selected candidate no longer exists as a real person record -- remove and re-add them in Candidates, then save again" };
+    }
+
     const { error } = await supabase
       .from("callings")
-      .update({ current_holder_id: row.candidate_person_ids[0] })
+      .update({ current_holder_id: candidateId })
       .eq("id", row.calling_id);
     if (error) return { error: error.message };
   }

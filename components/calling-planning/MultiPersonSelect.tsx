@@ -43,9 +43,18 @@ export function MultiPersonSelect({
 
   const selectedSet = new Set(selected);
   const available = people.filter((p) => !selectedSet.has(p.id));
-  const selectedPeople = selected
-    .map((id) => people.find((p) => p.id === id))
-    .filter((p): p is PersonOption => Boolean(p));
+  // Always one entry per selected id, even if it no longer resolves to
+  // a real person (2026-10-30, found from the user's own report: a
+  // stale id -- left over from a since-deleted person record, since
+  // this array has no real database-enforced foreign key -- used to
+  // just vanish from this list entirely with no way to see or remove
+  // it, yet still silently submitted on every save). A real but
+  // unresolvable id now renders as its own removable chip instead of
+  // disappearing, so a stale reference like this is always fixable
+  // right here going forward, not just via a one-time data cleanup.
+  const selectedPeople = selected.map(
+    (id): PersonOption => people.find((p) => p.id === id) ?? { id, name: "(missing person record)" }
+  );
 
   const addPerson = (id: string) => {
     if (!id || selectedSet.has(id)) return;
