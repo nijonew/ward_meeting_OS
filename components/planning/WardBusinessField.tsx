@@ -267,12 +267,21 @@ function CallingPlanningSection({
  * the same reason -- every row in it is already the same type. The
  * standing pool itself is still managed from its own page,
  * /rabnm-planning -- this is only the pull-into-this-meeting half.
+ *
+ * Move Up/Down added to each category's own existing items, 2026-10-31
+ * (the user's own follow-up request, right after the five-subsection
+ * split above shipped) -- same `moveWardBusinessItem` action and same
+ * swap-adjacent-sort_order mechanics Releases/Callings' own
+ * `ExistingRow` already used, just scoped by this category's own
+ * `type` instead of `"release" | "new_calling"`.
  */
 function RabnmCategorySection({
+  type,
   meetingId,
   existing,
   candidates,
 }: {
+  type: RabnmPlanningType;
   meetingId: string;
   existing: RabnmRow[];
   candidates: CallableRabnmItem[];
@@ -299,9 +308,15 @@ function RabnmCategorySection({
       {existing.length > 0 ? (
         <table className="mt-2 w-full text-sm">
           <tbody>
-            {existing.map((item) => (
+            {existing.map((item, index) => (
               <tr key={item.id} className="border-t border-rule/40 align-top">
-                <ExistingRabnmCells item={item} meetingId={meetingId} />
+                <ExistingRabnmCells
+                  item={item}
+                  meetingId={meetingId}
+                  type={type}
+                  isFirst={index === 0}
+                  isLast={index === existing.length - 1}
+                />
               </tr>
             ))}
           </tbody>
@@ -335,17 +350,35 @@ function RabnmCategorySection({
   );
 }
 
-/** A RABNM-planning row's own two <td>s (people + detail, Remove) --
- *  split out on its own so a future caller could still prepend an
- *  extra leading <td> to the same <tr> without duplicating the
- *  Remove-button logic, the same way the original combined
+/** A RABNM-planning row's own two <td>s (people + detail, Move Up/
+ *  Down + Remove) -- split out on its own so a future caller could
+ *  still prepend an extra leading <td> to the same <tr> without
+ *  duplicating this logic, the same way the original combined
  *  `RabnmPlanningSection` once did for its own Type column (removed
  *  2026-10-31 once each category became its own subsection and that
  *  column stopped being useful -- every row in one category's table is
  *  already the same type). `RabnmCategorySection` renders this as the
- *  whole row today, with nothing prepended. */
-function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
+ *  whole row today, with nothing prepended.
+ *
+ *  Move Up/Down (2026-10-31, the same follow-up request as
+ *  `RabnmCategorySection`'s own comment above) -- same
+ *  `isFirst`/`isLast`-disables-the-button-at-a-boundary shape as
+ *  `ExistingRow`'s identical controls for Releases/Callings. */
+function ExistingRabnmCells({
+  item,
+  meetingId,
+  type,
+  isFirst,
+  isLast,
+}: {
+  item: RabnmRow;
+  meetingId: string;
+  type: RabnmPlanningType;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
   const [removing, startRemove] = useTransition();
+  const [moving, startMove] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const remove = () => {
@@ -358,6 +391,14 @@ function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: st
     });
   };
 
+  const move = (direction: "up" | "down") => {
+    setError(null);
+    startMove(async () => {
+      const result = await moveWardBusinessItem(meetingId, item.id, type, direction);
+      if ("error" in result) setError(result.error);
+    });
+  };
+
   return (
     <>
       <td className="py-1.5 pr-3">
@@ -365,9 +406,27 @@ function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: st
         {item.detail ? ` -- ${item.detail}` : ""}
       </td>
       <td className="py-1.5 text-right">
-        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
-          {removing ? "Removing..." : "Remove"}
-        </button>
+        <span className="inline-flex items-center gap-2">
+          <button
+            type="button"
+            disabled={moving || isFirst}
+            onClick={() => move("up")}
+            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+          >
+            &uarr;
+          </button>
+          <button
+            type="button"
+            disabled={moving || isLast}
+            onClick={() => move("down")}
+            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
+          >
+            &darr;
+          </button>
+          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+            {removing ? "Removing..." : "Remove"}
+          </button>
+        </span>
         {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </>
@@ -441,6 +500,7 @@ export function WardBusinessField({
     title,
     node: (
       <RabnmCategorySection
+        type={type}
         meetingId={meetingId}
         existing={items.filter((i) => i.type === type)}
         candidates={callableRabnm.filter((c) => c.type === type)}

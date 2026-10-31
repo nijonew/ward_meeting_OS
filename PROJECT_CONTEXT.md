@@ -2128,13 +2128,22 @@ every row in a single category's own table is already that type.
 `"release" | "new_calling"` to also accept a `RabnmPlanningType` --
 the underlying query already just filters `sacrament_rabnm.type` by
 whatever string it's given, so this is a type-signature widening with
-no logic change, done for forward-compatibility; no Move Up/Down
-control was actually added to the five new subsections' own existing
-items in this pass, since the user's request was specifically about
-promoting them to subsections, not about reordering within one --
-flag if that's wanted too, since the groundwork (a real per-type
-`sort_order`, already maintained by `insertSacramentRabnmLink` for
-every category) is already there.
+no logic change.
+
+**Move Up/Down added to each category's own existing items too, same
+day, right after the above shipped** (the user's own immediate
+follow-up: "Add Move Up/Down within each of the five new categories
+too") -- `ExistingRabnmCells` gained the identical `moving`/Move Up/
+Down-button shape `ExistingRow` (Releases/Callings) already had,
+calling the same `moveWardBusinessItem` action now that its `type`
+parameter accepts a `RabnmPlanningType`; `RabnmCategorySection` passes
+its own `type` plus each row's `isFirst`/`isLast` through, computed
+from its own already-filtered, already-`sort_order`-sorted `existing`
+list -- same boundary-disables-the-button shape as every other Move
+Up/Down control in this app. No new column or logic needed on the
+data side -- `insertSacramentRabnmLink` has always maintained a real
+per-`(meeting, type)` `sort_order` for every category, this just
+finally exposed a way to change it.
 
 **Deliberately left unchanged**: the archived/read-only view
 (`app/meetings/[id]/archived/page.tsx`) already rendered every
@@ -2152,9 +2161,12 @@ now shows seven subsections (Releases, Callings, Recognitions,
 Advancements, Baptisms, New Members, Baby Blessings), each with its
 own Add dropdown and existing-items list; Move Up/Down on each
 subsection's own heading reorders all seven relative to each other,
-ward-wide; and (if the ward had already customized the old three-way
+ward-wide; (if the ward had already customized the old three-way
 order) the five new subsections land where the old combined RABNM
-block used to sit, not at the very end.
+block used to sit, not at the very end; and each category's own
+existing items now show working Move Up/Down buttons that reorder only
+within that one category (a disabled arrow at either end of its own
+list, same as Releases/Callings already had).
 
 **Performance pass, part 2, 2026-10-31: a second, deeper round of the
 same N+1/sequential-round-trip audit**, after the user asked "what was
