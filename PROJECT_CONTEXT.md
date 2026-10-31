@@ -2044,7 +2044,7 @@ avoid confusing the two.
 
 **Bug found and fixed 2026-10-31: entering a New Member item hit `new
 row for relation "sacrament_rabnm" violates check constraint
-"sacrament_rabnm_type_check"` -- migration `094`, not yet run.** The
+"sacrament_rabnm_type_check"` -- migration `094`, confirmed run.** The
 user's own report, right after the per-category Move Up/Down addition
 above shipped. This assistant has no live database access, so the
 diagnosis leans entirely on the error message itself plus this
@@ -2076,13 +2076,9 @@ that can silently drift the next time either vocabulary changes.
 
 Confirmed via `tsc`/`eslint` only -- this is a pure database migration,
 no application code changed, so there's nothing to build for this one.
-**Confirm migration number `094` is actually free before running it**,
-per this project's own repeated numbering-collision history, then ask
-the user to retry the exact New Member entry that failed and confirm
-it now succeeds -- and, while there, to also try one of each of the
-other four categories (Recognitions/Advancements/Baptisms/Baby
-Blessings) in case the same stale constraint is missing more than just
-this one value.
+**Migration `094` confirmed run, and the fix confirmed working in
+production, 2026-10-31** -- the user's own words, after retrying the
+New Member entry plus one more category: "Ran it, both work now."
 
 **Bug found and fixed 2026-10-31: Ward Business's New Members/Callings/
 Releases/Baby Blessing entries "vanished" from tomorrow's Sacrament
