@@ -15,7 +15,13 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 type ActionResult = { success: true } | { error: string };
 type PushActionResult = { error?: string; filled?: number; overwritten?: number };
-type PushFixedRolesActionResult = { error?: string; filled?: number; overwritten?: number; skippedVacant?: number };
+type PushFixedRolesActionResult = {
+  error?: string;
+  filled?: number;
+  overwritten?: number;
+  skippedVacant?: number;
+  skippedAmbiguous?: number;
+};
 type SaveGridActionResult = { error?: string; success?: boolean };
 
 // None of these actions had a server-side check at all before this

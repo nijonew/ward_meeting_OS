@@ -138,7 +138,22 @@ export async function getTitlePrefixesForAssignments(
     }
   }
 
-  const callingsByName = new Map(callings.map((c) => [c.name, c]));
+  // Grouped by name, not collapsed to one row per name -- this app's own
+  // established convention for a calling with more than one simultaneous
+  // holder (e.g. the "Stake High Councilor (<area>)" seats) is literally
+  // a second `callings` row sharing the same name, and the same thing
+  // happens by accident if a name gets duplicated (a test account added
+  // as "another" counselor, say). A plain `new Map(callings.map((c) =>
+  // [c.name, c]))` silently keeps only whichever row came back last for
+  // a given name, so the match below would find nothing for the REAL
+  // holder whenever the "wrong" duplicate won that collapse -- found
+  // 2026-10-31 alongside the identical bug in lib/data/rotations.ts.
+  const callingsByName = new Map<string, CallingLookupRow[]>();
+  for (const c of callings) {
+    const existing = callingsByName.get(c.name);
+    if (existing) existing.push(c);
+    else callingsByName.set(c.name, [c]);
+  }
   const callingsById = new Map(callings.map((c) => [c.id, c]));
 
   for (const { elementKey, personId } of pairs) {
@@ -149,7 +164,8 @@ export async function getTitlePrefixesForAssignments(
 
     const names = exactNamesByKey.get(elementKey);
     if (names && !titlePrefix) {
-      const match = names.map((n) => callingsByName.get(n)).find((c) => c?.current_holder_id === personId);
+      const candidates = names.flatMap((n) => callingsByName.get(n) ?? []);
+      const match = candidates.find((c) => c.current_holder_id === personId);
       if (match?.title_prefix) titlePrefix = match.title_prefix;
     }
 

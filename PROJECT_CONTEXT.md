@@ -2042,6 +2042,117 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-31: a duplicated calling name could
+silently steal Presiding/Conducting's real auto-assignment -- no
+migration needed, pure application code.** The user's own report:
+"rotations are a struggle again. I want to clear out any rotations by
+name. I want only rotations by calling. It seems that since I played
+with the first counselor position by adding a test account as another
+first counselor it is not recognized in rotations and also I it seems
+like the rotations are not pushing correctly." This bundled three
+things -- a real, confirmed bug (this entry), a structural request
+that turns out to already be self-serve today (see below), and a
+vaguer "pushing isn't working" complaint that, as far as this
+assistant's own code reading can tell, is fully explained by the same
+bug -- flag if it's still happening once this ships and the test
+duplicate is cleaned up.
+
+Root cause, found by reading (no live database access): three
+functions in `lib/data/rotations.ts` resolved "whoever holds the
+`Bishop`/`Bishopric First Counselor`/`Bishopric Second Counselor`
+calling right now" (`CONDUCTING_CALLING_ORDER`, used for Presiding's
+fixed default and Conducting's month-of-year cycle) by building a
+plain `new Map(rows.map((c) => [c.name, c.current_holder_id]))` from a
+query already filtered to `active = true`. A `Map` built this way
+silently keeps only whichever row comes back LAST for a given key --
+so the moment a second active `callings` row shares a name (exactly
+what "adding a test account as another first counselor" describes --
+this app's own established convention for a calling with more than
+one simultaneous holder, e.g. the "Stake High Councilor (`<area>`)"
+seats, is literally a second row with the same name), which of the two
+holders "wins" became arbitrary, decided purely by query result order
+-- with no error, no warning, nothing visibly wrong until the real
+counselor's assignments started quietly going to the wrong person (or
+to nobody, if the "winning" row's own holder had since been cleared).
+A fourth, equivalent bug was found the same way in
+`lib/data/person-display.ts`'s `getTitlePrefixesForAssignments` (the
+"title + last name" resolver built during the Conducting script
+rewrite immediately before this) -- same collapse, there it meant the
+real holder's title could silently fail to resolve rather than a wrong
+assignment, since the lookup is a name-to-value `Map`, not a
+name-to-holder-id one.
+
+Fixed in all four places: new `holdersByCallingName()` (`lib/data/rotations.ts`)
+collects every distinct holder per name into a real array instead of
+collapsing to one, and new `resolveSingleHolder()` narrows that down
+to exactly one holder ONLY when there's exactly one -- a name with zero
+current holders is "vacant" (unchanged, already handled); a name with
+two or more is now its own distinct "ambiguous" case, silently skipped
+for auto-assignment purposes (same as vacant) but counted and reported
+separately, since unlike an ordinary vacancy, this one means a real
+data problem worth fixing in Callings. Applied to
+`applyFixedSacramentRoles` (sets Presiding/Conducting on a brand-new
+meeting) and `pushFixedSacramentRolesToUpcomingMeetings` ("Fill
+Presiding/Conducting for upcoming meetings starting `<date>`," whose
+`PushFixedRolesResult` gained a new `skippedAmbiguous` count,
+surfaced on `/rotations` right alongside the existing "skipped --
+vacant" message: "`<n>` skipped -- that calling currently has more
+than one active holder; fix the duplicate in Callings"). The
+Assignment Grid's own Conducting-column dropdown
+(`eligiblePeopleByColumn`) needed the opposite fix, not the same one
+-- it's building a list of pickable OPTIONS, not writing a single
+value, so the right behavior there is to show every distinct holder as
+its own separate option (de-duplicated only by person id, in case the
+same person is accidentally listed under two rows) rather than hiding
+one. `getTitlePrefixesForAssignments` got the equivalent fix -- its
+`callingsByName` lookup is now grouped (`Map<string, CallingLookupRow[]>`)
+instead of collapsed to one row per name, so the title match can check
+every row sharing a name, not just whichever one a plain `Map`
+happened to keep.
+
+**"I want to clear out any rotations by name. I want only rotations by
+calling" is already fully self-serve today, no code change needed** --
+confirmed by reading `app/rotations/actions.ts`: `/rotations`' own
+"Add a calling..." picker (alongside the existing "Add someone...")
+already lets any rotation take a calling-based member
+(`rotation_members.calling_id`, migration 080) exactly like a
+person-based one, and `removeRotationMember` already removes either
+kind. Converting a specific rotation (e.g. Opening Prayer for
+Bishopric Meeting) from a list of named people to a list of callings
+means, for that rotation, removing each person-based member and adding
+whichever calling(s) should take their place instead -- this assistant
+has no live database access to see which rotations currently hold
+person-based members or to guess which calling (if any) should stand
+in for each person, so this is something only the user can actually
+do, rotation by rotation, from the existing UI. Ask the user directly
+if they'd like a specific rotation's conversion scoped out as its own
+task once they've identified which one(s) and which calling(s).
+
+**Not independently confirmed**: whether a genuinely duplicate
+"Bishopric First Counselor" `callings` ROW (two rows, same name) was
+created, versus the one existing row's holder simply being reassigned
+to a test account (which would NOT trigger this bug on its own -- the
+collapse only happens with two or more rows sharing a name, not two
+different holders of one row over time). Ask the user to check Table
+Admin's Callings grid (or `/callings`) for a literal duplicate row
+named "Bishopric First Counselor" and remove/deactivate whichever one
+is the test entry -- the code fix above stops the wrong-holder
+silently winning, but a genuine duplicate row should still be cleaned
+up as real ward data, not left in place relying on this fix to pick
+the right one by luck of query order forever.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to: (1) check Callings for a duplicate "Bishopric First Counselor" row
+and remove the test one; (2) confirm the real counselor now shows up
+correctly for Presiding/Conducting on both a newly-created meeting and
+via "Fill Presiding/Conducting for upcoming meetings starting
+`<date>`" on `/rotations`; (3) report back whether "rotations are not
+pushing correctly" still happens once both of those are done -- if so,
+it's a separate issue this fix doesn't explain, and the next step
+would be a specific example (which rotation, which meeting, what was
+expected vs. what showed up).
+
 **Bug found and fixed 2026-10-31: entering a New Member item hit `new
 row for relation "sacrament_rabnm" violates check constraint
 "sacrament_rabnm_type_check"` -- migration `094`, confirmed run.** The

@@ -197,6 +197,70 @@ async function computeEligiblePersonIdsForFixedCalling(
 }
 
 /**
+ * Resolves each of the given calling NAMES to every distinct current
+ * holder id among active `callings` rows with that exact name --
+ * plural, because this app's own established convention for a calling
+ * with more than one simultaneous holder (see e.g. the "Stake High
+ * Councilor (<area>)" seats) is literally a second `callings` row
+ * sharing the same name, which is also exactly what happens if a name
+ * gets accidentally duplicated (a test account added as "another"
+ * counselor, say). A caller that can only use ONE holder per name must
+ * decide what "more than one" means for its own purpose -- see
+ * resolveSingleHolder below -- rather than silently collapsing to
+ * "whichever row the query happened to return last," which is the bug
+ * a plain `new Map(rows.map((c) => [c.name, c.current_holder_id]))`
+ * construction has every time.
+ *
+ * **Bug found and fixed 2026-10-31** (the user's own report: "since I
+ * played with the first counselor position by adding a test account
+ * as another first counselor it is not recognized in rotations"):
+ * exactly this collapse, in three places --
+ * applyFixedSacramentRoles/pushFixedSacramentRolesToUpcomingMeetings
+ * (Presiding/Conducting auto-assignment) both used the plain-Map
+ * pattern directly, and eligiblePeopleByColumn's own Conducting-column
+ * dropdown used an equivalent single-row-per-name Map. Once a second
+ * active "Bishopric First Counselor" row existed, whichever of the two
+ * rows Postgres happened to return last silently became "the" holder
+ * everywhere -- the real counselor could stop being assigned (or stop
+ * showing as a pickable option) with no error, depending purely on
+ * query result order.
+ */
+async function holdersByCallingName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  names: string[]
+): Promise<Map<string, string[]>> {
+  const { data } = await supabase.from("callings").select("name, current_holder_id").in("name", names).eq("active", true);
+  const result = new Map<string, string[]>();
+  for (const row of (data ?? []) as { name: string; current_holder_id: string | null }[]) {
+    if (!row.current_holder_id) continue;
+    const existing = result.get(row.name);
+    if (existing) {
+      if (!existing.includes(row.current_holder_id)) existing.push(row.current_holder_id);
+    } else {
+      result.set(row.name, [row.current_holder_id]);
+    }
+  }
+  return result;
+}
+
+/**
+ * Narrows holdersByCallingName's per-name list down to exactly one
+ * holder, for a caller that can only ever write a single person into a
+ * single-value field (Presiding, Conducting). Vacant (no holder) and
+ * ambiguous (2+ distinct holders -- a duplicated calling name) are both
+ * treated as "nothing to assign," but counted/reported separately --
+ * ambiguous is a real data problem worth surfacing to an admin
+ * (duplicate calling rows), not silently indistinguishable from an
+ * ordinary vacancy.
+ */
+function resolveSingleHolder(holders: Map<string, string[]>, name: string): { personId: string | null; ambiguous: boolean } {
+  const ids = holders.get(name);
+  if (!ids || ids.length === 0) return { personId: null, ambiguous: false };
+  if (ids.length > 1) return { personId: null, ambiguous: true };
+  return { personId: ids[0], ambiguous: false };
+}
+
+/**
  * Finds eligible people for a rotation based on its configured source, and
  * replaces its membership list with them (preserving existing sort order
  * for anyone still eligible, appending anyone new at the end, and
@@ -464,6 +528,7 @@ export interface PushFixedRolesResult {
   filled: number;
   overwritten: number;
   skippedVacant: number;
+  skippedAmbiguous: number;
 }
 
 /**
@@ -495,6 +560,14 @@ export interface PushFixedRolesResult {
  * update what is blank?"): an already-assigned role is no longer left
  * alone -- its existing row is deleted and replaced with whatever the
  * calling's current holder resolves to now, every time this is pushed.
+ *
+ * **Bug found and fixed 2026-10-31** -- see holdersByCallingName's own
+ * doc comment above for the full root cause (a duplicated active
+ * calling name collapsing to whichever row a plain Map happened to
+ * keep last). A calling name that currently resolves to more than one
+ * distinct holder is now skipped and counted separately
+ * (`skippedAmbiguous`) rather than silently assigned to the wrong one
+ * of the two.
  */
 export async function pushFixedSacramentRolesToUpcomingMeetings(
   fromDateISO: string
@@ -508,7 +581,7 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
     .gte("date", fromDateISO)
     .order("date", { ascending: true });
   const meetings = (meetingRows ?? []) as { id: string; date: string }[];
-  if (meetings.length === 0) return { filled: 0, overwritten: 0, skippedVacant: 0 };
+  if (meetings.length === 0) return { filled: 0, overwritten: 0, skippedVacant: 0, skippedAmbiguous: 0 };
 
   const meetingIds = meetings.map((m) => m.id);
   const { data: existingRows } = await supabase
@@ -520,38 +593,37 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
     ((existingRows ?? []) as { meeting_id: string; role: string }[]).map((r) => `${r.meeting_id}::${r.role}`)
   );
 
-  const { data: callingRows } = await supabase
-    .from("callings")
-    .select("name, current_holder_id")
-    .in("name", CONDUCTING_CALLING_ORDER)
-    .eq("active", true);
-  const holderByCallingName = new Map(
-    ((callingRows ?? []) as { name: string; current_holder_id: string | null }[]).map((c) => [c.name, c.current_holder_id])
-  );
+  const holders = await holdersByCallingName(supabase, CONDUCTING_CALLING_ORDER);
 
   let skippedVacant = 0;
+  let skippedAmbiguous = 0;
 
   // Unlike pushRotationToUpcomingMeetings' own per-meeting RPC loop
   // (which must stay sequential -- each call atomically advances a
   // shared rotation pointer that the next meeting's own assignment
   // depends on), Presiding/Conducting are resolved fresh from each
-  // meeting's own date against `holderByCallingName`, already fetched
-  // once above -- no state carries from one meeting to the next, so
-  // there's nothing to lose by computing every meeting's assignments
-  // up front and writing them all in two batched queries instead of up
-  // to 4 sequential round trips per meeting (2026-10-31, chasing the
-  // user's own "this app is extremely slow" report).
+  // meeting's own date against `holders`, already fetched once above
+  // -- no state carries from one meeting to the next, so there's
+  // nothing to lose by computing every meeting's assignments up front
+  // and writing them all in two batched queries instead of up to 4
+  // sequential round trips per meeting (2026-10-31, chasing the user's
+  // own "this app is extremely slow" report).
   const toInsert: { meeting_id: string; role: string; assigned_to_id: string }[] = [];
   const toDeleteByRole: Record<string, string[]> = { presiding: [], conducting: [] };
 
   for (const meeting of meetings) {
     const monthIndex = new Date(`${meeting.date}T00:00:00`).getMonth() % 3;
-    const roles: { role: string; personId: string | null | undefined }[] = [
-      { role: "presiding", personId: holderByCallingName.get("Bishop") },
-      { role: "conducting", personId: holderByCallingName.get(CONDUCTING_CALLING_ORDER[monthIndex]) },
+    const roles: { role: string; callingName: string }[] = [
+      { role: "presiding", callingName: "Bishop" },
+      { role: "conducting", callingName: CONDUCTING_CALLING_ORDER[monthIndex] },
     ];
 
-    for (const { role, personId } of roles) {
+    for (const { role, callingName } of roles) {
+      const { personId, ambiguous } = resolveSingleHolder(holders, callingName);
+      if (ambiguous) {
+        skippedAmbiguous += 1;
+        continue;
+      }
       if (!personId) {
         skippedVacant += 1;
         continue;
@@ -578,7 +650,7 @@ export async function pushFixedSacramentRolesToUpcomingMeetings(
   }
 
   const overwritten = toDeleteByRole.presiding.length + toDeleteByRole.conducting.length;
-  return { filled: toInsert.length, overwritten, skippedVacant };
+  return { filled: toInsert.length, overwritten, skippedVacant, skippedAmbiguous };
 }
 
 /**
@@ -778,27 +850,23 @@ export async function getEligiblePeopleByElementKey(
  * editable afterward like any other sacrament_assignments row (via the
  * planning view or the Table Admin grid); this only sets the default.
  * Silently skips a role if the relevant calling is currently vacant,
- * matching how the generic rotation path skips an empty member list.
+ * matching how the generic rotation path skips an empty member list --
+ * and skips it the same way if the calling name is currently
+ * AMBIGUOUS (two or more active `callings` rows sharing that name with
+ * different holders), rather than guessing which one is "real" (see
+ * holdersByCallingName's own doc comment above).
  */
 async function applyFixedSacramentRoles(
   supabase: Awaited<ReturnType<typeof createClient>>,
   meetingId: string,
   date: string
 ): Promise<void> {
-  const { data: callingRows } = await supabase
-    .from("callings")
-    .select("name, current_holder_id")
-    .in("name", CONDUCTING_CALLING_ORDER)
-    .eq("active", true);
-
-  const holderByCallingName = new Map(
-    ((callingRows ?? []) as { name: string; current_holder_id: string | null }[]).map((c) => [c.name, c.current_holder_id])
-  );
+  const holders = await holdersByCallingName(supabase, CONDUCTING_CALLING_ORDER);
 
   const monthIndex = new Date(`${date}T00:00:00`).getMonth() % 3;
-  const roles: { role: string; personId: string | null | undefined }[] = [
-    { role: "presiding", personId: holderByCallingName.get("Bishop") },
-    { role: "conducting", personId: holderByCallingName.get(CONDUCTING_CALLING_ORDER[monthIndex]) },
+  const roles: { role: string; personId: string | null }[] = [
+    { role: "presiding", personId: resolveSingleHolder(holders, "Bishop").personId },
+    { role: "conducting", personId: resolveSingleHolder(holders, CONDUCTING_CALLING_ORDER[monthIndex]).personId },
   ];
 
   // A brand-new meeting never has an existing row for either role, so
@@ -1023,13 +1091,31 @@ async function eligiblePeopleByColumn(
       .in("name", CONDUCTING_CALLING_ORDER)
       .eq("active", true);
     const rows = (data ?? []) as unknown as { name: string; current_holder_id: string | null; people: { name?: string }[] | { name?: string } | null }[];
-    const byName = new Map(rows.map((r) => [r.name, r]));
-    result["conducting"] = CONDUCTING_CALLING_ORDER.map((name) => byName.get(name))
-      .filter((r): r is (typeof rows)[number] => Boolean(r?.current_holder_id))
-      .map((r) => {
-        const person = Array.isArray(r.people) ? r.people[0] : r.people;
-        return { id: r.current_holder_id as string, name: person?.name ?? "Unknown" };
-      });
+
+    // Unlike resolveSingleHolder's own narrowing (used by the two
+    // auto-assignment functions above, which can only ever write ONE
+    // person into a single-value field), this is building the
+    // dropdown's own list of pickable options -- so if a calling name
+    // currently resolves to more than one distinct holder (two active
+    // `callings` rows sharing a name -- see holdersByCallingName's own
+    // doc comment), the right answer here is to show BOTH as separate
+    // options, not collapse to one. Previously used a plain
+    // `new Map(rows.map((r) => [r.name, r]))`, which silently dropped
+    // whichever row didn't come back last for a given name -- found
+    // 2026-10-31 after the user added a test second holder for
+    // "Bishopric First Counselor" and the real one stopped showing up
+    // as a pickable option in this exact dropdown.
+    const seenPersonIds = new Set<string>();
+    const options: PersonOption[] = [];
+    for (const name of CONDUCTING_CALLING_ORDER) {
+      for (const row of rows.filter((r) => r.name === name)) {
+        if (!row.current_holder_id || seenPersonIds.has(row.current_holder_id)) continue;
+        seenPersonIds.add(row.current_holder_id);
+        const person = Array.isArray(row.people) ? row.people[0] : row.people;
+        options.push({ id: row.current_holder_id, name: person?.name ?? "Unknown" });
+      }
+    }
+    result["conducting"] = options;
   }
 
   const remaining = columns.filter((c) => !result[c.key]);

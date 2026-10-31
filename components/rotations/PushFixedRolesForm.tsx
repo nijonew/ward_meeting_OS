@@ -3,7 +3,13 @@
 import { useActionState } from "react";
 import { pushFixedSacramentRoles } from "@/app/rotations/actions";
 
-const initialState: { error?: string; filled?: number; overwritten?: number; skippedVacant?: number } = {};
+const initialState: {
+  error?: string;
+  filled?: number;
+  overwritten?: number;
+  skippedVacant?: number;
+  skippedAmbiguous?: number;
+} = {};
 
 /**
  * "Fill Presiding/Conducting starting <date>" -- the fixed-by-calling
@@ -45,6 +51,9 @@ export function PushFixedRolesForm() {
           {state.overwritten ? ` (${state.overwritten} already had someone assigned and were overwritten)` : ""}
           {state.skippedVacant
             ? ` (${state.skippedVacant} skipped -- that calling currently has no holder set)`
+            : ""}
+          {state.skippedAmbiguous
+            ? ` (${state.skippedAmbiguous} skipped -- that calling currently has more than one active holder; fix the duplicate in Callings)`
             : ""}
           .
         </p>
