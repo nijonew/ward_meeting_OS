@@ -68,51 +68,42 @@ export default async function MeetingPlanningPage() {
       </Link>
 
       <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Planning</h1>
-      <p className="mt-2 text-sm text-ink-muted">
-        Schedule, cancel, and adjust rotations, or jump into a meeting&rsquo;s own agenda.
-      </p>
 
       <div className="mt-6">
         <TileGrid>
           {canPlanAnyMeeting && (
             <Tile
               title="Meeting Agendas"
-              description="Create, cancel, and manage meetings, by type"
               href="/meeting-agendas"
             />
           )}
           {canMeetingSchedule && (
             <Tile
               title="Meeting Schedule"
-              description="Set cadence and generate meetings"
               href="/meeting-schedule"
             />
           )}
           {canMeetingCancellations && (
             <Tile
               title="Meeting Cancellations"
-              description="Conferences, holidays, etc. -- auto-cancels affected meetings"
               href="/meeting-cancellations"
             />
           )}
           {canRotations && (
             <Tile
               title="Assignment Rotations"
-              description="Who's next for prayers, chorister, etc."
               href="/rotations"
             />
           )}
           {canSpeakerPrayerHistory && (
             <Tile
               title="Speaker & Prayer History"
-              description="Who's due for a turn"
               href="/speaker-prayer-history"
             />
           )}
           {canRabnmPlanning && (
             <Tile
               title="Recognitions & Advancements Planning"
-              description="Plan ahead for Ward Business's other categories"
               href="/rabnm-planning"
             />
           )}

@@ -171,6 +171,17 @@ export interface AdminColumnConfig {
    * patch before it reaches the database (see sanitizePatch).
    */
   presenceIndicator?: { trueLabel: string; falseLabel: string };
+  /**
+   * For type: "select" only -- renders as a small row of toggle
+   * buttons (one per `options` entry) instead of a `<select>`
+   * dropdown, e.g. People's Gender column (2026-10-31, the user's own
+   * request: "a selection between male/female rather than a
+   * dropdown"). Clicking a button sets the value to that option;
+   * there's no explicit "clear" affordance, same as Age Group's own
+   * checkbox -- a blank/unset value just shows neither button
+   * pressed, and stays that way until one is actually clicked.
+   */
+  toggleButtons?: boolean;
 }
 
 export interface AdminTableConfig {

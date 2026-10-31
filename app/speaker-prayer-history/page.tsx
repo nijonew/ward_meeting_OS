@@ -117,10 +117,6 @@ export default async function SpeakerPrayerHistoryPage() {
 
       <section className="mt-4">
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Speaker &amp; Prayer History</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Sourced from archived sacrament meetings, plus the ward&rsquo;s own imported history and anything
-          logged by hand below.
-        </p>
       </section>
 
       {entries.length === 0 && (

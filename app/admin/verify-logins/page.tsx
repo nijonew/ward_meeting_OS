@@ -45,11 +45,6 @@ export default async function VerifyLoginsPage() {
           &larr; All tables
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Verify Logins</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Every login not yet matched to a person -- they have no access to anything until this is
-          done. Match each to a person (or add a new one). Their access then comes automatically
-          from whichever calling(s) that person holds, set on the Callings table in Table Admin.
-        </p>
       </section>
 
       {profiles.length === 0 ? (

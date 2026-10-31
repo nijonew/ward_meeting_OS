@@ -2038,6 +2038,63 @@ avoid confusing the two.
 
 ## Known open items
 
+**Gender toggle buttons, and a sweep removing explanatory subtitles/
+descriptions and the dashboard's "Planning" stage box, 2026-10-31. No
+migration needed.** Three requests in one message:
+
+1. **Gender: toggle buttons, not a dropdown.** The user's own words,
+   correcting the dropdown built minutes earlier the same session: "I
+   would like to request that the gender selection in people be a
+   selection between male/female rather than a dropdown." New generic
+   `AdminColumnConfig.toggleButtons` (`lib/admin/types.ts`, `type:
+   "select"` only) -- renders a small row of buttons, one per option,
+   instead of a `<select>`; clicking one sets the value directly, same
+   "no explicit clear affordance" convention Age Group's own checkbox
+   already established. `AdminTableEditor.tsx`'s `AdminCellInput`
+   gained the matching render branch, checked before the existing
+   select/foreign_key dropdown branch. People's `gender` column
+   (`lib/admin/registry.ts`) is the first and only user of this flag so
+   far -- Male/Female as two buttons, the active one highlighted.
+2. **Tile subtitles and page-description paragraphs removed app-wide**
+   (the user's own words: "remove the sub-titles on all tiles
+   throughout the app unless it is announcing a status such as coming
+   soon or stating availability... also remove the descriptions on
+   each page that explains the page"). `Tile`'s own `description` prop
+   is gone entirely, not left unused -- `disabledLabel`/`comingSoon`
+   (the two tiles that actually use either, on the landing page) are
+   untouched, since those announce status/availability, not an
+   explanation. Every plain explanatory paragraph directly under a
+   page's own `<h1>` was removed across `/admin`, `/admin/[table]`,
+   `/admin/person-callings`, `/admin/archived-people`,
+   `/admin/calling-features`, `/admin/meeting-templates`,
+   `/admin/verify-logins`, `/meeting-planning`, `/meeting-agendas`,
+   `/meeting-schedule`, `/meeting-cancellations`,
+   `/youth-activity-planning`, `/rabnm-planning`, `/calling-planning`,
+   `/rotations`, `/speaker-prayer-history`, and both of
+   `/youth-teaching-planning`'s views (the hub and the single-class
+   view). Deliberately kept, since neither is a plain explanatory
+   subtitle: `/calling-planning`'s conditional "Filtered to `<X>`" status
+   line and its separate `/callings` cross-link ("Manage the calling
+   roster... &rarr;"), and Table Admin's own registry `description`
+   field (still real data, just no longer rendered on either the index
+   or a table's own page).
+3. **The dashboard's per-row "Planning" stage pill is gone** (the
+   user's own words: "we also don't need the 'planning' box next to
+   each occurrence of meetings in the meeting tables"). `LifecycleBadge`
+   had exactly one render site in the whole app --
+   `app/dashboard/page.tsx`'s `MeetingRow`, always in `compact` mode --
+   so the component is deleted outright, not left unused. The row's
+   other status spans (Coming soon/Cancelled/No Activity) are
+   untouched -- those are real status indicators the user didn't ask to
+   remove, unlike the stage pill itself.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/admin/people` (Gender renders as Male/Female buttons), a
+handful of hub pages for the missing subtitles/descriptions, and
+`/dashboard` for the missing stage pill (Coming soon/Cancelled/No
+Activity should still show where applicable).
+
 **The Conducting script's wording rewritten against a complete script
 the user supplied, migration `093`, not yet run, 2026-10-31.** The
 user pasted a full, detailed Conducting script covering Welcome,

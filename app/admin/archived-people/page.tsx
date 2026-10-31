@@ -38,12 +38,6 @@ export default async function ArchivedPeoplePage() {
           &larr; All tables
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Archived People</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Removed from the People grid via Delete there, which archives rather than truly deleting --
-          their calling assignment(s) and login link were cleared at that point. Restore brings them
-          back onto the main list (re-link a calling or login afterward if needed); Delete Permanently
-          is a real, irreversible delete.
-        </p>
       </section>
 
       {people.length > 0 ? (

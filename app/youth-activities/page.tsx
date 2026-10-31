@@ -49,24 +49,21 @@ export default async function YouthActivitiesPage({
           manager, and both Generate actions moved to the new Manage
           tile/page below instead of sitting inline here. */}
       <TileGrid>
-        <Tile title="Upcoming Activities" description="Every activity, all groups" href={`/youth-activities/upcoming${suffix}`} />
+        <Tile title="Upcoming Activities" href={`/youth-activities/upcoming${suffix}`} />
         <Tile
           title="Combined Young Men & Young Women Activities"
-          description="Combined YM/YW schedule"
           href={`/youth-activities/combined-ym-yw${suffix}`}
         />
         <Tile
           title="Combined Young Men Activities"
-          description="Combined YM schedule"
           href={`/youth-activities/combined-ym${suffix}`}
         />
         <Tile
           title="Combined Young Women Activities"
-          description="Combined YW schedule"
           href={`/youth-activities/combined-yw${suffix}`}
         />
         {canManage && (
-          <Tile title="Manage" description="Add activities, cadence rules, and generate" href="/youth-activities/manage" />
+          <Tile title="Manage" href="/youth-activities/manage" />
         )}
       </TileGrid>
     </main>

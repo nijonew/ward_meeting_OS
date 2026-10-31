@@ -101,19 +101,17 @@ export default async function HomePage() {
             {todaysSacramentMeeting ? (
               <Tile
                 title="Sacrament Meeting Program"
-                description="Today's program"
                 href={`/meetings/${todaysSacramentMeeting.id}/public`}
               />
             ) : earlyAccessSacramentMeeting ? (
               <Tile
                 title="Sacrament Meeting Program"
-                description="Early preview -- not published yet"
                 href={`/meetings/${earlyAccessSacramentMeeting.id}/public`}
               />
             ) : (
-              <Tile title="Sacrament Meeting Program" description="Published on meeting day" comingSoon />
+              <Tile title="Sacrament Meeting Program" comingSoon />
             )}
-          <Tile title="Announcements" description="Ward-wide announcements" href="/announcements/public" />
+          <Tile title="Announcements" href="/announcements/public" />
           {/* Requires login (2026-10-07, the user's own request) --
               unlike the rest of this tier, grayed out with a specific
               reason rather than "Coming soon" for a logged-out
@@ -137,7 +135,6 @@ export default async function HomePage() {
               Activity Planning -> Manage. */}
           <Tile
             title="Youth Activities"
-            description="Planned activities for YW and YM"
             href={user ? "/youth-activities?readonly=1" : undefined}
             disabledLabel={user ? undefined : "Please log in to see youth activities"}
           />
@@ -186,21 +183,18 @@ export default async function HomePage() {
             {attendsMeetings && (
               <Tile
                 title="Meeting Agenda Items"
-                description="Submit an agenda item for a meeting you attend"
                 href="/submit/agenda-item"
               />
             )}
             {canSubmitAnnouncement && (
               <Tile
                 title="Submit an Announcement"
-                description="Share something with the ward"
                 href="/submit/announcement"
               />
             )}
             {hasFeature(profile, "sacrament_program_view") && (
               <Tile
                 title="Sacrament Meeting Programs"
-                description="Preview upcoming and past programs, not just today's"
                 href="/dashboard?type=sacrament-meeting&readonly=1"
               />
             )}
@@ -223,7 +217,6 @@ export default async function HomePage() {
           <TileGrid>
             <Tile
               title="Sacrament Meeting Music Planning"
-              description="Enter and plan upcoming hymns and music"
               href="/music"
             />
           </TileGrid>
@@ -250,7 +243,6 @@ export default async function HomePage() {
           <TileGrid>
             <Tile
               title="Youth Activity Planning"
-              description="Activities, teaching calendar, and management tools"
               href="/youth-activity-planning"
             />
           </TileGrid>
@@ -268,26 +260,23 @@ export default async function HomePage() {
             {canMeetingPlanningHub && (
               <Tile
                 title="Meeting Planning"
-                description="Meeting agendas, schedule, cancellations, and rotations"
                 href="/meeting-planning"
               />
             )}
             {canCallingPlanning && (
               <Tile
                 title="Calling Planning"
-                description="One row per calling change: candidates, status, release, and readiness to announce"
                 href="/calling-planning"
               />
             )}
             {canAnnouncementManagement && (
               <Tile
                 title="Manage Announcements"
-                description="Review and publish submissions"
                 href="/announcements"
               />
             )}
             {canTableAdmin && (
-              <Tile title="Table Admin" description="Direct edit access to raw data tables" href="/admin" />
+              <Tile title="Table Admin" href="/admin" />
             )}
           </TileGrid>
         </section>

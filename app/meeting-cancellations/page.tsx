@@ -52,14 +52,6 @@ export default async function MeetingCancellationsPage() {
 
       <section className="mt-4">
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Meeting Cancellations</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          A date range, a reason, and which meeting types (and optionally youth activities) get
-          cancelled for it, shown with the reason as a note rather than hidden. Use this for General
-          Conference, Stake Conference, holidays, or anything else where some meetings still happen
-          that day but others don&rsquo;t. For General Conference, set the start date to the Monday of
-          its week and the end date to its closing Sunday. Already-cancelled rows are never touched,
-          so a manual cancellation (or un-cancelling one afterward) is always safe.
-        </p>
       </section>
 
       <div className="rounded border border-rule bg-surface p-6">

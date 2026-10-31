@@ -77,11 +77,6 @@ export default async function MeetingTemplatesAdminPage({
           &larr; All tables
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Meeting Templates</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          The default agenda new meetings are seeded with at creation time. Editing here never
-          changes a meeting that already exists. Edit one specific meeting&rsquo;s own agenda
-          from its <em>Agenda Elements</em> page instead (linked from its Planning view).
-        </p>
       </section>
 
       <div className="flex w-fit flex-wrap gap-1 rounded border border-rule p-1">

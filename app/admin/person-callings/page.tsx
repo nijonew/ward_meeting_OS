@@ -51,11 +51,6 @@ export default async function PersonCallingsPage({
           &larr; All tables
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Assign Callings</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Pick a person to see and edit every calling they currently hold. Checking a calling that
-          already has a different holder reassigns it to this person instead -- the checklist shows
-          who that is beforehand, so it&rsquo;s never a surprise.
-        </p>
       </section>
 
       <form method="get" className="flex flex-wrap items-center gap-3 rounded border border-rule bg-surface p-4">

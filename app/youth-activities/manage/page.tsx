@@ -62,7 +62,6 @@ export default async function YouthActivitiesManagePage() {
       <TileGrid>
         <Tile
           title="Class Activities"
-          description="Each class's own weekly schedule, drawn from Combined where it applies"
           href="/youth-activities/manage/classes"
         />
       </TileGrid>

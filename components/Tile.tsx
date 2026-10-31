@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 
 interface TileProps {
   title: string;
-  description?: string;
   href?: string;
   comingSoon?: boolean;
   /** Overrides the disabled-state caption, normally "Coming soon"
@@ -19,8 +18,15 @@ interface TileProps {
  * `comingSoon` is set), the tile renders as a disabled/grayed card
  * instead of a link -- same visual language the old dashboard used for
  * not-yet-built meeting types.
+ *
+ * **Lost its own explanatory subtitle, 2026-10-31** (the user's own
+ * request: "the sub-titles on all tiles be removed... unless it is
+ * announcing a status such as coming soon or stating availability") --
+ * `description` is gone outright, not left as an unused prop; only
+ * `disabledLabel`/`comingSoon`'s own status caption below survives,
+ * since that's the one category of tile text the user asked to keep.
  */
-export function Tile({ title, description, href, comingSoon, disabledLabel }: TileProps) {
+export function Tile({ title, href, comingSoon, disabledLabel }: TileProps) {
   const isDisabled = comingSoon || !href;
 
   const card = (
@@ -33,11 +39,6 @@ export function Tile({ title, description, href, comingSoon, disabledLabel }: Ti
       <span className={["font-display text-lg", isDisabled ? "text-ink/40" : "text-ink"].join(" ")}>
         {title}
       </span>
-      {description && (
-        <span className={["mt-1 text-sm", isDisabled ? "text-ink-muted/60" : "text-ink-muted"].join(" ")}>
-          {description}
-        </span>
-      )}
       {isDisabled && (
         <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
           {disabledLabel ?? "Coming soon"}

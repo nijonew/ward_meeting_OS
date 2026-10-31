@@ -74,13 +74,6 @@ export default async function CallingPlanningPage({
 
       <section className="mt-4">
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Calling Planning</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          One row per potential calling change, across every calling: candidates, status,
-          release, and readiness to announce in Sacrament Meeting. Pick from the Candidates
-          dropdown to add someone under consideration, click &times; on a name to remove them, and
-          narrow it down to exactly one person once decided, before announcing. Click a column
-          heading to sort by it; type in the box under a heading to filter.
-        </p>
         {filteredCallingName && (
           <p className="mt-2 text-xs text-ink-muted">
             Filtered to <span className="text-ink">{filteredCallingName}</span> &middot;{" "}

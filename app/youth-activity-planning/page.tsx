@@ -64,37 +64,31 @@ export default async function YouthActivityPlanningPage() {
       </Link>
 
       <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Activity Planning</h1>
-      <p className="mt-2 text-sm text-ink-muted">Activities, the teaching calendar, and cancellations.</p>
 
       <div className="mt-6">
         <TileGrid>
-          <Tile title="Upcoming Activities" description="Every activity, all groups" href="/youth-activities/upcoming" />
+          <Tile title="Upcoming Activities" href="/youth-activities/upcoming" />
           <Tile
             title="Combined Young Men & Young Women Activities"
-            description="Combined YM/YW schedule"
             href="/youth-activities/combined-ym-yw"
           />
           <Tile
             title="Combined Young Women Activities"
-            description="Combined YW schedule"
             href="/youth-activities/combined-yw"
           />
           <Tile
             title="Combined Young Men Activities"
-            description="Combined YM schedule"
             href="/youth-activities/combined-ym"
           />
           {canTeachingPlanning && (
             <Tile
               title="Youth Teaching Management"
-              description="Sunday teaching assignments for your class"
               href="/youth-teaching-planning"
             />
           )}
           {canManageActivities && (
             <Tile
               title="All-Youth Activity Cancellations"
-              description="Cancel activities for a date range, e.g. holidays"
               href="/youth-activity-cancellations"
             />
           )}

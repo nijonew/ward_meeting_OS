@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { LifecycleBadge } from "@/components/LifecycleBadge";
 import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
 import { DeleteMeetingButton } from "@/components/dashboard/DeleteMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
@@ -54,6 +53,14 @@ function formatMeetingDate(iso: string) {
  * this app -- see CallingPlanningGridForm's own comment for the full
  * reasoning (including why gray striping was revised to this warm
  * accent tint).
+ *
+ * **`LifecycleBadge` dropped entirely, 2026-10-31** (the user's own
+ * words: "we don't need the 'planning' box next to each occurrence of
+ * meetings in the meeting tables") -- this row was `LifecycleBadge`'s
+ * only render site anywhere in the app, so the component itself was
+ * deleted outright rather than left unused. Coming soon/Cancelled/No
+ * Activity are untouched -- those are real status indicators, not the
+ * stage pill being removed here.
  */
 function MeetingRow({
   meeting,
@@ -121,7 +128,6 @@ function MeetingRow({
       {showType && <td className="px-2 py-2 align-top text-sm text-ink-muted">{meeting.title}</td>}
       <td className="px-2 py-2 align-top">
         <div className="flex flex-wrap items-center gap-2">
-          <LifecycleBadge stage={meeting.stage} compact />
           {!isBuilt && (
             <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
               Coming soon

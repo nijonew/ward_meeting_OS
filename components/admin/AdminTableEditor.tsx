@@ -524,6 +524,30 @@ function AdminCellInput({
     );
   }
 
+  if (column.type === "select" && column.toggleButtons) {
+    const stringValue = value == null ? "" : String(value);
+    return (
+      <span className="inline-flex gap-1">
+        {(options ?? []).map((o) => {
+          const active = o.value === stringValue;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onChange(o.value)}
+              className={[
+                "rounded border px-2 py-1 text-xs",
+                active ? "border-accent bg-accent text-paper" : "border-rule text-ink hover:bg-ink/5",
+              ].join(" ")}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </span>
+    );
+  }
+
   if (column.type === "select" || column.type === "foreign_key") {
     return (
       <select value={value == null ? "" : String(value)} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>

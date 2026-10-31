@@ -395,6 +395,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
         column: "gender",
         label: "Gender",
         type: "select",
+        toggleButtons: true,
         options: [
           { value: "male", label: "Male" },
           { value: "female", label: "Female" },

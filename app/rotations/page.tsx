@@ -275,13 +275,6 @@ export default async function RotationsPage({
 
       <section className="mt-4">
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Assignment Rotations</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Every upcoming meeting down one side, every role across the top. Fill in who&rsquo;s
-          actually assigned. This is the real, applied assignment for that meeting, however it got
-          there (a fixed calling order, a rotation, or a manual pick). Editing a cell here
-          never changes whose turn is next for the rotations below, it only overrides this one
-          meeting.
-        </p>
       </section>
 
       <div className="flex w-fit flex-wrap gap-1 rounded border border-rule p-1">
@@ -338,12 +331,6 @@ export default async function RotationsPage({
 
       <section className="mt-2">
         <h2 className="font-display text-xl">Rotation Order</h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Whoever&rsquo;s next gets pre-filled automatically when a new meeting is created. This is
-          secondary to the grid above -- it only sets the *default* for a meeting that doesn&rsquo;t
-          have one yet, or after everyone above has had a turn. Presiding and Conducting aren&rsquo;t
-          configured here at all (fixed by calling -- see the note above).
-        </p>
       </section>
 
       <div className="flex flex-col gap-4">

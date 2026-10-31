@@ -33,9 +33,6 @@ export default async function MeetingSchedulePage() {
 
       <section className="mt-4">
         <h1 className="rise-in font-display text-3xl leading-tight sm:text-4xl">Meeting Schedule</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Set the typical cadence for each meeting type, then generate real meetings from it.
-        </p>
       </section>
 
       <RulesManager

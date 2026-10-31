@@ -47,9 +47,6 @@ export default async function CallingFeaturesPage({
           &larr; All tables
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Calling Features</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Pick a calling to see and edit every feature it grants to whoever currently holds it.
-        </p>
       </section>
 
       <form method="get" className="flex flex-wrap items-center gap-3 rounded border border-rule bg-surface p-4">

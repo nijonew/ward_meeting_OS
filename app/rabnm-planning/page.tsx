@@ -53,11 +53,6 @@ export default async function RabnmPlanningPage() {
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">
           Recognitions &amp; Advancements Planning
         </h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Keep a running list for each category ahead of time, then add any of them into a
-          specific Sacrament Meeting&rsquo;s Ward Business from that meeting&rsquo;s own Planning
-          view.
-        </p>
       </section>
 
       <div className="flex flex-col gap-5">

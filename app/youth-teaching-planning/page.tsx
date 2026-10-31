@@ -64,10 +64,6 @@ export default async function YouthTeachingPlanningPage({
         </Link>
 
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Sunday teaching assignments for each class. Short free-text entries only, not linked
-          to any person or calling record.
-        </p>
 
         {accessibleClasses.length === 0 ? (
           <p className="mt-6 text-sm text-ink-muted">
@@ -115,10 +111,6 @@ export default async function YouthTeachingPlanningPage({
           &larr; Youth Teaching Planning
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{rawClass}</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Sunday teaching assignments. Short free-text entries only, not linked to any person
-          or calling record, so type whatever&rsquo;s useful (a name, a lesson topic, or both).
-        </p>
       </section>
 
       <div className="rounded border border-rule bg-surface p-6">
