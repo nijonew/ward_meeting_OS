@@ -2038,6 +2038,53 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-30: `column "role_source" does not
+exist`, hit on both Calling Planning's own grid save and
+`/admin/person-callings` -- migration `088`, not yet run.** The user's
+own report, right after confirming the bug fixes above: the same error
+on both pages. Both write to `callings.current_holder_id` -- the real
+clue, since it meant whatever was blocking one was blocking the other
+regardless of which page triggered it.
+
+This assistant has no live database access, so root-causing this went
+through the same diagnostic-query-and-paste-back loop this project has
+needed several times before for an undocumented database object.
+`information_schema.triggers` turned up a trigger, `calling_role_sync`,
+on `callings` (firing on insert and update) calling `sync_calling_role()`,
+which calls `recompute_role_for_person(person_id)` for whichever person
+just gained or lost a calling. That function reads/writes
+`profiles.role`/`role_source` -- both dropped by migration `058` once
+the permissions model moved to `calling_features` (migration `060`) --
+and joins against `calling_role_mappings`, a table from that same
+first-pass design. All three (`calling_role_sync`, `sync_calling_role()`,
+`recompute_role_for_person()`, plus the `calling_role_mappings` table)
+are a live, orphaned leftover of the abandoned first-pass permissions
+design this file's own Architecture section already documents as
+superseded -- created directly in the Supabase SQL editor at some point
+during that first pass (migration `057`'s own history note says the
+tracked migration *file* for this exact design "was deleted before
+ever being confirmed run," but the SQL itself clearly still reached the
+live database some other way) and never cleaned up once the design was
+dropped from the codebase. The exact same "undocumented object,
+created directly in the SQL editor, never updated when the design it
+belonged to changed" class of bug this project has hit repeatedly
+(migrations `038`/`041`/`063`/`067`/`068`/`069`/`075`/`078`) -- just
+this time a trigger instead of an RLS policy or CHECK constraint.
+
+Migration `088` drops the whole chain outright -- the trigger, both
+functions, and the mapping table -- not recreated against anything.
+Nothing in the current app reads `profiles.role`/`role_source` or
+`calling_role_mappings` any more; the real, current permissions model
+(`calling_features`) needs no trigger-based auto-sync at all.
+
+No application code changed -- this is a pure database cleanup, so
+there's nothing to `tsc`/`eslint`/build for this one. **Confirm
+migration number `088` is actually free before running it**, per this
+project's own repeated numbering-collision history, then ask the user
+to retry both the Calling Planning save that originally failed and
+adding a calling on `/admin/person-callings`, and confirm both now
+succeed with no "role_source" error.
+
 **Table Admin's generic grid gained a single "Save All Changes" button,
 2026-10-30, replacing its own per-row Save button.** The user's own
 request: "I would like to have a save all changes button on all pages
