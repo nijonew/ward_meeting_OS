@@ -137,8 +137,7 @@ export async function saveMeetingAsTemplate(meetingId: string): Promise<ActionRe
   if (denied) return denied;
 
   const supabase = await createClient();
-  const meeting = await getMeetingById(meetingId);
-  const meetingWithType = await getMeetingWithType(meetingId);
+  const [meeting, meetingWithType] = await Promise.all([getMeetingById(meetingId), getMeetingWithType(meetingId)]);
   if (!meeting || !meetingWithType) return { error: "Could not load this meeting." };
 
   const isSacrament = meeting.meetingType === "sacrament-meeting";

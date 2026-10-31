@@ -154,9 +154,17 @@ export async function getUpcomingMeetings(): Promise<Meeting[]> {
   // keep existing without anyone needing to visit that page and click
   // "Generate Meetings" (see that function's own comment for the
   // user's request behind this).
-  await sweepMeetingCancellations();
-  await autoGenerateUpcomingMeetings();
-  const noActivityIds = await autoArchivePastMeetings();
+  // autoGenerateUpcomingMeetings only ever touches present/future rows
+  // and reads neither `cancelled` nor `stage`, so it has no ordering
+  // relationship with the other two sweeps -- runs concurrently with
+  // them instead of before/after (2026-10-31, chasing the user's own
+  // "this app is extremely slow" report). The one real ordering
+  // constraint -- sweepMeetingCancellations before autoArchivePastMeetings,
+  // explained above -- is still preserved exactly.
+  const [, noActivityIds] = await Promise.all([
+    autoGenerateUpcomingMeetings(),
+    sweepMeetingCancellations().then(() => autoArchivePastMeetings()),
+  ]);
 
   const supabase = await createClient();
   const { data, error } = await supabase

@@ -37,6 +37,12 @@ export default async function TemplatePage({
     redirect("/login");
   }
 
+  // Doesn't need anything from the authorization check below, so its
+  // own fetch starts now rather than waiting for that check to pass
+  // first (2026-10-31, chasing the user's own "this app is extremely
+  // slow" report).
+  const meetingWithTypePromise = getMeetingWithType(meetingId);
+
   const meetingStage = await getMeetingById(meetingId);
   if (!meetingStage) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
@@ -50,7 +56,7 @@ export default async function TemplatePage({
     );
   }
 
-  const meeting = await getMeetingWithType(meetingId);
+  const meeting = await meetingWithTypePromise;
   if (!meeting) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }

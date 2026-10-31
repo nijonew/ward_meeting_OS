@@ -287,19 +287,27 @@ export default async function DashboardPage({
     );
   }
 
-  const [allMeetings, meetingTypes] = await Promise.all([getUpcomingMeetings(), getMeetingTypes()]);
-  const meetings = allMeetings
-    .filter((m) => !typeFilter || m.meetingType === typeFilter)
-    .filter((m) => showPast || m.date >= todayIso);
-  const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
   // This list can show every meeting type at once (no ?type= filter) --
   // "can manage" is no longer one blanket flag now that planning access
   // is granted per meeting type, so each row below checks its own
   // type's planning feature. canCreate here only gates the page-level
   // controls (+ New Meeting, Meeting Schedule link, Unassigned Agenda
-  // Items) that aren't tied to any one meeting's type.
+  // Items) that aren't tied to any one meeting's type. Computed before
+  // the fetch below (it only needs `profile`/`isReadOnly`, both already
+  // in hand) so getUnassignedAgendaItems can join the same wave instead
+  // of its own sequential await after it (2026-10-31, chasing the
+  // user's own "this app is extremely slow" report).
   const canCreate = hasAnyFeature(profile, allMeetingFeatures("planning")) && !isReadOnly;
-  const unassignedAgendaItems = canCreate ? await getUnassignedAgendaItems() : [];
+
+  const [allMeetings, meetingTypes, unassignedAgendaItems] = await Promise.all([
+    getUpcomingMeetings(),
+    getMeetingTypes(),
+    canCreate ? getUnassignedAgendaItems() : Promise.resolve([]),
+  ]);
+  const meetings = allMeetings
+    .filter((m) => !typeFilter || m.meetingType === typeFilter)
+    .filter((m) => showPast || m.date >= todayIso);
+  const builtSlugs = new Set(meetingTypes.filter((t) => t.isBuilt).map((t) => t.slug));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">

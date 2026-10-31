@@ -2038,6 +2038,78 @@ avoid confusing the two.
 
 ## Known open items
 
+**Performance pass, part 2, 2026-10-31: a second, deeper round of the
+same N+1/sequential-round-trip audit**, after the user asked "what was
+done to review and improve performance... if there is more to do
+let's do it" the morning after the first pass below shipped. Same
+rules as part 1 -- no migration, pure application-code changes, and
+the two correctness-critical sequential loops (the generic rotation
+push's per-meeting RPC call, and `applyRotationsToNewMeeting`'s own
+per-rotation loop, both advancing a shared rotation pointer) are still
+untouched. Five more real fixes, found by continuing the same sweep
+into pages/data-layer functions part 1 didn't reach:
+
+1. **`getUpcomingMeetings()`** (`lib/data/meetings.ts`, run on every
+   single `/dashboard` and `/calling-planning` load) ran its three lazy
+   sweeps -- `sweepMeetingCancellations`, `autoGenerateUpcomingMeetings`,
+   `autoArchivePastMeetings` -- fully sequentially. Confirmed
+   `autoGenerateUpcomingMeetings` reads neither `cancelled` nor `stage`
+   and only ever creates brand-new present/future rows, so it has no
+   real ordering relationship with the other two at all -- it now runs
+   concurrently with `sweepMeetingCancellations` (chained into
+   `autoArchivePastMeetings` right after, preserving the one real
+   constraint: a meeting must be marked cancelled before the archive
+   sweep decides whether it "had real activity," documented in that
+   same function already).
+2. **The Dashboard page itself** (`app/dashboard/page.tsx`) computed
+   `canCreate` (needs only `profile`/`isReadOnly`, both already in
+   hand) *after* its own `Promise.all`, then used it to conditionally
+   fetch `getUnassignedAgendaItems()` as one more sequential await.
+   Moved the computation earlier so that fetch joins the same wave.
+3. **`getConductingRows`** (`lib/data/conducting.ts`) -- the Conducting
+   script's own data layer, polled every 8 seconds during a live
+   meeting, so its latency matters more here than on an ordinary
+   one-shot page load. `getMeetingById`/`getMeetingWithType` ran
+   sequentially (independent of each other) before the function's main
+   9-way `Promise.all`; a tenth, unconditional `people.id, gender`
+   query ran sequentially *after* that same wave despite depending on
+   nothing in it. Both fixed into fewer, fuller waves.
+4. **`getPublicSacramentView`** (`lib/data/public-view.ts`) -- the
+   single most-opened page in the app by ordinary ward members, every
+   Sunday morning. `getMeetingById` ran before the function's own main
+   7-way wave even though neither needs the other's result; the Baby
+   Blessing children lookup and the "title + last name" calling lookup
+   ran one after another even though neither depends on the other
+   (both only need the first wave's own results). Both pairs now run
+   concurrently instead.
+5. **The non-Sacrament read-only "Public" view**
+   (`app/meetings/[id]/archived/page.tsx`) and **the Agenda Elements
+   editor** (`app/meetings/[id]/template/page.tsx` +
+   `saveMeetingAsTemplate` in `template-actions.ts`) all had the exact
+   same `getMeetingById`-then-`getMeetingWithType` sequential pair
+   already fixed in the Planning page during part 1 -- found by
+   grepping for the same two-call shape across the rest of the app.
+   The archived page additionally had the same "three independent
+   fetches sequentially after the main wave" shape as the Planning
+   page (`getBishopricMeetingData`/`getCouncilNotes`/
+   `getAgendaItemsForMeeting`) -- folded into its own main wave the
+   same way.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (the build hit
+the known, unrelated transient Google Fonts fetch failure on
+`app/layout.tsx`'s own `next/font/google` import three times in a row
+before clearing -- confirmed unrelated since `tsc`/`eslint` were
+already clean beforehand, same root cause as every other time this has
+happened in this project), same no-live-database-access gap as part 1
+-- there's still no way to measure real-world latency before/after
+without a live deploy. Ask the user to check the same way as part 1:
+`/dashboard` and `/calling-planning` should load noticeably faster;
+the Conducting script should feel snappier both on first open and on
+each 8-second poll during a live meeting; the public Sacrament Meeting
+program should load faster for a logged-out visitor; and a meeting's
+own "Public" (non-Sacrament) read-only view and its Agenda Elements
+editor page should both load faster too.
+
 **Mobile-friendliness audit, 2026-10-31.** The user's own question,
 right after the performance pass below shipped: "Is there a way to
 make this app more mobile phone friendly?" This assistant has no way

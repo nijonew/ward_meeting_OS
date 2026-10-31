@@ -121,6 +121,13 @@ export default async function ArchivedMeetingPage({
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
 
+  // Nothing between here and where this is actually needed (below)
+  // reads meetingWithType, so its own fetch starts now and runs
+  // alongside the access-gating checks instead of waiting for them to
+  // finish first (2026-10-31, chasing the user's own "this app is
+  // extremely slow" report).
+  const meetingWithTypePromise = getMeetingWithType(meetingId);
+
   // "isAdmin" here means "can edit this meeting," i.e. this specific
   // meeting type's own planning feature (2026-10-04, replacing a
   // single blanket "bishopric" check).
@@ -207,7 +214,7 @@ export default async function ArchivedMeetingPage({
   const showRealTimeNotes =
     isAdmin || hasFeature(profile, meetingFeature(meeting.meetingType, "notes")) || meeting.stage === "archived";
 
-  const meetingWithType = await getMeetingWithType(meetingId);
+  const meetingWithType = await meetingWithTypePromise;
   if (!meetingWithType) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
@@ -217,13 +224,30 @@ export default async function ArchivedMeetingPage({
   const isCouncil = meeting.meetingType === "ward-council" || meeting.meetingType === "youth-council";
   const roleTable = isSacrament ? "sacrament_assignments" : "bishopric_assignments";
 
-  const [plannedElements, people, roleAssignments, elementNotes, sacramentData, announcementsByPlannedElement] = await Promise.all([
+  const [
+    plannedElements,
+    people,
+    roleAssignments,
+    elementNotes,
+    sacramentData,
+    announcementsByPlannedElement,
+    bishopricData,
+    councilNotes,
+    agendaItems,
+  ] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
     getRoleAssignments(meetingId, roleTable),
     getElementNotes(meetingId),
     isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
     isSacrament ? getAnnouncementsByPlannedElement(meetingId) : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
+    // The next three only need meetingId/isBishopric/isCouncil -- folded
+    // into this same wave instead of three more sequential awaits after
+    // it (2026-10-31, chasing the user's own "this app is extremely
+    // slow" report).
+    isBishopric ? getBishopricMeetingData(meetingId) : Promise.resolve(null),
+    isCouncil ? getCouncilNotes(meetingId) : Promise.resolve(null),
+    getAgendaItemsForMeeting(meetingId),
   ]);
 
   const templateElements =
@@ -233,10 +257,6 @@ export default async function ArchivedMeetingPage({
           meetingWithType.meetingTypeId,
           isSacrament ? sacramentData?.planning?.special_format ?? "standard" : null
         );
-
-  const bishopricData = isBishopric ? await getBishopricMeetingData(meetingId) : null;
-  const councilNotes = isCouncil ? await getCouncilNotes(meetingId) : null;
-  const agendaItems = await getAgendaItemsForMeeting(meetingId);
 
   // "Title + last name" (2026-10-21) for any role resolved via a
   // calling -- see getTitlePrefixesForAssignments. Same approach as

@@ -97,13 +97,19 @@ function programItemRow(item: ResolvedProgramItem, peopleById: Map<string, strin
  * sync with what Planning actually supports.
  */
 export async function getConductingRows(meetingId: string): Promise<ConductingScript | null> {
-  const meeting = await getMeetingById(meetingId);
+  // getMeetingById and getMeetingWithType are independent lookups of
+  // the same meeting (one's cached per-request, the other isn't, but
+  // neither reads anything the other writes) -- run together instead
+  // of one after the other (2026-10-31, chasing the user's own "this
+  // app is extremely slow" report). This page polls this whole
+  // function every 8 seconds during a live meeting, so its own latency
+  // matters more here than on an ordinary one-shot page load.
+  const [meeting, meetingWithType] = await Promise.all([getMeetingById(meetingId), getMeetingWithType(meetingId)]);
   if (!meeting) return null;
-
-  const meetingWithType = await getMeetingWithType(meetingId);
   if (!meetingWithType) return null;
 
-  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcementsByPlannedElement, wardName] =
+  const supabase = await createClient();
+  const [plannedElements, roleAssignments, elementNotes, data, people, programItems, visitingAuthorities, announcementsByPlannedElement, wardName, genderRows] =
     await Promise.all([
       getPlannedElements(meetingId),
       getRoleAssignments(meetingId, "sacrament_assignments"),
@@ -114,15 +120,15 @@ export async function getConductingRows(meetingId: string): Promise<ConductingSc
       getVisitingAuthorities(meetingId),
       getAnnouncementsByPlannedElement(meetingId),
       getWardName(),
+      // A lean, scoped lookup (just id + gender), rather than widening
+      // the shared getActivePeople()/PersonOption many unrelated call
+      // sites across this app already depend on -- gender resolution
+      // is only needed for a handful of Conducting's own pronoun
+      // choices (New Members, Baptisms, single Callings/Releases).
+      // Folded into this same wave instead of its own sequential await
+      // after it -- it depends on nothing else fetched here.
+      supabase.from("people").select("id, gender").then((r) => r.data),
     ]);
-
-  // A lean, scoped lookup (just id + gender), rather than widening the
-  // shared getActivePeople()/PersonOption many unrelated call sites
-  // across this app already depend on -- gender resolution is only
-  // needed for a handful of Conducting's own pronoun choices (New
-  // Members, Baptisms, single Callings/Releases).
-  const supabase = await createClient();
-  const { data: genderRows } = await supabase.from("people").select("id, gender");
   const genderById = new Map(((genderRows ?? []) as { id: string; gender: string | null }[]).map((p) => [p.id, p.gender]));
 
   const templateElements =

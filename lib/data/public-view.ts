@@ -45,8 +45,12 @@ interface RawRabnm {
 
 export async function getPublicSacramentView(meetingId: string): Promise<PublicSacramentView | null> {
   const supabase = await createClient();
-  const meeting = await getMeetingById(meetingId);
-  if (!meeting) return null;
+  // getMeetingById doesn't need anything the wave below fetches (and
+  // vice versa), so it runs concurrently with it instead of blocking
+  // it first (2026-10-31, chasing the user's own "this app is
+  // extremely slow" report) -- this is the single most-opened page in
+  // the app by ordinary ward members, every Sunday.
+  const meetingPromise = getMeetingById(meetingId);
 
   const [
     formatRes,
@@ -81,27 +85,51 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     getSacramentProgramItems(meetingId),
   ]);
 
+  const meeting = await meetingPromise;
+  if (!meeting) return null;
+
   const assignments = (assignmentsRes.data ?? []) as RawAssignment[];
   const adults = (adultsRes.data ?? []) as RawSpeaker[];
   const youth = (youthRes.data ?? []) as RawSpeaker[];
   const music = (musicRes.data ?? []) as RawMusic[];
   const rabnm = (rabnmRes.data ?? []) as RawRabnm[];
 
-  // Baby Blessing items can name more than one child -- fetch the linked
-  // people separately, keyed by rabnm_id.
+  // Baby Blessing items can name more than one child -- fetch the
+  // linked people separately, keyed by rabnm_id. Independent of
+  // "title + last name" resolution below (that one only needs
+  // `assignments`, already in hand) -- the two run together rather
+  // than one after the other.
   const rabnmIds = rabnm.map((r) => r.id);
-  const rabnmPeopleByRabnmId = new Map<string, string[]>();
-  if (rabnmIds.length > 0) {
-    const { data: rabnmPeople } = await supabase
-      .from("sacrament_rabnm_people")
-      .select("rabnm_id, person_id")
-      .in("rabnm_id", rabnmIds);
+  // "Title + last name" (2026-10-21) for any role resolved via a
+  // calling -- see getTitlePrefixesForAssignments. **Known limitation
+  // for a genuinely anonymous (no-login) viewer**: unlike
+  // get_public_people_names below, this reads `callings` through the
+  // ordinary client, which has no anon-facing RLS policy today -- it
+  // degrades gracefully (plain names, no error) rather than crashing,
+  // but an anonymous visitor to this specific page won't see the title
+  // prefix; an admin/Bishopric preview (always authenticated) does. A
+  // dedicated security-definer RPC, mirroring get_public_people_names,
+  // would be the fix if extending this to anonymous viewers matters.
+  const titlePairs = assignments
+    .filter((a) => a.assigned_to_id)
+    .map((a) => ({ elementKey: a.role, personId: a.assigned_to_id as string }));
 
-    for (const row of (rabnmPeople ?? []) as { rabnm_id: string; person_id: string }[]) {
-      const list = rabnmPeopleByRabnmId.get(row.rabnm_id) ?? [];
-      list.push(row.person_id);
-      rabnmPeopleByRabnmId.set(row.rabnm_id, list);
-    }
+  const [rabnmPeopleRows, titlePrefixByKey] = await Promise.all([
+    rabnmIds.length > 0
+      ? supabase
+          .from("sacrament_rabnm_people")
+          .select("rabnm_id, person_id")
+          .in("rabnm_id", rabnmIds)
+          .then((r) => r.data)
+      : Promise.resolve([] as { rabnm_id: string; person_id: string }[] | null),
+    getTitlePrefixesForAssignments("sacrament-meeting", titlePairs),
+  ]);
+
+  const rabnmPeopleByRabnmId = new Map<string, string[]>();
+  for (const row of (rabnmPeopleRows ?? []) as { rabnm_id: string; person_id: string }[]) {
+    const list = rabnmPeopleByRabnmId.get(row.rabnm_id) ?? [];
+    list.push(row.person_id);
+    rabnmPeopleByRabnmId.set(row.rabnm_id, list);
   }
 
   // Batch-resolve every person id referenced above into a name, via the
@@ -119,21 +147,6 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     p_ids: Array.from(idSet),
   });
   const nameById = new Map(((peopleRows ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
-
-  // "Title + last name" (2026-10-21) for any role resolved via a
-  // calling -- see getTitlePrefixesForAssignments. **Known limitation
-  // for a genuinely anonymous (no-login) viewer**: unlike
-  // get_public_people_names above, this reads `callings` through the
-  // ordinary client, which has no anon-facing RLS policy today -- it
-  // degrades gracefully (plain names, no error) rather than crashing,
-  // but an anonymous visitor to this specific page won't see the title
-  // prefix; an admin/Bishopric preview (always authenticated) does. A
-  // dedicated security-definer RPC, mirroring get_public_people_names,
-  // would be the fix if extending this to anonymous viewers matters.
-  const titlePairs = assignments
-    .filter((a) => a.assigned_to_id)
-    .map((a) => ({ elementKey: a.role, personId: a.assigned_to_id as string }));
-  const titlePrefixByKey = await getTitlePrefixesForAssignments("sacrament-meeting", titlePairs);
 
   const roleName = (role: string) => {
     const a = assignments.find((x) => x.role === role);
