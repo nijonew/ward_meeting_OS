@@ -42,6 +42,7 @@ export default async function MeetingPlanningPage() {
   const canRotations = hasFeature(profile, "rotations");
   const canSpeakerPrayerHistory = hasFeature(profile, "speaker_prayer_history");
   const canRabnmPlanning = hasFeature(profile, "sacrament_rabnm");
+  const canReminderEmail = hasFeature(profile, "meeting_reminder_email");
 
   if (
     !canPlanAnyMeeting &&
@@ -49,7 +50,8 @@ export default async function MeetingPlanningPage() {
     !canMeetingCancellations &&
     !canRotations &&
     !canSpeakerPrayerHistory &&
-    !canRabnmPlanning
+    !canRabnmPlanning &&
+    !canReminderEmail
   ) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -105,6 +107,12 @@ export default async function MeetingPlanningPage() {
             <Tile
               title="Recognitions & Advancements Planning"
               href="/rabnm-planning"
+            />
+          )}
+          {canReminderEmail && (
+            <Tile
+              title="Meeting Reminder Email"
+              href="/meeting-reminder-email"
             />
           )}
         </TileGrid>

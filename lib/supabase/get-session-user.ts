@@ -71,6 +71,7 @@ export type Feature =
   | "callings_roster"
   | "verify_logins"
   | "meeting_templates_admin"
+  | "meeting_reminder_email"
   // Table Admin, one per table
   | "table_admin_ward_settings"
   | "table_admin_admin_select_options"
