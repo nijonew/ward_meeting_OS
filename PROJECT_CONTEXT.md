@@ -2050,6 +2050,68 @@ avoid confusing the two.
 
 ## Known open items
 
+**Ward Calendar View reworked the same day it shipped, 2026-11-01. No
+migration needed.** The user's own immediate follow-up, right after
+trying it: "for the calendar view lets hold off on including the
+youth activities for now. lets also include all sacrament meetings
+including those that are cancelled. rather than striking out items
+that are cancelled can we add '(No Sacrament Meeting due to...)'
+after the name of the meeting and then include the reason for
+cancellation?" Three changes, all in `lib/data/calendar.ts`:
+
+1. **Youth Activities removed entirely**, not just hidden -- the
+   `getYouthActivities()` merge, the `"youth"` item kind, and its own
+   legend entry are all gone (re-add if/when this comes back; this
+   session's own git history has the removed code if it's wanted
+   again later).
+2. **Every Sacrament Meeting now shows, not just today's** -- a real
+   scope reversal from how this was first built hours earlier (see
+   that entry's own "day-of only" note just below). New
+   `getAllSacramentMeetings()` (same file) is a lean, direct query
+   against `meetings` (any date, any stage, cancelled included) --
+   replacing the call to `getTodaysPublishedSacramentMeeting()`, which
+   stays exactly as it was for its own other callers (the landing
+   page's own "This week" tile). The reasoning this holds up against
+   the Vision workflow's own "no early reveal" rule: showing that a
+   given Sunday HAD or WILL HAVE a Sacrament Meeting is a plain
+   calendar fact, not the meeting's own program content -- every ward
+   holds one every week, that's not sensitive on its own. Clicking
+   through to `/meetings/[id]/public` for a date that isn't actually
+   viewable yet (or one that's since archived) already shows a plain
+   "isn't available right now" message rather than erroring, so
+   linking every date is safe regardless of whether that specific
+   meeting's program is open yet.
+3. **A cancelled Sacrament Meeting shows its reason inline instead of
+   a struck-through title** -- composed directly into the item's own
+   `title` string ("Sacrament Meeting (No Sacrament Meeting due to
+   `<reason>`)"), falling back to "(No Sacrament Meeting)" with no
+   reason clause if a cancellation was recorded with no note. The
+   calendar page's own render layer no longer has any cancelled-
+   specific styling at all (the strikethrough it briefly had was only
+   ever exercised by Youth Activities, which is gone now anyway).
+
+**Not independently verified**: whether `meetings`' own (undocumented,
+pre-existing) anon-facing RLS policy actually returns every Sacrament
+Meeting row to a logged-out visitor, or only some date-scoped subset
+of them -- every other anonymous read this app has ever done against
+`meetings` was scoped to "today" (`getTodaysPublishedSacramentMeeting`)
+or "the next two" (`getNextTwoSacramentMeetingIds`), never an
+unscoped "every row," so this calendar is the first thing in the app
+to actually test that. This assistant has no live database access to
+check `meetings`' own policies directly -- ask the user to check
+`/calendar` logged out, specifically a past month and a future month
+several Sundays out, and confirm Sacrament Meeting items still show
+up there, not just in the current month.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calendar`: Youth Activities no longer appear at all; every
+Sunday (past, present, future) shows a Sacrament Meeting item; a
+cancelled one reads "Sacrament Meeting (No Sacrament Meeting due to
+`<reason>`)" with no strikethrough; and clicking through to an
+archived or not-yet-public one still shows a graceful message rather
+than an error.
+
 **Announcements no longer disappear from the public page just because
 they've also been pulled into a meeting, and non-Sacrament meetings'
 Review section now shows just the title, 2026-11-01. No migration

@@ -1,9 +1,8 @@
-import { getTodaysPublishedSacramentMeeting } from "@/lib/data/meetings";
-import { getYouthActivities } from "@/lib/data/youth-activities";
+import { createClient } from "@/lib/supabase/server";
 import { getWardEvents } from "@/lib/data/ward-events";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
 
-export type CalendarItemKind = "sacrament" | "youth" | "ward" | "announcement";
+export type CalendarItemKind = "sacrament" | "ward" | "announcement";
 
 export interface CalendarItem {
   /** ISO date, "yyyy-mm-dd" -- which day cell this item lands in. */
@@ -11,36 +10,83 @@ export interface CalendarItem {
   time: string | null;
   title: string;
   kind: CalendarItemKind;
-  cancelled: boolean;
-  /** A short second line under the title -- a group name, a location,
-   *  a cancellation note, or a recurrence phrase. */
+  /** A short second line under the title -- a location, or a
+   *  recurrence phrase. Sacrament Meeting's own cancellation reason
+   *  is folded directly into `title` instead (see getCalendarItems'
+   *  own comment), not carried here. */
   note: string | null;
-  /** Only Sacrament Meeting links anywhere -- Youth Activities/Ward
-   *  Events/Announcements have no single-item public page of their
-   *  own to link to. */
+  /** Only Sacrament Meeting links anywhere -- Ward Events/
+   *  Announcements have no single-item public page of their own to
+   *  link to. */
   href: string | null;
 }
 
+interface SacramentMeetingRow {
+  id: string;
+  date: string;
+  cancelled: boolean;
+  cancellation_note: string | null;
+}
+
 /**
- * The public Ward Calendar View's own data (2026-11-01) -- merges the
- * same four sources the user named when scoping it: Sacrament Meetings,
- * Youth Activities, Ward Events, and dated Announcements, exactly the
- * same public-visibility rules each already has elsewhere in this app
- * (no new RLS, no new gate):
+ * Every Sacrament Meeting row (any date, any stage, cancelled or
+ * not) -- a direct, lean query rather than going through
+ * `lib/data/meetings.ts`'s full `Meeting` shape/`mapMeetingRow`,
+ * since the calendar only ever needs these four columns. Unlike
+ * `getTodaysPublishedSacramentMeeting`, this is NOT scoped to today
+ * or to non-archived -- see getCalendarItems' own comment for why
+ * that's fine here (showing that a Sunday HAD or WILL HAVE a
+ * Sacrament Meeting is not the same as revealing its program).
+ */
+async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id, date, cancelled, cancellation_note, meeting_types!inner(slug)")
+    .eq("meeting_types.slug", "sacrament-meeting");
+  if (error || !data) return [];
+  return data as unknown as SacramentMeetingRow[];
+}
+
+/**
+ * The public Ward Calendar View's own data (2026-11-01, reworked the
+ * same day per the user's own follow-up):
  *
- * - **Sacrament Meeting**: `getTodaysPublishedSacramentMeeting()` --
- *   the exact same function the landing page's own "This week" tile
- *   uses, so this can only ever show up on *today's* cell, and only
- *   once the public gate has opened (6 AM Mountain). No early reveal
- *   of a future Sunday, no lingering display of a past one -- matches
- *   the Vision workflow's own "public with no login, for that one day
- *   only" rule exactly, which is what "day-of only" meant when this
- *   scope was confirmed.
- * - **Youth Activities / Ward Events**: `getYouthActivities()`/
- *   `getWardEvents()`, unfiltered -- the same two calls /events
- *   already makes with no login gate; RLS on both tables already
- *   limits an anonymous visitor to `status = 'published'` rows (see
- *   each function's own comment), same as there.
+ * - **Sacrament Meeting -- every one, cancelled included, 2026-11-01**
+ *   (the user's own request: "include all sacrament meetings
+ *   including those that are cancelled" -- a reversal of this
+ *   function's original "today only" scope). Showing that a given
+ *   Sunday HAD or WILL HAVE a Sacrament Meeting is not the same as
+ *   revealing that meeting's own program -- every ward holds one
+ *   every week, that's not sensitive information on its own -- so
+ *   this calendar fact is shown for any date, while the actual
+ *   program (what clicking through to `/meetings/[id]/public` shows)
+ *   still only opens on the real day, exactly as before; an archived
+ *   or not-yet-public meeting's own page already shows a plain
+ *   "isn't available right now" message rather than erroring, so
+ *   linking every date here is safe regardless of whether that
+ *   meeting's program is actually viewable yet.
+ *
+ *   **A cancelled one shows its own reason inline, not struck
+ *   through** (the user's own request, same message: "rather than
+ *   striking out items that are cancelled can we add '(No Sacrament
+ *   Meeting due to...)' after the name of the meeting and then
+ *   include the reason for cancellation?") -- `title` itself becomes
+ *   "Sacrament Meeting (No Sacrament Meeting due to `<reason>`)",
+ *   composed here rather than in the page's own render layer, so the
+ *   calendar page doesn't need any cancelled-specific styling at all.
+ *   Falls back to "(No Sacrament Meeting)" with no reason clause for
+ *   the rare case of a cancellation recorded with no note.
+ *
+ * - **Youth Activities, held off for now, 2026-11-01** (the user's own
+ *   words: "lets hold off on including the youth activities for
+ *   now") -- removed entirely, not just hidden; re-add the
+ *   `getYouthActivities()` merge (see this function's own git
+ *   history) if/when this comes back.
+ * - **Ward Events**: `getWardEvents()`, unfiltered -- the same call
+ *   `/events` already makes with no login gate; RLS already limits
+ *   an anonymous visitor to `status = 'published'` rows (see that
+ *   function's own comment).
  * - **Announcements**: `getPublishedAnnouncements()`, the same list
  *   `/announcements/public` shows, placed on its own `start_date`.
  *   **Known simplification**: a recurring announcement (migration 083)
@@ -52,36 +98,25 @@ export interface CalendarItem {
  *   asked for here.
  */
 export async function getCalendarItems(): Promise<CalendarItem[]> {
-  const [sacrament, youthActivities, wardEvents, announcements] = await Promise.all([
-    getTodaysPublishedSacramentMeeting(),
-    getYouthActivities(),
+  const [sacramentMeetings, wardEvents, announcements] = await Promise.all([
+    getAllSacramentMeetings(),
     getWardEvents(),
     getPublishedAnnouncements(),
   ]);
 
   const items: CalendarItem[] = [];
 
-  if (sacrament) {
+  for (const meeting of sacramentMeetings) {
+    const title = meeting.cancelled
+      ? `Sacrament Meeting (No Sacrament Meeting${meeting.cancellation_note ? ` due to ${meeting.cancellation_note}` : ""})`
+      : "Sacrament Meeting";
     items.push({
-      date: sacrament.date,
+      date: meeting.date,
       time: null,
-      title: "Sacrament Meeting",
+      title,
       kind: "sacrament",
-      cancelled: false,
       note: null,
-      href: `/meetings/${sacrament.id}/public`,
-    });
-  }
-
-  for (const a of youthActivities) {
-    items.push({
-      date: a.activity_date,
-      time: a.activity_time,
-      title: a.title,
-      kind: "youth",
-      cancelled: a.cancelled,
-      note: a.cancelled ? a.cancellation_note : a.group_name,
-      href: null,
+      href: `/meetings/${meeting.id}/public`,
     });
   }
 
@@ -91,7 +126,6 @@ export async function getCalendarItems(): Promise<CalendarItem[]> {
       time: e.event_time,
       title: e.title,
       kind: "ward",
-      cancelled: false,
       note: e.location,
       href: null,
     });
@@ -104,7 +138,6 @@ export async function getCalendarItems(): Promise<CalendarItem[]> {
       time: an.start_time,
       title: an.title,
       kind: "announcement",
-      cancelled: false,
       note: an.recurrence ? "Recurring" : null,
       href: null,
     });

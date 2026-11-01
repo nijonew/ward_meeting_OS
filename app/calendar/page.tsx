@@ -5,19 +5,20 @@ import { getMountainTimeNow } from "@/lib/data/timezone";
 
 /**
  * Public Ward Calendar View (2026-11-01) -- no login required, same
- * tier as /announcements/public and /events. Scoped via AskUserQuestion
- * before building: shows the same public content /events already
- * shows (Youth Activities, Ward Events), extended with Sacrament
- * Meeting (day-of only -- see getCalendarItems' own doc comment) and
- * dated Announcements, as a real month grid rather than a date-sorted
- * list.
+ * tier as /announcements/public and /events. Originally scoped via
+ * AskUserQuestion to show Sacrament Meeting (day-of only), Youth
+ * Activities, Ward Events, and dated Announcements; reworked the same
+ * day per the user's own follow-up -- see getCalendarItems' own doc
+ * comment for the current scope (every Sacrament Meeting, cancelled
+ * ones included with their own reason shown inline; Youth Activities
+ * held off for now; Ward Events and Announcements unchanged).
  *
  * Month navigation is plain `?y=&m=` links -- no client state needed,
  * since every month's own content is already public and cheap to
- * refetch. `getCalendarItems()` fetches all four sources unfiltered by
- * month (none of the four tables are large enough in a single ward for
- * that to matter) and this page buckets them by date client-side (well,
- * server-side, but the same idea) once per render.
+ * refetch. `getCalendarItems()` fetches every source unfiltered by
+ * month (none of them are large enough in a single ward for that to
+ * matter) and this page buckets them by date server-side once per
+ * render.
  *
  * **Accepted mobile tradeoff**: a 7-column month grid needs real width
  * to stay legible -- this wraps in the same `overflow-x-auto` pattern
@@ -34,14 +35,12 @@ function pad(n: number): string {
 
 const KIND_LABELS: Record<CalendarItemKind, string> = {
   sacrament: "Sacrament Meeting",
-  youth: "Youth Activity",
   ward: "Ward Event",
   announcement: "Announcement",
 };
 
 const KIND_DOT_CLASS: Record<CalendarItemKind, string> = {
   sacrament: "bg-accent",
-  youth: "bg-ink",
   ward: "bg-ink/40",
   announcement: "bg-danger",
 };
@@ -54,7 +53,7 @@ function DayItem({ item }: { item: CalendarItem }) {
   const content = (
     <span className="flex items-start gap-1">
       <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${KIND_DOT_CLASS[item.kind]}`} aria-hidden="true" />
-      <span className={item.cancelled ? "text-danger line-through" : "text-ink"}>{item.title}</span>
+      <span className="text-ink">{item.title}</span>
     </span>
   );
   if (!item.href) return content;
