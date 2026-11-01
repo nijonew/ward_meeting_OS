@@ -178,8 +178,34 @@ export async function buildReminderDraft(
 
   const lines = assignments.map((a) => `${a.label}: ${a.personName ?? "(not yet assigned)"}`);
 
+  // The bare /meetings/[id] route, not /planning directly (2026-10-31,
+  // the user's own request: "I do want to include a line in the email
+  // that includes the link to the meeting on the app") -- that route
+  // already redirects each viewer to wherever they actually belong
+  // (Planning for an admin, the read-only view for anyone else who
+  // attends by calling), so one link works correctly for every
+  // recipient regardless of their own access level, rather than
+  // assuming everyone receiving this can reach Planning. Reuses
+  // NEXT_PUBLIC_SITE_URL, the same env var this app's auth emails
+  // already rely on, rather than a new one.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ward-meeting-os.vercel.app";
+  const meetingLink = `${siteUrl}/meetings/${meetingId}`;
+
   return {
     subject: `Reminder: ${meetingLabel}`,
-    body: [`Hi all,`, "", `A quick reminder for our upcoming ${MEETING_TYPE_LABELS[meetingTypeSlug]}:`, "", meetingLabel, "", ...lines, "", `Thanks!`, `${wardName} Ward`].join("\n"),
+    body: [
+      `Hi all,`,
+      "",
+      `A quick reminder for our upcoming ${MEETING_TYPE_LABELS[meetingTypeSlug]}:`,
+      "",
+      meetingLabel,
+      "",
+      ...lines,
+      "",
+      `View the full agenda: ${meetingLink}`,
+      "",
+      `Thanks!`,
+      `${wardName} Ward`,
+    ].join("\n"),
   };
 }

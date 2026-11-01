@@ -2050,6 +2050,28 @@ avoid confusing the two.
 
 ## Known open items
 
+**Meeting Reminder Email now links back to the meeting itself,
+2026-10-31** -- the user's own request, right after confirming
+migration `095` was run and the feature granted: "I do want to include
+a line in the email that includes the link to the meeting on the app
+as well when we send email reminders." `buildReminderDraft`
+(`lib/data/meeting-reminder-email.ts`) now adds a "View the full
+agenda: `<link>`" line, linking to the bare `/meetings/[id]` route
+rather than `/planning` directly -- that route already redirects each
+viewer to wherever they actually belong (Planning for an admin, the
+read-only view for anyone else who attends by calling), so the one
+link works correctly regardless of which recipient clicks it, rather
+than assuming everyone receiving the reminder has Planning access.
+Reuses `NEXT_PUBLIC_SITE_URL`, the same environment variable this
+app's own auth emails already depend on, with the known production
+domain as a literal fallback if that var is ever unset.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to generate a new draft on `/meeting-reminder-email` and confirm the
+link appears and opens the right meeting, correctly routed, for both
+an admin account and an ordinary attendee account.
+
 **Rotation Order cards now show who currently holds each calling,
 2026-10-31** -- the user's own immediate follow-up once rotation
 membership was already calling-only: "Now that it is by calling, when
