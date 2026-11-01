@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 
 export interface CouncilNotes {
   notes: string | null;
@@ -17,21 +16,10 @@ export async function getCouncilNotes(meetingId: string): Promise<CouncilNotes |
   return data ?? null;
 }
 
-export async function saveCouncilNotes(meetingId: string, formData: FormData) {
-  "use server";
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("council_notes").upsert(
-    {
-      meeting_id: meetingId,
-      notes: String(formData.get("notes") ?? "").trim() || null,
-      next_meeting_date: String(formData.get("next_meeting_date") ?? "") || null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "meeting_id" }
-  );
-
-  if (error) return { error: error.message };
-  revalidatePath(`/meetings/${meetingId}`);
-  return { success: true };
-}
+// saveCouncilNotes moved to app/meetings/[id]/council-actions.ts,
+// 2026-11-01 -- a per-function inline "use server" directive (as this
+// one used to be) only works when the importing module is part of the
+// server tree; once CouncilNotesForm.tsx became a Client Component
+// (for the combined "Save All Changes" button -- see
+// CollaborativeMeetingBody.tsx), it needed a real top-level "use
+// server" file instead, matching bishopric-actions.ts's own convention.

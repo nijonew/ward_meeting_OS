@@ -2050,6 +2050,92 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bishopric Meeting/Ward Council/Youth Council's Planning page gained
+one combined "Save All Changes" button, 2026-11-01.** The user's own
+report, surfaced while triaging Corey Anderson's own vague "correct
+link to meeting notes" feedback item (see the Feedback Widget triage
+entry below): "the meetings have too many instances of the save all
+changes button." Confirmed real -- a Bishopric Meeting's own Planning
+page could show up to 6 independent Save buttons at once (one
+`AgendaGridForm` per section, the Discussion section's own before/
+after split around Agenda Items, plus `BishopricMinutesForm`'s and
+`CouncilNotesForm`'s own separate buttons).
+
+New `lib/hooks/use-combined-save.ts`'s `useCombinedSave(formIds)`
+generalizes `CombinedAgendaGrids.tsx`'s existing fixed two-grid design
+(built for Sacrament Meeting's opening/closing split) to an arbitrary,
+caller-supplied list of form ids -- each child form still submits
+through its own real `<form id="...">` (`hideActions` suppresses its
+own button/feedback), this only aggregates their dirty/pending/result
+state and drives every registered form's native `requestSubmit()`
+from one button. New `components/planning/CollaborativeMeetingBody.tsx`
+(a Client Component) owns the actual rendering for every non-Sacrament
+meeting type -- every section's grid(s), `BishopricMinutesForm`,
+`ActionItemsSection`, `CouncilNotesForm` -- replacing the inline JSX
+block `app/meetings/[id]/planning/page.tsx` used to render directly;
+`buildAgendaRows` itself still runs server-side, in the page, exactly
+as before -- only the resulting `AgendaRow[]` data crosses into the
+client, the same way `AgendaGridForm` has always received its own
+`rows` prop. `ActionItemsSection` is deliberately NOT part of the
+combine -- Add/Mark done both commit immediately (no bulk-save button
+to begin with), same as every other add/remove list in this app.
+
+**Real, necessary side effects, not scope creep**: `BishopricMinutesForm`/
+`CouncilNotesForm` were plain Server Components using a bare inline
+`"use server"` closure (`<form action={save}>`) -- legal only because
+the importing page was itself a Server Component. Once they needed to
+report dirty/state up to `useCombinedSave` (a hook, which only works
+in a Client Component), both became real Client Components using
+`useActionState`, gaining the same optional `formId`/`hideActions`/
+`onDirtyChange`/`onStateChange` shape `AgendaGridForm` already has --
+both still work standalone (their own visible button) when none of
+those are passed in. `saveBishopricMinutes`/`saveCouncilNotes` each
+needed a `_prevState` parameter added (required by `useActionState`'s
+own calling convention) and a widened, non-strict return type (`{
+error?: string; success?: boolean }` instead of the stricter `{
+success: true } | { error: string }` union) -- `useActionState`'s
+`initialState` (`{}`) has to be assignable to the action's own return
+type, which the strict union rejects.
+
+**A real build failure, not just a type error, surfaced two more
+components with the identical latent problem**: `ActionItemsSection`
+and `AgendaItemsSection` both used PER-ROW inline `"use server"`
+closures (Publish/Archive/Mark done/Save notes) -- legal only when the
+importing module is part of the server tree. The instant
+`CollaborativeMeetingBody.tsx` (a Client Component) started importing
+them directly, `next build` refused outright: "It is not allowed to
+define inline 'use server' annotated Server Actions in Client
+Components." Both are now Client Components too, calling the
+already-existing, already-exported real Server Actions
+(`setAgendaItemStatus`/`saveAgendaItemNotes`/`toggleActionItem`)
+directly via `useTransition` instead of through a wrapper closure --
+same pattern `RotationMemberList.tsx`'s own Remove button already
+established earlier this session. `addActionItem` (the one case bound
+straight to a `<form action={...}>`, not through `useTransition`)
+needed a small plain-client wrapper discarding its own return value --
+React's typing for a `<form action>` not bound through `useActionState`
+expects `void | Promise<void>`, not this app's real `ActionResult`;
+the old inline closure discarded the same value for the same reason,
+so no error-surfacing capability was lost, just preserved under the
+new shape. `saveCouncilNotes` itself had the same per-function-inline-
+directive problem one level removed -- moved out of `lib/data/council-notes.ts`
+(which keeps only the plain `getCouncilNotes` read + the `CouncilNotes`
+type) into a new, proper top-level `"use server"` file,
+`app/meetings/[id]/council-actions.ts`, matching `bishopric-actions.ts`'s
+own established convention.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open a Bishopric Meeting/Ward Council/Youth Council's Planning page
+and confirm: exactly one "Save All Changes" button appears at the
+bottom of the whole page (not one per section, not separate ones for
+Minutes/Notes), editing anything anywhere on the page enables it, and
+clicking it saves everything at once; Action Items' Add/Mark done and
+Agenda Items' Publish/Archive/Save notes all still work immediately,
+unaffected, exactly as before; and the archived/read-only view
+(`/meetings/[id]/archived`) is unaffected, since it never imported any
+of these components in the first place.
+
 **First real pass through the persistent Feedback Widget's own
 suggestion/bug log, 2026-11-01** -- the user asked to check on it;
 pasted back the full contents of the `feedback` table (this assistant

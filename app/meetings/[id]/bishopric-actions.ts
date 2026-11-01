@@ -14,7 +14,18 @@ type ActionResult = { success: true } | { error: string };
  * form, and including them as `null` here would silently wipe out any
  * historical data still sitting in those columns on every save.
  */
-export async function saveBishopricMinutes(meetingId: string, formData: FormData): Promise<ActionResult> {
+// Widened to a non-strict shape rather than the shared `ActionResult`
+// union (2026-11-01) -- `useActionState`'s own `initialState` ({}) must
+// be assignable to this function's return type, which a strict
+// `{ success: true } | { error: string }` union rejects (same reason
+// AgendaGridForm's own saveAgendaGrid uses an equivalent loose local
+// type, SaveGridActionResult, rather than a stricter one). The actual
+// `return` statements below are unchanged.
+export async function saveBishopricMinutes(
+  meetingId: string,
+  _prevState: unknown,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
   const supabase = await createClient();
 
   const field = (name: string) => String(formData.get(name) ?? "").trim() || null;

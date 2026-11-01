@@ -34,14 +34,10 @@ import {
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { getWardBusinessSectionOrder, WARD_BUSINESS_SECTION_KEYS } from "@/lib/data/ward-settings";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
-import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
 import { AgendaElementsManager } from "@/components/planning/AgendaElementsManager";
 import { CombinedAgendaGrids } from "@/components/planning/CombinedAgendaGrids";
 import { SacramentProgramSection } from "@/components/planning/SacramentProgramSection";
-import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
-import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
-import { AgendaItemsSection } from "@/components/bishopric/AgendaItemsSection";
-import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
+import { CollaborativeMeetingBody } from "@/components/planning/CollaborativeMeetingBody";
 
 /**
  * The planning view, rebuilt 2026-09-09 around a single agenda grid --
@@ -507,73 +503,59 @@ export default async function PlanningViewPage({
                 </div>
               </CombinedAgendaGrids>
             ) : (
-              <div className="flex flex-col gap-6">
-                {collaborativeSections.map((section, i) => {
-                  // Discussion gets real, named treatment (the
-                  // agenda_items split); every other section
-                  // (Devotional, Review, Closing, and the unlabeled
-                  // lead-in before this meeting's first divider -- e.g.
-                  // one created before migration 078 seeded one) is
-                  // just its own grid of ordinary rows, still
-                  // agenda_items-aware so a not-yet-migrated meeting
-                  // keeps working exactly as it did before. Review's
-                  // own content (Announcements, Previous Meeting
-                  // Minutes) used to need its own special case here --
-                  // now that both are real elements (2026-10-27,
-                  // review_announcements/previous_meeting_minutes),
-                  // this generic branch already renders them correctly
-                  // in order, same as any other element.
-                  const itemsIndex = section.elements.findIndex((el) => el.key === "agenda_items");
-                  const before = itemsIndex === -1 ? section.elements : section.elements.slice(0, itemsIndex);
-                  const after = itemsIndex === -1 ? [] : section.elements.slice(itemsIndex + 1);
-
-                  if (before.length === 0 && itemsIndex === -1 && after.length === 0) return null;
-
-                  return (
-                    <div key={`section-${i}`} className="border-t-2 border-rule pt-6 first:border-t-0 first:pt-0">
-                      {section.label && (
-                        <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">
-                          {section.label}
-                        </span>
-                      )}
-                      <div className="mt-3 flex flex-col gap-4">
-                        {before.length > 0 && (
-                          <AgendaGridForm
-                            meetingId={meetingId}
-                            roleTable={roleTable}
-                            rows={buildAgendaRows({ elements: before, ...rowInputs })}
-                            people={people}
-                            hymnalIndex={hymnalIndex}
-                          />
-                        )}
-                        {itemsIndex !== -1 && <AgendaItemsSection meetingId={meetingId} items={agendaItems} />}
-                        {after.length > 0 && (
-                          <AgendaGridForm
-                            meetingId={meetingId}
-                            roleTable={roleTable}
-                            rows={buildAgendaRows({ elements: after, ...rowInputs })}
-                            people={people}
-                            hymnalIndex={hymnalIndex}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              // Discussion gets real, named treatment (the agenda_items
+              // split); every other section (Devotional, Review,
+              // Closing, and the unlabeled lead-in before this meeting's
+              // first divider -- e.g. one created before migration 078
+              // seeded one) is just its own grid of ordinary rows, still
+              // agenda_items-aware so a not-yet-migrated meeting keeps
+              // working exactly as it did before. Review's own content
+              // (Announcements, Previous Meeting Minutes) used to need
+              // its own special case here -- now that both are real
+              // elements (2026-10-27, review_announcements/
+              // previous_meeting_minutes), this generic branch already
+              // renders them correctly in order, same as any other
+              // element.
+              //
+              // One combined "Save All Changes" button for everything
+              // below, 2026-11-01 (the user's own report: "the meetings
+              // have too many instances of the save all changes
+              // button") -- CollaborativeMeetingBody (a Client
+              // Component) owns the actual rendering of every section's
+              // grid(s) plus Bishopric Minutes/Action Items/Council
+              // Notes; buildAgendaRows itself still runs here, server-
+              // side, same as always -- only the resulting AgendaRow[]
+              // data crosses into the client, the same way AgendaGridForm
+              // has always received its own `rows` prop.
+              <CollaborativeMeetingBody
+                meetingId={meetingId}
+                roleTable={roleTable}
+                people={people}
+                hymnalIndex={hymnalIndex}
+                sections={collaborativeSections
+                  .map((section) => {
+                    const itemsIndex = section.elements.findIndex((el) => el.key === "agenda_items");
+                    const before = itemsIndex === -1 ? section.elements : section.elements.slice(0, itemsIndex);
+                    const after = itemsIndex === -1 ? [] : section.elements.slice(itemsIndex + 1);
+                    return {
+                      label: section.label,
+                      beforeRows: before.length > 0 ? buildAgendaRows({ elements: before, ...rowInputs }) : [],
+                      hasAgendaItems: itemsIndex !== -1,
+                      afterRows: after.length > 0 ? buildAgendaRows({ elements: after, ...rowInputs }) : [],
+                    };
+                  })
+                  .filter((s) => s.beforeRows.length > 0 || s.hasAgendaItems || s.afterRows.length > 0)}
+                agendaItems={agendaItems}
+                isBishopric={isBishopric}
+                bishopricMinutes={isBishopric ? bishopricData?.minutes ?? null : null}
+                actionItems={isBishopric ? bishopricData?.actionItems ?? [] : []}
+                isCouncil={isCouncil}
+                councilNotes={isCouncil ? councilNotes : null}
+              />
             )}
           </div>
         </div>
       )}
-
-      {isBishopric && bishopricData && (
-        <>
-          <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData.minutes} />
-          <ActionItemsSection meetingId={meetingId} items={bishopricData.actionItems} people={people} />
-        </>
-      )}
-
-      {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
     </div>
   );
 }
