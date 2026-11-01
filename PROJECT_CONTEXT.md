@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 096
+## Current migration number: 099
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,142 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**New: a public Ward Calendar View, plus optional images on
+announcements with auto-delete on archive -- migration `099`, not yet
+run, 2026-11-01.** Both scoped and built together per the user's own
+request, right after confirming the Feedback Widget's own storage
+footprint lives on Supabase's free plan: "please scope and build this
+[auto-delete on archive] along with a calendar view as mentioned in
+the feature request." Both started life as Suggestions on the
+Feedback Widget's own log (Corey Anderson, 2026-10-11 -- "Ward
+Calendar View" and "upload images to support an event"). Four real
+scope decisions were confirmed via `AskUserQuestion` before building
+either, since guessing wrong on a brand-new page (no calendar-grid
+component exists anywhere in this app) would have meant rebuilding a
+page-sized feature:
+1. Calendar content -- **everything public**: Sacrament Meetings
+   (day-of only), Youth Activities, Ward Events, and dated
+   Announcements -- the same public content `/events` already shows,
+   extended with meeting dates and announcements.
+2. Layout -- a **traditional month grid**, not a date-grouped list.
+3. Access -- **public, no login**, same tier as `/events` and
+   `/announcements/public`.
+4. Who can attach an announcement image -- **anyone submitting one**,
+   via the public `/submit/announcement` form itself, not an
+   admin-only after-the-fact addition.
+
+**New `/calendar`** (`app/calendar/page.tsx` + `lib/data/calendar.ts`)
+-- no login, no feature gate, reached from a new Tier-0 "Calendar"
+tile on the landing page right next to Announcements.
+`getCalendarItems()` merges the same four sources named above:
+- **Sacrament Meeting** reuses `getTodaysPublishedSacramentMeeting()`
+  verbatim (the exact function the landing page's own "This week" tile
+  already calls) -- so it can only ever appear on *today's* cell, and
+  only once the existing 6 AM Mountain public gate has opened. No
+  early reveal of a future Sunday's program, no lingering display of
+  a past one once archived -- this is a direct, deliberate consequence
+  of "day-of only" as scoped, not a separate design decision.
+- **Youth Activities / Ward Events** reuse `getYouthActivities()`/
+  `getWardEvents()` exactly as `/events` already calls them, with no
+  new filtering -- RLS on both tables already limits an anonymous
+  visitor to published rows (see each function's own existing
+  comment), so the calendar inherits the identical public scope with
+  no new code needed there.
+- **Announcements** reuse `getPublishedAnnouncements()`, placed on
+  each one's own `start_date`. **Known, deliberate simplification**: a
+  recurring announcement (migration 083) renders once, on the series'
+  own start date, labeled "Recurring" -- expanding its own cadence
+  into every real calendar occurrence would be a genuinely separate
+  feature (real occurrence generation, the same class of work
+  `/meeting-schedule`'s own cadence engine already does elsewhere),
+  not something implied by what was asked for here. Flag if real
+  per-occurrence rendering turns out to matter in practice.
+
+The grid itself is plain month date-math (full weeks only -- starts on
+the Sunday on/before the 1st, ends on the Saturday on/after the
+month's own last day), with `?y=&m=` links for Previous/Next/Today --
+no client state, since every month's content is already public and
+cheap to refetch. A color-coded dot per item kind, with a small legend
+below the grid. **Accepted mobile tradeoff**: wrapped in the same
+`overflow-x-auto` pattern this app already uses for its wide admin
+grids, rather than collapsing into a non-calendar layout on a narrow
+phone -- a 7-column month grid inherently needs real width to stay
+legible, and the date-grouped-list alternative (which would have
+avoided this) was the option *not* chosen when this was scoped.
+
+**Optional announcement images** (migration `099`): new
+`announcements.image_url` column, same `"image"` Table Admin column
+type the Feedback Widget's own screenshot already uses (a thumbnail
+above the field, still a plain editable URL underneath). The real new
+piece is where it's actually set -- a file input added directly to
+the public `AnnouncementForm.tsx`/`submitAnnouncement`
+(`app/submit/actions.ts`), same optional-upload shape as
+`submitFeedback` (validate it's a real image under 5MB, upload under
+a fresh random filename into a new `announcement-images` Storage
+bucket, store the resulting public URL) -- so the person submitting
+the announcement can attach a flyer/photo themselves, not just an
+admin after the fact. Rendered on `/announcements/public` as a plain
+`<img>` beneath the body, capped at a reasonable max height.
+
+**Auto-delete on archive, the actual thing that prompted this** -- the
+user's own question, right after confirming this project runs on
+Supabase's free plan (1 GB Storage total): "if we allow images with
+announcements can they auto delete when the announcement is archived
+to help with storage limits?" `sweepPastAnnouncements()`
+(`lib/data/announcements.ts`, the existing lazy sweep that archives a
+lapsed announcement on read) now also deletes that row's Storage
+object and nulls `image_url` in the same pass it flips `status` to
+`archived` -- never for a row an admin archived by hand for some
+other reason, since this sweep only ever touches rows it itself is
+archiving right now.
+
+**Generalized into one reusable cleanup hook, not an announcements-
+only special case**: new `lib/storage/image-cleanup.ts`'s
+`deleteStorageImageAtUrl(supabase, url)` parses the bucket and path
+straight out of a Storage object's own public URL (both are already
+encoded in it -- `.../storage/v1/object/public/<bucket>/<path>`), so
+no column needs to separately declare which bucket it lives in.
+Swallows its own errors (a malformed URL, an object already gone, a
+permissions gap) -- losing a real database write over a storage
+cleanup that didn't happen would be a worse failure than one harmless
+orphaned file. Wired into two places: the archive-time sweep above,
+and a new generic hook in `deleteAdminRow`
+(`lib/admin/table-data.ts`) that cleans up every `"image"`-type
+column's own file before the row itself is deleted -- this covers any
+table with an image column through one shared hook (feedback's own
+screenshot included, not just announcements), matching this file's
+own "no per-table logic" principle, rather than writing the cleanup
+twice.
+
+**A real DELETE policy on `storage.objects` was needed for the first
+time** -- migration `098` (feedback images) only ever needed INSERT +
+SELECT, since nothing deleted a feedback image before now. Migration
+`099` adds a `to authenticated` DELETE policy for both the new
+`announcement-images` bucket and (backfilled) the existing
+`feedback-images` bucket -- scoped to `authenticated`, not `anon`,
+matching the fact that both cleanup call sites already only ever run
+successfully under an authenticated session (the archive sweep's own
+status-flip UPDATE already needs one to succeed in the first place,
+so the image delete riding along with it needs nothing broader).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- **confirm migration number `099` is actually free before
+running it**, per this project's own repeated numbering-collision
+history, then ask the user to: open `/calendar` and confirm the month
+grid shows today's Sacrament Meeting (once past 6 AM), any Youth
+Activities/Ward Events/Announcements in the current month, and that
+Previous/Next/Today navigation works; submit a test announcement with
+an image attached and confirm it shows up on `/announcements/public`;
+and confirm that once that announcement's own date range lapses (or
+by manually setting its date into the past in Table Admin and
+reloading a page that triggers the sweep), its image disappears from
+Supabase Storage along with the archive, and that deleting a
+feedback or announcement row with an image through Table Admin/Manage
+Announcements also removes its Storage file.
 
 **The persistent Feedback Widget gained an optional screenshot
 attachment, migration `098`, not yet run, 2026-11-01.** The most

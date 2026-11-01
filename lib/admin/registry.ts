@@ -212,6 +212,18 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       // Status) are left as plain single-line inputs, same as before.
       { column: "title", label: "Title", type: "text", required: true, wrap: true },
       { column: "body", label: "Body", type: "long_text", required: true },
+      // "image" (migration 099, 2026-11-01, the user's own request:
+      // "scope and build this [image attachments] along with a
+      // calendar view") -- a flyer/photo attached from the public
+      // submit form itself; same display-only-thumbnail behavior as
+      // feedback.image_url (see types.ts's own doc comment on this
+      // column type). The Storage object is deleted automatically
+      // once this announcement archives (sweepPastAnnouncements,
+      // lib/data/announcements.ts) -- the user's own follow-up
+      // question, prompted by this project running on Supabase's free
+      // 1 GB Storage plan: "can they auto delete when the
+      // announcement is archived to help with storage limits?"
+      { column: "image_url", label: "Image", type: "image" },
       // select_with_other/multi_select, 2026-10-18 (the user's own
       // request: "the same options in the submit announcements page
       // [...] available via dropdown or checkbox in dropdown on the

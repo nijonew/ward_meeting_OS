@@ -116,6 +116,10 @@ export default async function HomePage() {
               />
             )}
           <Tile title="Announcements" href="/announcements/public" />
+          {/* Ward Calendar View, 2026-11-01 -- public, no login, same
+              tier as the two tiles above (scoped via AskUserQuestion:
+              "Public, no login" + "Everything public"). */}
+          <Tile title="Calendar" href="/calendar" />
           {/* Requires login (2026-10-07, the user's own request) --
               unlike the rest of this tier, grayed out with a specific
               reason rather than "Coming soon" for a logged-out

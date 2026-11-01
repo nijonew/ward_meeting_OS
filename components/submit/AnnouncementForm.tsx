@@ -87,6 +87,13 @@ function RadioSelectWithOther({
  * here for the same reason it never existed on AgendaItemForm: the
  * submitter is a known signed-in account now, so submitAnnouncement
  * attributes the submission from the session instead of typed-in text.
+ *
+ * **Optional image field added 2026-11-01** (migration 099, from the
+ * Feedback Widget's own suggestion log -- Corey Anderson, 2026-10-11:
+ * "upload images to support an event"), scoped to announcements first
+ * per the user's own instruction. No `encType` needed -- React's own
+ * form-action handling builds a real FormData (Files included)
+ * regardless of the form's encoding attribute.
  */
 export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) => Promise<void> }) {
   return (
@@ -145,6 +152,13 @@ export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) 
 
       <input type="text" name="location" placeholder="Location" className={INPUT_CLASS} />
       <input type="url" name="link_url" placeholder="Link to event info" className={INPUT_CLASS} />
+
+      {/* Optional flyer/photo, 2026-11-01 -- same optional-upload
+          pattern as the Feedback Widget's own screenshot field. */}
+      <label className={LABEL_CLASS}>
+        Image (optional)
+        <input type="file" name="image" accept="image/*" className="mt-1 block w-full text-sm text-ink-muted" />
+      </label>
 
       <button
         type="submit"

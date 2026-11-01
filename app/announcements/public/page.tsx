@@ -100,6 +100,19 @@ function AnnouncementBody({ a }: { a: PublishedAnnouncement }) {
   return (
     <>
       {a.body && <p className="mt-2 whitespace-pre-wrap text-ink-muted">{a.body}</p>}
+      {/* 2026-11-01, migration 099 -- an optional flyer/photo attached
+          at submission time. Plain <img>, not next/image: this app has
+          never used next/image anywhere, and a config-less <Image>
+          component would need the Storage CDN's own host allow-listed
+          in next.config -- not worth it for one image per announcement. */}
+      {a.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={a.image_url}
+          alt=""
+          className="mt-2 max-h-80 w-auto max-w-full rounded border border-rule object-contain"
+        />
+      )}
       {/* 2026-10-13, the user's own request: "can we get the word
           'Link' to show up in the public views of the announcements as
           a hyperlink to any announcement that has a url?" -- the title

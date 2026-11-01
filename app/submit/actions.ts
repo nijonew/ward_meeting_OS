@@ -10,6 +10,7 @@ import type { MeetingTypeSlug } from "@/lib/types";
 import { OTHER_VALUE } from "@/lib/data/announcement-constants";
 
 const TIME_NEEDED_OPTIONS = ["1-2 Minutes", "3-5 Minutes", "6+ Minutes"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** For the form's two "Other" radio questions (organization, type): the
  *  free-text box submitted alongside the radio replaces the literal
@@ -52,6 +53,15 @@ function deriveTitle(description: string): string {
  * (2026-10-04, granular-features pass -- replaces the old scalar
  * "bishopric"/"communications_specialist" role check), matching the
  * page's own gate exactly.
+ *
+ * **Optional image upload, 2026-11-01** (migration 099) -- same shape
+ * as submitFeedback's own screenshot handling (app/feedback-actions.ts):
+ * validates it's a real image under 5MB, uploads it under a fresh
+ * random filename (never the browser's own name, so two unrelated
+ * people's "flyer.jpg" can't collide) into the `announcement-images`
+ * Storage bucket, and includes the resulting public URL on the insert.
+ * A failed upload fails the whole submission, same redirect-with-error
+ * pattern every other validation in this function already uses.
  */
 export async function submitAnnouncement(formData: FormData) {
   const supabase = await createClient();
@@ -113,6 +123,26 @@ export async function submitAnnouncement(formData: FormData) {
     );
   }
 
+  let imageUrl: string | null = null;
+  const image = formData.get("image");
+  if (image instanceof File && image.size > 0) {
+    if (!image.type.startsWith("image/")) {
+      redirect(`/submit/announcement?error=${encodeURIComponent("The attachment must be an image.")}`);
+    }
+    if (image.size > MAX_IMAGE_BYTES) {
+      redirect(`/submit/announcement?error=${encodeURIComponent("Image must be smaller than 5MB.")}`);
+    }
+    const ext = image.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("announcement-images")
+      .upload(path, image, { contentType: image.type });
+    if (uploadError) {
+      redirect(`/submit/announcement?error=${encodeURIComponent(`Could not upload image: ${uploadError.message}`)}`);
+    }
+    imageUrl = supabase.storage.from("announcement-images").getPublicUrl(path).data.publicUrl;
+  }
+
   const { error } = await supabase.from("announcements").insert({
     title,
     body,
@@ -129,6 +159,7 @@ export async function submitAnnouncement(formData: FormData) {
     end_time: endTime,
     location,
     link_url: linkUrl,
+    image_url: imageUrl,
     recurrence,
     recurrence_day_of_week: recurrenceDayOfWeek,
     recurrence_nth_occurrence: recurrenceNthOccurrence,

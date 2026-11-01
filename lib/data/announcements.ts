@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import { deleteStorageImageAtUrl } from "@/lib/storage/image-cleanup";
 import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib/data/announcement-constants";
 
 /**
@@ -49,6 +50,18 @@ import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib
  * than contorting this into one PostgREST filter string -- this table
  * is small (a ward's worth of announcements), so fetching every
  * published row to filter in memory costs nothing real.
+ *
+ * **Also deletes the Storage image (if any) once an announcement
+ * archives, 2026-11-01** (migration 099, the user's own question
+ * right after the Feedback Widget's own screenshot feature shipped:
+ * "if we allow images with announcements can they auto delete when
+ * the announcement is archived to help with storage limits?") -- this
+ * project is on Supabase's free plan (1 GB Storage total), and an
+ * announcement's image has no real reason to survive once the
+ * announcement itself is no longer current. The file is removed and
+ * `image_url` nulled in the same pass an announcement lapses -- never
+ * for one an admin archived by hand for some other reason, since this
+ * sweep only ever touches rows it itself just flipped to `archived`.
  */
 export async function sweepPastAnnouncements(): Promise<void> {
   const supabase = await createClient();
@@ -56,23 +69,28 @@ export async function sweepPastAnnouncements(): Promise<void> {
 
   const { data } = await supabase
     .from("announcements")
-    .select("id, start_date, start_time, end_date, end_time")
+    .select("id, start_date, start_time, end_date, end_time, image_url")
     .eq("status", "published");
 
-  const lapsedIds = (data ?? [])
-    .filter((a) => {
-      const effectiveDate = a.end_date ?? a.start_date;
-      if (!effectiveDate) return false; // no date at all -- nothing to compare against
-      if (effectiveDate < today) return true;
-      if (effectiveDate > today) return false;
-      const effectiveTime = a.end_time ?? a.start_time;
-      return effectiveTime != null && effectiveTime < now;
-    })
-    .map((a) => a.id as string);
+  const lapsed = (data ?? []).filter((a) => {
+    const effectiveDate = a.end_date ?? a.start_date;
+    if (!effectiveDate) return false; // no date at all -- nothing to compare against
+    if (effectiveDate < today) return true;
+    if (effectiveDate > today) return false;
+    const effectiveTime = a.end_time ?? a.start_time;
+    return effectiveTime != null && effectiveTime < now;
+  });
 
-  if (lapsedIds.length > 0) {
-    await supabase.from("announcements").update({ status: "archived" }).in("id", lapsedIds);
-  }
+  if (lapsed.length === 0) return;
+
+  await Promise.all(lapsed.map((a) => deleteStorageImageAtUrl(supabase, a.image_url as string | null)));
+  await supabase
+    .from("announcements")
+    .update({ status: "archived", image_url: null })
+    .in(
+      "id",
+      lapsed.map((a) => a.id as string)
+    );
 }
 
 function ordinal(day: number): string {

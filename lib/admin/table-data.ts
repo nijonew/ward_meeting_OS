@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
 import { getSelectOptions } from "@/lib/data/select-options";
+import { deleteStorageImageAtUrl } from "@/lib/storage/image-cleanup";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { decodeCreateMeetingValue, type AdminColumnConfig, type AdminOption, type AdminTableConfig } from "./types";
 
@@ -333,8 +334,37 @@ export async function insertAdminRow(
   return { success: true };
 }
 
+/**
+ * Deletes whatever Storage object(s) this row's own "image"-type
+ * column(s) point at, before the row itself is gone (2026-11-01,
+ * generalized alongside announcements.image_url -- see that column's
+ * own doc comment in lib/admin/registry.ts for why keeping Storage
+ * usage bounded matters on this project's free Supabase plan). Covers
+ * every table with an "image" column through this one generic hook,
+ * feedback's screenshot included, rather than a per-table special
+ * case -- matches this file's own "no per-table logic" principle.
+ * Best-effort: `deleteStorageImageAtUrl` swallows its own errors, so a
+ * missing object or a permissions gap can never block the real row
+ * delete that follows.
+ */
+async function cleanUpRowImages(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  config: AdminTableConfig,
+  id: string
+): Promise<void> {
+  const imageColumns = config.columns.filter((c) => c.type === "image").map((c) => c.column);
+  if (imageColumns.length === 0) return;
+
+  const { data: row } = await supabase.from(config.table).select(imageColumns.join(", ")).eq("id", id).single();
+  if (!row) return;
+
+  const typedRow = row as unknown as Record<string, unknown>;
+  await Promise.all(imageColumns.map((col) => deleteStorageImageAtUrl(supabase, typedRow[col] as string | null)));
+}
+
 export async function deleteAdminRow(config: AdminTableConfig, id: string): Promise<MutationResult> {
   const supabase = await createClient();
+  await cleanUpRowImages(supabase, config, id);
   // Archive instead of delete (2026-10-30) -- see AdminTableConfig.archiveRpc's
   // own comment. The RPC owns every side effect; this never falls back
   // to a real delete for a table that declares one.
