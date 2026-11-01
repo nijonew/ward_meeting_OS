@@ -348,10 +348,7 @@ export default async function ArchivedMeetingPage({
           {reviewAnnouncements.length > 0 ? (
             <div className="flex flex-col gap-2">
               {reviewAnnouncements.map((a) => (
-                <div key={a.id}>
-                  <Plain>{a.title}</Plain>
-                  {a.body && <Note>{a.body}</Note>}
-                </div>
+                <Plain key={a.id}>{a.title}</Plain>
               ))}
             </div>
           ) : (

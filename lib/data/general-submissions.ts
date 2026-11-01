@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEverPulledAnnouncementIds } from "@/lib/data/sacrament-announcements";
 import { sweepPastAnnouncements } from "@/lib/data/announcements";
 
 export interface SubmissionRow {
@@ -40,15 +39,30 @@ export interface PublishedAnnouncement {
  * role has its own submission UI) has marked "published" -- these are
  * safe to show on the public landing page with no login required.
  *
- * Excludes anything ever pulled into a Sacrament Meeting's own
- * Announcements block, via `getEverPulledAnnouncementIds()` -- once
- * incorporated into a meeting's own program, it's no longer shown as
- * a separate public announcement. **Switched from a stale
- * `.is("meeting_id", null)` filter to this 2026-10-15** (migration
- * 077) -- that column stopped being written once announcement pulls
- * moved to the real `sacrament_announcement_pulls` join table (see
- * that file's own header for why), so the old filter would have let
- * every pulled announcement right back onto this public page.
+ * **No longer excludes an announcement just because it's also been
+ * pulled into a meeting, 2026-11-01** (the user's own request, right
+ * after noticing the old behavior firsthand: "not all of the
+ * announcements are landing in the announcements page, and it seems
+ * to be those that are called into other meetings. I want every
+ * single announcement to remain in the announcements page even if it
+ * is being announced in a meeting... selected announcements in other
+ * places"). From 2026-10-11 through today, pulling an announcement
+ * into a Sacrament Meeting's own Announcements block (or, for a
+ * non-Sacrament meeting, it simply matching that type's own
+ * `where_announced` label) removed it from this list entirely, on the
+ * theory that it had been "incorporated into the program" and no
+ * longer needed a separate public listing. The user's own correction:
+ * this page should always show every published announcement,
+ * regardless of which meeting(s) have separately pulled it in --
+ * being selected into a meeting and being on the public page are two
+ * independent things now, not mutually exclusive. The old
+ * `sacrament_announcement_pulls`-based exclusion had exactly one
+ * purpose -- this one -- so its own helper,
+ * `getEverPulledAnnouncementIds` (lib/data/sacrament-announcements.ts),
+ * is deleted outright rather than left unused; a specific meeting's
+ * own "already pulled into THIS meeting" check (`getPullableAnnouncements`,
+ * same file) is a separate, already-independent mechanism and is
+ * completely unaffected by this change.
  *
  * Also runs `sweepPastAnnouncements()` first (2026-10-18) -- an
  * announcement whose own date range already ended gets archived
@@ -61,30 +75,26 @@ export async function getPublishedAnnouncements(): Promise<PublishedAnnouncement
   await sweepPastAnnouncements();
   const supabase = await createClient();
 
-  const [pulledIds, { data, error }] = await Promise.all([
-    getEverPulledAnnouncementIds(),
-    supabase
-      .from("announcements")
-      .select(
-        "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url, image_url, recurrence, recurrence_day_of_week, recurrence_nth_occurrence, recurrence_day_of_month"
-      )
-      .eq("status", "published")
-      .order("created_at", { ascending: false }),
-  ]);
+  const { data, error } = await supabase
+    .from("announcements")
+    .select(
+      "id, title, body, created_at, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url, image_url, recurrence, recurrence_day_of_week, recurrence_nth_occurrence, recurrence_day_of_month"
+    )
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
 
   if (error || !data) {
     return [];
   }
 
-  return (data as PublishedAnnouncement[]).filter((a) => !pulledIds.has(a.id));
+  return data as PublishedAnnouncement[];
 }
 
 export async function getGeneralSubmissions(): Promise<SubmissionRow[]> {
   await sweepPastAnnouncements();
   const supabase = await createClient();
 
-  const [pulledIds, announcementsRes, agendaRes] = await Promise.all([
-    getEverPulledAnnouncementIds(),
+  const [announcementsRes, agendaRes] = await Promise.all([
     supabase
       .from("announcements")
       .select("id, title, body, submitted_by_name, submitted_by_email, status, created_at")
@@ -96,12 +106,12 @@ export async function getGeneralSubmissions(): Promise<SubmissionRow[]> {
       .order("created_at", { ascending: false }),
   ]);
 
-  const announcements = ((announcementsRes.data ?? []) as (Omit<SubmissionRow, "kind"> & { id: string })[])
-    .filter((r) => !pulledIds.has(r.id))
-    .map((r) => ({
+  const announcements = ((announcementsRes.data ?? []) as (Omit<SubmissionRow, "kind"> & { id: string })[]).map(
+    (r) => ({
       ...r,
       kind: "announcement" as const,
-    }));
+    })
+  );
   const agendaItems = ((agendaRes.data ?? []) as Omit<SubmissionRow, "kind">[]).map((r) => ({
     ...r,
     kind: "agenda_item" as const,

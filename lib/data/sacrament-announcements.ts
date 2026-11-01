@@ -69,25 +69,6 @@ function toPulledAnnouncement(raw: unknown): PulledAnnouncement | null {
   return (r as PulledAnnouncement) ?? null;
 }
 
-/** Every announcement id that's ever been pulled into any meeting, in
- *  any block -- what `getPublishedAnnouncements`/`getGeneralSubmissions`
- *  (lib/data/general-submissions.ts) exclude from the general public
- *  page and admin inbox: once incorporated into a Sacrament Meeting's
- *  own program, it's no longer shown as a separate, generic public
- *  announcement, regardless of how many meetings it's since been
- *  pulled into. Unlike the old single-column check, this is "ever
- *  pulled anywhere," not "currently pulled" -- an announcement doesn't
- *  come back to the general page just because it was later removed
- *  from one meeting while still sitting in another, or because it was
- *  removed from every meeting it was ever in (that case is vanishingly
- *  rare and not worth a more precise, "still pulled somewhere right
- *  now" query for). */
-export async function getEverPulledAnnouncementIds(): Promise<Set<string>> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("sacrament_announcement_pulls").select("announcement_id");
-  return new Set((data ?? []).map((r) => (r as { announcement_id: string }).announcement_id));
-}
-
 /** Published, not yet pulled into THIS specific meeting (any of its
  *  blocks) -- what the "call in an announcement" dropdown offers.
  *  **An announcement already pulled into a DIFFERENT meeting is still

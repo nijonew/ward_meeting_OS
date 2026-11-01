@@ -2050,9 +2050,64 @@ avoid confusing the two.
 
 ## Known open items
 
+**Announcements no longer disappear from the public page just because
+they've also been pulled into a meeting, and non-Sacrament meetings'
+Review section now shows just the title, 2026-11-01. No migration
+needed.** Two requests in the same message, right after confirming
+migration `099` fixed the "announcements vanished entirely" bug
+(itself caused by `099` not having been run yet -- a real instance of
+this project's own repeated "code landed before the matching
+migration ran" bug class, see that entry's own note):
+
+1. **"Not all of the announcements are landing in the announcements
+   page, and it seems to be those that are called into other
+   meetings. I want every single announcement to remain in the
+   announcements page even if it is being announced in a meeting...
+   selected announcements in other places."** This was never a bug --
+   it was `getPublishedAnnouncements()`'s own deliberate design since
+   2026-10-11: once pulled into a Sacrament Meeting's Announcements
+   block, an announcement was excluded from the general public page
+   forever (`getEverPulledAnnouncementIds()`, lib/data/sacrament-announcements.ts),
+   on the theory that it had been "incorporated into the program" and
+   didn't need a separate listing anymore. The user's own correction
+   reverses that: being selected into a meeting (Sacrament's own pull,
+   or a non-Sacrament type's live `where_announced` match) and
+   showing on the public page are now two fully independent things --
+   `getPublishedAnnouncements()` (`lib/data/general-submissions.ts`)
+   dropped the exclusion entirely, and `getEverPulledAnnouncementIds`
+   itself is deleted outright (it had exactly one real purpose, this
+   one, and nothing else called it -- confirmed by grep before
+   removing). A meeting's own "already pulled into THIS specific
+   meeting" check (`getPullableAnnouncements`, same file) is a
+   completely separate, independent mechanism and is unaffected --
+   an announcement still can't be pulled into the same meeting twice,
+   it just no longer disappears from the general page either way.
+   Since `lib/data/calendar.ts`'s own Ward Calendar View (built the
+   same day) also calls `getPublishedAnnouncements()`, this fix
+   applies there too, for free.
+2. **"Also in non-sacrament meetings I only want the announcement
+   title rather than the whole announcement."** Bishopric Meeting/
+   Ward Council/Youth Council's Review section
+   (`getAnnouncementsForMeetingReview`, `lib/data/meeting-review.ts`)
+   used to show each matching announcement's title AND body. `body`
+   is no longer selected, returned, or rendered at all -- both render
+   sites (`AgendaGridForm.tsx`'s Planning view, `archived/page.tsx`'s
+   read-only view) now show just the title as a single line. The full
+   announcement is still one click away on `/announcements/public`,
+   which this change doesn't touch.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: an announcement already pulled into a Sacrament Meeting (or
+matching a non-Sacrament type's own Where Announced label) now still
+shows on `/announcements/public` and on `/calendar`; and that a
+Bishopric Meeting/Ward Council/Youth Council's Review section now
+shows only each announcement's title, with no body text underneath,
+on both the Planning page and the archived/read-only view.
+
 **New: a public Ward Calendar View, plus optional images on
-announcements with auto-delete on archive -- migration `099`, not yet
-run, 2026-11-01.** Both scoped and built together per the user's own
+announcements with auto-delete on archive -- migration `099`,
+confirmed run, 2026-11-01.** Both scoped and built together per the user's own
 request, right after confirming the Feedback Widget's own storage
 footprint lives on Supabase's free plan: "please scope and build this
 [auto-delete on archive] along with a calendar view as mentioned in

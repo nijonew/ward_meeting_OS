@@ -390,9 +390,8 @@ export function AgendaGridForm({
                       {row.items.length > 0 ? (
                         <ul className="flex flex-col gap-2">
                           {row.items.map((a) => (
-                            <li key={a.id} className="text-sm">
-                              <span className="text-ink">{a.title}</span>
-                              {a.body && <p className="mt-0.5 text-ink-muted">{a.body}</p>}
+                            <li key={a.id} className="text-sm text-ink">
+                              {a.title}
                             </li>
                           ))}
                         </ul>

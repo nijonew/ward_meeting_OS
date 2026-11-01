@@ -6,7 +6,6 @@ import type { MeetingTypeSlug } from "@/lib/types";
 export interface ReviewAnnouncement {
   id: string;
   title: string;
-  body: string;
 }
 
 export interface PreviousMeetingMinutes {
@@ -66,6 +65,15 @@ function whereAnnouncedIncludes(raw: string | null, label: string, allValues: re
  * the `review_announcements` row kind (lib/data/agenda-rows.ts)
  * doesn't display a schedule line, so they're dropped again before
  * returning.
+ *
+ * **Title only, not the full announcement, 2026-11-01** (the user's
+ * own request, same message as the public-page exclusion fix: "also
+ * in non-sacrament meetings I only want the announcement title rather
+ * than the whole announcement") -- `body` is no longer selected or
+ * returned at all; a council reviewing this section sees just the
+ * title of each announcement that named its meeting type, same as a
+ * quick agenda line, not the full text. The full announcement is
+ * still one click away on `/announcements/public`.
  */
 export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeSlug): Promise<ReviewAnnouncement[]> {
   if (!isCollaborativeType(meetingType)) return [];
@@ -75,20 +83,19 @@ export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeS
   const supabase = await createClient();
   const { data } = await supabase
     .from("announcements")
-    .select("id, title, body, where_announced, start_date, start_time")
+    .select("id, title, where_announced, start_date, start_time")
     .eq("status", "published");
 
   return ((data ?? []) as {
     id: string;
     title: string;
-    body: string;
     where_announced: string | null;
     start_date: string | null;
     start_time: string | null;
   }[])
     .filter((row) => whereAnnouncedIncludes(row.where_announced, label, ANNOUNCEMENT_WHERE))
     .sort(compareAnnouncementsBySchedule)
-    .map((row) => ({ id: row.id, title: row.title, body: row.body }));
+    .map((row) => ({ id: row.id, title: row.title }));
 }
 
 /**
