@@ -11,15 +11,22 @@ export interface RotationMember {
   person_id: string | null;
   calling_id: string | null;
   /**
-   * What to show for this member -- never a person's name (2026-10-31,
-   * the user's own request: "I don't want rotations to ever say
-   * anyone's name"). A calling-based member shows that calling's own
-   * name, plus "(vacant)" when nobody currently holds it -- a status
-   * flag about the CALLING, not an identity disclosure, so it stays. A
-   * legacy person-based member (from before this redesign -- new ones
-   * can no longer be added, see addRotationMember) shows a plain notice
-   * instead of who it is, since there's no calling to name for it at
-   * all; Remove it and add the right calling in its place.
+   * What to show for this member. A calling-based member shows
+   * "<Calling> — <current holder>" (2026-10-31, the user's own
+   * follow-up once rotation membership was already calling-only: "when
+   * the calling is listed in the rotations it can say 'Calling Name - -
+   * Person's Name'") -- this is purely a display convenience now that
+   * membership is genuinely calling-based underneath (migration 080 +
+   * the 2026-10-31 redesign), not a reversion of that same day's
+   * earlier "I don't want rotations to ever say anyone's name" request
+   * -- that one was about the OLD person-snapshotting mechanism, which
+   * is gone; showing who currently holds a calling is just information
+   * about the calling, resolved fresh every render, never stored. Falls
+   * back to "(vacant)" when nobody currently holds it. A legacy
+   * person-based member (from before the calling-only redesign -- new
+   * ones can no longer be added, see addRotationMember) shows a plain
+   * notice instead of who it is, since there's no calling to name for
+   * it at all; Remove it and add the right calling in its place.
    */
   display_label: string;
   sort_order: number;
@@ -43,7 +50,7 @@ export async function getAllRotations(): Promise<RotationRow[]> {
   const { data, error } = await supabase
     .from("rotations")
     .select(
-      "id, meeting_type_id, element_key, next_index, eligibility_source, eligibility_calling_names, meeting_types(name), rotation_members(id, person_id, calling_id, sort_order, callings(name, current_holder_id))"
+      "id, meeting_type_id, element_key, next_index, eligibility_source, eligibility_calling_names, meeting_types(name), rotation_members(id, person_id, calling_id, sort_order, callings(name, current_holder_id, people:current_holder_id(name)))"
     )
     .order("element_key");
 
@@ -64,7 +71,10 @@ export async function getAllRotations(): Promise<RotationRow[]> {
             person_id: string | null;
             calling_id: string | null;
             sort_order: number;
-            callings: { name?: string; current_holder_id?: string | null }[] | { name?: string; current_holder_id?: string | null } | null;
+            callings:
+              | { name?: string; current_holder_id?: string | null; people: { name?: string }[] | { name?: string } | null }[]
+              | { name?: string; current_holder_id?: string | null; people: { name?: string }[] | { name?: string } | null }
+              | null;
           }[]
         | null;
     };
@@ -74,11 +84,12 @@ export async function getAllRotations(): Promise<RotationRow[]> {
         if (m.calling_id) {
           const calling = Array.isArray(m.callings) ? m.callings[0] : m.callings;
           const name = calling?.name ?? "Calling";
+          const holder = calling ? (Array.isArray(calling.people) ? calling.people[0] : calling.people) : null;
           return {
             id: m.id,
             person_id: null,
             calling_id: m.calling_id,
-            display_label: calling?.current_holder_id ? name : `${name} (vacant)`,
+            display_label: holder?.name ? `${name} — ${holder.name}` : `${name} (vacant)`,
             sort_order: m.sort_order,
           };
         }

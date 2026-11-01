@@ -2050,7 +2050,31 @@ avoid confusing the two.
 
 ## Known open items
 
-**New: Merge Duplicate People -- migration `096`, not yet run,
+**Rotation Order cards now show who currently holds each calling,
+2026-10-31** -- the user's own immediate follow-up once rotation
+membership was already calling-only: "Now that it is by calling, when
+the calling is listed in the rotations it can say 'Calling Name - -
+Person's Name'." Not a reversal of the same day's earlier "never say
+anyone's name" request -- that one was about the old person-
+snapshotting mechanism, now gone; this is purely a display convenience
+on top of membership that's genuinely calling-based underneath,
+resolved fresh every render, never stored. `RotationMember.display_label`
+(`lib/data/rotations.ts`'s `getAllRotations()`) now reads
+"`<Calling>` — `<current holder>`" for a filled calling-based
+member, falling back to "`<Calling>` (vacant)" when nobody currently
+holds it -- flows automatically into both the Rotation Order member
+list and "Next up," since both already read this one field. Scoped to
+the Rotation Order cards only, not the applied-assignment grid's own
+calling dropdowns, which weren't part of this request.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open `/rotations` and confirm a filled calling-based rotation member
+now reads "`<Calling>` — `<Person>`" in both the member list and
+"Next up," and that a vacant one still reads "`<Calling>` (vacant)"
+with no name.
+
+**New: Merge Duplicate People -- migration `096`, confirmed run,
 2026-10-31.** The user asked where this project had landed on "the
 tool to merge two people lines to a single line" -- checked, and the
 honest answer was nowhere: `PROJECT_CONTEXT.md` itself claimed "see
