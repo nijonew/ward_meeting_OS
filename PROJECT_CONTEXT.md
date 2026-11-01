@@ -2050,6 +2050,69 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-10-31: pushing a rotation kept "hanging
+onto who's next" instead of starting a freshly-curated list from the
+top.** The user's own report: "It seems to be hanging onto 'who's
+next' and keeps them in the queue. I don't want that. If I create a
+rotation and push it with the start date of 11/1 I don't want the
+rotation to insert who's next on 11/1. I want the rotation that I
+just curated to begin 11/1 and ignore 'who's next.'" Confirmed exactly
+right by reading `apply_rotation_assignment`'s own SQL (migration
+041): every push used to read the rotation's stored `next_index`
+live, per meeting, and continue from wherever it happened to be left
+over from however this rotation was last applied -- under whatever
+member list existed back then. `next_index` is a bare array position,
+not a person; curating a new order (adding, removing, or reordering
+members) never reset it, so a stale index silently landed on an
+arbitrary person in the new list instead of the first one.
+
+Asked via `AskUserQuestion` how this should work going forward
+(auto-reset on every member edit; a checkbox on the Push form; or a
+separate reset button) -- the user's own answer reframed it more
+simply than any of those three: "Rotations should only change when a
+rotation list is pushed. It should start with the first name on the
+rotation list on the date it was pushed to start on."
+
+**`pushRotationToUpcomingMeetings`** (`lib/data/rotations.ts`)
+rewritten accordingly -- it no longer reads `next_index` at all. The
+first meeting in the pushed date range always gets `memberIds[0]`,
+literally the first name on the rotation's current list; the second
+gets `memberIds[1]`, cycling as needed. This makes a push a pure,
+deterministic function of (current member order, start date, meetings
+in range) -- pushing the exact same range twice now reproduces the
+exact same result both times, a real behavior change from the
+2026-10-23 design (which deliberately did NOT repeat the same
+assignments on a second push over the same range) -- the user's own
+new framing supersedes that choice. Every meeting in range is still
+reassigned regardless of whether it already had a value, matching
+2026-10-23's "overwrite every time" rule -- that part is unchanged.
+
+`next_index` is still **written**, once, after the loop -- set to
+`meetings.length % count` -- but never read as an input. This isn't
+something the user asked for directly; it's there so a brand-new
+meeting auto-created *later* (which still goes through the separate,
+deliberately untouched `applyRotationsToNewMeeting`/
+`apply_rotation_assignment` RPC path -- meeting-creation-time
+automatic rotation assignment was not part of this report or this
+fix) continues right after wherever this push's own list left off,
+rather than being left pointing at a now-meaningless stale value.
+Flag if this write should go too -- it's a pure byproduct with no
+visible effect on anything this fix was actually asked to change.
+
+Since a meeting's assignment no longer depends on reading any shared,
+live state per meeting, every write is now independent -- the
+role-table's own pre-clear and the batch insert/upsert that follows
+replace what used to be one `apply_rotation_assignment` RPC call per
+meeting in range, which also makes a wide-range push meaningfully
+faster, not just more correct.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to curate (or just reorder) a rotation's member list, push it starting
+some date, and confirm the first meeting on or after that date gets
+the first person on the list, not whoever "next up" showed before the
+push.
+
 **Every Move Up/Down reorder control in the app converted to a drag
 handle, 2026-10-31.** The user's own exploratory question, right after
 the rotations-by-calling rework and the reminder-email work above

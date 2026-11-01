@@ -464,22 +464,49 @@ export const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "hand
  * finding elsewhere in PROJECT_CONTEXT.md -- never got their assignment
  * row written by applyRotationsToNewMeeting at creation time).
  *
- * **Changed 2026-10-23, per the user's own request** ("can we change the
- * rotation push to overwrite every time we push and not just update
- * what is blank?"): every meeting in range is now re-assigned from the
- * rotation's own next-up order regardless of whether it already had a
- * value -- a deliberate reversal of the original "only fills a blank
- * cell" rule. This also means the rotation's pointer advances once per
- * meeting in range every time this is pushed, including a meeting
- * that's already been pushed before -- running this twice over the
- * same date range reassigns everyone to whoever the rotation has moved
- * on to by then, it does not repeat the same assignments. For the
- * role-table target (sacrament_assignments/bishopric_assignments), the
- * existing row for this role is deleted before the RPC inserts the new
- * one, since that insert path isn't an upsert (see the RPC's own
- * definition, migration 041) -- the element_notes target already
- * upserts on (meeting_id, element_key), so no extra delete is needed
- * there.
+ * **Rewritten 2026-10-31, per the user's own report** -- pushing a
+ * freshly-curated member list no longer "hangs onto who's next": "I
+ * don't want the rotation to insert who's next on 11/1. I want the
+ * rotation that I just curated to begin 11/1 and ignore 'who's next.'
+ * ...Rotations should only change when a rotation list is pushed. It
+ * should start with the first name on the rotation list on the date it
+ * was pushed to start on." Root cause -- confirmed directly in
+ * apply_rotation_assignment's own SQL (migration 041) -- was that every
+ * push used to read the rotation's STORED `next_index` live, per
+ * meeting, and continue from wherever it happened to be left over from
+ * however this rotation was last applied (under whatever member list
+ * existed THEN). `next_index` is a bare array position, not a person --
+ * curating a new order (adding/removing/reordering members) never
+ * resets it, so a stale index silently landed on an arbitrary person in
+ * the new list instead of the first one.
+ *
+ * Push no longer reads `next_index` at all. The first meeting in the
+ * pushed date range always gets `memberIds[0]` -- literally the first
+ * name on the rotation's current list -- the second gets `memberIds[1]`,
+ * cycling as needed; this makes a push a pure, deterministic function of
+ * (current member order, start date, meetings in range), so re-pushing
+ * the exact same range reproduces the exact same result every time
+ * (unlike the old design, which the user never asked to keep). Every
+ * meeting in range is still reassigned regardless of whether it already
+ * had a value, matching the 2026-10-23 "overwrite every time" design --
+ * that part is unchanged.
+ *
+ * `next_index` is still WRITTEN once, at the end, to
+ * `meetings.length % count` -- not read as an input to this push, but
+ * updated as an output so a brand-new meeting auto-created later (which
+ * still goes through `applyRotationsToNewMeeting`/`apply_rotation_assignment`,
+ * both deliberately untouched by this change) continues smoothly right
+ * after wherever this push's own list left off, rather than being left
+ * pointing at a now-meaningless stale value. Automatic rotation
+ * assignment at meeting-creation time is a separate, pre-existing
+ * mechanism the user didn't ask to change here and isn't affected by
+ * this rewrite at all.
+ *
+ * Since position no longer depends on reading any shared, live state
+ * per meeting, every meeting's write is independent -- all of them
+ * (and the role table's own pre-clear) can run as a handful of batched
+ * calls instead of one RPC call per meeting, which also makes this
+ * meaningfully faster over a wide date range.
  *
  * **Bug found and fixed 2026-10-21** (the user's own report: "bishopric
  * meeting prayers and spiritual thoughts and handbook trainings...
@@ -491,8 +518,8 @@ export const PERSON_AND_TEXT_ROTATION_KEYS = new Set(["spiritual_thought", "hand
  * 'person_and_text' elements, read by the Planning page via
  * `elementNotes[key]?.person_id`, never via `roleAssignments[key]`).
  * Pushing either of those two therefore inserted a row into the wrong
- * table entirely -- invisible on the agenda regardless. Now routes the
- * write the same way applyRotationsToNewMeeting already does.
+ * table entirely -- invisible on the agenda regardless. Still routes
+ * the write the same way applyRotationsToNewMeeting does.
  */
 export async function pushRotationToUpcomingMeetings(
   rotationId: string,
@@ -519,7 +546,8 @@ export async function pushRotationToUpcomingMeetings(
     supabase,
     (rotation.rotation_members ?? []) as { person_id: string | null; calling_id: string | null; sort_order: number }[]
   );
-  if (memberIds.length === 0) {
+  const count = memberIds.length;
+  if (count === 0) {
     return { error: "This rotation's members are all calling-based and currently vacant -- nobody to assign." };
   }
 
@@ -527,7 +555,6 @@ export async function pushRotationToUpcomingMeetings(
   // function's own doc comment above for the bug this fixes.
   const isPersonAndText = PERSON_AND_TEXT_ROTATION_KEYS.has(rotation.element_key);
   const table = gridTableFor(slug);
-  const target = isPersonAndText ? "element_notes" : table;
 
   const { data: meetingRows } = await supabase
     .from("meetings")
@@ -539,7 +566,13 @@ export async function pushRotationToUpcomingMeetings(
   if (meetings.length === 0) return { filled: 0, overwritten: 0 };
 
   const meetingIds = meetings.map((m) => m.id);
-  let previouslyAssigned: Set<string>;
+
+  // Position within THIS push's own list, 0-based -- meetings[0] always
+  // gets memberIds[0], never whatever next_index happened to hold.
+  const assignments = meetings.map((meeting, i) => ({ meetingId: meeting.id, personId: memberIds[i % count] }));
+
+  let overwritten = 0;
+
   if (isPersonAndText) {
     const { data: existingNotes } = await supabase
       .from("meeting_element_notes")
@@ -547,53 +580,51 @@ export async function pushRotationToUpcomingMeetings(
       .eq("element_key", rotation.element_key)
       .not("person_id", "is", null)
       .in("meeting_id", meetingIds);
-    previouslyAssigned = new Set(((existingNotes ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+    const previouslyAssigned = new Set(((existingNotes ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+    overwritten = meetingIds.filter((id) => previouslyAssigned.has(id)).length;
+
+    const { error } = await supabase.from("meeting_element_notes").upsert(
+      assignments.map((a) => ({ meeting_id: a.meetingId, element_key: rotation.element_key, person_id: a.personId })),
+      { onConflict: "meeting_id,element_key" }
+    );
+    if (error) return { error: error.message };
   } else {
     const { data: existingAssignments } = await supabase
       .from(table)
       .select("meeting_id")
       .eq("role", rotation.element_key)
       .in("meeting_id", meetingIds);
-    previouslyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+    const previouslyAssigned = new Set(((existingAssignments ?? []) as { meeting_id: string }[]).map((r) => r.meeting_id));
+    overwritten = meetingIds.filter((id) => previouslyAssigned.has(id)).length;
 
-    // The role-table insert the RPC does below is a plain INSERT, not an
-    // upsert (see apply_rotation_assignment, migration 041) -- unlike
-    // element_notes, which upserts on (meeting_id, element_key). Clear
-    // every existing row for this role across the whole range first so
-    // overwriting can never leave a duplicate row behind.
+    // This table's own insert isn't an upsert (see migration 041's
+    // former apply_rotation_assignment definition) -- clear every
+    // existing row for this role across the whole range first so the
+    // fresh batch insert below can never leave a duplicate behind.
     const { error: clearError } = await supabase
       .from(table)
       .delete()
       .eq("role", rotation.element_key)
       .in("meeting_id", meetingIds);
     if (clearError) return { error: clearError.message };
-  }
 
-  let filled = 0;
-  let overwritten = 0;
-
-  // One apply_rotation_assignment call per meeting in range -- the same
-  // RPC applyRotationsToNewMeeting already uses for a single new
-  // meeting, so the pointer advance stays atomic and correctly routed
-  // (element_notes vs. the role table) without this function needing to
-  // duplicate that logic by hand. It re-reads next_index live under a
-  // row lock each call, so there's no need to track it locally here
-  // either. Every meeting is processed regardless of whether it already
-  // had a value -- see this function's own 2026-10-23 doc comment above.
-  for (const meeting of meetings) {
-    const { error } = await supabase.rpc("apply_rotation_assignment", {
-      p_rotation_id: rotationId,
-      p_meeting_id: meeting.id,
-      p_element_key: rotation.element_key,
-      p_target: target,
-      p_member_ids: memberIds,
-    });
+    const { error } = await supabase
+      .from(table)
+      .insert(assignments.map((a) => ({ meeting_id: a.meetingId, role: rotation.element_key, assigned_to_id: a.personId })));
     if (error) return { error: error.message };
-    filled += 1;
-    if (previouslyAssigned.has(meeting.id)) overwritten += 1;
   }
 
-  return { filled, overwritten };
+  // Not read as an input above -- written only so a meeting auto-created
+  // later (a separate, untouched mechanism) continues right after where
+  // this push's own list left off, instead of staying at a now-stale
+  // value.
+  const { error: pointerError } = await supabase
+    .from("rotations")
+    .update({ next_index: meetings.length % count })
+    .eq("id", rotationId);
+  if (pointerError) return { error: pointerError.message };
+
+  return { filled: meetings.length, overwritten };
 }
 
 export interface PushFixedRolesResult {
