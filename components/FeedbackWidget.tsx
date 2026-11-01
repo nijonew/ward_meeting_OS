@@ -91,6 +91,16 @@ export function FeedbackWidget() {
             className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
 
+          <label className="text-xs text-ink-muted">
+            Screenshot (optional)
+            <input
+              type="file"
+              name="image"
+              accept="image/*"
+              className="mt-1 block w-full text-xs text-ink-muted"
+            />
+          </label>
+
           {state.error && <p className="text-xs text-danger">{state.error}</p>}
 
           <div className="flex items-center justify-between">

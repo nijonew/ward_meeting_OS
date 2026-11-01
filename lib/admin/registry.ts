@@ -305,6 +305,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     columns: [
       { column: "type", label: "Type", type: "select", required: true, options: FEEDBACK_TYPES },
       { column: "body", label: "Body", type: "long_text", required: true },
+      { column: "image_url", label: "Screenshot", type: "image" },
       { column: "page_path", label: "Page", type: "text" },
       { column: "submitted_by_name", label: "Submitted By", type: "text" },
       { column: "submitted_by_email", label: "Email", type: "text" },

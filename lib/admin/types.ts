@@ -20,7 +20,8 @@ export type AdminColumnType =
   | "multi_select"
   | "foreign_key"
   | "reverse_lookup"
-  | "presence_indicator";
+  | "presence_indicator"
+  | "image";
 
 /**
  * "select_with_other" and "multi_select" (2026-10-18, the user's own
@@ -60,6 +61,14 @@ export type AdminColumnType =
  *   until a row is actually saved from this grid, so simply viewing such
  *   a row can't lose data; only clicking Save on one would replace it
  *   with just whatever the checklist shows checked.
+ * - **"image"** (migration 098, 2026-11-01, the Feedback Widget's new
+ *   screenshot attachment): stores a plain URL on a real `text` column,
+ *   same as "text" -- the only difference is the editor also shows a
+ *   small thumbnail (linking to the full image in a new tab) above the
+ *   input when a value is present, so an admin reviewing a report
+ *   doesn't have to copy the raw URL into a new tab by hand. Still a
+ *   plain editable text field underneath -- clearing or replacing the
+ *   URL works exactly like any other text column.
  */
 
 /** value/label plus an optional raw date, so a "meetings" lookup's

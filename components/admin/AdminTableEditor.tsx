@@ -657,6 +657,25 @@ function AdminCellInput({
     );
   }
 
+  if (column.type === "image") {
+    const url = value == null ? "" : String(value);
+    return (
+      <div className="flex flex-col gap-1">
+        {url && (
+          <a href={url} target="_blank" rel="noopener noreferrer" title="Open full image">
+            {/* A small, rarely-viewed admin thumbnail -- next/image's own
+             *  optimization needs a configured remote-pattern allowlist
+             *  for this app's Supabase Storage domain, not worth adding
+             *  for this one use. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" className="h-12 w-auto max-w-[6rem] rounded border border-rule object-cover" />
+          </a>
+        )}
+        <input type="text" value={url} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} />
+      </div>
+    );
+  }
+
   return (
     <input
       type={inputType}

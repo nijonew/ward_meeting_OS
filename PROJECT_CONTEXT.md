@@ -2050,8 +2050,65 @@ avoid confusing the two.
 
 ## Known open items
 
+**The persistent Feedback Widget gained an optional screenshot
+attachment, migration `098`, not yet run, 2026-11-01.** The most
+corroborated ask on the Feedback Widget's own suggestion log -- Corey
+Anderson and Jeremy Hardman both independently asked for this the
+same day (2026-10-11): "Upload screen shots in help field to show
+issue" / "Add ability to upload images for bug fix to be able to show
+what the problem is."
+
+This app has never used Supabase Storage before -- confirmed by
+grepping the whole codebase for any `.storage.` call before starting.
+A Storage bucket is just a row in `storage.buckets`, so migration
+`098` creates one (`feedback-images`) the same way every other piece
+of this schema is created: a plain SQL migration, **no Supabase
+dashboard step needed**. Marked **public** (readable via Storage's
+own CDN-style URL with no auth token at all) rather than private/
+signed-URL -- these are low-sensitivity bug-report screenshots, not
+worth the added complexity of generating and expiring signed URLs;
+the real access boundary that matters (who can see the feedback ROW
+itself, with its page/body/submitter) is already the
+`table_admin_feedback` feature gate on `/admin/feedback`, completely
+unaffected by this -- a public image URL only ever reveals the
+screenshot to someone who already has its exact, randomly-generated
+filename. Also adds `feedback.image_url text`.
+
+**`submitFeedback`** (`app/feedback-actions.ts`) now reads an optional
+`image` file straight off the same `FormData` the rest of the form
+already submits -- Server Actions accept a `File` natively, no
+separate upload request needed. Validates it's a real image and under
+5MB before uploading; the filename itself is always a fresh
+`crypto.randomUUID()`, never the browser's own name, so two people's
+unrelated "screenshot.png" can never collide. An upload failure fails
+the whole submission (not silently dropped), since attaching it was
+the submitter's own deliberate choice. `FeedbackWidget.tsx` gained one
+new optional `<input type="file" accept="image/*">` -- no `encType`
+needed on the form itself, since React's own form-action handling
+already constructs `FormData` directly, Files included, regardless of
+the form's encoding attribute.
+
+**New generic Table Admin column type, `"image"`** (`lib/admin/types.ts`,
+`components/admin/AdminTableEditor.tsx`) -- stores a plain URL on a
+real `text` column, same as `"text"`; the only difference is the
+editor also shows a small thumbnail (linking to the full image in a
+new tab) above the input when a value is present, so reviewing a
+report on `/admin/feedback` doesn't mean copying a raw URL into a new
+tab by hand. Still a plain editable text field underneath -- clearing
+or replacing the URL works like any other text column. `feedback`'s
+own registry entry gained an `image_url` → "Screenshot" column using
+this new type.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- this
+assistant has no way to test an actual upload without a live deploy.
+Ask the user to run migration `098`, then submit a test feedback
+report with a screenshot attached (from any logged-in page) and
+confirm it shows up with a working thumbnail on `/admin/feedback`,
+opening the full image in a new tab when clicked.
+
 **Speaker & Prayer History gained a manually-curated "Due" list,
-migration `097`, not yet run, 2026-11-01.** Came out of the Feedback
+migration `097`, confirmed run, 2026-11-01.** Came out of the Feedback
 Widget triage below -- Andrew Bott's own suggestion asked for the
 computed "due to speak next" design the user had explicitly removed
 on 2026-10-30. Rather than simply reversing that removal, the user
