@@ -210,3 +210,24 @@ export async function getSpeakingPrayingNotes(): Promise<Map<string, SpeakingPra
   }
   return result;
 }
+
+/**
+ * The "Due" list, migration 097, 2026-11-01 -- the user's own design,
+ * a manually checkbox-curated list (not a computed one -- see
+ * PROJECT_CONTEXT.md's Known open items for the full history of why
+ * the earlier computed version was removed, then this different one
+ * requested in its place). Scoped per category, matching this page's
+ * own three history cards, since someone could be due to speak but
+ * not due to pray.
+ */
+export type DueCategory = "speaker_adult" | "speaker_youth" | "prayer";
+export const DUE_CATEGORIES: DueCategory[] = ["speaker_adult", "speaker_youth", "prayer"];
+
+/** Composite `${person_id}::${category}` keys -- one query, checked
+ *  directly rather than shaped into a nested Map, since every caller
+ *  just needs a cheap "is this person due in this category" lookup. */
+export async function getDueFlags(): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("speaker_prayer_due_list").select("person_id, category");
+  return new Set(((data ?? []) as { person_id: string; category: string }[]).map((r) => `${r.person_id}::${r.category}`));
+}

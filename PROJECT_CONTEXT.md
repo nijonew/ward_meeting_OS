@@ -2050,6 +2050,60 @@ avoid confusing the two.
 
 ## Known open items
 
+**Speaker & Prayer History gained a manually-curated "Due" list,
+migration `097`, not yet run, 2026-11-01.** Came out of the Feedback
+Widget triage below -- Andrew Bott's own suggestion asked for the
+computed "due to speak next" design the user had explicitly removed
+on 2026-10-30. Rather than simply reversing that removal, the user
+gave a different, real design when asked how it should actually work:
+"the intent is that when a member of the bishopric is looking at the
+list of people and when they last spoke they can easily identify who
+they might want to reach out to. How about we add a checkbox next to
+someone's listing so that they can be added to a curated list of who
+is due. That list should appear next to the overall list with people
+who are checked." This is manual curation, not a date-based
+computation -- a person is "due" exactly when an admin has checked
+them, nothing more.
+
+New `speaker_prayer_due_list` table (`person_id`, `category`, `unique
+(person_id, category)`) -- scoped per category (`speaker_adult`/
+`speaker_youth`/`prayer`, matching this page's own existing three
+history cards exactly) since someone could be due to speak but not
+due to pray. New `getDueFlags()` (`lib/data/speaker-prayer-history.ts`)
+returns one `Set` of `${personId}::${category}` keys for a cheap
+membership check; new `toggleDueFlag` (`app/speaker-prayer-history/actions.ts`)
+inserts or deletes a row. New `DueCheckbox` (a small Client Component)
+is the one interactive piece -- everything else on the page stays
+server-rendered.
+
+`HistoryListCard` now shows a small "Due" box right above each
+category's own full history list -- exactly "next to the overall
+list" -- populated by whoever's currently checked, each with the same
+checkbox (pre-checked) so unchecking from there works too. The
+checkbox itself appears only once per person, next to their own
+most-recent row (entries are already sorted newest-first, so a
+person's first appearance in the list is their most recent turn) --
+older turns for the same person don't repeat it. A guest with no real
+`person_id` gets no checkbox at all, nothing to flag.
+
+**One real scope limitation, not built**: a checkbox can only exist
+next to someone who already has at least one history entry in that
+category -- there's no way to flag someone as due who's never spoken
+or prayed before (e.g. a first-time invitation). This matches the
+user's own literal framing ("a checkbox next to someone's listing"),
+but flag if a way to add someone with no prior history is wanted
+later -- that would need a small picker added separately, not
+implied by what was asked here.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to run migration `097`, then open `/speaker-prayer-history` and
+confirm: checking someone's box (next to their most recent turn) adds
+them to that category's own "Due" box immediately; unchecking them
+there (or back on their row) removes them; and that checking someone
+due to speak doesn't affect whether they show as due to pray, or vice
+versa.
+
 **Bishopric Meeting/Ward Council/Youth Council's Planning page gained
 one combined "Save All Changes" button, 2026-11-01.** The user's own
 report, surfaced while triaging Corey Anderson's own vague "correct

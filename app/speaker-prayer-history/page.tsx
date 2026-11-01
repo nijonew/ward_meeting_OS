@@ -5,12 +5,15 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import {
   getSpeakerPrayerHistory,
   getSpeakingPrayingNotes,
+  getDueFlags,
   type HistoryEntry,
   type SpeakingPrayingNote,
+  type DueCategory,
 } from "@/lib/data/speaker-prayer-history";
 import { getActivePeople } from "@/lib/data/people";
 import { AddEntryForm } from "@/components/speaker-prayer-history/AddEntryForm";
 import { DeleteEntryButton } from "@/components/speaker-prayer-history/DeleteEntryButton";
+import { DueCheckbox } from "@/components/speaker-prayer-history/DueCheckbox";
 
 function formatDate(iso: string) {
   if (!iso) return "";
@@ -35,41 +38,94 @@ function speakerBucket(entry: HistoryEntry): "adult" | "youth" {
   return entry.age_group === "youth" ? "youth" : "adult";
 }
 
+/**
+ * "Due" box + the full history list, 2026-11-01 (the user's own
+ * design, migration 097): a checkbox next to each person's own
+ * most-recent row (their only checkbox -- older turns for the same
+ * person don't repeat it) adds or removes them from a small curated
+ * "Due" box shown right above the full list, "so that we know who has
+ * not spoken or prayed recently" -- the user's own original framing,
+ * now served by manual curation rather than an automatic computation.
+ * A guest with no real `person_id` gets no checkbox at all -- nothing
+ * to flag as due to reach out to.
+ */
 function HistoryListCard({
   title,
+  category,
   entries,
   notesByPerson,
   noteKey,
+  dueFlags,
 }: {
   title: string;
+  category: DueCategory;
   entries: HistoryEntry[];
   notesByPerson: Map<string, SpeakingPrayingNote>;
   noteKey: "speaking_note" | "praying_note";
+  dueFlags: Set<string>;
 }) {
+  const nameByPersonId = new Map<string, string>();
+  for (const e of entries) {
+    if (e.person_id && !nameByPersonId.has(e.person_id)) nameByPersonId.set(e.person_id, e.person_name);
+  }
+  const duePeople = Array.from(nameByPersonId.entries()).filter(([personId]) =>
+    dueFlags.has(`${personId}::${category}`)
+  );
+
+  const seenPersonIds = new Set<string>();
+
   return (
     <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">{title}</h2>
+
+      <div className="mt-3 rounded border border-accent/30 bg-accent/5 p-3">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">Due</p>
+        {duePeople.length === 0 ? (
+          <p className="mt-1 text-xs text-ink-muted">Check someone below to add them here.</p>
+        ) : (
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {duePeople.map(([personId, name]) => (
+              <li key={personId} className="flex items-center gap-2 text-sm">
+                <DueCheckbox personId={personId} category={category} checked />
+                <span className="text-ink">{name}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <ul className="mt-3 flex flex-col gap-1.5">
         {entries.length === 0 && <li className="text-sm text-ink-muted">Nothing on record yet.</li>}
-        {entries.map((e, i) => (
-          <li
-            key={i}
-            className="flex items-baseline justify-between gap-3 border-b border-rule/40 py-1.5 text-sm last:border-0"
-          >
-            <span>
-              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">{e.role}</span>{" "}
-              <span className="text-ink">{e.person_name}</span>
-              {e.topic && <span className="text-ink-muted"> &middot; {e.topic}</span>}
-              {e.person_id && notesByPerson.get(e.person_id)?.[noteKey] && (
-                <span className="ml-1.5 text-[10px] text-ink-muted/70">({notesByPerson.get(e.person_id)?.[noteKey]})</span>
-              )}
-            </span>
-            <span className="flex shrink-0 items-center gap-2">
-              <span className="text-xs text-ink-muted">{formatDate(e.date)}</span>
-              {e.historyImportId && <DeleteEntryButton entryId={e.historyImportId} />}
-            </span>
-          </li>
-        ))}
+        {entries.map((e, i) => {
+          const isFirstForPerson = e.person_id ? !seenPersonIds.has(e.person_id) : false;
+          if (e.person_id) seenPersonIds.add(e.person_id);
+          return (
+            <li
+              key={i}
+              className="flex items-baseline justify-between gap-3 border-b border-rule/40 py-1.5 text-sm last:border-0"
+            >
+              <span className="flex items-center gap-2">
+                {e.person_id && isFirstForPerson ? (
+                  <DueCheckbox personId={e.person_id} category={category} checked={dueFlags.has(`${e.person_id}::${category}`)} />
+                ) : (
+                  <span className="inline-block w-3.5" />
+                )}
+                <span>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">{e.role}</span>{" "}
+                  <span className="text-ink">{e.person_name}</span>
+                  {e.topic && <span className="text-ink-muted"> &middot; {e.topic}</span>}
+                  {e.person_id && notesByPerson.get(e.person_id)?.[noteKey] && (
+                    <span className="ml-1.5 text-[10px] text-ink-muted/70">({notesByPerson.get(e.person_id)?.[noteKey]})</span>
+                  )}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-ink-muted">{formatDate(e.date)}</span>
+                {e.historyImportId && <DeleteEntryButton entryId={e.historyImportId} />}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -88,10 +144,11 @@ export default async function SpeakerPrayerHistoryPage() {
     );
   }
 
-  const [entries, people, notesByPerson] = await Promise.all([
+  const [entries, people, notesByPerson, dueFlags] = await Promise.all([
     getSpeakerPrayerHistory(),
     getActivePeople(),
     getSpeakingPrayingNotes(),
+    getDueFlags(),
   ]);
 
   const speakerEntries = entries.filter((e) => e.role === "Speaker" || e.role === "Youth Speaker");
@@ -130,9 +187,30 @@ export default async function SpeakerPrayerHistoryPage() {
 
       {entries.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <HistoryListCard title="Speakers (Adults)" entries={speakerAdultHistory} notesByPerson={notesByPerson} noteKey="speaking_note" />
-          <HistoryListCard title="Speakers (Youth)" entries={speakerYouthHistory} notesByPerson={notesByPerson} noteKey="speaking_note" />
-          <HistoryListCard title="Prayers" entries={prayerHistory} notesByPerson={notesByPerson} noteKey="praying_note" />
+          <HistoryListCard
+            title="Speakers (Adults)"
+            category="speaker_adult"
+            entries={speakerAdultHistory}
+            notesByPerson={notesByPerson}
+            noteKey="speaking_note"
+            dueFlags={dueFlags}
+          />
+          <HistoryListCard
+            title="Speakers (Youth)"
+            category="speaker_youth"
+            entries={speakerYouthHistory}
+            notesByPerson={notesByPerson}
+            noteKey="speaking_note"
+            dueFlags={dueFlags}
+          />
+          <HistoryListCard
+            title="Prayers"
+            category="prayer"
+            entries={prayerHistory}
+            notesByPerson={notesByPerson}
+            noteKey="praying_note"
+            dueFlags={dueFlags}
+          />
         </div>
       )}
 

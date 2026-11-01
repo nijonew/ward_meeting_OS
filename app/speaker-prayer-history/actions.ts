@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import type { DueCategory } from "@/lib/data/speaker-prayer-history";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -58,6 +59,38 @@ export async function deleteSpeakerPrayerHistoryEntry(entryId: string): Promise<
   const supabase = await createClient();
   const { error } = await supabase.from("speaker_prayer_history_import").delete().eq("id", entryId);
   if (error) return { error: error.message };
+  revalidatePath("/speaker-prayer-history");
+  return { success: true };
+}
+
+/**
+ * Toggles one person's "Due" checkbox for one category (migration 097,
+ * 2026-11-01) -- checking adds a row, unchecking removes it. `upsert`
+ * with `ignoreDuplicates` rather than a plain insert, since clicking
+ * the same checkbox in two places (their row in the main history list,
+ * and the "Due" box itself) in quick succession shouldn't be able to
+ * violate the table's own `unique (person_id, category)` constraint.
+ */
+export async function toggleDueFlag(personId: string, category: DueCategory, due: boolean): Promise<ActionResult> {
+  const denied = await requireSpeakerPrayerHistoryFeature();
+  if (denied) return denied;
+  if (!personId) return { error: "Missing person." };
+
+  const supabase = await createClient();
+  if (due) {
+    const { error } = await supabase
+      .from("speaker_prayer_due_list")
+      .upsert({ person_id: personId, category }, { onConflict: "person_id,category", ignoreDuplicates: true });
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase
+      .from("speaker_prayer_due_list")
+      .delete()
+      .eq("person_id", personId)
+      .eq("category", category);
+    if (error) return { error: error.message };
+  }
+
   revalidatePath("/speaker-prayer-history");
   return { success: true };
 }
