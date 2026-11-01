@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { insertSacramentRabnmLink, removeSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
 import { clearPoolExclusion } from "@/lib/data/pool-sweep";
+import { writeSortOrder } from "@/lib/data/reorder";
 import type { RabnmPlanningType } from "@/lib/data/sacrament-rabnm-planning";
 import {
   normalizeWardBusinessSectionOrder,
@@ -203,103 +204,55 @@ export async function removeCallingPlanningFromMeeting(meetingId: string, planni
 }
 
 /**
- * Moves one Ward Business line up or down within its own list -- the
- * user's own request, 2026-10-30: "I would like to be able to
- * re-order individual lines in callings/releases in sacrament meeting
- * to the order I would like to have them announced." Scoped by `type`
- * so each of Ward Business's now-seven subsections (Releases,
- * Callings, and the five RABNM-planning categories, split out
- * 2026-10-31 -- see ward-settings.ts's own doc comment) reorders
- * independently, matching WardBusinessField.tsx's own split of the
- * lists. `type` was originally just `"release" | "new_calling"`;
- * widened to also accept a `RabnmPlanningType` once the five RABNM
- * categories became their own subsections too -- the underlying query
- * already just filters `sacrament_rabnm.type` by whatever string it's
- * given, so no logic changed, only what's allowed to be passed in.
- *
- * Same swap-adjacent-sort_order shape as every other Move Up/Down
- * action in this app (moveTemplateElement, moveRotationMember,
- * moveProgramItem) -- fetch this meeting's own rows of this type in
- * order, find the target, swap its sort_order with its neighbor's, or
- * silently no-op at a boundary.
+ * Replaces the old swap-adjacent moveWardBusinessItem (2026-10-31, the
+ * user's own request to convert every Move Up/Down pair to a drag
+ * handle) -- a drag can drop a line anywhere in one motion, so this
+ * takes the WHOLE new order for one subsection's own list at once.
+ * Scoped by `meetingId` + `type` via writeSortOrder's own `scope`
+ * param, matching the original action's exact scoping -- each of Ward
+ * Business's seven subsections (Releases, Callings, the five
+ * RABNM-planning categories) still reorders independently.
  */
-export async function moveWardBusinessItem(
+export async function setWardBusinessItemOrder(
   meetingId: string,
-  itemId: string,
   type: "release" | "new_calling" | RabnmPlanningType,
-  direction: "up" | "down"
+  orderedIds: string[]
 ): Promise<ActionResult> {
   const denied = await requireRabnmFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
-
-  const { data: rows, error: fetchError } = await supabase
-    .from("sacrament_rabnm")
-    .select("id, sort_order")
-    .eq("meeting_id", meetingId)
-    .eq("type", type)
-    .order("sort_order", { ascending: true });
-
-  if (fetchError || !rows) {
-    return { error: fetchError?.message ?? "Could not load Ward Business items." };
-  }
-
-  const index = rows.findIndex((r) => r.id === itemId);
-  if (index === -1) {
-    return { error: "Item not found on this meeting." };
-  }
-
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= rows.length) {
-    return { success: true };
-  }
-
-  const current = rows[index];
-  const swap = rows[swapIndex];
-
-  const { error: error1 } = await supabase
-    .from("sacrament_rabnm")
-    .update({ sort_order: swap.sort_order })
-    .eq("id", current.id);
-  if (error1) return { error: error1.message };
-
-  const { error: error2 } = await supabase
-    .from("sacrament_rabnm")
-    .update({ sort_order: current.sort_order })
-    .eq("id", swap.id);
-  if (error2) return { error: error2.message };
+  const { error } = await writeSortOrder(supabase, "sacrament_rabnm", "id", orderedIds, { meeting_id: meetingId, type });
+  if (error) return { error };
 
   revalidateBoth(meetingId);
   return { success: true };
 }
 
 /**
- * Moves one of Ward Business's subsections (Releases, Callings, and --
- * since 2026-10-31 -- each of the five RABNM-planning categories
- * individually, see ward-settings.ts's own doc comment) up or down in
- * a single ward-wide display order -- the user's own request,
- * 2026-10-30: "I would like to be able to adjust the order of
- * subsections in the ward business section." Stored on
- * `ward_settings` (a singleton row, same as the ward's own display
- * name), not per-meeting -- see WARD_BUSINESS_SECTION_KEYS's own doc
- * comment. Only revalidates this one meeting's own Planning page --
+ * Replaces the old swap-adjacent moveWardBusinessSection (2026-10-31,
+ * the user's own request to convert every Move Up/Down pair to a drag
+ * handle). Unlike setWardBusinessItemOrder above, there's no table of
+ * rows to write sort_order onto here -- the subsection order is a
+ * single `text[]` on the `ward_settings` singleton row (the user's own
+ * request, 2026-10-30: "I would like to be able to adjust the order of
+ * subsections in the ward business section"), so this just overwrites
+ * that array directly with the new order, after validating it still
+ * names exactly the same set of known keys (normalizeWardBusinessSectionOrder
+ * guards against a stale/incomplete submission silently dropping a
+ * section). Only revalidates this one meeting's own Planning page --
  * every other meeting's Planning page re-reads `ward_settings` fresh
  * on its own next load regardless, same as any other dynamic route in
  * this app.
  */
-export async function moveWardBusinessSection(
-  meetingId: string,
-  key: WardBusinessSectionKey,
-  direction: "up" | "down"
-): Promise<ActionResult> {
+export async function setWardBusinessSectionOrder(meetingId: string, orderedKeys: WardBusinessSectionKey[]): Promise<ActionResult> {
   const denied = await requireRabnmFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
   const { data: settingsRow, error: fetchError } = await supabase
     .from("ward_settings")
-    .select("id, ward_business_section_order")
+    .select("id")
     .limit(1)
     .maybeSingle();
 
@@ -307,17 +260,8 @@ export async function moveWardBusinessSection(
     return { error: fetchError?.message ?? "Ward settings row not found." };
   }
 
-  const order = normalizeWardBusinessSectionOrder(settingsRow.ward_business_section_order as string[] | null);
-  const index = order.indexOf(key);
-  if (index === -1) return { error: "Unknown Ward Business section." };
-
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= order.length) return { success: true };
-
-  const next = [...order];
-  [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
-
-  const { error } = await supabase.from("ward_settings").update({ ward_business_section_order: next }).eq("id", settingsRow.id);
+  const normalized = normalizeWardBusinessSectionOrder(orderedKeys);
+  const { error } = await supabase.from("ward_settings").update({ ward_business_section_order: normalized }).eq("id", settingsRow.id);
   if (error) return { error: error.message };
 
   revalidatePath(`/meetings/${meetingId}/planning`);

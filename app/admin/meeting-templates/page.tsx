@@ -5,12 +5,8 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getMeetingTypes } from "@/lib/data/meeting-types";
 import { getApplicableElements, getTemplateElements } from "@/lib/data/meeting-elements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
-import {
-  addDefaultTemplateElement,
-  removeDefaultTemplateElement,
-  setDefaultTemplateSlotCount,
-  moveDefaultTemplateElement,
-} from "./actions";
+import { addDefaultTemplateElement } from "./actions";
+import { DefaultTemplateElementList } from "@/components/admin/DefaultTemplateElementList";
 
 function TabLink({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
@@ -109,80 +105,8 @@ export default async function MeetingTemplatesAdminPage({
           {isSacrament && ` · ${SPECIAL_FORMATS.find((f) => f.value === formatKey)?.label}`}
         </h2>
 
-        <div className="mt-4 flex flex-col gap-2">
-          {included.length === 0 ? (
-            <p className="text-sm text-ink-muted">No elements added yet.</p>
-          ) : (
-            included.map((el, idx) => {
-              const moveUp = async () => {
-                "use server";
-                await moveDefaultTemplateElement(selectedType.id, formatKey, el.id, "up");
-              };
-              const moveDown = async () => {
-                "use server";
-                await moveDefaultTemplateElement(selectedType.id, formatKey, el.id, "down");
-              };
-              const remove = async () => {
-                "use server";
-                await removeDefaultTemplateElement(el.id);
-              };
-              const setSlots = async (formData: FormData) => {
-                "use server";
-                const value = Number(formData.get("slot_count"));
-                await setDefaultTemplateSlotCount(el.id, value);
-              };
-
-              return (
-                <div
-                  key={el.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-2 text-sm"
-                >
-                  <span className="text-ink">{el.label}</span>
-
-                  <span className="flex items-center gap-2">
-                    {el.repeatable && (
-                      <form action={setSlots} className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          name="slot_count"
-                          min={1}
-                          max={el.max_slots ?? undefined}
-                          defaultValue={el.slot_count ?? 1}
-                          className="w-14 rounded border border-rule bg-paper px-2 py-1 text-xs text-ink"
-                        />
-                        <button type="submit" className="text-xs text-ink-muted hover:text-ink">
-                          Set
-                        </button>
-                      </form>
-                    )}
-                    <form action={moveUp}>
-                      <button
-                        type="submit"
-                        disabled={idx === 0}
-                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-                      >
-                        &uarr;
-                      </button>
-                    </form>
-                    <form action={moveDown}>
-                      <button
-                        type="submit"
-                        disabled={idx === included.length - 1}
-                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-                      >
-                        &darr;
-                      </button>
-                    </form>
-                    <form action={remove}>
-                      <button type="submit" className="text-xs text-danger/70 hover:text-danger">
-                        Remove
-                      </button>
-                    </form>
-                  </span>
-                </div>
-              );
-            })
-          )}
+        <div className="mt-4">
+          <DefaultTemplateElementList meetingTypeId={selectedType.id} formatKey={formatKey} included={included} />
         </div>
       </div>
 

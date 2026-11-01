@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { kindOfItemKey } from "@/lib/data/sacrament-program";
 import { lookupHymnTitle } from "@/lib/data/hymnal";
+import { writeSortOrder } from "@/lib/data/reorder";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -128,28 +129,15 @@ export async function removeProgramItem(itemId: string, meetingId: string): Prom
   return { success: true };
 }
 
-export async function moveProgramItem(meetingId: string, itemId: string, direction: "up" | "down"): Promise<ActionResult> {
+/** Replaces the old swap-adjacent moveProgramItem (2026-10-31, "apply
+ *  broadly everywhere!") -- writes the whole new order at once. */
+export async function setProgramItemOrder(meetingId: string, orderedIds: string[]): Promise<ActionResult> {
   const auth = await requireBishopric();
   if (!("userId" in auth)) return auth;
   const supabase = await createClient();
 
-  const { data: items } = await supabase
-    .from("sacrament_program_items")
-    .select("id, sort_order")
-    .eq("meeting_id", meetingId)
-    .order("sort_order", { ascending: true });
-  if (!items) return { error: "Could not load items." };
-
-  const idx = items.findIndex((i) => i.id === itemId);
-  const swapWith = direction === "up" ? idx - 1 : idx + 1;
-  if (idx === -1 || swapWith < 0 || swapWith >= items.length) return { success: true };
-
-  const a = items[idx] as { id: string; sort_order: number };
-  const b = items[swapWith] as { id: string; sort_order: number };
-  const { error: e1 } = await supabase.from("sacrament_program_items").update({ sort_order: b.sort_order }).eq("id", a.id);
-  if (e1) return { error: e1.message };
-  const { error: e2 } = await supabase.from("sacrament_program_items").update({ sort_order: a.sort_order }).eq("id", b.id);
-  if (e2) return { error: e2.message };
+  const { error } = await writeSortOrder(supabase, "sacrament_program_items", "id", orderedIds, { meeting_id: meetingId });
+  if (error) return { error };
 
   revalidateBoth(meetingId);
   return { success: true };

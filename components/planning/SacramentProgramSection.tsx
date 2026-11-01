@@ -4,11 +4,15 @@ import { useActionState, useTransition } from "react";
 import {
   addProgramItem,
   removeProgramItem,
-  moveProgramItem,
+  setProgramItemOrder,
   saveProgramSpeaker,
   saveProgramMusic,
   type SaveActionResult,
 } from "@/app/meetings/[id]/speakers-music-actions";
+import { DragReorderGroup } from "@/components/drag-reorder/DragReorderGroup";
+import { DragHandle } from "@/components/drag-reorder/DragHandle";
+import { useSortableRow } from "@/lib/hooks/use-sortable-row";
+import { useReorderAction } from "@/lib/hooks/use-reorder-action";
 import { allProgramItemOptions, type ResolvedProgramItem } from "@/lib/data/sacrament-program-shared";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
@@ -35,7 +39,7 @@ function ItemRow({
   // though it's only used by the intermediate_hymn branch below.
   const { titleRef: hymnTitleRef, onNumberChange: onHymnNumberChange } = useHymnTitleLiveFill(hymnalIndex);
   const [removing, startRemove] = useTransition();
-  const [moving, startMove] = useTransition();
+  const { rowProps, handleProps } = useSortableRow(item.id);
 
   const remove = () => {
     if (!window.confirm(`Remove ${item.label}?`)) return;
@@ -43,9 +47,6 @@ function ItemRow({
       await removeProgramItem(item.id, meetingId);
     });
   };
-  const move = (direction: "up" | "down") => startMove(async () => {
-    await moveProgramItem(meetingId, item.id, direction);
-  });
 
   // `useActionState` rather than a bare async form action (2026-10-03,
   // the user's own report: a saved speaker "did not stay populated...
@@ -85,33 +86,23 @@ function ItemRow({
   );
 
   return (
-    <li className="rounded border border-rule/60 p-3">
-      <div
-        className={[
-          "flex flex-wrap items-center gap-2",
-          item.kind === "primary_program" ? "justify-end" : "justify-between",
-        ].join(" ")}
-      >
-        {/* Primary Program renders as a single centered line with no
-         *  label heading above it (2026-10-24, the user's own request
-         *  after seeing the first pass: "without a section heading
-         *  'primary program' and then again 'Primary program. Nothing
-         *  to Fill in.'... just a line of text centered on the page") --
-         *  every other kind keeps its small-caps label. */}
-        {item.kind !== "primary_program" && (
-          <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{item.label}</span>
-        )}
-        <span className="flex items-center gap-3">
-          <button type="button" onClick={() => move("up")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
-            &uarr;
-          </button>
-          <button type="button" onClick={() => move("down")} disabled={moving} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
-            &darr;
-          </button>
-          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger disabled:opacity-30">
-            Remove
-          </button>
+    <li {...rowProps} className="rounded border border-rule/60 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <DragHandle {...handleProps} />
+          {/* Primary Program renders as a single centered line with no
+           *  label heading above it (2026-10-24, the user's own request
+           *  after seeing the first pass: "without a section heading
+           *  'primary program' and then again 'Primary program. Nothing
+           *  to Fill in.'... just a line of text centered on the page") --
+           *  every other kind keeps its small-caps label. */}
+          {item.kind !== "primary_program" && (
+            <span className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{item.label}</span>
+          )}
         </span>
+        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger disabled:opacity-30">
+          Remove
+        </button>
       </div>
 
       {(item.kind === "speaker" || item.kind === "youth_speaker") && (
@@ -243,6 +234,8 @@ export function SacramentProgramSection({
   hymnalIndex: HymnalIndexEntry[];
 }) {
   const [adding, startAdd] = useTransition();
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const { onReorder, error: reorderError } = useReorderAction((orderedIds) => setProgramItemOrder(meetingId, orderedIds));
   const usedKeys = new Set(items.map((i) => i.itemKey.startsWith("intermediate_hymn") ? "intermediate_hymn" : i.itemKey));
   // Intermediate Hymn's own dropdown option stays available even after
   // one's been added (it can repeat, auto-numbered) -- everything else
@@ -262,12 +255,20 @@ export function SacramentProgramSection({
       {items.length === 0 ? (
         <p className="mt-4 text-sm text-ink-muted">Nothing added yet.</p>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2">
-          {items.map((item) => (
-            <ItemRow key={item.id} item={item} meetingId={meetingId} people={people} hymnalIndex={hymnalIndex} />
-          ))}
-        </ul>
+        <DragReorderGroup ids={items.map((item) => item.id)} onReorder={onReorder}>
+          {(orderedIds) => (
+            <ul className="mt-4 flex flex-col gap-2">
+              {orderedIds.map((id) => {
+                const item = byId.get(id);
+                return item ? (
+                  <ItemRow key={id} item={item} meetingId={meetingId} people={people} hymnalIndex={hymnalIndex} />
+                ) : null;
+              })}
+            </ul>
+          )}
+        </DragReorderGroup>
       )}
+      {reorderError && <p className="mt-1 text-xs text-danger">{reorderError}</p>}
 
       {available.length > 0 && (
         <form action={add} className="mt-4 flex flex-wrap items-center gap-2 border-t border-rule/60 pt-4">

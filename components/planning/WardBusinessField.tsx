@@ -7,9 +7,13 @@ import {
   removeCallingPlanningFromMeeting,
   pullRabnmPlanningIntoMeeting,
   removeRabnmPlanningFromMeeting,
-  moveWardBusinessItem,
-  moveWardBusinessSection,
+  setWardBusinessItemOrder,
+  setWardBusinessSectionOrder,
 } from "@/app/meetings/[id]/ward-business-actions";
+import { DragReorderGroup } from "@/components/drag-reorder/DragReorderGroup";
+import { DragHandle } from "@/components/drag-reorder/DragHandle";
+import { useSortableRow } from "@/lib/hooks/use-sortable-row";
+import { useReorderAction } from "@/lib/hooks/use-reorder-action";
 import type { RabnmRow } from "@/lib/data/sacrament-planning";
 import type { CallableCallingItem } from "@/lib/data/calling-planning";
 import type { CallableRabnmItem, RabnmPlanningType } from "@/lib/data/sacrament-rabnm-planning";
@@ -23,30 +27,15 @@ const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink
  *  predating this rework (a manually-added "Other"/Presidency Change
  *  item from before 2026-10-03, which has no such link).
  *
- * Move Up/Down (2026-10-30, the user's own request: "I would like to
- * be able to re-order individual lines in callings/releases... to the
- * order I would like to have them announced") -- same plain
- * `type="button"` + `useTransition` convention as
- * AgendaElementsManager.tsx's own Up/Down controls, never a real
- * `<form>`, since this row sits inside the bigger agenda grid's own
- * form. `isFirst`/`isLast` disable the button at a boundary, scoped to
- * this row's own list (Releases or Callings reorder independently). */
-function ExistingRow({
-  item,
-  meetingId,
-  type,
-  isFirst,
-  isLast,
-}: {
-  item: RabnmRow;
-  meetingId: string;
-  type: "release" | "new_calling";
-  isFirst: boolean;
-  isLast: boolean;
-}) {
+ * Drag handle, not Move Up/Down (2026-10-31, the user's own request:
+ * "apply broadly everywhere!" once asked about converting every
+ * Move Up/Down pair) -- the actual drag/drop context that makes this
+ * row sortable lives one level up, in CallingPlanningSection's own
+ * DragReorderGroup; this row just plugs into it via useSortableRow. */
+function ExistingRow({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
   const [removing, startRemove] = useTransition();
-  const [moving, startMove] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { rowProps, handleProps } = useSortableRow(item.id);
 
   const remove = () => {
     setError(null);
@@ -58,40 +47,19 @@ function ExistingRow({
     });
   };
 
-  const move = (direction: "up" | "down") => {
-    setError(null);
-    startMove(async () => {
-      const result = await moveWardBusinessItem(meetingId, item.id, type, direction);
-      if ("error" in result) setError(result.error);
-    });
-  };
-
   return (
-    <tr className="border-t border-rule/40">
-      <td className="py-1.5 pr-3">{item.people.length > 0 ? item.people.map((p) => p.name).join(", ") : "—"}</td>
+    <tr {...rowProps} className="border-t border-rule/40">
+      <td className="py-1.5 pr-3">
+        <span className="flex items-center gap-2">
+          <DragHandle {...handleProps} />
+          {item.people.length > 0 ? item.people.map((p) => p.name).join(", ") : "—"}
+        </span>
+      </td>
       <td className="py-1.5 pr-3 text-ink-muted">{item.calling_name ?? "—"}</td>
       <td className="py-1.5 text-right">
-        <span className="inline-flex items-center gap-2">
-          <button
-            type="button"
-            disabled={moving || isFirst}
-            onClick={() => move("up")}
-            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-          >
-            &uarr;
-          </button>
-          <button
-            type="button"
-            disabled={moving || isLast}
-            onClick={() => move("down")}
-            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-          >
-            &darr;
-          </button>
-          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
-            {removing ? "Removing..." : "Remove"}
-          </button>
-        </span>
+        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+          {removing ? "Removing..." : "Remove"}
+        </button>
         {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </tr>
@@ -100,61 +68,35 @@ function ExistingRow({
 
 /**
  * Shared heading row for each of Ward Business's subsections (seven
- * since 2026-10-31 -- see WardBusinessField's own doc comment below),
- * with Move Up/Down controls to reorder the SUBSECTIONS themselves
- * (migration 091, the user's own request: "I would like to be able to
- * adjust the order of subsections in the ward business section") --
- * distinct from `ExistingRow`'s own Move Up/Down, which reorders
- * individual LINES within one subsection. Pulled out of each section
- * component so `WardBusinessField` can render the title+controls once,
- * uniformly, for whichever section is in that position.
+ * since 2026-10-31 -- see WardBusinessField's own doc comment below) --
+ * now just the title plus a drag handle (`dragHandle`, supplied by
+ * `SortableSection` below, which owns the actual sortable row). The
+ * subsection-level drag/drop context lives in `WardBusinessField`
+ * itself, distinct from each subsection's own item-level
+ * DragReorderGroup (`CallingPlanningSection`/`RabnmCategorySection`) --
+ * two independent, non-nested-in-effect drag scopes (reordering a
+ * subsection never touches its own items' order and vice versa), each
+ * activated only by its own specific handle button.
  */
-function SectionHeading({
-  title,
-  meetingId,
-  sectionKey,
-  isFirst,
-  isLast,
-}: {
-  title: string;
-  meetingId: string;
-  sectionKey: WardBusinessSectionKey;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
-  const [moving, startMove] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  const move = (direction: "up" | "down") => {
-    setError(null);
-    startMove(async () => {
-      const result = await moveWardBusinessSection(meetingId, sectionKey, direction);
-      if ("error" in result) setError(result.error);
-    });
-  };
-
+function SectionHeading({ title, dragHandle }: { title: string; dragHandle: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center gap-2">
+      {dragHandle}
       <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{title}</p>
-      <span className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={moving || isFirst}
-          onClick={() => move("up")}
-          className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-        >
-          &uarr;
-        </button>
-        <button
-          type="button"
-          disabled={moving || isLast}
-          onClick={() => move("down")}
-          className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-        >
-          &darr;
-        </button>
-      </span>
-      {error && <p className="text-[11px] text-danger">{error}</p>}
+    </div>
+  );
+}
+
+/** Wraps one subsection (heading + its own content) as a sortable row
+ *  for the subsection-level drag context -- the actual `useSortableRow`
+ *  call has to happen here, at the thing being dragged, not inside
+ *  `SectionHeading` itself (which only renders the title + handle). */
+function SortableSection({ sectionKey, title, children }: { sectionKey: WardBusinessSectionKey; title: string; children: ReactNode }) {
+  const { rowProps, handleProps } = useSortableRow(sectionKey);
+  return (
+    <div {...rowProps}>
+      <SectionHeading title={title} dragHandle={<DragHandle {...handleProps} />} />
+      {children}
     </div>
   );
 }
@@ -190,6 +132,8 @@ function CallingPlanningSection({
   // this component's own (calling | release) prop name, type is the
   // real stored/moved-by value.
   const itemType: "release" | "new_calling" = kind === "release" ? "release" : "new_calling";
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  const { onReorder, error: reorderError } = useReorderAction((orderedIds) => setWardBusinessItemOrder(meetingId, itemType, orderedIds));
 
   const pull = () => {
     if (!selected) return;
@@ -208,22 +152,21 @@ function CallingPlanningSection({
     <div>
       {existing.length > 0 ? (
         <table className="mt-2 w-full text-sm">
-          <tbody>
-            {existing.map((item, index) => (
-              <ExistingRow
-                key={item.id}
-                item={item}
-                meetingId={meetingId}
-                type={itemType}
-                isFirst={index === 0}
-                isLast={index === existing.length - 1}
-              />
-            ))}
-          </tbody>
+          <DragReorderGroup ids={existing.map((item) => item.id)} onReorder={onReorder}>
+            {(orderedIds) => (
+              <tbody>
+                {orderedIds.map((id) => {
+                  const item = byId.get(id);
+                  return item ? <ExistingRow key={id} item={item} meetingId={meetingId} /> : null;
+                })}
+              </tbody>
+            )}
+          </DragReorderGroup>
         </table>
       ) : (
         <p className="mt-2 text-sm text-ink-muted">None yet.</p>
       )}
+      {reorderError && <p className="mt-1 text-[11px] text-danger">{reorderError}</p>}
 
       {sortedCandidates.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -268,11 +211,12 @@ function CallingPlanningSection({
  * standing pool itself is still managed from its own page,
  * /rabnm-planning -- this is only the pull-into-this-meeting half.
  *
- * Move Up/Down added to each category's own existing items, 2026-10-31
+ * Reorder added to each category's own existing items, 2026-10-31
  * (the user's own follow-up request, right after the five-subsection
- * split above shipped) -- same `moveWardBusinessItem` action and same
- * swap-adjacent-sort_order mechanics Releases/Callings' own
- * `ExistingRow` already used, just scoped by this category's own
+ * split above shipped, then converted the same day from Move Up/Down
+ * to a drag handle per "apply broadly everywhere!") -- same
+ * `setWardBusinessItemOrder` action Releases/Callings' own
+ * `ExistingRow` already uses, just scoped by this category's own
  * `type` instead of `"release" | "new_calling"`.
  */
 function RabnmCategorySection({
@@ -289,6 +233,8 @@ function RabnmCategorySection({
   const [selected, setSelected] = useState("");
   const [pending, startPull] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  const { onReorder, error: reorderError } = useReorderAction((orderedIds) => setWardBusinessItemOrder(meetingId, type, orderedIds));
 
   const pull = () => {
     if (!selected) return;
@@ -307,23 +253,21 @@ function RabnmCategorySection({
     <div>
       {existing.length > 0 ? (
         <table className="mt-2 w-full text-sm">
-          <tbody>
-            {existing.map((item, index) => (
-              <tr key={item.id} className="border-t border-rule/40 align-top">
-                <ExistingRabnmCells
-                  item={item}
-                  meetingId={meetingId}
-                  type={type}
-                  isFirst={index === 0}
-                  isLast={index === existing.length - 1}
-                />
-              </tr>
-            ))}
-          </tbody>
+          <DragReorderGroup ids={existing.map((item) => item.id)} onReorder={onReorder}>
+            {(orderedIds) => (
+              <tbody>
+                {orderedIds.map((id) => {
+                  const item = byId.get(id);
+                  return item ? <ExistingRabnmCells key={id} item={item} meetingId={meetingId} /> : null;
+                })}
+              </tbody>
+            )}
+          </DragReorderGroup>
         </table>
       ) : (
         <p className="mt-2 text-sm text-ink-muted">None yet.</p>
       )}
+      {reorderError && <p className="mt-1 text-[11px] text-danger">{reorderError}</p>}
 
       {candidates.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -350,36 +294,19 @@ function RabnmCategorySection({
   );
 }
 
-/** A RABNM-planning row's own two <td>s (people + detail, Move Up/
- *  Down + Remove) -- split out on its own so a future caller could
- *  still prepend an extra leading <td> to the same <tr> without
- *  duplicating this logic, the same way the original combined
- *  `RabnmPlanningSection` once did for its own Type column (removed
- *  2026-10-31 once each category became its own subsection and that
- *  column stopped being useful -- every row in one category's table is
- *  already the same type). `RabnmCategorySection` renders this as the
- *  whole row today, with nothing prepended.
+/** A RABNM-planning row (people + detail, drag handle + Remove) --
+ *  renders its own full `<tr>` (merged in 2026-10-31 so it can carry a
+ *  sortable row ref, where it used to render just the trailing `<td>`s
+ *  with `RabnmCategorySection` supplying the `<tr>` wrapper).
  *
- *  Move Up/Down (2026-10-31, the same follow-up request as
- *  `RabnmCategorySection`'s own comment above) -- same
- *  `isFirst`/`isLast`-disables-the-button-at-a-boundary shape as
- *  `ExistingRow`'s identical controls for Releases/Callings. */
-function ExistingRabnmCells({
-  item,
-  meetingId,
-  type,
-  isFirst,
-  isLast,
-}: {
-  item: RabnmRow;
-  meetingId: string;
-  type: RabnmPlanningType;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
+ *  Drag handle, not Move Up/Down (2026-10-31, "apply broadly
+ *  everywhere!") -- same shape as `ExistingRow`'s identical conversion
+ *  for Releases/Callings; the sortable context lives one level up, in
+ *  `RabnmCategorySection`'s own `DragReorderGroup`. */
+function ExistingRabnmCells({ item, meetingId }: { item: RabnmRow; meetingId: string }) {
   const [removing, startRemove] = useTransition();
-  const [moving, startMove] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { rowProps, handleProps } = useSortableRow(item.id);
 
   const remove = () => {
     setError(null);
@@ -391,45 +318,24 @@ function ExistingRabnmCells({
     });
   };
 
-  const move = (direction: "up" | "down") => {
-    setError(null);
-    startMove(async () => {
-      const result = await moveWardBusinessItem(meetingId, item.id, type, direction);
-      if ("error" in result) setError(result.error);
-    });
-  };
-
   return (
-    <>
+    <tr {...rowProps} className="border-t border-rule/40 align-top">
       <td className="py-1.5 pr-3">
-        {item.people.length > 0 ? item.people.map((p) => p.name).join(", ") : "—"}
-        {item.detail ? ` -- ${item.detail}` : ""}
+        <span className="flex items-center gap-2">
+          <DragHandle {...handleProps} />
+          <span>
+            {item.people.length > 0 ? item.people.map((p) => p.name).join(", ") : "—"}
+            {item.detail ? ` -- ${item.detail}` : ""}
+          </span>
+        </span>
       </td>
       <td className="py-1.5 text-right">
-        <span className="inline-flex items-center gap-2">
-          <button
-            type="button"
-            disabled={moving || isFirst}
-            onClick={() => move("up")}
-            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-          >
-            &uarr;
-          </button>
-          <button
-            type="button"
-            disabled={moving || isLast}
-            onClick={() => move("down")}
-            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-          >
-            &darr;
-          </button>
-          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
-            {removing ? "Removing..." : "Remove"}
-          </button>
-        </span>
+        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+          {removing ? "Removing..." : "Remove"}
+        </button>
         {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
-    </>
+    </tr>
   );
 }
 
@@ -527,20 +433,25 @@ export function WardBusinessField({
     baby_blessing: rabnmSection("baby_blessing", "Baby Blessings"),
   };
 
+  const { onReorder: onSectionReorder, error: sectionError } = useReorderAction((orderedKeys) =>
+    setWardBusinessSectionOrder(meetingId, orderedKeys as WardBusinessSectionKey[])
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      {sectionOrder.map((key, index) => (
-        <div key={key}>
-          <SectionHeading
-            title={sections[key].title}
-            meetingId={meetingId}
-            sectionKey={key}
-            isFirst={index === 0}
-            isLast={index === sectionOrder.length - 1}
-          />
-          {sections[key].node}
-        </div>
-      ))}
+      <DragReorderGroup ids={sectionOrder} onReorder={onSectionReorder}>
+        {(orderedKeys) =>
+          orderedKeys.map((key) => {
+            const sectionKey = key as WardBusinessSectionKey;
+            return (
+              <SortableSection key={sectionKey} sectionKey={sectionKey} title={sections[sectionKey].title}>
+                {sections[sectionKey].node}
+              </SortableSection>
+            );
+          })
+        }
+      </DragReorderGroup>
+      {sectionError && <p className="text-[11px] text-danger">{sectionError}</p>}
     </div>
   );
 }

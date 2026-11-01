@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { createClient } from "@/lib/supabase/server";
+import { writeSortOrder } from "@/lib/data/reorder";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -81,46 +82,25 @@ export async function setDefaultTemplateSlotCount(templateRowId: string, slotCou
   return { success: true };
 }
 
-export async function moveDefaultTemplateElement(
+/** Replaces the old swap-adjacent moveDefaultTemplateElement
+ *  (2026-10-31, "apply broadly everywhere!") -- writes the whole new
+ *  order at once, scoped by `meeting_type_id` + the nullable
+ *  `format_key` (writeSortOrder's own `null`-aware scope handling). */
+export async function setDefaultTemplateElementOrder(
   meetingTypeId: string,
   formatKey: string | null,
-  templateRowId: string,
-  direction: "up" | "down"
+  orderedIds: string[]
 ): Promise<ActionResult> {
   const denied = await requireMeetingTemplatesFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
+  const { error } = await writeSortOrder(supabase, "meeting_templates", "id", orderedIds, {
+    meeting_type_id: meetingTypeId,
+    format_key: formatKey,
+  });
+  if (error) return { error };
 
-  let rowsQuery = supabase
-    .from("meeting_templates")
-    .select("id, sort_order")
-    .eq("meeting_type_id", meetingTypeId)
-    .order("sort_order", { ascending: true });
-  rowsQuery = formatKey ? rowsQuery.eq("format_key", formatKey) : rowsQuery.is("format_key", null);
-  const { data: rows } = await rowsQuery;
-
-  if (!rows) return { error: "Could not load template." };
-
-  const index = rows.findIndex((r) => r.id === templateRowId);
-  if (index === -1) return { error: "Element not found in template." };
-
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= rows.length) return { success: true };
-
-  const current = rows[index];
-  const swap = rows[swapIndex];
-
-  const { error: error1 } = await supabase
-    .from("meeting_templates")
-    .update({ sort_order: swap.sort_order })
-    .eq("id", current.id);
-  const { error: error2 } = await supabase
-    .from("meeting_templates")
-    .update({ sort_order: current.sort_order })
-    .eq("id", swap.id);
-
-  if (error1 || error2) return { error: error1?.message ?? error2?.message ?? "Could not reorder." };
   revalidatePath("/admin/meeting-templates");
   return { success: true };
 }

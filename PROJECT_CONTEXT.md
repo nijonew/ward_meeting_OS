@@ -2050,8 +2050,148 @@ avoid confusing the two.
 
 ## Known open items
 
+**Every Move Up/Down reorder control in the app converted to a drag
+handle, 2026-10-31.** The user's own exploratory question, right after
+the rotations-by-calling rework and the reminder-email work above
+shipped: "Is there a way to update the ordering arrows to be a handle
+to grab, drag, and reorder? I think the handles usually appear as
+several dots." Confirmed the direction, then asked where to start --
+the answer was unqualified: "apply broadly everywhere!" This touched
+every reorderable list in the app, seven in total.
+
+New shared infrastructure (`@dnd-kit/core`/`@dnd-kit/sortable`/
+`@dnd-kit/utilities`, newly added dependencies -- chosen over the
+native HTML5 Drag and Drop API for its touch/keyboard/accessibility
+support, and because it's pure client-side with no backend cost,
+keeping this free within Vercel):
+- **`lib/data/reorder.ts`**'s `writeSortOrder(supabase, table,
+  idColumn, orderedIds, scope?)` -- the shared write-side half every
+  site uses. Replaces the old one-step-at-a-time swap-adjacent-
+  `sort_order` pattern (every Move Up/Down action in this app used to
+  fetch the full ordered list, find the dragged row's neighbor, and
+  swap their two `sort_order` values) with "write the whole new order
+  at once" (`sort_order = index * 10` for every id in the submitted
+  order) -- a real drag can drop an item anywhere in one motion, not
+  just nudge it by one position, so the old swap-only shape couldn't
+  express that. `scope` narrows the write to one list's own rows when
+  a table holds more than one independent order at once (e.g.
+  `sacrament_rabnm`'s `type` column, or a rotation's own
+  `rotation_id`); a scope value of `null` matches `is <col> null`
+  rather than `eq <col> null` (which matches nothing in Postgres) --
+  needed for `meeting_templates`' own nullable `format_key` scope (the
+  shared, no-special-format default template).
+- **`components/drag-reorder/DragReorderGroup.tsx`** -- the shared
+  `DndContext`/`SortableContext` wrapper, a render-prop over the
+  current ordered id list (`children: (orderedIds: string[]) =>
+  ReactNode`) so each caller renders whatever wrapping element
+  actually fits its own markup (`<ul>`, a `<table><tbody>`, a plain
+  `<div>`) rather than this component imposing one. Reorders
+  optimistically (the visible order updates the instant a drag
+  completes, before the server round trip resolves) and re-syncs to
+  the `ids` prop whenever its own content changes elsewhere (a save,
+  a revalidation) by comparing the joined id string during render --
+  not a `useEffect`, same "respond to a value that just changed"
+  pattern `AssignmentGridForm`'s own dirty-reset already uses.
+- **`components/drag-reorder/DragHandle.tsx`** -- the one grip-dot
+  icon button every converted list uses (a plain inline SVG, six
+  circles -- this app has never added an icon library and six circles
+  isn't worth one), props spread straight from `useSortableRow`'s own
+  `handleProps`.
+- **`lib/hooks/use-sortable-row.ts`**'s `useSortableRow(id)` -- one
+  row's own drag plumbing (`useSortable` wrapped with the CSS
+  transform/transition/dragging-opacity it needs), returning
+  `rowProps` (spread onto the row's own wrapping element) and
+  `handleProps` (spread onto its `DragHandle`).
+- **`lib/hooks/use-reorder-action.ts`**'s `useReorderAction(action)` --
+  the small bit of error-surfacing boilerplate every converted list
+  needs: calls the given server action with the new order, reads back
+  an `{ error }` result if there is one, same "never swallow a real
+  error" principle every other action-backed form in this app already
+  follows.
+
+**The seven converted sites**, each previously its own swap-adjacent
+Move Up/Down action:
+1. **Rotation Order** (`/rotations`) -- `moveRotationMember` ->
+   `setRotationMemberOrder` (`app/rotations/actions.ts`), new
+   `components/rotations/RotationMemberList.tsx` (`RotationCard` in
+   `app/rotations/page.tsx`, a Server Component, now just renders this
+   new Client Component for its own member list -- the drag
+   interaction itself can't run server-side).
+2. **Ward Business** (`sacrament_rabnm`, the Releases/Callings/five
+   RABNM-planning categories) -- two separate reorder mechanisms, both
+   converted: `moveWardBusinessItem` -> `setWardBusinessItemOrder`
+   (reorders within one subsection) and `moveWardBusinessSection` ->
+   `setWardBusinessSectionOrder` (reorders the seven subsections
+   themselves, still just overwriting the single `text[]` on the
+   `ward_settings` singleton row, not a table write). Both in
+   `app/meetings/[id]/ward-business-actions.ts`;
+   `components/planning/WardBusinessField.tsx` restructured --
+   `ExistingRow`/`ExistingRabnmCells` each now render their own full
+   sortable `<tr>` (previously the latter only rendered its trailing
+   `<td>`s, with the wrapping `<tr>` supplied by `RabnmCategorySection`),
+   and a new `SortableSection` wrapper carries the subsection-level
+   drag ref since `SectionHeading` itself only renders the title +
+   handle now. The subsection-level drag context and each subsection's
+   own item-level context are deliberately independent, non-conflicting
+   `DndContext`s (each activated only by its own specific handle
+   button, not a shared ancestor capture) rather than one elaborate
+   "sortable items inside a sortable container" setup -- reordering a
+   subsection never touches its own items' order and vice versa, so
+   the simpler two-independent-contexts shape was enough.
+3. **Announcements** (`sacrament_announcement_pulls`) --
+   `moveAnnouncementPull` -> `setAnnouncementPullOrder`
+   (`app/meetings/[id]/announcements-actions.ts`). This table has no
+   real `id` column of its own (its key is the composite
+   `(announcement_id, meeting_id)`) -- `writeSortOrder`'s own
+   `idColumn`/`scope` shape still matches correctly without a bespoke
+   variant, since `announcement_id` is already unique within one
+   `planned_element_id` scope (an announcement can only ever be pulled
+   into a given meeting once at all, regardless of block).
+   `components/planning/AnnouncementsField.tsx` converted the same way
+   as Ward Business's `ExistingRow`.
+4. **Speakers & Music / Teaching Program** (`sacrament_program_items`)
+   -- `moveProgramItem` -> `setProgramItemOrder`
+   (`app/meetings/[id]/speakers-music-actions.ts`).
+   `components/planning/SacramentProgramSection.tsx`'s `ItemRow` keeps
+   its own real nested `<form>`s (the per-item Save for a speaker/
+   musical number/intermediate hymn) completely unaffected -- dnd-kit's
+   sortable mechanics only care about the outer draggable element's
+   ref, not what's inside it, so adding a drag handle to the row's own
+   header has no interaction with the forms nested below it.
+5. **Agenda Elements, inline on the Planning page**
+   (`meeting_planned_elements`, via `AgendaElementsManager.tsx`) --
+   `moveTemplateElement` -> `setTemplateElementOrder`
+   (`app/meetings/[id]/template-actions.ts`).
+6. **Agenda Elements, the standalone page**
+   (`/meetings/[id]/template`, same `meeting_planned_elements` table,
+   same new action as #5) -- this one was a Server Component with
+   inline per-row `"use server"` closures, which can't run a drag
+   interaction at all. Extracted into new
+   `components/planning/TemplateElementList.tsx`, mirroring how
+   `RotationMemberList.tsx` already handled the identical "a Server
+   Component's own list needs to become a Client Component for this"
+   problem for Rotation Order.
+7. **Admin > Meeting Templates** (the shared default template,
+   `meeting_templates`, scoped by meeting type + nullable
+   `format_key`) -- `moveDefaultTemplateElement` ->
+   `setDefaultTemplateElementOrder` (`app/admin/meeting-templates/actions.ts`).
+   Same "Server Component with inline closures" extraction as #6, into
+   new `components/admin/DefaultTemplateElementList.tsx`.
+
+Confirmed via `tsc`/`eslint` on every changed file plus a full
+`rm -rf .next && npx next build --webpack` (clean) -- same no-live-
+browser gap as everything else in this project, so the actual drag
+gesture itself (pointer feel, touch behavior on a phone, the
+optimistic-reorder-then-save round trip) isn't verified beyond static
+analysis. Ask the user to try dragging a row on each of the seven
+pages once deployed and confirm: the grip-dot handle appears, dragging
+reorders the list smoothly with no flash back to the old order, and a
+page reload shows the new order persisted (not reverted).
+
 **Meeting Reminder Email now links back to the meeting itself,
 2026-10-31** -- the user's own request, right after confirming
+migration `095` was run and the feature granted: "I do want to include
+a line in the email that includes the link to the meeting on the app -- the user's own request, right after confirming
 migration `095` was run and the feature granted: "I do want to include
 a line in the email that includes the link to the meeting on the app
 as well when we send email reminders." `buildReminderDraft`

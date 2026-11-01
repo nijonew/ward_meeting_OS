@@ -4,34 +4,25 @@ import { useState, useTransition } from "react";
 import {
   pullAnnouncementIntoMeeting,
   removeAnnouncementFromMeeting,
-  moveAnnouncementPull,
+  setAnnouncementPullOrder,
 } from "@/app/meetings/[id]/announcements-actions";
+import { DragReorderGroup } from "@/components/drag-reorder/DragReorderGroup";
+import { DragHandle } from "@/components/drag-reorder/DragHandle";
+import { useSortableRow } from "@/lib/hooks/use-sortable-row";
+import { useReorderAction } from "@/lib/hooks/use-reorder-action";
 import type { PulledAnnouncement } from "@/lib/data/sacrament-announcements";
 
 const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 
-/** Move Up/Down (2026-10-30, the user's own request: "I need to be able
- *  to put announcements in order also in sacrament meetings") -- same
- *  plain `type="button"` + `useTransition` convention as
- *  WardBusinessField.tsx's own reorder controls, scoped to this one
+/** Drag handle, not Move Up/Down (2026-10-31, "apply broadly
+ *  everywhere!") -- the sortable context lives one level up, in
+ *  `AnnouncementsField`'s own `DragReorderGroup`, scoped to this one
  *  block (`plannedElementId`) so each Announcements block on a meeting
  *  reorders independently. */
-function ExistingRow({
-  item,
-  meetingId,
-  plannedElementId,
-  isFirst,
-  isLast,
-}: {
-  item: PulledAnnouncement;
-  meetingId: string;
-  plannedElementId: string;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
+function ExistingRow({ item, meetingId }: { item: PulledAnnouncement; meetingId: string }) {
   const [removing, startRemove] = useTransition();
-  const [moving, startMove] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { rowProps, handleProps } = useSortableRow(item.id);
 
   const remove = () => {
     setError(null);
@@ -41,40 +32,19 @@ function ExistingRow({
     });
   };
 
-  const move = (direction: "up" | "down") => {
-    setError(null);
-    startMove(async () => {
-      const result = await moveAnnouncementPull(meetingId, item.id, plannedElementId, direction);
-      if ("error" in result) setError(result.error);
-    });
-  };
-
   return (
-    <tr className="border-t border-rule/40">
-      <td className="py-1.5 pr-3">{item.title}</td>
+    <tr {...rowProps} className="border-t border-rule/40">
+      <td className="py-1.5 pr-3">
+        <span className="flex items-center gap-2">
+          <DragHandle {...handleProps} />
+          {item.title}
+        </span>
+      </td>
       <td className="py-1.5 pr-3 text-ink-muted">{item.organization ?? "—"}</td>
       <td className="py-1.5 text-right">
-        <span className="inline-flex items-center gap-2">
-          <button
-            type="button"
-            disabled={moving || isFirst}
-            onClick={() => move("up")}
-            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-          >
-            &uarr;
-          </button>
-          <button
-            type="button"
-            disabled={moving || isLast}
-            onClick={() => move("down")}
-            className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-          >
-            &darr;
-          </button>
-          <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
-            {removing ? "Removing..." : "Remove"}
-          </button>
-        </span>
+        <button type="button" onClick={remove} disabled={removing} className="text-xs text-danger/70 hover:text-danger">
+          {removing ? "Removing..." : "Remove"}
+        </button>
         {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
       </td>
     </tr>
@@ -126,6 +96,10 @@ export function AnnouncementsField({
   const [selected, setSelected] = useState("");
   const [pending, startPull] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const { onReorder, error: reorderError } = useReorderAction((orderedIds) =>
+    setAnnouncementPullOrder(meetingId, plannedElementId, orderedIds)
+  );
 
   const pull = () => {
     if (!selected) return;
@@ -144,22 +118,21 @@ export function AnnouncementsField({
     <div>
       {items.length > 0 ? (
         <table className="w-full text-sm">
-          <tbody>
-            {items.map((item, index) => (
-              <ExistingRow
-                key={item.id}
-                item={item}
-                meetingId={meetingId}
-                plannedElementId={plannedElementId}
-                isFirst={index === 0}
-                isLast={index === items.length - 1}
-              />
-            ))}
-          </tbody>
+          <DragReorderGroup ids={items.map((item) => item.id)} onReorder={onReorder}>
+            {(orderedIds) => (
+              <tbody>
+                {orderedIds.map((id) => {
+                  const item = byId.get(id);
+                  return item ? <ExistingRow key={id} item={item} meetingId={meetingId} /> : null;
+                })}
+              </tbody>
+            )}
+          </DragReorderGroup>
         </table>
       ) : (
         <p className="text-sm text-ink-muted">None selected yet.</p>
       )}
+      {reorderError && <p className="mt-1 text-[11px] text-danger">{reorderError}</p>}
 
       {pullable.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-2">

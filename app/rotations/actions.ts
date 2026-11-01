@@ -11,6 +11,7 @@ import {
   PERSON_AND_TEXT_ROTATION_KEYS,
   UNLISTED_CALLING_VALUE,
 } from "@/lib/data/rotations";
+import { writeSortOrder } from "@/lib/data/reorder";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
@@ -274,43 +275,22 @@ export async function removeRotationMember(memberId: string): Promise<ActionResu
   return { success: true };
 }
 
-export async function moveRotationMember(
-  rotationId: string,
-  memberId: string,
-  direction: "up" | "down"
-): Promise<ActionResult> {
+/**
+ * Replaces the old swap-adjacent moveRotationMember (2026-10-31, the
+ * user's own request to convert every Move Up/Down pair to a drag
+ * handle) -- a drag can drop a member anywhere in one motion, so this
+ * takes the WHOLE new member order at once rather than one step.
+ * Scoped by `rotationId` via writeSortOrder's own `scope` param, so
+ * this can never touch another rotation's members even if a stale id
+ * somehow made it into the submitted list.
+ */
+export async function setRotationMemberOrder(rotationId: string, orderedIds: string[]): Promise<ActionResult> {
   const denied = await requireRotationsFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
-
-  const { data: members, error } = await supabase
-    .from("rotation_members")
-    .select("id, sort_order")
-    .eq("rotation_id", rotationId)
-    .order("sort_order");
-
-  if (error || !members) return { error: error?.message ?? "Could not load members." };
-
-  const idx = members.findIndex((m) => m.id === memberId);
-  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-  if (idx === -1 || swapIdx < 0 || swapIdx >= members.length) {
-    return { success: true }; // nothing to do at the boundary
-  }
-
-  const a = members[idx];
-  const b = members[swapIdx];
-
-  const { error: err1 } = await supabase
-    .from("rotation_members")
-    .update({ sort_order: b.sort_order })
-    .eq("id", a.id);
-  const { error: err2 } = await supabase
-    .from("rotation_members")
-    .update({ sort_order: a.sort_order })
-    .eq("id", b.id);
-
-  if (err1 || err2) return { error: err1?.message ?? err2?.message ?? "Could not reorder." };
+  const { error } = await writeSortOrder(supabase, "rotation_members", "id", orderedIds, { rotation_id: rotationId });
+  if (error) return { error };
 
   revalidatePath("/rotations");
   return { success: true };

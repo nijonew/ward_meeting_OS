@@ -6,6 +6,7 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getMeetingWithType } from "@/lib/data/meeting-elements";
+import { writeSortOrder } from "@/lib/data/reorder";
 
 export type ActionResult = { success: true } | { error: string };
 
@@ -203,51 +204,16 @@ export async function saveMeetingAsTemplate(meetingId: string): Promise<ActionRe
   return { success: true };
 }
 
-export async function moveTemplateElement(
-  meetingId: string,
-  plannedRowId: string,
-  direction: "up" | "down"
-): Promise<ActionResult> {
+/** Replaces the old swap-adjacent moveTemplateElement (2026-10-31,
+ *  "apply broadly everywhere!") -- writes the whole new agenda order
+ *  at once. */
+export async function setTemplateElementOrder(meetingId: string, orderedIds: string[]): Promise<ActionResult> {
   const denied = await requireTemplateFeature(meetingId);
   if (denied) return denied;
 
   const supabase = await createClient();
-
-  const { data: rows } = await supabase
-    .from("meeting_planned_elements")
-    .select("id, sort_order")
-    .eq("meeting_id", meetingId)
-    .order("sort_order", { ascending: true });
-
-  if (!rows) {
-    return { error: "Could not load agenda elements." };
-  }
-
-  const index = rows.findIndex((r) => r.id === plannedRowId);
-  if (index === -1) {
-    return { error: "Element not found in this meeting's agenda." };
-  }
-
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= rows.length) {
-    return { success: true };
-  }
-
-  const current = rows[index];
-  const swap = rows[swapIndex];
-
-  const { error: error1 } = await supabase
-    .from("meeting_planned_elements")
-    .update({ sort_order: swap.sort_order })
-    .eq("id", current.id);
-  const { error: error2 } = await supabase
-    .from("meeting_planned_elements")
-    .update({ sort_order: current.sort_order })
-    .eq("id", swap.id);
-
-  if (error1 || error2) {
-    return { error: error1?.message ?? error2?.message ?? "Could not reorder." };
-  }
+  const { error } = await writeSortOrder(supabase, "meeting_planned_elements", "id", orderedIds, { meeting_id: meetingId });
+  if (error) return { error };
 
   revalidatePath(`/meetings/${meetingId}/template`);
   revalidatePath(`/meetings/${meetingId}/planning`);

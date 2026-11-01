@@ -5,40 +5,37 @@ import {
   addTemplateElement,
   removeTemplateElement,
   setTemplateSlotCount,
-  moveTemplateElement,
+  setTemplateElementOrder,
   saveMeetingAsTemplate,
   type ActionResult,
 } from "@/app/meetings/[id]/template-actions";
+import { DragReorderGroup } from "@/components/drag-reorder/DragReorderGroup";
+import { DragHandle } from "@/components/drag-reorder/DragHandle";
+import { useSortableRow } from "@/lib/hooks/use-sortable-row";
+import { useReorderAction } from "@/lib/hooks/use-reorder-action";
 import type { MeetingElement, TemplateElementRow } from "@/lib/data/meeting-elements";
 
 const SELECT = "rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 
 /**
- * One already-on-the-agenda element -- Set (for a repeatable element's
- * slot count), Up/Down, and Remove, all plain `type="button"` +
- * `useTransition` calls straight to the same `app/meetings/[id]/template-actions.ts`
- * functions the standalone Agenda Elements page
- * (`/meetings/[id]/template`) already uses -- never a real `<form>`,
- * since this whole component renders as a sibling of the agenda
- * grid's own `<form>`(s) on the Planning page, and HTML forbids
- * nested forms (same reasoning Ward Business/RABNM/Visiting
- * Authorities/Speakers & Music already established elsewhere on this
- * same page).
+ * One already-on-the-agenda element -- a drag handle (not Move Up/Down,
+ * 2026-10-31: "apply broadly everywhere!"), Set (for a repeatable
+ * element's slot count), and Remove, the latter two still plain
+ * `type="button"` + `useTransition` calls straight to the same
+ * `app/meetings/[id]/template-actions.ts` functions the standalone
+ * Agenda Elements page (`/meetings/[id]/template`) already uses --
+ * never a real `<form>`, since this whole component renders as a
+ * sibling of the agenda grid's own `<form>`(s) on the Planning page,
+ * and HTML forbids nested forms (same reasoning Ward Business/RABNM/
+ * Visiting Authorities/Speakers & Music already established elsewhere
+ * on this same page). The sortable context itself lives one level up,
+ * in `AgendaElementsManager`'s own `DragReorderGroup`.
  */
-function ElementRow({
-  meetingId,
-  el,
-  isFirst,
-  isLast,
-}: {
-  meetingId: string;
-  el: TemplateElementRow;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
+function ElementRow({ meetingId, el }: { meetingId: string; el: TemplateElementRow }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const slotRef = useRef<HTMLInputElement>(null);
+  const { rowProps, handleProps } = useSortableRow(el.id);
 
   const run = (action: () => Promise<ActionResult>) => {
     setError(null);
@@ -49,8 +46,11 @@ function ElementRow({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-1.5 text-sm">
-      <span className="text-ink">{el.label}</span>
+    <div {...rowProps} className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule/60 px-3 py-1.5 text-sm">
+      <span className="flex items-center gap-2 text-ink">
+        <DragHandle {...handleProps} />
+        {el.label}
+      </span>
       <span className="flex items-center gap-2">
         {el.repeatable && (
           <>
@@ -72,22 +72,6 @@ function ElementRow({
             </button>
           </>
         )}
-        <button
-          type="button"
-          disabled={pending || isFirst}
-          onClick={() => run(() => moveTemplateElement(meetingId, el.id, "up"))}
-          className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-        >
-          &uarr;
-        </button>
-        <button
-          type="button"
-          disabled={pending || isLast}
-          onClick={() => run(() => moveTemplateElement(meetingId, el.id, "down"))}
-          className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-        >
-          &darr;
-        </button>
         <button
           type="button"
           disabled={pending}
@@ -143,6 +127,9 @@ export function AgendaElementsManager({
   const [savingTemplate, startSaveTemplate] = useTransition();
   const [templateResult, setTemplateResult] = useState<string | null>(null);
 
+  const byId = new Map(included.map((el) => [el.id, el]));
+  const { onReorder, error: reorderError } = useReorderAction((orderedIds) => setTemplateElementOrder(meetingId, orderedIds));
+
   const add = () => {
     if (!selected) return;
     setError(null);
@@ -180,12 +167,18 @@ export function AgendaElementsManager({
           {included.length === 0 ? (
             <p className="text-sm text-ink-muted">No elements added yet.</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {included.map((el, idx) => (
-                <ElementRow key={el.id} meetingId={meetingId} el={el} isFirst={idx === 0} isLast={idx === included.length - 1} />
-              ))}
-            </div>
+            <DragReorderGroup ids={included.map((el) => el.id)} onReorder={onReorder}>
+              {(orderedIds) => (
+                <div className="flex flex-col gap-2">
+                  {orderedIds.map((id) => {
+                    const el = byId.get(id);
+                    return el ? <ElementRow key={id} meetingId={meetingId} el={el} /> : null;
+                  })}
+                </div>
+              )}
+            </DragReorderGroup>
           )}
+          {reorderError && <p className="mt-1 text-[11px] text-danger">{reorderError}</p>}
 
           {available.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule/40 pt-3">

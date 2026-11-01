@@ -7,12 +7,8 @@ import { getCallingsForMeetingType, type CallingOption } from "@/lib/data/callin
 import { PushRotationForm } from "@/components/rotations/PushRotationForm";
 import { PushFixedRolesForm } from "@/components/rotations/PushFixedRolesForm";
 import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
-import {
-  syncRotation,
-  addRotationMember,
-  removeRotationMember,
-  moveRotationMember,
-} from "@/app/rotations/actions";
+import { RotationMemberList } from "@/components/rotations/RotationMemberList";
+import { syncRotation, addRotationMember } from "@/app/rotations/actions";
 import type { MeetingTypeSlug } from "@/lib/types";
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -139,53 +135,7 @@ function RotationCard({ rotation, callings }: { rotation: RotationRow; callings:
           <p className="mt-4 text-xs text-ink-muted">
             Next up: <span className="text-ink">{nextUpLabel}</span>
           </p>
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {rotation.members.map((m, idx) => {
-              const remove = async () => {
-                "use server";
-                await removeRotationMember(m.id);
-              };
-              const moveUp = async () => {
-                "use server";
-                await moveRotationMember(rotation.id, m.id, "up");
-              };
-              const moveDown = async () => {
-                "use server";
-                await moveRotationMember(rotation.id, m.id, "down");
-              };
-              return (
-                <li
-                  key={m.id}
-                  className="flex items-center justify-between gap-2 rounded border border-rule/60 px-3 py-1.5 text-sm"
-                >
-                  <span className={idx === rotation.next_index % rotation.members.length ? "text-ink" : "text-ink-muted"}>
-                    {m.display_label}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <form action={moveUp}>
-                      <button type="submit" disabled={idx === 0} className="text-xs text-ink-muted hover:text-ink disabled:opacity-30">
-                        &uarr;
-                      </button>
-                    </form>
-                    <form action={moveDown}>
-                      <button
-                        type="submit"
-                        disabled={idx === rotation.members.length - 1}
-                        className="text-xs text-ink-muted hover:text-ink disabled:opacity-30"
-                      >
-                        &darr;
-                      </button>
-                    </form>
-                    <form action={remove}>
-                      <button type="submit" className="text-xs text-danger/70 hover:text-danger">
-                        Remove
-                      </button>
-                    </form>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <RotationMemberList rotationId={rotation.id} members={rotation.members} nextIndex={rotation.next_index} />
         </>
       )}
 

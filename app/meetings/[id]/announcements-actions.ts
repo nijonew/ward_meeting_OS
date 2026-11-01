@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { clearPoolExclusion } from "@/lib/data/pool-sweep";
 import { nextAnnouncementPullSortOrder } from "@/lib/data/sacrament-announcements";
+import { writeSortOrder } from "@/lib/data/reorder";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -118,56 +119,30 @@ export async function removeAnnouncementFromMeeting(meetingId: string, announcem
 }
 
 /**
- * Moves one pulled announcement up or down within its own Announcements
- * block -- the user's own request, 2026-10-30: "I need to be able to put
- * announcements in order also in sacrament meetings." Scoped by
- * `plannedElementId`, not just `meetingId`, so a meeting with more than
- * one Announcements block (migration 074) reorders each one
- * independently. Same swap-adjacent-sort_order shape as
- * `moveWardBusinessItem` (migration 090).
+ * Replaces the old swap-adjacent moveAnnouncementPull (2026-10-31, the
+ * user's own request to convert every Move Up/Down pair to a drag
+ * handle) -- writes the whole new order for one Announcements block at
+ * once. `sacrament_announcement_pulls` has no single `id` column of its
+ * own (its real key is the composite `(announcement_id, meeting_id)`),
+ * but `announcement_id` is already unique within one `planned_element_id`
+ * scope (an announcement can only ever be pulled into a given meeting
+ * once at all, regardless of block), so `writeSortOrder`'s own
+ * `idColumn`/`scope` shape -- built for a real `id` column -- still
+ * matches correctly without needing its own bespoke variant.
  */
-export async function moveAnnouncementPull(
+export async function setAnnouncementPullOrder(
   meetingId: string,
-  announcementId: string,
   plannedElementId: string,
-  direction: "up" | "down"
+  orderedAnnouncementIds: string[]
 ): Promise<ActionResult> {
   const denied = await requireSacramentPlanningFeature();
   if (denied) return denied;
 
   const supabase = await createClient();
-  const { data: rows, error: fetchError } = await supabase
-    .from("sacrament_announcement_pulls")
-    .select("announcement_id, sort_order")
-    .eq("planned_element_id", plannedElementId)
-    .order("sort_order", { ascending: true });
-
-  if (fetchError || !rows) {
-    return { error: fetchError?.message ?? "Could not load this block's announcements." };
-  }
-
-  const index = rows.findIndex((r) => r.announcement_id === announcementId);
-  if (index === -1) return { error: "Announcement not found on this block." };
-
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= rows.length) return { success: true };
-
-  const current = rows[index];
-  const swap = rows[swapIndex];
-
-  const { error: error1 } = await supabase
-    .from("sacrament_announcement_pulls")
-    .update({ sort_order: swap.sort_order })
-    .eq("planned_element_id", plannedElementId)
-    .eq("announcement_id", current.announcement_id);
-  if (error1) return { error: error1.message };
-
-  const { error: error2 } = await supabase
-    .from("sacrament_announcement_pulls")
-    .update({ sort_order: current.sort_order })
-    .eq("planned_element_id", plannedElementId)
-    .eq("announcement_id", swap.announcement_id);
-  if (error2) return { error: error2.message };
+  const { error } = await writeSortOrder(supabase, "sacrament_announcement_pulls", "announcement_id", orderedAnnouncementIds, {
+    planned_element_id: plannedElementId,
+  });
+  if (error) return { error };
 
   revalidateBoth(meetingId);
   return { success: true };
