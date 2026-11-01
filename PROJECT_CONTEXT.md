@@ -330,12 +330,20 @@ Migrations are plain `.sql` files at
 the repo root, run manually by the user in the Supabase SQL editor (no
 migration tool/CLI wired up). Always make migrations idempotent
 (`DROP ... IF EXISTS` before `CREATE`) since partial-failure re-runs are
-common. **Confirm the next free number with the user before assuming --
-two separate numbering collisions have now happened**, including one
-between two parallel sessions that each thought they were the only one
-working on this repo. If a long-running session or branch is a
-possibility, say so to the user explicitly rather than assuming
-exclusive access.
+common.
+
+**No longer asking the user to confirm the next migration number
+before running it, per the user's own request (2026-10-31): "we can
+also stop confirming the migration name is free."** Two separate
+numbering collisions did happen earlier in this project's history
+(including one between two parallel sessions that each thought they
+were the only one working on this repo) -- that's why this caution
+existed in the first place, and it's worth knowing if a collision ever
+happens again -- but the header above (`## Current migration number`)
+is now kept current with every new migration file, which is the actual
+thing that drifting out of date for a long stretch is what let those
+collisions happen. Just use the next number after whatever this header
+says and move on; no need to ask first anymore.
 
 ## Architecture
 
@@ -2123,15 +2131,15 @@ the foreign-key-error case it was always meant to hand off to.
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
 database-access gap as everything else in this project -- this
 assistant has no way to test the actual merge against real duplicate
-data. **Confirm migration number `096` is actually free before running
-it**, per this project's own repeated numbering-collision history, then
-grant `merge_people` sparingly via `/admin/calling-features` and ask
-the user to try it on a real (or deliberately test) duplicate pair:
-confirm the reference breakdown looks right before confirming, that
-the merge actually succeeds and the duplicate disappears from People,
-and that whatever used to reference the removed person (an assignment,
-a rotation member, a calling-planning candidate, etc.) now correctly
-shows the kept person instead.
+data. **Migration `096` confirmed run, 2026-10-31.** Functional
+behavior not yet confirmed -- grant `merge_people` sparingly via
+`/admin/calling-features` and ask the user to try it on a real (or
+deliberately test) duplicate pair: confirm the reference breakdown
+looks right before confirming, that the merge actually succeeds and
+the duplicate disappears from People, and that whatever used to
+reference the removed person (an assignment, a rotation member, a
+calling-planning candidate, etc.) now correctly shows the kept person
+instead.
 
 **New: Meeting Reminder Email, a real email-sending tool for the
 Executive Secretary -- migration `095`, not yet run, 2026-10-31.** The
@@ -10536,4 +10544,6 @@ now fully worked through.
   than one sitting, or the user mentions another session/branch, say so
   explicitly and check `git log` against the remote's default branch
   before assuming this file or the migration counter reflects the whole
-  truth.
+  truth. That said, per the user's own 2026-10-31 request, this no
+  longer means asking in chat to confirm each new migration number
+  before running it -- see "Current migration number" above for why.
