@@ -2050,6 +2050,136 @@ avoid confusing the two.
 
 ## Known open items
 
+**First real pass through the persistent Feedback Widget's own
+suggestion/bug log, 2026-11-01** -- the user asked to check on it;
+pasted back the full contents of the `feedback` table (this assistant
+has no live database access to query it directly). Two real,
+well-specified bug reports were fixed immediately (bugs/fixes are
+priorities as soon as filed, per how this feature was originally
+scoped); everything else is either a content edit, too vague to act
+on, noise, or a Suggestion still sitting at Status = New -- none of
+those are built without the Status being moved to Approved first, per
+that same original rule.
+
+1. **Fixed: "Manage Announcements... I am able to remove where to
+   announce but not add by clicking the boxes"** (Mark Young,
+   2026-10-23) -- see that bug's own entry below for the root cause
+   and fix (`MultiSelectDropdown.tsx`).
+2. **Investigated, not yet fixed: "if you forget your password it
+   doesn't let you reset it... goes to the login screen again"** (Mark
+   Young, 2026-10-18) -- this assistant's working theory, not yet
+   confirmed: Supabase's PKCE password-recovery flow ties the emailed
+   `?code=` link to a `code_verifier` cookie set in whichever browser
+   originally requested the reset -- clicking the link from a
+   *different* browser or device (a phone, after requesting from a
+   desktop, is the common real case) fails that check by Supabase's
+   own design, landing back on `/auth/callback`'s `/login?error=...`
+   fallback. Not yet built -- the robust fix (a new `/auth/confirm`
+   route using `verifyOtp` against a `token_hash`, which doesn't
+   depend on any prior browser state) also needs a matching change to
+   the "Reset Password" email template in the Supabase dashboard, which
+   this assistant can't make directly. Ask the user first whether they
+   clicked the original reset link on the same device/browser they
+   requested it from, and if not, whether the login page showed a
+   `?error=` message naming the actual failure -- either would confirm
+   or rule out this theory before building the fix.
+3. **Not a bug -- already fixed**: "I was able to see Sacrament
+   meeting songs only until I created an account and signed in then I
+   could see the full meeting agenda" (Jeremy Hardman, 2026-10-11) is
+   the exact symptom migration `075`'s own entry below already
+   describes and the user already confirmed fixed in production the
+   same day ("checked, it's working now"). Ask the user to mark this
+   row's Status as Done (or similar) on `/admin/feedback` so it stops
+   looking like an open item.
+4. **Content edit, not a code fix**: "Please use Google Sheets link
+   for Super Saturday `<url>`" (Jen Zaugg, 2026-10-11) is a request to
+   change one specific announcement's own Link field -- do this
+   directly in Manage Announcements (`/announcements`), not something
+   to build.
+5. **Too vague to act on**: "correct link to meeting notes" (Corey
+   Anderson, 2026-10-11) -- doesn't say which link, where it currently
+   points, or where it should point instead. Needs a follow-up from
+   Corey before anyone can do anything with it.
+6. **Noise**: "tying again" (Nick Newbold, 2026-10-11, on
+   `/admin/feedback` itself) -- a test submission from the day this
+   feature was first built. Safe to delete or mark Declined.
+7. **Suggestions, still Status = New, not built**: a "due to speak
+   next" list on Speaker & Prayer History (Andrew Bott, 2026-11-01) --
+   **flag before approving this one specifically**: it's the literal
+   "Due" list design this ward's own admin explicitly asked to have
+   *removed* on 2026-10-30 ("I would rather not have due lists, just
+   history lists... No need for due lists") -- a real end user is now
+   independently asking for what was just taken out, worth knowing
+   before deciding whether to bring it back. A missionary-email
+   auto-ingestion section (Jeremy Hardman, 2026-10-25) -- a genuinely
+   large feature (would need some kind of email-ingestion pipeline,
+   nothing like it exists in this app), not a quick build either way.
+   Background images for visual appeal (Corey Anderson, mistagged
+   "bug," 2026-10-11). Screenshot/image upload on the feedback widget
+   itself (Corey Anderson's own Suggestion plus Jeremy Hardman's
+   identically-themed "bug," both 2026-10-11) -- two different people
+   independently hit the same gap the same day, the most corroborated
+   ask on the list. A broader "upload images to support an event"
+   feature for content sections generally (Corey Anderson, 2026-10-11).
+   A "Ward Calendar View" (Corey Anderson, 2026-10-11) -- a real,
+   substantial feature idea, not yet scoped. None of these are built;
+   ask before approving any of them.
+
+**Bug found and fixed 2026-11-01: the top applied-assignment grid on
+`/rotations` never visibly updated after clicking Push.** The user's
+own report, right after confirming the push-pointer fix below: "ensure
+that the upper part of the rotations page updates upon pressing push."
+`pushRotation` (`app/rotations/actions.ts`) already calls
+`revalidatePath("/rotations")`, which does deliver fresh `rows`/
+`columns` props to `AssignmentGridForm` once a push completes -- the
+grid itself just never showed it. Every cell there is a `defaultValue`-
+based (uncontrolled) `<select>`, keyed only by `row.meetingId`/`c.key`
+(the role column), neither of which ever changes -- React keeps
+reusing the same mounted `<select>` across the refresh and only ever
+applies `defaultValue` once, at first mount. Same bug class already
+found and fixed twice elsewhere in this app (`SacramentProgramSection`'s
+`ItemRow`, `CallingPlanningGridForm`) -- `CallingCell`'s `<select>`
+(`components/rotations/AssignmentGridForm.tsx`) now carries
+`key={value}`, forcing a clean remount with a fresh default exactly
+when that cell's real value changes, never during an in-progress,
+unsaved edit (the key only changes once new server data actually
+arrives).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to push a rotation and confirm the grid above now visibly reflects the
+new assignments without needing a manual page reload.
+
+**Bug found and fixed 2026-11-01: "Manage Announcements" checkboxes
+could remove a "Where Announced" value but not add one.** The user's
+own feedback-widget report (Mark Young, filed 2026-10-23, surfaced
+during this same session's review of the whole feedback log -- see
+that entry above): "I am able to remove where to announce but not add
+by clicking the boxes." Root cause, found by reading the two halves of
+this column type together: `MultiSelectDropdown.tsx`'s own `toggleValue`
+appended a newly-checked value to the END of the `selected` array,
+regardless of where it canonically belongs; `parseMultiSelectValue`
+(`AdminTableEditor.tsx`) assumes the stored, joined string's values
+appear in the SAME order as the column's own `options` list, walking
+that list in order and peeling matches off the FRONT of the string --
+a documented assumption, "always correct for data saved through the
+real submit form," which an out-of-order *add* from this checkbox UI
+violated. A newly-checked box that landed anywhere but last in
+canonical order got silently dropped the very next render (the parser
+simply never found it), which looks exactly like clicking the checkbox
+did nothing -- while removing a value only ever filters the array,
+which can't disturb the order of what's left, so it always worked.
+Fixed by having `toggleValue`'s add case rebuild `selected` by walking
+`options` in their own canonical order, so the result (and the string
+`onChange` produces) can never land out of order regardless of which
+box was clicked when.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check a Where Announced (or Audience) cell on `/announcements` or
+`/admin/announcements`: checking a second or third box should now
+stick immediately, in whatever order they're clicked.
+
 **Bug found and fixed 2026-10-31: pushing a rotation kept "hanging
 onto who's next" instead of starting a freshly-curated list from the
 top.** The user's own report: "It seems to be hanging onto 'who's

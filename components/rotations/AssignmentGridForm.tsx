@@ -35,6 +35,21 @@ function formatDate(iso: string) {
  * assignment already exists here that doesn't map to any calling this
  * column tracks, and leaving it selected keeps that assignment intact
  * on save rather than silently clearing it.
+ *
+ * **Bug found and fixed 2026-11-01** (the user's own report: "ensure
+ * that the upper part of the rotations page updates upon pressing
+ * push"). `revalidatePath("/rotations")` (pushRotation,
+ * app/rotations/actions.ts) already delivers fresh `rows`/`columns`
+ * props after a push completes -- the grid just never showed it,
+ * since every `<select>` here is `defaultValue`-based (uncontrolled)
+ * and its row/column keys (`row.meetingId`/`c.key`) never change, so
+ * React keeps reusing the same mounted element and only ever applies
+ * `defaultValue` once, at first mount. Same bug class already found
+ * and fixed elsewhere in this app (SacramentProgramSection's `ItemRow`,
+ * CallingPlanningGridForm) -- keying the element on its own current
+ * value forces a clean remount with a fresh default exactly when that
+ * value actually changes, never during an in-progress, unsaved edit
+ * (since `value` only updates once new server data actually arrives).
  */
 function CallingCell({ name, callings, value }: { name: string; callings: { id: string; name: string }[]; value: string }) {
   const options =
@@ -43,6 +58,7 @@ function CallingCell({ name, callings, value }: { name: string; callings: { id: 
       : callings;
   return (
     <select
+      key={value}
       name={name}
       defaultValue={value}
       className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"

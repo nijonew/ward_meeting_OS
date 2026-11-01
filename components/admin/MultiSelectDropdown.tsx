@@ -60,8 +60,28 @@ export function MultiSelectDropdown({
 
   const selectedSet = new Set(selected);
 
+  /**
+   * Bug found and fixed 2026-11-01 (a real ward member's own feedback-
+   * widget report: "I am able to remove where to announce but not add
+   * by clicking the boxes"). Removing just filtered the array, which
+   * preserves whatever order it already had; adding used to append the
+   * newly-checked value at the END of `selected` regardless of click
+   * order. `parseMultiSelectValue` (AdminTableEditor.tsx) assumes the
+   * stored string's values appear in `options`' own canonical order --
+   * walking options in that order and peeling matches off the FRONT of
+   * the string -- so an append-at-the-end add could land out of order
+   * and get silently dropped the very next render, which looks exactly
+   * like checking the box did nothing. Now always rebuilds `selected`
+   * by walking `options` in their own order, so the result (and the
+   * joined string `onChange` produces) is never out of order regardless
+   * of which box was clicked when.
+   */
   function toggleValue(v: string) {
-    onChange(selectedSet.has(v) ? selected.filter((s) => s !== v) : [...selected, v]);
+    if (selectedSet.has(v)) {
+      onChange(selected.filter((s) => s !== v));
+      return;
+    }
+    onChange(options.filter((o) => selectedSet.has(o.value) || o.value === v).map((o) => o.value));
   }
 
   const summary =
