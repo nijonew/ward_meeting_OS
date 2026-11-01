@@ -2050,6 +2050,45 @@ avoid confusing the two.
 
 ## Known open items
 
+**Meeting cancellation wording changed to "Cancelled for `<reason>`,"
+not "Cancelled: `<reason>`," 2026-11-01. No migration needed.** The
+user's own report: "someone took that as the reason having been
+cancelled rather than the meeting being cancelled because of the
+reason." A real, reasonable misreading -- "Cancelled: General
+Conference" can parse as "General Conference has been cancelled"
+just as easily as "cancelled because of General Conference."
+
+Scoped to `meetings.cancellation_note` specifically (what the user
+called "our cancellation table" -- the shared `meeting_cancellations`
+sweep, or a manual per-meeting Cancel), not `youth_activities`' own,
+separate cancellation note (`app/events/page.tsx`,
+`components/youth-activities/ActivitiesTable.tsx`) -- left untouched
+since the user's own wording named meetings specifically; flag if the
+identical fix should apply there too.
+
+Four display sites, all meeting-occurrence lists or a meeting's own
+page chrome, same `: ${note}` -> ` for ${note}` fix in each (a bare
+"Cancelled" fallback when there's no note at all is unaffected by
+this, in every site that has one):
+- `app/dashboard/page.tsx` -- the per-row badge on the meeting list.
+- `app/meetings/[id]/layout.tsx` -- the shared Cancelled banner on a
+  meeting's own header.
+- `app/meetings/[id]/public/page.tsx` -- "This meeting has been
+  cancelled for `<reason>`."
+- `app/meetings/[id]/archived/page.tsx` -- "This meeting was
+  cancelled for `<reason>`."
+
+`lib/data/calendar.ts`'s own Sacrament Meeting cancellation wording
+(built the same day, "(No Sacrament Meeting due to `<reason>`)") was
+already phrased this same unambiguous way and needed no change.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check a cancelled meeting on `/dashboard`, a meeting's own header,
+`/meetings/[id]/public`, and `/meetings/[id]/archived` and confirm each
+now reads "Cancelled for `<reason>`" rather than "Cancelled:
+`<reason>`."
+
 **Ward Calendar View reworked the same day it shipped, 2026-11-01. No
 migration needed.** The user's own immediate follow-up, right after
 trying it: "for the calendar view lets hold off on including the

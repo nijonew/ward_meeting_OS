@@ -131,7 +131,11 @@ export default async function MeetingLayout({
         {meeting.cancelled && (
           <div className="mt-6 flex flex-wrap items-center gap-3 overflow-x-auto pb-1">
             <span className="whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-danger">
-              Cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : ""}
+              {/* "Cancelled for <reason>", not "Cancelled: <reason>"
+                  (2026-11-01, the user's own report: a colon reads as
+                  "the reason has been cancelled," not "the meeting
+                  was cancelled because of this reason"). */}
+              Cancelled{meeting.cancellationNote ? ` for ${meeting.cancellationNote}` : ""}
             </span>
           </div>
         )}

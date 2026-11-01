@@ -50,9 +50,13 @@ export default async function PublicViewPage({
   // before the admin/non-admin branch below so it applies regardless
   // of who's asking.
   if (meeting.cancelled) {
+    // "cancelled for <reason>", not "cancelled: <reason>" (2026-11-01,
+    // the user's own report: a colon reads as "the reason has been
+    // cancelled," not "the meeting was cancelled because of this
+    // reason").
     return (
       <p className="text-ink-muted">
-        This meeting has been cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
+        This meeting has been cancelled{meeting.cancellationNote ? ` for ${meeting.cancellationNote}` : "."}
       </p>
     );
   }

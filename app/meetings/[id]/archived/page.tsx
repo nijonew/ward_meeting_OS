@@ -477,8 +477,12 @@ export default async function ArchivedMeetingPage({
       </div>
 
       {meeting.cancelled && (
+        // "cancelled for <reason>", not "cancelled: <reason>"
+        // (2026-11-01, the user's own report: a colon reads as "the
+        // reason has been cancelled," not "the meeting was cancelled
+        // because of this reason").
         <div className="rounded border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
-          This meeting was cancelled{meeting.cancellationNote ? `: ${meeting.cancellationNote}` : "."}
+          This meeting was cancelled{meeting.cancellationNote ? ` for ${meeting.cancellationNote}` : "."}
         </div>
       )}
 
