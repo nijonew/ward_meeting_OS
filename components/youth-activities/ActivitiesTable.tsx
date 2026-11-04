@@ -442,7 +442,7 @@ export function ActivitiesTable({
                         href={COMBINED_GROUP_PATHS[row.source_group_name] ?? "/youth-activities"}
                         className="text-[11px] font-medium text-accent hover:underline"
                       >
-                        Shared {row.source_group_name} activity &mdash; edit on the {row.source_group_name} page &rarr;
+                        Edit activity &rarr;
                       </Link>
                     </div>
                   )}
