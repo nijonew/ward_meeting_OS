@@ -2050,6 +2050,46 @@ avoid confusing the two.
 
 ## Known open items
 
+**Youth Activities re-added to the Ward Calendar View, logged-in only,
+2026-11-04. No migration needed.** The calendar (`/calendar`, built
+2026-11-01) had Youth Activities removed entirely on day one, per the
+user's own "lets hold off on including the youth activities for now."
+The user's own follow-up: "I would like for the calendar to not show
+youth activities unless someone is logged in. If someone is logged in I
+want those shown."
+
+`getCalendarItems()` (`lib/data/calendar.ts`) now checks
+`getSessionUser()`'s own `user` first and only calls `getYouthActivities()`
+when one exists -- gated on plain sign-in, not on any specific feature
+or role, matching the user's own literal "someone is logged in" (this
+calendar has no other per-item role gating to match either). A youth
+activity renders the same way Sacrament Meeting already does for a
+cancellation -- the reason folded directly into the item's own `title`
+("`<title>` (Cancelled due to `<reason>`)") rather than any
+kind-specific styling in the page's render layer, since
+`youth_activities` carries the identical `cancelled`/`cancellation_note`
+shape. New `"youth"` `CalendarItemKind` (`app/calendar/page.tsx`) gets
+its own legend label ("Youth Activity") and dot color (`bg-success`,
+distinct from Sacrament/Ward/Announcement's existing colors) -- the
+legend itself also checks the same session and hides the Youth Activity
+entry entirely for a logged-out visitor, so it never promises a category
+that can't show up for them.
+
+**Noticed in passing, not fixed**: `CalendarItem.note` (a short second
+line meant for a location or a recurrence phrase) is populated for Ward
+Events (location) and Announcements ("Recurring") and now for Youth
+Activities too (the activity's own `group_name`) -- but nothing in
+`DayItem` (`app/calendar/page.tsx`) actually renders it anywhere. This
+predates this change; flag if a second line under the title turns out
+to be wanted after all.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calendar` logged out (no Youth Activity items or legend
+entry) and logged in (Youth Activity items show, including a cancelled
+one reading "`<title>` (Cancelled due to `<reason>`)", and the legend
+shows "Youth Activity" with its own green dot).
+
 **Youth Activities: cancellation finally honored as the highest-priority
 source, Combined pseudo-groups removed from the cancellation page's own
 checklist, edits to a Combined activity now auto-push to classes (not

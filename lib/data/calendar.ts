@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWardEvents } from "@/lib/data/ward-events";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
+import { getYouthActivities } from "@/lib/data/youth-activities";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
 
-export type CalendarItemKind = "sacrament" | "ward" | "announcement";
+export type CalendarItemKind = "sacrament" | "ward" | "announcement" | "youth";
 
 export interface CalendarItem {
   /** ISO date, "yyyy-mm-dd" -- which day cell this item lands in. */
@@ -78,11 +80,18 @@ async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   Falls back to "(No Sacrament Meeting)" with no reason clause for
  *   the rare case of a cancellation recorded with no note.
  *
- * - **Youth Activities, held off for now, 2026-11-01** (the user's own
- *   words: "lets hold off on including the youth activities for
- *   now") -- removed entirely, not just hidden; re-add the
- *   `getYouthActivities()` merge (see this function's own git
- *   history) if/when this comes back.
+ * - **Youth Activities, logged-in only, 2026-11-04** -- removed
+ *   entirely on 2026-11-01 ("lets hold off on including the youth
+ *   activities for now"), then re-added with a login gate the user's
+ *   own words asked for directly: "I would like for the calendar to
+ *   not show youth activities unless someone is logged in. If someone
+ *   is logged in I want those shown." Gated on plain sign-in (any
+ *   account, `getSessionUser()`'s own `user`), not on a specific
+ *   feature/role -- matches the user's own literal "someone is logged
+ *   in," and this calendar has no other per-item role gating to be
+ *   consistent with. Same cancelled-reason-in-title treatment as
+ *   Sacrament Meeting above, since `youth_activities` carries the same
+ *   `cancelled`/`cancellation_note` shape.
  * - **Ward Events**: `getWardEvents()`, unfiltered -- the same call
  *   `/events` already makes with no login gate; RLS already limits
  *   an anonymous visitor to `status = 'published'` rows (see that
@@ -98,10 +107,13 @@ async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   asked for here.
  */
 export async function getCalendarItems(): Promise<CalendarItem[]> {
-  const [sacramentMeetings, wardEvents, announcements] = await Promise.all([
+  const { user } = await getSessionUser();
+
+  const [sacramentMeetings, wardEvents, announcements, youthActivities] = await Promise.all([
     getAllSacramentMeetings(),
     getWardEvents(),
     getPublishedAnnouncements(),
+    user ? getYouthActivities() : Promise.resolve([]),
   ]);
 
   const items: CalendarItem[] = [];
@@ -139,6 +151,20 @@ export async function getCalendarItems(): Promise<CalendarItem[]> {
       title: an.title,
       kind: "announcement",
       note: an.recurrence ? "Recurring" : null,
+      href: null,
+    });
+  }
+
+  for (const a of youthActivities) {
+    const title = a.cancelled
+      ? `${a.title} (Cancelled${a.cancellation_note ? ` due to ${a.cancellation_note}` : ""})`
+      : a.title;
+    items.push({
+      date: a.activity_date,
+      time: a.activity_time,
+      title,
+      kind: "youth",
+      note: a.group_name,
       href: null,
     });
   }

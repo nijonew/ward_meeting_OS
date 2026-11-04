@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getCalendarItems, type CalendarItem, type CalendarItemKind } from "@/lib/data/calendar";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
 
 /**
  * Public Ward Calendar View (2026-11-01) -- no login required, same
@@ -10,8 +11,13 @@ import { getMountainTimeNow } from "@/lib/data/timezone";
  * Activities, Ward Events, and dated Announcements; reworked the same
  * day per the user's own follow-up -- see getCalendarItems' own doc
  * comment for the current scope (every Sacrament Meeting, cancelled
- * ones included with their own reason shown inline; Youth Activities
- * held off for now; Ward Events and Announcements unchanged).
+ * ones included with their own reason shown inline; Ward Events and
+ * Announcements unchanged).
+ *
+ * **Youth Activities are logged-in-only, 2026-11-04** -- the page
+ * itself needs no gate for this (it's `getCalendarItems()`'s own job
+ * to decide whether to include any at all), but still renders
+ * perfectly well with zero youth items for a logged-out visitor.
  *
  * Month navigation is plain `?y=&m=` links -- no client state needed,
  * since every month's own content is already public and cheap to
@@ -37,12 +43,14 @@ const KIND_LABELS: Record<CalendarItemKind, string> = {
   sacrament: "Sacrament Meeting",
   ward: "Ward Event",
   announcement: "Announcement",
+  youth: "Youth Activity",
 };
 
 const KIND_DOT_CLASS: Record<CalendarItemKind, string> = {
   sacrament: "bg-accent",
   ward: "bg-ink/40",
   announcement: "bg-danger",
+  youth: "bg-success",
 };
 
 function monthHref(year: number, month: number): string {
@@ -70,6 +78,7 @@ export default async function CalendarPage({
   searchParams: Promise<{ y?: string; m?: string }>;
 }) {
   const { y, m } = await searchParams;
+  const { user } = await getSessionUser();
   const { dateIso: todayIso } = getMountainTimeNow();
   const [todayYear, todayMonth] = todayIso.split("-").map(Number);
 
@@ -193,12 +202,14 @@ export default async function CalendarPage({
       </div>
 
       <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
-        {(Object.keys(KIND_LABELS) as CalendarItemKind[]).map((kind) => (
-          <span key={kind} className="flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${KIND_DOT_CLASS[kind]}`} aria-hidden="true" />
-            {KIND_LABELS[kind]}
-          </span>
-        ))}
+        {(Object.keys(KIND_LABELS) as CalendarItemKind[])
+          .filter((kind) => kind !== "youth" || user)
+          .map((kind) => (
+            <span key={kind} className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${KIND_DOT_CLASS[kind]}`} aria-hidden="true" />
+              {KIND_LABELS[kind]}
+            </span>
+          ))}
       </div>
     </main>
   );
