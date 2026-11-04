@@ -37,6 +37,19 @@ export function classesForCombinedGroup(groupName: string): string[] | null {
 }
 
 /**
+ * Where each Combined pseudo-group's own page lives -- the one place a
+ * shared Combined activity's fields can actually be edited. Used by
+ * Upcoming Activities (2026-11-04, see explodeActivitiesByClass's own
+ * updated comment below) to point a viewer at the real editing location
+ * instead of a dead end.
+ */
+export const COMBINED_GROUP_PATHS: Record<string, string> = {
+  "Combined YM": "/youth-activities/combined-ym",
+  "Combined YW": "/youth-activities/combined-yw",
+  "Combined YM/YW": "/youth-activities/combined-ym-yw",
+};
+
+/**
  * Which of a class's candidate rows on one date actually applies to
  * it, given a `group_name -> row` map for that date -- shared by
  * `getClassActivityGrid` and `explodeActivitiesByClass` below so the
@@ -80,6 +93,17 @@ export function resolveForClass<T extends { group_name: string }>(
  * keyed on `id`) and a "<group> activity." note prepended to whatever
  * real notes it already had, rather than ever showing "Combined ..."
  * in the Group column itself.
+ *
+ * **Also carries `source_group_name`, 2026-11-04** -- the real
+ * underlying `youth_activities.group_name` this row was drawn from
+ * ("Combined YM"/"Combined YW"/"Combined YM/YW"), or `null` for an
+ * ordinary individual-class row. This page has no edit affordance at
+ * all (by design), which made a Combined-sourced row look like a dead
+ * end to someone who landed here expecting to fix it -- exactly the
+ * gap flagged when diagnosing a Young Women president's report that
+ * she couldn't change an already-entered activity. `ActivitiesTable`
+ * uses this field to point back at the one real page where that row
+ * can actually be edited, via `COMBINED_GROUP_PATHS` above.
  */
 export function explodeActivitiesByClass(activities: YouthActivityRow[]): YouthActivityRow[] {
   const byDate = new Map<string, Map<string, YouthActivityRow>>();
@@ -101,6 +125,7 @@ export function explodeActivitiesByClass(activities: YouthActivityRow[]): YouthA
         id: isCombined ? `${source.id}::${className}` : source.id,
         group_name: className,
         notes: isCombined ? [`${source.group_name} activity.`, source.notes].filter(Boolean).join(" ") : source.notes,
+        source_group_name: isCombined ? source.group_name : null,
       });
     }
   }

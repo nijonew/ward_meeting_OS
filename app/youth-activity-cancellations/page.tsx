@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivityCancellations } from "@/lib/data/youth-activity-cancellations";
-import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
+import { ACTIVITY_CLASSES } from "@/lib/data/class-activities-shared";
 import {
   addYouthActivityCancellationAction,
   deleteYouthActivityCancellationAction,
@@ -133,13 +133,16 @@ export default async function YouthActivityCancellationsPage() {
 
           <fieldset className="rounded border border-rule px-3 py-2">
             <p className="text-xs text-ink-muted">
-              Cancel only these groups for the date range above (leave all unchecked to cancel every group)
+              Cancel only these classes/quorums for the date range above (leave all unchecked to
+              cancel every one of them). Combined YM/YW, Combined YM, and Combined YW aren&rsquo;t
+              listed here -- they&rsquo;re not groups of their own, just which classes share an
+              activity; checking all the classes a Combined activity covers has the same effect.
             </p>
             <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {YOUTH_ACTIVITY_GROUPS.map((g) => (
-                <label key={g.value} className="flex items-center gap-2 text-sm text-ink">
-                  <input type="checkbox" name="group_names" value={g.value} />
-                  {g.label}
+              {ACTIVITY_CLASSES.map((className) => (
+                <label key={className} className="flex items-center gap-2 text-sm text-ink">
+                  <input type="checkbox" name="group_names" value={className} />
+                  {className}
                 </label>
               ))}
             </div>

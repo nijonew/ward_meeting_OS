@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import { PushToClassesButton } from "@/components/youth-activities/PushToClassesButton";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
 import { DualScrollbar } from "@/components/DualScrollbar";
-import { classesForCombinedGroup } from "@/lib/data/class-activities-shared";
+import { classesForCombinedGroup, COMBINED_GROUP_PATHS } from "@/lib/data/class-activities-shared";
 import { saveActivityGrid, deleteYouthActivity } from "@/app/youth-activities/actions";
 import type { YouthActivityRow } from "@/lib/data/youth-activities";
 
@@ -434,6 +435,16 @@ export function ActivitiesTable({
                   )}
                   {!row.cancelled && !row.confirmed && (
                     <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">Tentative</span>
+                  )}
+                  {row.source_group_name && (
+                    <div className="mt-1">
+                      <Link
+                        href={COMBINED_GROUP_PATHS[row.source_group_name] ?? "/youth-activities"}
+                        className="text-[11px] font-medium text-accent hover:underline"
+                      >
+                        Shared {row.source_group_name} activity &mdash; edit on the {row.source_group_name} page &rarr;
+                      </Link>
+                    </div>
                   )}
                 </td>
                 {showPlanningGroupColumn && (

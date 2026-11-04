@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { classesForCombinedGroup } from "@/lib/data/class-activities-shared";
+import { overwriteClassesFromCombined } from "@/app/youth-activities/actions";
 
 type ActionResult = { error?: string; success?: boolean };
 
@@ -22,6 +24,17 @@ type ActionResult = { error?: string; success?: boolean };
  * to update, so it's always created as this class's own individual
  * activity -- there's no way to decide "this should actually be a
  * Combined week" from a single class's own page.
+ *
+ * **Also re-pushes to the other classes a Combined-sourced edit
+ * covers, 2026-11-04** -- same fix, same reasoning, as
+ * `saveActivityGrid`'s own comment (`app/youth-activities/actions.ts`):
+ * updating the shared row directly is already correct for any class
+ * still reading it live, but a class that already has its own stamped
+ * copy (from a prior overwrite) needs that copy re-pushed too, or it
+ * silently falls out of sync with what was just typed here. Never
+ * fires for a brand-new blank line filled in -- `blankRow` always
+ * gives that its own class's name, never a Combined one, so there's
+ * nothing to push.
  */
 export async function saveClassActivityGrid(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
   const { profile } = await getSessionUser();
@@ -64,27 +77,33 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
 
   const { data: existingRows, error: fetchError } = await supabase
     .from("youth_activities")
-    .select("id, activity_date, group_name")
+    .select("id, activity_date, group_name, activity_time, youth_lead, advisor_lead, notes")
     .in("activity_date", dates)
     .in("group_name", groupNames);
 
   if (fetchError) return { error: fetchError.message };
 
+  type ExistingRow = {
+    id: string;
+    activity_date: string;
+    group_name: string;
+    activity_time: string | null;
+    youth_lead: string | null;
+    advisor_lead: string | null;
+    notes: string | null;
+  };
   const existingByKey = new Map(
-    ((existingRows ?? []) as { id: string; activity_date: string; group_name: string }[]).map((r) => [
-      `${r.activity_date}::${r.group_name}`,
-      r.id,
-    ])
+    ((existingRows ?? []) as ExistingRow[]).map((r) => [`${r.activity_date}::${r.group_name}`, r])
   );
 
   const results = await Promise.all(
     entries.map(([key, fields]) => {
       const [activityDate, sourceGroupName] = key.split("::");
-      const existingId = existingByKey.get(key);
+      const existing = existingByKey.get(key);
 
       const confirmed = fields.confirmed === "true";
 
-      if (existingId) {
+      if (existing) {
         return supabase
           .from("youth_activities")
           .update({
@@ -94,7 +113,7 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
             planning_group: fields.planning_group || null,
             confirmed,
           })
-          .eq("id", existingId);
+          .eq("id", existing.id);
       }
 
       return supabase.from("youth_activities").insert({
@@ -113,6 +132,28 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
 
   const failed = results.find((r) => r.error);
   if (failed?.error) return { error: failed.error.message };
+
+  const overwriteResults = await Promise.all(
+    entries
+      .filter(([key]) => classesForCombinedGroup(key.split("::")[1]) !== null)
+      .map(([key, fields]) => {
+        const [activityDate, sourceGroupName] = key.split("::");
+        const existing = existingByKey.get(key);
+        return overwriteClassesFromCombined(supabase, {
+          activity_date: activityDate,
+          activity_time: existing?.activity_time ?? "19:00",
+          title: fields.title,
+          location: fields.location || null,
+          development_category: fields.development_category || null,
+          youth_lead: existing?.youth_lead ?? null,
+          advisor_lead: existing?.advisor_lead ?? null,
+          notes: existing?.notes ?? null,
+          group_name: sourceGroupName,
+        });
+      })
+  );
+  const overwriteFailed = overwriteResults.find((r) => "error" in r);
+  if (overwriteFailed && "error" in overwriteFailed) return { error: overwriteFailed.error };
 
   revalidatePath("/youth-activities/manage/classes");
   revalidatePath("/youth-activities/upcoming");

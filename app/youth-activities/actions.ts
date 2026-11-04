@@ -114,7 +114,7 @@ export async function generateYouthActivities(
   return { created: result.created, skippedExisting: result.skippedExisting };
 }
 
-type CombinedActivitySource = {
+export type CombinedActivitySource = {
   activity_date: string;
   activity_time: string | null;
   title: string;
@@ -142,13 +142,14 @@ type CombinedActivitySource = {
  * manageable after the copy).
  *
  * Shared between `pushCombinedActivityToClasses` (the manual
- * "Overwrite" button, re-syncing a Combined row's *later* edits) and
- * `addYouthActivity` (auto-overwrite at creation time, 2026-10-16) so
- * the two can't drift apart. A no-op, returning success immediately,
- * when `source.group_name` isn't one of the three Combined values --
- * callers that need to treat that as a real error (the manual button
- * should never actually hit this case, but stays defensive) check for
- * it themselves before calling in.
+ * "Overwrite" button), `addYouthActivity` (auto-overwrite at creation
+ * time, 2026-10-16), and `saveActivityGrid`/`saveClassActivityGrid`
+ * (auto-overwrite on every edit too, 2026-11-04 -- see each call
+ * site's own comment) so none of the four can drift apart. A no-op,
+ * returning success immediately, when `source.group_name` isn't one
+ * of the three Combined values -- callers that need to treat that as a
+ * real error (the manual button should never actually hit this case,
+ * but stays defensive) check for it themselves before calling in.
  *
  * This is a "stamp a copy out to each class" action, distinct from
  * `getClassActivityGrid`'s own live fallback display (a class with no
@@ -157,7 +158,7 @@ type CombinedActivitySource = {
  * of its own, so further edits from its own page only affect that one
  * class, not the shared Combined row or any other class's copy.
  */
-async function overwriteClassesFromCombined(
+export async function overwriteClassesFromCombined(
   supabase: Awaited<ReturnType<typeof createClient>>,
   source: CombinedActivitySource
 ): Promise<ActionResult> {
@@ -287,6 +288,27 @@ export async function pushCombinedActivityToClasses(activityId: string): Promise
  * can't see where we make something tentative vs confirmed") -- same
  * hidden-"false"-before-the-real-checkbox convention
  * `saveClassActivityGrid` already uses for this exact column.
+ *
+ * **Every save here also re-pushes to the classes it covers, 2026-11-04**
+ * (diagnosing a Young Women president's report that she couldn't
+ * change an already-entered activity: "How are those changes pushed to
+ * the listings for each group when a change is made?" -- the honest
+ * answer, until this fix, was "they aren't, unless you also click
+ * Overwrite"). Editing a Combined activity's content directly in this
+ * grid used to only update the one shared `youth_activities` row --
+ * any class that already had its own individual copy (stamped out at
+ * creation time, or by a prior manual Overwrite click) stayed exactly
+ * as it was, silently out of sync with the edit. Per the user's own
+ * priority rule ("the combined young women/young men is the next
+ * highest priority... it either overwrites the activities already
+ * entered... or writes an activity"), a Combined row's priority should
+ * hold for every write to it, not just its first one -- so every save
+ * now re-runs `overwriteClassesFromCombined` for each edited row that's
+ * actually a Combined one, the same push `addYouthActivity`/the manual
+ * "Overwrite" button already do. The manual button itself stays --
+ * still useful to force a re-push with no field actually changing (e.g.
+ * after a direct Table Admin edit, which bypasses this action
+ * entirely).
  */
 export async function saveActivityGrid(
   _prevState: { error?: string; success?: boolean },
@@ -317,6 +339,24 @@ export async function saveActivityGrid(
     if (!fields.title) return { error: "Title cannot be blank." };
   }
 
+  const ids = Array.from(byId.keys());
+  const { data: existingRows, error: fetchError } = await supabase
+    .from("youth_activities")
+    .select("id, activity_date, group_name, location, development_category, youth_lead, advisor_lead")
+    .in("id", ids);
+  if (fetchError) return { error: fetchError.message };
+
+  type ExistingRow = {
+    id: string;
+    activity_date: string;
+    group_name: string;
+    location: string | null;
+    development_category: string | null;
+    youth_lead: string | null;
+    advisor_lead: string | null;
+  };
+  const existingById = new Map(((existingRows ?? []) as ExistingRow[]).map((r) => [r.id, r]));
+
   const results = await Promise.all(
     Array.from(byId.entries()).map(([id, fields]) =>
       supabase
@@ -335,6 +375,28 @@ export async function saveActivityGrid(
   const failed = results.find((r) => r.error);
   if (failed?.error) return { error: failed.error.message };
 
+  const overwriteResults = await Promise.all(
+    Array.from(byId.entries())
+      .filter(([id]) => classesForCombinedGroup(existingById.get(id)?.group_name ?? "") !== null)
+      .map(([id, fields]) => {
+        const existing = existingById.get(id)!;
+        return overwriteClassesFromCombined(supabase, {
+          activity_date: existing.activity_date,
+          activity_time: fields.activity_time || null,
+          title: fields.title,
+          location: existing.location,
+          development_category: existing.development_category,
+          youth_lead: existing.youth_lead,
+          advisor_lead: existing.advisor_lead,
+          notes: fields.notes || null,
+          group_name: existing.group_name,
+        });
+      })
+  );
+  const overwriteFailed = overwriteResults.find((r) => "error" in r);
+  if (overwriteFailed && "error" in overwriteFailed) return { error: overwriteFailed.error };
+
+  revalidatePath("/youth-activities/manage/classes");
   revalidateActivityListings();
   return { success: true };
 }

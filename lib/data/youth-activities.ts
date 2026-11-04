@@ -19,6 +19,12 @@ export interface YouthActivityRow {
   confirmed: boolean;
   cancelled: boolean;
   cancellation_note: string | null;
+  /** UI-only, never a real column -- set only by
+   *  `explodeActivitiesByClass` (lib/data/class-activities-shared.ts)
+   *  on a row it drew from a shared Combined activity, naming which
+   *  one. Absent (undefined) on every plain row straight from this
+   *  function's own query. */
+  source_group_name?: string | null;
 }
 
 // No role branching needed here -- RLS on youth_activities already returns

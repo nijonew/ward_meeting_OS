@@ -2050,6 +2050,155 @@ avoid confusing the two.
 
 ## Known open items
 
+**Youth Activities: cancellation finally honored as the highest-priority
+source, Combined pseudo-groups removed from the cancellation page's own
+checklist, edits to a Combined activity now auto-push to classes (not
+just creation), and Upcoming Activities points to the real edit location
+for a Combined-sourced row -- all 2026-11-04. No migration needed.** The
+user laid out the intended priority model directly: Cancellations (the
+`youth_activity_cancellations` table/sweep) outrank everything, Combined
+YM/YW outranks the two single-gender Combined tables, which outrank an
+individual class's own activity -- and asked specifically how an edit to
+a Combined activity gets "pushed to the listings for each group," after
+the Young Women president reported she couldn't change an already-entered
+activity. Checked the actual code against all of this rather than
+guessing; found four real, confirmed gaps.
+
+1. **Combined YM/Combined YW/Combined YM/YW were listed as checkable
+   "affected groups" on `/youth-activity-cancellations`** -- a direct
+   violation of the user's own explicit rule ("combined ym/yw is not a
+   group unto itself so it should not be listed in any location where
+   groups affected are selected"). That page's checklist
+   (`app/youth-activity-cancellations/page.tsx`) iterated the full
+   `YOUTH_ACTIVITY_GROUPS` list (9 values, Combined pseudo-groups
+   included) instead of the 6 real classes. Switched to
+   `ACTIVITY_CLASSES` (`lib/data/class-activities-shared.ts`), with a
+   short explanatory line added to the fieldset for why the three
+   Combined names aren't options here.
+
+2. **The cancellation sweep (`sweepYouthActivityCancellations`,
+   `lib/data/youth-activity-cancellations.ts`) never created a row when
+   none existed** -- a real, literal gap against the user's own stated
+   rule: "If there is not a planned activity for that group for that
+   week an activity is input to show that the activity is cancelled --
+   no additional information needed for the week other than it is
+   cancelled." The old version only ever ran an `UPDATE` scoped
+   directly to whatever rows already existed for the cancelled date
+   range + `group_name` filter -- a class with nothing scheduled for a
+   cancelled week (no individual row, no Combined row covering it)
+   showed nothing cancelled at all, silently.
+
+   **A second, more serious bug was found alongside it**: filtering
+   straight on `group_name` can't safely touch a SHARED Combined row
+   when only *some* of the classes it covers are actually in this
+   cancellation's own `group_names` list -- e.g. cancelling just
+   Builders of Faith for a week that's really a "Combined YW" week
+   would, under the old logic, either miss it entirely (if filtered to
+   `group_name = "Builders of Faith"`, which doesn't exist as its own
+   row that week) or, worse, wrongly cancel Gatherers of Light and
+   Messengers of Hope too (if it matched and updated the shared
+   "Combined YW" row directly).
+
+   Rewritten to work per cancellation, per real class, per Wednesday
+   actually in range (`weeklyDates`, the same cadence helper
+   `getClassActivityGrid` already uses), with three outcomes mirroring
+   `resolveForClass`'s own precedence: an existing INDIVIDUAL row for
+   that class just gets marked cancelled; a SHARED Combined row whose
+   *every* attending class is also affected (or `group_names` is empty,
+   meaning everyone) gets cancelled directly, once; a SHARED Combined
+   row covering this class but NOT every class it covers gets left
+   completely alone, and this one class instead gets its own new
+   INDIVIDUAL row, cancelled -- which (per `resolveForClass`'s
+   "individual row wins" rule) takes over display for just that class
+   while everyone else sharing the Combined row keeps seeing it
+   normally. Nothing covering the class at all -> a brand-new
+   individual row, cancelled, with a literal placeholder title
+   (`"(No activity)"`, since "no additional information is needed" --
+   the existing "Cancelled" badge next to it already says the rest).
+   Processes cancellations one at a time (not all at once via
+   `Promise.all` the way the old version did) so two cancellations in
+   the same sweep can't race to insert the same brand-new row twice.
+
+3. **Editing a Combined activity's own content never pushed that
+   change out to classes that already had their own stamped copy** --
+   this is the most likely real explanation for the Young Women
+   president's report, and a direct answer to the user's own question
+   ("How are those changes pushed to the listings for each group when a
+   change is made?"): until now, the honest answer was "they aren't,
+   unless you also click the separate 'Overwrite' button." Creating a
+   brand-new Combined activity already auto-overwrote every class it
+   covers (`addYouthActivity`, 2026-10-16) -- but *editing* an
+   already-created one, either inline on its own Combined page's grid
+   (`saveActivityGrid`) or from a class's own per-class grid when that
+   class's row happens to be Combined-sourced (`saveClassActivityGrid`),
+   only ever updated the one shared row directly. A class that had
+   already been given its own individual copy (by the original
+   creation-time auto-overwrite, or by a prior manual "Overwrite"
+   click) kept that copy completely unchanged, now silently out of sync
+   with whatever was just edited -- indistinguishable, from the
+   editor's own point of view, from "my edit didn't take."
+
+   Per the user's own priority framing (Combined activities outrank
+   individual entries "when ... created ... or ... written," not just
+   the first time), both save actions now re-run the same
+   `overwriteClassesFromCombined` helper creation already used,
+   exported from `app/youth-activities/actions.ts` so
+   `app/youth-activities/manage/classes/actions.ts` can share it too,
+   for every edited row that's actually a Combined one. The manual
+   "Overwrite" button itself stays -- still useful to force a re-push
+   with nothing in this app's own actions having changed (e.g. after a
+   direct edit through Table Admin's raw grid, which bypasses both of
+   these actions entirely).
+
+4. **Upcoming Activities pointed to a dead end for a Combined-sourced
+   row** (the user's own direct follow-up, asking whether this was the
+   actual root cause: "If the issue... was due to trying to edit a
+   combined activity in the /upcoming page can we get a warning...
+   or... point people to the respective combined... pages to edit
+   those?"). That page has no edit affordance at all, by design, for
+   ANY row -- but a Combined-sourced one (shown there once per
+   attending class, via `explodeActivitiesByClass`) only ever got a
+   plain, unlinked note folded into its Notes column ("Combined YW
+   activity."), easy to miss and not actionable. `explodeActivitiesByClass`
+   (`lib/data/class-activities-shared.ts`) now also attaches
+   `source_group_name` to a Combined-sourced row (a new, UI-only,
+   optional field on `YouthActivityRow` -- `lib/data/youth-activities.ts`
+   -- never set outside this one function); `ActivitiesTable.tsx`
+   renders it as a real link, right under the title where an edit would
+   actually be attempted: "Shared `<Combined X>` activity -- edit on
+   the `<Combined X>` page ->", via a new `COMBINED_GROUP_PATHS` map.
+   Never shows on the three Combined-group pages themselves (their own
+   rows are never exploded) or on any individual-class row.
+
+**Confirmed already consistent, no change needed**: the user also asked
+for "consistency between the groups regarding how the tentative label
+is applied, changed, removed." Checked directly -- `ActivitiesTable.tsx`
+(the three Combined-group pages' own editable grid) and
+`ClassActivityGridForm.tsx` (the per-class grid) both already use the
+identical mechanism: a hidden `confirmed=false` field before the real
+checkbox (so unchecking it actually submits `false` instead of nothing),
+labeled "Confirmed," with the same `!cancelled && !confirmed` condition
+showing a "Tentative" badge next to the title everywhere. Applying,
+changing, and removing the label already works the same way on every
+class/quorum and on every Combined page.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure on
+`app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- ask the user to check: `/youth-activity-cancellations`'s own
+checklist now lists only the 6 real classes; entering a cancellation for
+a week with nothing scheduled yet for an affected class now shows that
+class as Cancelled rather than nothing; a partial cancellation (e.g.
+just one YW class during a Combined YW week) shows Cancelled only for
+that one class, with the other two YW classes still showing the
+original Combined activity unaffected; editing a Combined activity's
+title/time/location/category/notes directly (on its own Combined page,
+or from a class's own per-class page) now shows up for every class it
+covers without needing a separate Overwrite click; and that a
+Combined-sourced row on Upcoming Activities now shows a working "edit on
+the Combined `<X>` page" link.
+
 **Meeting cancellation wording changed to "Cancelled for `<reason>`,"
 not "Cancelled: `<reason>`," 2026-11-01. No migration needed.** The
 user's own report: "someone took that as the reason having been
