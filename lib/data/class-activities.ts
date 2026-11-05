@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { weeklyDates } from "@/lib/data/cadence";
 import { combinedTypeForClass, resolveForClass } from "@/lib/data/class-activities-shared";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import { runYouthActivitySweeps } from "@/lib/data/youth-activities";
 
 export { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 
@@ -51,6 +52,12 @@ function blankRow(activityDate: string, className: string): ClassActivityRow {
  * event, not a per-class copy of it.
  */
 export async function getClassActivityGrid(className: string, throughDateISO: string): Promise<ClassActivityRow[]> {
+  // This page queries youth_activities directly rather than through
+  // getYouthActivities(), so it has to trigger the same lazy sweeps
+  // itself (2026-11-04) -- see runYouthActivitySweeps' own comment for
+  // why, most directly the "TBD" placeholder fill.
+  await runYouthActivitySweeps();
+
   // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
   // see lib/data/meetings.ts's autoArchivePastMeetings for why.
   const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);

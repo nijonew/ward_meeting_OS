@@ -2050,6 +2050,113 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-04: a Combined YW activity showed twice
+on the calendar (once collectively, once per class) -- the other two
+Combined types didn't, yet, only because nobody had edited them since
+the auto-push fix shipped minutes earlier.** The user's own report,
+right after trying the group-name-prefix/collapse work: "I did see that
+the week of a combined YW activity there is a listing for each group
+with the combined activity title and group name, plus a listing for
+combined yw and the activity title. whereas the ym combined and ym/yw
+combined activities list only combined ym or combined ym/yw... I want
+the YW combined to be like the other combined activities listings."
+
+Root cause isn't a new bug in this calendar work -- it's a direct,
+expected side effect of this app's own established overwrite mechanism
+(`overwriteClassesFromCombined`), extended earlier today (see the
+"cancellation finally honored..." entry below) to also re-push on every
+EDIT, not just creation. Creating or editing a Combined activity stamps
+a real copy of it onto every class it covers so each class's own
+management grid has something to see/edit -- meaning the shared
+"Combined YW" row and its 3 stamped per-class copies all genuinely
+exist in `youth_activities` at once. Combined YM/Combined YM/YW hadn't
+shown this yet purely because nobody had touched them since that fix
+shipped -- the moment either gets edited, the identical duplication
+would appear there too. The calendar was simply dumping every raw row
+as its own line, with no awareness that some of them are just stamped
+mirrors of another.
+
+Fixed in `buildYouthActivityItems` (`lib/data/calendar.ts`): before
+rendering a date's individual-class rows, it now computes which real
+classes are already covered by any Combined-type row present that same
+date, and skips an individual row for a class already covered that way
+-- matching this app's own Combined-outranks-individual priority model
+(the same one behind the cancellation/overwrite work earlier today),
+not a content/title match, so this can't quietly stop working the
+moment one side diverges from the other. The "cancelled for all youth"
+collapse and the TBD-placeholder exclusion (both just below) still look
+at every raw row, unaffected -- only the per-row display loop dedupes.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calendar` on that same Combined YW week and confirm it now
+shows one "Combined YW: `<title>`" line, not four.
+
+**Youth Activities get a "TBD" placeholder for every class, every week,
+automatically -- 2026-11-04. No migration needed.** The user's own
+request: "I would like to have a placeholder activity for every youth
+group each week. It will list the group and TBD. I don't want to
+overwrite any existing activities with this, but would like to fill
+the rest of the table with these placeholders out as far as is
+reasonable." Confirmed via `AskUserQuestion`: automatic and ongoing
+(the same lazy-sweep pattern as the existing Combined-activity auto-
+generation), rolling ~3 months ahead.
+
+New `fillYouthActivityPlaceholders()` (`lib/data/youth-activity-schedule.ts`):
+for every Wednesday through the rolling horizon, for every one of the 6
+real classes, inserts a brand-new individual row (`title: "TBD"`, same
+defaults -- `activity_time: "19:00"`, `status: "published"`,
+`confirmed: false` -- every other individual-row insert in this app
+already uses) only when NOTHING covers that class that week yet --
+never touches anything that already exists, whether that's the class's
+own individual row or a shared Combined row covering it (its own
+single-gender Combined, or Combined YM/YW), regardless of that
+existing row's own status. Deliberately stores plain `"TBD"`, not
+`"<class>: TBD"` -- the calendar already prefixes a row's own group
+name onto its title (see the entry below), so baking the group in here
+too would double it up there ("Deacons: Deacons: TBD").
+
+**Must run strictly after the other three lazy sweeps settle, not
+alongside them** -- a real ordering requirement, not just tidiness: if
+this ran concurrently with `autoGenerateCombinedYouthActivities`/
+`sweepYouthActivityCancellations` (the existing `Promise.all`), it
+could race ahead of either one finishing and stamp a redundant "TBD"
+row for a class that's actually about to be covered by a Combined
+activity (or a cancellation) created in the very same sweep --
+`resolveForClass` always prefers a class's own individual row over a
+shared one, so a stray "TBD" would then silently hide the real
+activity from that one class's own view. New
+`runYouthActivitySweeps()` (`lib/data/youth-activities.ts`) is the one
+shared sequence ("the existing three, then this, in that order") --
+`getYouthActivities()` calls it, and so now does
+`getClassActivityGrid()` (`lib/data/class-activities.ts`), which
+queries `youth_activities` directly rather than through
+`getYouthActivities()` and would otherwise never trigger any of these
+sweeps at all -- a real, separate gap this closes along the way
+(visiting a single class's own grid first, before ever loading
+Upcoming Activities/a Combined page/the calendar, used to show that
+page's own "Not yet planned" blank-line fallback instead of a real,
+saved "TBD" row).
+
+**Calendar excludes a plain, un-cancelled "TBD" placeholder entirely**
+(`buildYouthActivityItems`, `lib/data/calendar.ts`) -- useful on the
+management grids as something to click into and fill in, but a wall of
+"`<class>`: TBD" for every class, every week nobody's decided anything
+for yet isn't information worth showing someone browsing what's
+actually happening on a shared calendar. A TBD row that's since been
+cancelled still counts, since cancelling something (even an unplanned
+placeholder) is a real fact -- and it still feeds the "cancelled for
+all youth" collapse.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: a class's own per-class grid (`/youth-activities/manage/classes`)
+now shows "TBD" as a real saved value for an upcoming week with nothing
+else planned, not just the input's own placeholder text; a week that's
+genuinely covered (an individual activity, or a Combined one) is left
+completely untouched; and `/calendar` (logged in) shows no "TBD" noise
+at all, while still collapsing a fully-cancelled week into one line.
+
 **Calendar's Youth Activity items now lead with the group name, and a
 ward-wide cancellation collapses into one line, 2026-11-04. No
 migration needed.** Direct follow-up to the "logged-in only" calendar

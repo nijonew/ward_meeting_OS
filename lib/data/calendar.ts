@@ -132,8 +132,44 @@ async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   "(Cancelled due to `<reason>`)" suffix, since cancellation isn't
  *   total for this date and still needs a day-of-week-sized line here
  *   rather than this function's own collapsed summary.
+ *
+ * **Plain, un-cancelled "TBD" placeholders don't show here at all,
+ * 2026-11-04** -- `fillYouthActivityPlaceholders`
+ * (`lib/data/youth-activity-schedule.ts`) now stamps a "TBD" row for
+ * every class with nothing covering it, every week, rolling ~3 months
+ * out, specifically so the management grids always have something to
+ * fill in rather than a blank line. That's genuinely useful on those
+ * pages; on a shared calendar it would just be a wall of "`<class>`:
+ * TBD" lines for everything nobody's decided yet, which isn't
+ * information worth showing someone browsing what's actually
+ * happening. A TBD row that's since been CANCELLED still counts --
+ * cancelling something, even an unplanned placeholder, is a real fact
+ * worth showing (and still feeds the "cancelled for all youth" check
+ * above).
+ *
+ * **An individual class row is suppressed once a Combined row already
+ * covers that same class on the same date, 2026-11-04** (the user's
+ * own report: a Combined YW week showed both "Combined YW: `<title>`"
+ * AND the same title again for each of the 3 YW classes individually
+ * -- "I want it listed once for the YW... and not individually and
+ * collectively"). Root cause isn't a calendar bug alone -- it's a real
+ * side effect of this app's own established overwrite behavior
+ * (`overwriteClassesFromCombined`, `app/youth-activities/actions.ts`):
+ * creating or editing a Combined activity stamps a real copy of it
+ * onto every class it covers, on purpose, so each class's own
+ * management grid has something to see/edit -- meaning the shared
+ * Combined row and its per-class copies genuinely both exist in the
+ * table at once. That's correct and necessary for the management
+ * grids; it's only a problem here, where the calendar was blindly
+ * showing every raw row as its own line. Fixed by always preferring
+ * the Combined line for a class the Combined row already covers,
+ * matching this app's own Combined-outranks-individual priority model
+ * -- regardless of whether the individual copy's own content still
+ * matches it exactly, so this can't quietly stop working the moment
+ * someone edits one side without the other.
  */
-function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarItem[] {
+function buildYouthActivityItems(rawYouthActivities: YouthActivityRow[]): CalendarItem[] {
+  const youthActivities = rawYouthActivities.filter((a) => a.cancelled || a.title !== "TBD");
   const byDate = new Map<string, YouthActivityRow[]>();
   for (const a of youthActivities) {
     const list = byDate.get(a.activity_date) ?? [];
@@ -142,9 +178,9 @@ function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarI
   }
 
   const items: CalendarItem[] = [];
-  for (const [date, rows] of byDate) {
+  for (const [date, allRows] of byDate) {
     const cancelledClasses = new Set<string>();
-    for (const r of rows) {
+    for (const r of allRows) {
       if (!r.cancelled) continue;
       for (const cls of classesForCombinedGroup(r.group_name) ?? [r.group_name]) {
         cancelledClasses.add(cls);
@@ -153,7 +189,7 @@ function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarI
 
     if (ACTIVITY_CLASSES.every((cls) => cancelledClasses.has(cls))) {
       const reasons = Array.from(
-        new Set(rows.filter((r) => r.cancelled && r.cancellation_note).map((r) => r.cancellation_note as string))
+        new Set(allRows.filter((r) => r.cancelled && r.cancellation_note).map((r) => r.cancellation_note as string))
       );
       items.push({
         date,
@@ -165,6 +201,13 @@ function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarI
       });
       continue;
     }
+
+    const combinedCoveredClasses = new Set<string>();
+    for (const r of allRows) {
+      const covered = classesForCombinedGroup(r.group_name);
+      if (covered) for (const cls of covered) combinedCoveredClasses.add(cls);
+    }
+    const rows = allRows.filter((r) => !combinedCoveredClasses.has(r.group_name));
 
     for (const r of rows) {
       const title = r.cancelled
