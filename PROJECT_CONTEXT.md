@@ -2050,6 +2050,66 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-04: a recurring, open-ended announcement
+(no defined end date -- migration 083's own "ongoing" meaning)
+disappeared within a day or so of being submitted, instead of staying
+"ongoing" as intended.** The user's own report, one of two raised in
+the same message: "I have an announcement that should be showing up
+that isn't." Traced every place `announcements` gets filtered by date
+(grepped for the `end_date ?? start_date` fallback pattern specifically,
+to make sure both sites were found, not just the one that happened to
+surface this report) and found the identical gap in two places, both
+fixed the same way:
+
+1. **`sweepPastAnnouncements`** (`lib/data/announcements.ts`, the lazy
+   sweep that archives a lapsed announcement on every read) computed
+   `effectiveDate = end_date ?? start_date` with no awareness of
+   `recurrence` at all -- correct for a genuine one-time event with
+   only a start date (a one-day item), but wrong for a recurring series
+   deliberately left open-ended: its `start_date` is virtually always
+   in the past by the time anyone's looking at it again, so it
+   archived within about a day of being submitted, recurrence or not.
+   Now skips archiving by date entirely when `recurrence` is set and
+   `end_date` is null -- a recurring row WITH a real end date set is
+   unaffected, still archives correctly once that date passes.
+2. **`autoPullSacramentAnnouncements`**'s own eligibility check
+   (`lib/data/sacrament-announcements.ts`, the sweep that auto-pulls an
+   announcement flagged "Sacrament Meeting" into every applicable
+   upcoming meeting) had the exact same bug in its own window
+   calculation (`windowEnd = row.end_date ?? row.start_date`),
+   directly contradicting this function's own stated goal ("land in
+   EVERY applicable Sacrament Meeting... up until the time the
+   announced item has lapsed or occurred" -- an item with no end never
+   lapses). A recurring, open-ended item stopped auto-pulling into new
+   meetings after its first week. Also now calls `sweepPastAnnouncements()`
+   first, matching every other announcement-reading function in this
+   app except the one that's deliberately exempt (`getAnnouncementsByPlannedElement`,
+   which intentionally keeps showing whatever was already pulled into
+   a specific meeting as that meeting's own historical record,
+   regardless of the announcement's later status).
+
+**Not yet root-caused: "I have an already-passed-date announcement
+still showing up."** Traced every announcement-reading function in the
+app (the public page, Manage Announcements/Table Admin, the calendar,
+Sacrament Meeting's own pull mechanism, and the collaborative meeting
+types' Review section) -- all correctly call `sweepPastAnnouncements()`
+except the one deliberately-exempt historical-record case named above,
+and the two real bugs just fixed both pushed the opposite direction
+(something disappearing too early, not lingering too long). This
+assistant has no live database access to inspect the specific
+announcement in question -- ask the user for its title, whether it's
+flagged recurring or a one-time item, and whether they're seeing it on
+`/announcements/public` specifically or within a meeting's own agenda,
+before guessing further.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: a recurring announcement with no end date set now stays
+published indefinitely (confirm it doesn't flip to Archived in Manage
+Announcements shortly after submission) and keeps auto-pulling into
+each new Sacrament Meeting's Announcements block, not just the first
+one.
+
 **The optional-image file picker on Submit Announcement and the
 Feedback Widget now renders as a real, obviously-clickable button,
 2026-11-04. No migration needed.** The user's own report: "it is not

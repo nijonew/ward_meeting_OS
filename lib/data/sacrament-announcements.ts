@@ -190,15 +190,29 @@ export async function nextAnnouncementPullSortOrder(plannedElementId: string): P
  * no behavior change (each eligible announcement is now inserted one at
  * a time rather than in a single batched insert, which has no visible
  * effect on the end result).
+ *
+ * **Bug found and fixed 2026-11-04: a recurring, open-ended announcement
+ * stopped auto-pulling into new Sacrament Meetings after one week.**
+ * Same root cause as `sweepPastAnnouncements`'s own identical bug fixed
+ * the same day -- `windowEnd = row.end_date ?? row.start_date` collapsed
+ * an "ongoing, no defined end" recurring series (`end_date` left null
+ * on purpose) down to a single-day window, the one matching its own
+ * `start_date`, directly contradicting this function's own stated goal
+ * ("land in EVERY applicable Sacrament Meeting during its window...
+ * up until the time the announced item has lapsed or occurred" -- a
+ * recurring item with no end never "lapses" at all). A recurring row
+ * WITH a real `end_date` set is unaffected, still bounded by it.
  */
 interface AnnouncementSweepCandidate {
   id: string;
   where_announced: string | null;
   start_date: string | null;
   end_date: string | null;
+  recurrence: string | null;
 }
 
 export async function autoPullSacramentAnnouncements(meetingId: string, meetingDateIso: string): Promise<void> {
+  await sweepPastAnnouncements();
   const supabase = await createClient();
 
   const { data: block } = await supabase
@@ -219,7 +233,7 @@ export async function autoPullSacramentAnnouncements(meetingId: string, meetingD
     fetchCandidates: async () => {
       const { data: candidates } = await supabase
         .from("announcements")
-        .select("id, where_announced, start_date, end_date")
+        .select("id, where_announced, start_date, end_date, recurrence")
         .eq("status", "published")
         .ilike("where_announced", `%${SACRAMENT_MEETING_ANNOUNCEMENT_LABEL}%`);
       return (candidates ?? []) as AnnouncementSweepCandidate[];
@@ -235,6 +249,7 @@ export async function autoPullSacramentAnnouncements(meetingId: string, meetingD
           const labels = (row.where_announced ?? "").split(",").map((s) => s.trim());
           if (!labels.includes(SACRAMENT_MEETING_ANNOUNCEMENT_LABEL)) return false;
           if (!row.start_date) return true; // no dates at all -- always active while published
+          if (row.recurrence && !row.end_date) return meetingDateIso >= row.start_date; // ongoing recurring series
           const windowEnd = row.end_date ?? row.start_date;
           return meetingDateIso >= row.start_date && meetingDateIso <= windowEnd;
         },

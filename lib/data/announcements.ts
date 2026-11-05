@@ -62,6 +62,22 @@ import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib
  * `image_url` nulled in the same pass an announcement lapses -- never
  * for one an admin archived by hand for some other reason, since this
  * sweep only ever touches rows it itself just flipped to `archived`.
+ *
+ * **Bug found and fixed 2026-11-04: a recurring announcement with no
+ * end date (migration 083's own "ongoing" meaning -- "Weekly on
+ * Sundays, starting September 6," no defined end) got archived the
+ * very first time this sweep ran after its own `start_date` passed,**
+ * the user's own report: "I have an announcement that should be
+ * showing up that isn't." This function never looked at `recurrence`
+ * at all -- `effectiveDate = end_date ?? start_date` falls back to
+ * `start_date` whenever `end_date` is null, which is correct for a
+ * genuine one-time event with only a start date (a one-day item), but
+ * wrong for a recurring series left deliberately open-ended: its
+ * `start_date` is virtually always in the past by the time anyone's
+ * looking, so it would archive within a day or so of being submitted,
+ * recurrence or not. A recurring row with `end_date` actually SET
+ * (a series with a real, defined end) is unaffected -- it still
+ * archives correctly once that real end date passes.
  */
 export async function sweepPastAnnouncements(): Promise<void> {
   const supabase = await createClient();
@@ -69,10 +85,11 @@ export async function sweepPastAnnouncements(): Promise<void> {
 
   const { data } = await supabase
     .from("announcements")
-    .select("id, start_date, start_time, end_date, end_time, image_url")
+    .select("id, start_date, start_time, end_date, end_time, image_url, recurrence")
     .eq("status", "published");
 
   const lapsed = (data ?? []).filter((a) => {
+    if (a.recurrence && !a.end_date) return false; // ongoing recurring series -- no defined end
     const effectiveDate = a.end_date ?? a.start_date;
     if (!effectiveDate) return false; // no date at all -- nothing to compare against
     if (effectiveDate < today) return true;
