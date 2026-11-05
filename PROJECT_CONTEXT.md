@@ -2050,6 +2050,159 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calendar gained a "My Meetings" source (Bishopric Meeting/Ward
+Council/Youth Council occurrences this account is invited to by
+calling, plus Youth Council for every youth leader regardless of
+calling) -- no migration needed, 2026-11-05.** The user's own request,
+in the same message as the dashboard reorganization below: "can we
+also have an individual's meetings to which they are typically invited
+show up for them in their calendar view? I would also like the Ward
+Youth Council meeting to show up in the calendar view of all youth
+leaders."
+
+New `lib/data/calendar.ts` pieces: `PERSONAL_MEETING_TYPES` (Bishopric
+Meeting/Ward Council/Youth Council -- deliberately excludes Sacrament
+Meeting, which this calendar already shows separately, cancelled-only,
+per the 2026-11-04 "every ward member is implicitly invited to it
+regardless of calling" reasoning already recorded above);
+`resolvePersonalMeetingTypes(userId, profile)` unions two independent
+paths -- whichever of those three types `getVisibleMeetingTypesForUser`
+already resolves for this account (the exact same calling ->
+`meeting_type_members`/granted-feature resolution the landing page's
+own "My meetings" tiles use), and Youth Council unconditionally for
+any account holding `youth_teaching_planning` or
+`youth_activity_planning` (the identical `isYouthLeader` check
+`app/page.tsx` already defines for its own "Youth program" section) --
+a youth leader's own calling very often doesn't map to Youth Council
+via `meeting_type_members` at all (that mapping is about who sits ON
+the council, not who leads the youth program it discusses), so this is
+a real, separate inclusion rule, not redundant with the calling-based
+path; `getPersonalMeetingOccurrences` queries `meetings` for those
+resolved types within the calendar's own displayed date range (bounded,
+unlike the cancelled-Sacrament-Meeting query, since these three types
+occur weekly/biweekly and querying every one ever would only grow more
+expensive over time); `buildPersonalMeetingItems` renders each as the
+plain meeting-type label, or "`<label>` (Cancelled due to `<reason>`)"
+for a cancelled occurrence -- matching the "shown, not hidden" rule
+every cancellation in this app already follows -- linking to the bare
+`/meetings/<id>` route so each viewer lands wherever their own access
+already sends them (Planning, the read-only viewer, or Archived),
+exactly like the week-nav arrows above already do.
+
+New `"meeting"` `CalendarItemKind`, legend-labeled "My Meetings"
+(`bg-ink` dot, distinct from Ward Event's `bg-ink/40`), gated logged-in-
+only in both the item source and the legend -- same shape as Youth
+Activities' existing login gate on this same page.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calendar` while signed in as an account whose calling maps
+to Bishopric Meeting/Ward Council (via `meeting_type_members`) and
+confirm that type's upcoming occurrences show up as "My Meetings"
+dots; and separately, as an account holding `youth_teaching_planning`
+or `youth_activity_planning` but with no calling mapped to Youth
+Council, confirm Youth Council's own occurrences still show up anyway.
+
+**Dashboard/landing page reorganized into six real feature categories,
+no migration needed, 2026-11-05.** The user's own request: "Can you
+help me with a larger feature organization scrub? I want the dashboard
+to be more organized. I anticipate a few category sections updates
+other than My Week. I like 'my meetings' but it seems like some
+features are not well organized. Do announcements, meeting planning,
+youth program, admin, still cover the best categories for the
+dashboard and can you suggest where features should live within that
+scheme or a new scheme? I want to keep raw data table edit locations in
+the admin table edit area and not in these categories."
+
+Audited every tile on `app/page.tsx` plus the three existing hub pages
+(`/meeting-planning`, `/admin`, `/youth-activity-planning`) before
+changing anything, rather than guessing at a new scheme cold.
+Deliberately chose to reorganize the landing page's own section
+groupings rather than nest anything deeper into an existing sub-hub --
+this app has a repeated, explicit history of "too many levels" being a
+real complaint (the Youth Activity Planning hub flattening, 2026-10-17;
+the Meeting Agendas/Meeting Planning split both staying exactly one
+level deep, 2026-09-09) -- so every destination page, and the hub
+pages themselves, are completely unchanged; only which landing-page
+section a tile's own link sits under moved.
+
+**Final scheme, six sections** (This week and My meetings keep their
+existing content, per the user's own "I like 'my meetings'"):
+- **This week** -- unchanged (Sacrament Meeting Program, Announcements,
+  Calendar, Youth Activities).
+- **My meetings** -- unchanged except Submit an Announcement moved out
+  (see below); still the per-type tiles, Meeting Agenda Items, and
+  Sacrament Meeting Programs early-preview tile.
+- **Announcements** (new) -- Submit an Announcement (moved here from
+  My meetings: submitting one isn't really "my meeting," it was only
+  ever grouped there because the same calling-attendance check
+  happened to gate both) and Manage Announcements (moved here from the
+  old "Administration" section -- it's squarely an announcements tool,
+  not a general admin one).
+- **Meeting Planning** (new) -- the existing Meeting Planning hub tile
+  (unchanged destination, `/meeting-planning`), plus three tiles that
+  used to sit loose under "Administration" with no real grouping of
+  their own: Calling Planning, Sacrament Meeting Music Planning, and
+  Elders Quorum / Relief Society Teaching -- all three are meeting-
+  planning tools in substance (who's speaking/singing/teaching for an
+  upcoming meeting), just previously scattered next to unrelated admin
+  tools instead of grouped with the hub that already covers the rest of
+  this same category.
+- **Youth program** -- unchanged (Youth Activity Planning hub tile).
+- **Admin** (renamed from "Administration," narrowed) -- now just
+  **Table Admin** itself, per the user's own explicit instruction to
+  keep "raw data table edit locations in the admin table edit area and
+  not in these categories." Every other tool that used to live in
+  "Administration" moved to a real category above instead of staying
+  here as a catch-all.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open `/` and confirm: "My meetings" no longer shows Submit an
+Announcement; a new "Announcements" section shows it plus Manage
+Announcements (for whoever already had either); a new "Meeting
+Planning" section shows the Meeting Planning hub tile plus Calling
+Planning/Music Planning/EQ-RS Teaching (for whoever already had any of
+those); and "Admin" shows only Table Admin, with every other tool
+reachable from its new home instead.
+
+**Conducting script no longer shows the same fact twice per row,
+2026-11-05. No migration needed (pure rendering change).** The user
+pasted the raw text of a real Conducting script and pointed out the
+actual problem directly: "The actual script text is the smallest
+text, the section title and the data to be presented are larger and
+stand out more than the actual script and provide a lot of data that
+is in the script and is unnecessarily repeated." Traced the pasted
+text against `buildConductingRows`/`conducting.ts` and confirmed a
+systematic pattern: wherever a `ConductingRow` has both a `value` and
+a `wording`, `wording` was always built by interpolating that exact
+`value` into a sentence (a hymn number + title, a name, a list of
+names) -- so showing both ever said the same thing twice, once as a
+bare fact and once inside the sentence that already contains it. One
+instance was an outright bug, not just a design tradeoff: each pulled
+announcement's own row set both `label` and `value` to the identical
+title string, which is exactly the "Stake Conference / Stake
+Conference / `<detail>`" duplication visible in the user's own pasted
+example.
+
+Fixed entirely in `components/planning/ConductingRowList.tsx`, with no
+data-layer change at all: a row now renders `wording` when it has one
+(a strict superset of `value` in every real case, so nothing is lost),
+falling back to `value` only for the handful of rows that have only
+ever been a bare fact with no sentence (Presiding, Conducting,
+Recognize Music, a Speaker's name). Whichever one shows is now the
+full-size, full-color line -- previously `wording` was deliberately the
+smaller, italic, muted one (a "suggestion" below the "real" value),
+exactly backwards for a script meant to be read aloud live, where the
+words to actually say are the important line, not the de-emphasized
+one. Dropped the italic styling too, for the same reason.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to open a real meeting's Conducting script and confirm no row shows the
+same fact twice (a hymn, a name, an announcement title), and that the
+one line each row does show reads clearly at full size.
+
 **Week-to-week navigation arrows on every meeting page, and an "Edit
 Notes" unlock on the Archived/Public view -- no migration needed,
 2026-11-05.** The user's own question and follow-up request: "How do

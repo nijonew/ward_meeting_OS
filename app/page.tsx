@@ -62,6 +62,12 @@ export default async function HomePage() {
   // attendsMeetings itself rather than folding the feature into that
   // broader check, since attendsMeetings also gates Meeting Agenda
   // Items, which this feature has no business reason to need.
+  //
+  // **Moved out of "My meetings" into its own "Announcements" section,
+  // 2026-11-05** (the user's own dashboard-reorganization request) --
+  // submitting an announcement isn't really "my meeting," it was only
+  // ever grouped there because the same calling-attendance check
+  // happened to gate both. See the Announcements section below.
   const canSubmitAnnouncement = attendsMeetings || hasFeature(profile, "announcement_adding");
 
   const canPlanAnyMeeting = hasAnyFeature(profile, allMeetingFeatures("planning"));
@@ -73,16 +79,39 @@ export default async function HomePage() {
     canPlanAnyMeeting || canMeetingSchedule || canMeetingCancellations || canRotations || canSpeakerPrayerHistory;
   const canCallingPlanning = hasFeature(profile, "calling_planning");
   const canAnnouncementManagement = hasFeature(profile, "announcement_management");
-  // Elders Quorum / Relief Society Teaching Planning (2026-11-05) --
-  // an adult-organization tool, so it sits in Administration rather
-  // than the youth-only "Youth program" section above.
   const canAdultTeachingPlanning = hasFeature(profile, "adult_teaching_planning");
+  // Dashboard reorganization, 2026-11-05 (the user's own request: "do
+  // announcements, meeting planning, youth program, admin still cover
+  // the best categories... can you suggest where features should
+  // live"). Four real sections now, each named for what it actually
+  // is, replacing the old single "Administration" catch-all that had
+  // quietly accumulated Calling Planning, Manage Announcements, Music,
+  // and EQ/RS Teaching alongside Meeting Planning and Table Admin with
+  // no real grouping logic behind it:
+  // - **Announcements** -- submitting and managing them, together.
+  // - **Meeting Planning** -- every tool that plans the actual content
+  //   of a meeting, not just one meeting type's own agenda: the
+  //   existing Meeting Planning hub, Calling Planning (callings get
+  //   pushed into Sacrament Meeting's own Ward Business), Sacrament
+  //   Meeting Music Planning (was its own standalone "Music" section --
+  //   folded in here instead, since a music-only account still only
+  //   ever saw the one tile it actually had either way), and Elders
+  //   Quorum / Relief Society Teaching.
+  // - **Youth program** -- unchanged.
+  // - **Admin** -- renamed from "Administration," narrowed to exactly
+  //   Table Admin (raw data tables + the identity/calling-administration
+  //   tools already nested under it -- Verify Logins, Calling
+  //   Features, Assign Callings, Meeting Templates, Archived People,
+  //   Merge Duplicate People) per the user's own explicit request to
+  //   keep raw-data-table editing confined to its own area rather than
+  //   scattered across these feature categories.
   const canTableAdmin =
     hasFeature(profile, "meeting_templates_admin") ||
     hasFeature(profile, "verify_logins") ||
     Array.from(profile?.features ?? []).some((f) => f.startsWith("table_admin_"));
-  const showAdministration =
-    canMeetingPlanningHub || canCallingPlanning || canAnnouncementManagement || canAdultTeachingPlanning || canTableAdmin;
+  const showAnnouncementsSection = canSubmitAnnouncement || canAnnouncementManagement;
+  const showMeetingPlanningSection = canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canAdultTeachingPlanning;
+  const showAdminSection = canTableAdmin;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -166,14 +195,16 @@ export default async function HomePage() {
           calling actually maps to (meeting_type_members) -- admins see
           all four regardless. Replaces the old single "Meetings" tile,
           which just linked to /dashboard's unfiltered hodgepodge of
-          every meeting type. Meeting Agenda Items and Submit an
-          Announcement both moved in here 2026-09-09 (were public
-          Tier-0 tiles before) per the user's own request -- both are
-          now only shown to accounts that actually attend a meeting by
-          calling (attendsMeetings), not to every logged-in account the
-          way the rest of this section's tiles are (those always
-          include Sacrament Meeting regardless of calling -- see the
-          comment above attendsMeetings).
+          every meeting type. Meeting Agenda Items moved in here
+          2026-09-09 (was a public Tier-0 tile before) per the user's
+          own request -- only shown to accounts that actually attend a
+          meeting by calling (attendsMeetings), not to every logged-in
+          account the way the rest of this section's tiles are (those
+          always include Sacrament Meeting regardless of calling -- see
+          the comment above attendsMeetings). Submit an Announcement
+          used to sit here too (same gate, since it happened to share
+          attendsMeetings) -- moved out to its own "Announcements"
+          section 2026-11-05, see that section's own comment.
           ~~Per-type tiles link with `readonly=1`~~ -- true only until
           2026-10-07. Reversed per the user's own follow-up request,
           after repeatedly needing Delete from exactly this entry
@@ -182,7 +213,7 @@ export default async function HomePage() {
           already requires a real planning feature regardless of this
           flag, so dropping it only changes anything for an account
           that actually holds one. */}
-      {user && (visibleMeetingTypes.length > 0 || canSubmitAnnouncement) && (
+      {user && visibleMeetingTypes.length > 0 && (
         <section className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">My meetings</p>
           <TileGrid>
@@ -199,12 +230,6 @@ export default async function HomePage() {
                 href="/submit/agenda-item"
               />
             )}
-            {canSubmitAnnouncement && (
-              <Tile
-                title="Submit an Announcement"
-                href="/submit/announcement"
-              />
-            )}
             {hasFeature(profile, "sacrament_program_view") && (
               <Tile
                 title="Sacrament Meeting Programs"
@@ -215,23 +240,67 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 3 -- music coordinator + bishopric. Was two tiles
-          (Sacrament Music Planning + a separate Music Coordination
-          status overview) -- merged into one 2026-09-08 per the user's
-          own call: the per-meeting Planning view (unified 2026-09-08,
-          priority queue item 1 above) already covers everyday status
-          for one meeting at a time, so a separate weeks-at-a-glance
-          overview page added an entry point without adding a real
-          capability. /music-coordination and its data module were
-          removed outright, not just unlinked. */}
-      {isMusicPlanner && (
+      {/* New section, 2026-11-05 -- see showAnnouncementsSection's own
+          comment above. Submit an Announcement (moved from "My
+          meetings") and Manage Announcements (moved from the old
+          "Administration" grab-bag) together -- the public
+          Announcements listing itself stays in "This week" above,
+          deliberately not duplicated here, since that's a different
+          kind of tile (no login needed, nothing to manage from it). */}
+      {showAnnouncementsSection && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Music</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Announcements</p>
           <TileGrid>
-            <Tile
-              title="Sacrament Meeting Music Planning"
-              href="/music"
-            />
+            {canSubmitAnnouncement && (
+              <Tile
+                title="Submit an Announcement"
+                href="/submit/announcement"
+              />
+            )}
+            {canAnnouncementManagement && (
+              <Tile
+                title="Manage Announcements"
+                href="/announcements"
+              />
+            )}
+          </TileGrid>
+        </section>
+      )}
+
+      {/* New section, 2026-11-05 -- see showMeetingPlanningSection's
+          own comment above. Everything that plans what actually
+          happens content-wise in a meeting, not just the existing
+          Meeting Planning hub -- Calling Planning, Sacrament Meeting
+          Music Planning (was its own standalone "Music" section), and
+          Elders Quorum / Relief Society Teaching all moved in here. */}
+      {showMeetingPlanningSection && (
+        <section className="mt-10">
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Meeting Planning</p>
+          <TileGrid>
+            {canMeetingPlanningHub && (
+              <Tile
+                title="Meeting Planning"
+                href="/meeting-planning"
+              />
+            )}
+            {canCallingPlanning && (
+              <Tile
+                title="Calling Planning"
+                href="/calling-planning"
+              />
+            )}
+            {isMusicPlanner && (
+              <Tile
+                title="Sacrament Meeting Music Planning"
+                href="/music"
+              />
+            )}
+            {canAdultTeachingPlanning && (
+              <Tile
+                title="Elders Quorum / Relief Society Teaching"
+                href="/adult-teaching-planning"
+              />
+            )}
           </TileGrid>
         </section>
       )}
@@ -262,41 +331,18 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tier 4 -- shown only when at least one of its own tiles is
-          accessible (2026-10-04, granular-features pass) -- no more
-          single "bishopric" role gating the whole section; each tile
-          below is shown on its own feature. */}
-      {showAdministration && (
+      {/* Renamed from "Administration" and narrowed to exactly Table
+          Admin, 2026-11-05 -- see showAdminSection's own comment above
+          for why: every other tool that used to sit in this grab-bag
+          now has a real home in Announcements, Meeting Planning, or
+          Youth program, leaving this section as the deliberately
+          small, clearly-labeled raw-data escape hatch the user asked
+          to keep separate from the feature categories above. */}
+      {showAdminSection && (
         <section className="mt-10">
-          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Administration</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">Admin</p>
           <TileGrid>
-            {canMeetingPlanningHub && (
-              <Tile
-                title="Meeting Planning"
-                href="/meeting-planning"
-              />
-            )}
-            {canCallingPlanning && (
-              <Tile
-                title="Calling Planning"
-                href="/calling-planning"
-              />
-            )}
-            {canAnnouncementManagement && (
-              <Tile
-                title="Manage Announcements"
-                href="/announcements"
-              />
-            )}
-            {canAdultTeachingPlanning && (
-              <Tile
-                title="Elders Quorum / Relief Society Teaching"
-                href="/adult-teaching-planning"
-              />
-            )}
-            {canTableAdmin && (
-              <Tile title="Table Admin" href="/admin" />
-            )}
+            <Tile title="Table Admin" href="/admin" />
           </TileGrid>
         </section>
       )}

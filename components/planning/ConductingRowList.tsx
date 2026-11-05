@@ -1,12 +1,38 @@
 import type { ConductingRow } from "@/lib/data/conducting-rows";
 
 /**
- * Read-only presentation for the Conducting view's rows (2026-09-10) --
- * label always shown; the resolved value (if any) right below it; a
- * suggested spoken line (if any) below that, visually distinct (italic,
- * muted) so it reads as a suggestion rather than data. A row with
- * neither (a pure banner like "Title" with only wording, or a divider)
- * just renders whichever pieces it has.
+ * Read-only presentation for the Conducting view's rows.
+ *
+ * **Reworked 2026-11-05** (the user's own report, pasting the raw text
+ * of a real conducting script to show it directly: "The actual script
+ * text is the smallest text, the section title and the data to be
+ * presented are larger and stand out more than the actual script and
+ * provide a lot of data that is in the script and is unnecessarily
+ * repeated"). Confirmed by tracing the pasted text against
+ * `buildConductingRows`/`conducting.ts`: wherever a row has both a
+ * `value` and a `wording`, `wording` was *always* built by
+ * interpolating that exact `value` into a sentence (a hymn number +
+ * title, a name, a list of names) -- so showing both ever said the
+ * same thing twice, once as a bare fact and once inside the sentence
+ * that already contains it. One real, literal instance of this was an
+ * outright bug, not just a design tradeoff: each pulled announcement's
+ * own row set `label` and `value` to the identical string (its title),
+ * which is exactly the "Stake Conference / Stake Conference / <detail>"
+ * duplication in the user's own pasted example.
+ *
+ * Fixed by never showing both -- a row renders `wording` when it has
+ * one (a strict superset of `value` in every real case, so nothing is
+ * lost), falling back to `value` only for the handful of rows that
+ * have only ever been a bare fact with no sentence at all (Presiding,
+ * Conducting, Recognize Music, a Speaker's name). Whichever one ends
+ * up showing is now the full-size, full-color line -- previously
+ * `wording` was deliberately the smaller, italic, muted one (a
+ * "suggestion" below the "real" value), which is exactly backwards
+ * for a script meant to be read aloud live: the words to actually say
+ * are the important line on the row, not the de-emphasized one.
+ * Dropped the italic styling too -- legible at speaking speed mattered
+ * more here than visually marking it as "spoken text" once it's the
+ * only text on the row.
  */
 export function ConductingRowList({ rows }: { rows: ConductingRow[] }) {
   return (
@@ -23,11 +49,12 @@ export function ConductingRowList({ rows }: { rows: ConductingRow[] }) {
           );
         }
 
+        const text = row.wording || row.value;
+
         return (
           <div key={row.id}>
             <p className="font-mono text-[11px] uppercase tracking-wider text-ink-muted/70">{row.label}</p>
-            {row.value && <p className="mt-0.5 text-base text-ink">{row.value}</p>}
-            {row.wording && <p className="mt-1 text-sm italic leading-relaxed text-ink-muted">{row.wording}</p>}
+            {text && <p className="mt-0.5 text-base leading-relaxed text-ink">{text}</p>}
           </div>
         );
       })}

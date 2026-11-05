@@ -4,9 +4,11 @@ import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
 import { announcementOccurrenceDates } from "@/lib/data/announcements";
 import { getYouthActivities, type YouthActivityRow } from "@/lib/data/youth-activities";
 import { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
-import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getSessionUser, hasFeature, type SessionProfile } from "@/lib/supabase/get-session-user";
+import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
+import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 
-export type CalendarItemKind = "sacrament" | "ward" | "announcement" | "youth";
+export type CalendarItemKind = "sacrament" | "ward" | "announcement" | "youth" | "meeting";
 
 export interface CalendarItem {
   /** ISO date, "yyyy-mm-dd" -- which day cell this item lands in. */
@@ -118,6 +120,13 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   displayed month grid -- since an ongoing series (`end_date` left
  *   null on purpose) has no real upper bound to expand against
  *   otherwise.
+ * - **"My meetings," added 2026-11-05** -- Bishopric Meeting/Ward
+ *   Council/Youth Council occurrences this signed-in account is
+ *   either invited to by calling, or (Youth Council specifically)
+ *   leads the youth program regardless of calling. See
+ *   `resolvePersonalMeetingTypes`'s own comment for the two paths and
+ *   `buildPersonalMeetingItems` for how a cancelled one renders.
+ *   Logged-out visitors get none, same gating as Youth Activities.
  */
 /**
  * "Can we put the group name in front of the activity title? And if
@@ -238,6 +247,100 @@ function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarI
 }
 
 /**
+ * Which non-Sacrament meeting types count as "an individual's own
+ * meetings" for the calendar (2026-11-05, the user's own request: "can
+ * we also have an individual's meetings to which they are typically
+ * invited show up for them in their calendar view?"). Deliberately
+ * excludes Sacrament Meeting -- it's already on this calendar via
+ * `getCancelledSacramentMeetings` (cancelled-only, 2026-11-04, to avoid
+ * showing a dot every single Sunday), and every ward member is
+ * implicitly "invited" to it regardless of calling, so there's no real
+ * "my meetings" distinction to draw for that one type here.
+ */
+const PERSONAL_MEETING_TYPES: MeetingTypeSlug[] = ["bishopric-meeting", "ward-council", "youth-council"];
+
+interface PersonalMeetingRow {
+  id: string;
+  date: string;
+  cancelled: boolean | null;
+  cancellation_note: string | null;
+  meeting_types: { slug: string } | { slug: string }[] | null;
+}
+
+async function getPersonalMeetingOccurrences(
+  slugs: MeetingTypeSlug[],
+  rangeStartIso: string,
+  rangeEndIso: string
+): Promise<PersonalMeetingRow[]> {
+  if (slugs.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id, date, cancelled, cancellation_note, meeting_types!inner(slug)")
+    .in("meeting_types.slug", slugs)
+    .gte("date", rangeStartIso)
+    .lte("date", rangeEndIso);
+  if (error || !data) return [];
+  return data as unknown as PersonalMeetingRow[];
+}
+
+/**
+ * Resolves which meeting types should render as "my meetings" on the
+ * calendar for the signed-in account -- two independent paths, unioned
+ * (2026-11-05):
+ *
+ * - **By calling**: whichever of Bishopric Meeting/Ward Council/Youth
+ *   Council `getVisibleMeetingTypesForUser` already resolves for this
+ *   account -- the exact same calling -> `meeting_type_members` (or a
+ *   granted viewing/planning/agenda_items feature) resolution the
+ *   landing page's own "My meetings" tiles use, narrowed to just these
+ *   three types (Sacrament Meeting is excluded by `PERSONAL_MEETING_TYPES`
+ *   itself, see that constant's own comment).
+ * - **Youth Council for every youth leader, regardless of calling**
+ *   (the user's own explicit follow-up: "I would also like the Ward
+ *   Youth Council meeting to show up in the calendar view of all youth
+ *   leaders"). Reuses the exact same `isYouthLeader` feature check
+ *   `app/page.tsx` already defines for its own "Youth program"
+ *   section (`youth_teaching_planning` or `youth_activity_planning`) --
+ *   a youth leader's own calling very often doesn't map to Youth
+ *   Council via `meeting_type_members` at all (that mapping is about
+ *   who sits ON the council, not who leads a youth program it
+ *   discusses), so this is a real, separate inclusion rule, not
+ *   redundant with the calling-based path above.
+ */
+async function resolvePersonalMeetingTypes(userId: string, profile: SessionProfile | null): Promise<MeetingTypeSlug[]> {
+  const slugs = new Set<MeetingTypeSlug>();
+
+  const visible = await getVisibleMeetingTypesForUser(userId, profile?.features);
+  for (const slug of visible) {
+    if (PERSONAL_MEETING_TYPES.includes(slug)) slugs.add(slug);
+  }
+
+  if (hasFeature(profile, "youth_teaching_planning") || hasFeature(profile, "youth_activity_planning")) {
+    slugs.add("youth-council");
+  }
+
+  return Array.from(slugs);
+}
+
+function buildPersonalMeetingItems(rows: PersonalMeetingRow[]): CalendarItem[] {
+  return rows.map((row) => {
+    const meetingType = Array.isArray(row.meeting_types) ? row.meeting_types[0] : row.meeting_types;
+    const slug = (meetingType?.slug ?? "bishopric-meeting") as MeetingTypeSlug;
+    const label = MEETING_TYPE_LABELS[slug];
+    const title = row.cancelled ? `${label} (Cancelled${row.cancellation_note ? ` due to ${row.cancellation_note}` : ""})` : label;
+    return {
+      date: row.date,
+      time: null,
+      title,
+      kind: "meeting",
+      note: null,
+      href: `/meetings/${row.id}`,
+    };
+  });
+}
+
+/**
  * `rangeStartIso`/`rangeEndIso` bound how far a recurring announcement
  * gets expanded into real per-occurrence items -- see
  * `announcementOccurrenceDates`'s own comment. Callers pass their own
@@ -245,13 +348,19 @@ function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarI
  * including its leading/trailing days from adjacent months).
  */
 export async function getCalendarItems(rangeStartIso: string, rangeEndIso: string): Promise<CalendarItem[]> {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
 
-  const [cancelledSacramentMeetings, wardEvents, announcements, youthActivities] = await Promise.all([
+  // Resolved before the main Promise.all below, since it needs the
+  // user's own id/profile first and then feeds the personal-meetings
+  // query that goes into that same batch.
+  const personalMeetingTypes = user ? await resolvePersonalMeetingTypes(user.id, profile) : [];
+
+  const [cancelledSacramentMeetings, wardEvents, announcements, youthActivities, personalMeetings] = await Promise.all([
     getCancelledSacramentMeetings(),
     getWardEvents(),
     getPublishedAnnouncements(),
     user ? getYouthActivities() : Promise.resolve([]),
+    getPersonalMeetingOccurrences(personalMeetingTypes, rangeStartIso, rangeEndIso),
   ]);
 
   const items: CalendarItem[] = [];
@@ -297,6 +406,7 @@ export async function getCalendarItems(rangeStartIso: string, rangeEndIso: strin
   }
 
   items.push(...buildYouthActivityItems(youthActivities));
+  items.push(...buildPersonalMeetingItems(personalMeetings));
 
   return items;
 }

@@ -19,6 +19,12 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * to decide whether to include any at all), but still renders
  * perfectly well with zero youth items for a logged-out visitor.
  *
+ * **"My Meetings" (Bishopric Meeting/Ward Council/Youth Council
+ * occurrences this account is invited to), added 2026-11-05** -- same
+ * logged-in-only shape as Youth Activities; see
+ * `resolvePersonalMeetingTypes` in `lib/data/calendar.ts` for who
+ * actually sees which.
+ *
  * Month navigation is plain `?y=&m=` links -- no client state needed,
  * since every month's own content is already public and cheap to
  * refetch. `getCalendarItems()` fetches every source unfiltered by
@@ -53,6 +59,7 @@ const KIND_LABELS: Record<CalendarItemKind, string> = {
   ward: "Ward Event",
   announcement: "Announcement",
   youth: "Youth Activity",
+  meeting: "My Meetings",
 };
 
 const KIND_DOT_CLASS: Record<CalendarItemKind, string> = {
@@ -60,6 +67,7 @@ const KIND_DOT_CLASS: Record<CalendarItemKind, string> = {
   ward: "bg-ink/40",
   announcement: "bg-danger",
   youth: "bg-success",
+  meeting: "bg-ink",
 };
 
 function monthHref(year: number, month: number): string {
@@ -216,7 +224,7 @@ export default async function CalendarPage({
 
       <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
         {(Object.keys(KIND_LABELS) as CalendarItemKind[])
-          .filter((kind) => kind !== "youth" || user)
+          .filter((kind) => (kind !== "youth" && kind !== "meeting") || user)
           .map((kind) => (
             <span key={kind} className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${KIND_DOT_CLASS[kind]}`} aria-hidden="true" />
