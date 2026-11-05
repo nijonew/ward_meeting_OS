@@ -2128,15 +2128,37 @@ change, so they're flagged in `meeting-auth.ts`'s own comment rather
 than fixed as a drive-by -- a real security pass would need to close
 all of them at once, a separate task.
 
+**Corrected the same day, before ever being confirmed working**: the
+user's own follow-up reversed the "show the unlock button regardless
+of stage" choice above: "I would prefer the unlock button be only in
+past meetings. Anyone with notes writing access in any form should be
+able to write notes in a meeting that has not been archived without
+having the unlock button." `archived/page.tsx` now branches directly
+on `meeting.stage === "archived"` -- archived still renders
+`NotesEditToggle` (locked by default, dimmed, click to unlock) exactly
+as before; anything else (a still-open meeting) skips the toggle
+entirely and renders the real editable forms (`notesEditable`) with no
+lock, no button, no dimming. This is a safe simplification, not a new
+access decision -- `showRealTimeNotes` can only be true on a
+*non-archived* meeting via `isAdmin` or the `<type>_notes` feature,
+the exact same two checks `canEditNotes` makes, so reaching this
+section pre-archive already implies the viewer has editing rights to
+it; there's no case where someone sees real-time notes without also
+being allowed to write them. `NotesEditToggle` itself is unchanged
+except for its own doc comment -- it still only knows "lock/unlock
+around these two renderings," now called only from the archived
+branch.
+
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
 database-access gap as everything else in this project -- ask the user
-to check: every meeting page now shows &larr;/&rarr; arrows to the
-nearest earlier/later meeting of the same type; a Bishopric Meeting/
-Ward Council/Youth Council's Archived/Public view shows an "Edit Notes"
-button for an account holding that type's own notes (or planning)
-feature, which swaps in the real editable forms and saves correctly;
-and that an ordinary calling-based viewer with neither feature sees the
-read-only notes with no button and no dimming at all.
+to check: a still-open (not yet archived) Bishopric Meeting/Ward
+Council/Youth Council shows Minutes/Action Items/Council Notes as real
+editable forms directly, with no "Edit Notes" button and no dimming,
+for an account holding that type's notes (or planning) feature; once
+that same meeting archives, the identical content now shows locked and
+dimmed by default, with the "Edit Notes" button needed to unlock it;
+and an ordinary calling-based viewer with neither feature still sees
+the read-only notes on either case with no button at all.
 
 **Hymn titles in the public Sacrament Meeting program are now real
 hyperlinks to the song's own page on churchofjesuschrist.org, opening

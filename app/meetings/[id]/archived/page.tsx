@@ -472,6 +472,91 @@ export default async function ArchivedMeetingPage({
 
   const elementFields = isSacrament ? templateElements.map(renderElement).filter(Boolean) : [];
 
+  // Read-only vs. editable renderings of Minutes/Action Items/Council
+  // Notes, split out so the archived/not-archived branch below can pick
+  // between them directly -- see that branch's own comment for why.
+  const notesReadOnly = (
+    <div className="flex flex-col gap-6">
+      {isBishopric && bishopricData?.minutes && (
+        <div className="rounded border border-rule bg-surface p-6">
+          <h2 className="font-display text-xl">Minutes</h2>
+          <div className="mt-4 flex flex-col gap-2">
+            {[
+              { label: "Spiritual Thought", presenter: bishopricData.minutes.spiritual_thought_presenter_id, text: bishopricData.minutes.spiritual_thought_notes },
+              { label: "Handbook Training", presenter: bishopricData.minutes.handbook_training_presenter_id, text: bishopricData.minutes.handbook_training_topic },
+            ].map(
+              (f) =>
+                (f.text || f.presenter) && (
+                  <Row key={f.label} label={f.label}>
+                    {f.presenter && <Plain>{personName(people, f.presenter)}</Plain>}
+                    {f.text && <Note>{f.text}</Note>}
+                  </Row>
+                )
+            )}
+            {[
+              { label: "Calendar Review", text: bishopricData.minutes.calendar_review_notes },
+              { label: "Callings Discussion", text: bishopricData.minutes.callings_discussion_notes },
+              { label: "Sacrament Meeting Review", text: bishopricData.minutes.sacrament_planning_discussion_notes },
+              { label: "Young Men Coordination", text: bishopricData.minutes.young_men_coordination_notes },
+              { label: "Impressions", text: bishopricData.minutes.impressions },
+              { label: "General Minutes", text: bishopricData.minutes.minutes_body },
+            ].map((f) => f.text && (
+              <Row key={f.label} label={f.label}>
+                <Note>{f.text}</Note>
+              </Row>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isBishopric && bishopricData && bishopricData.actionItems.length > 0 && (
+        <div className="rounded border border-rule bg-surface p-6">
+          <h2 className="font-display text-xl">Action Items</h2>
+          <div className="mt-4 flex flex-col gap-2">
+            {bishopricData.actionItems.map((item) => (
+              <div key={item.id} className={ROW}>
+                <p className={LABEL}>
+                  {item.assigned_to_name ?? "Unassigned"}
+                  {item.due_date ? ` · Due ${item.due_date}` : ""}
+                  {item.completed ? " · Done" : ""}
+                </p>
+                <Note>{item.description}</Note>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isCouncil && (councilNotes?.notes || councilNotes?.next_meeting_date) && (
+        <div className="rounded border border-rule bg-surface p-6">
+          <h2 className="font-display text-xl">Council Notes</h2>
+          <div className="mt-4 flex flex-col gap-2">
+            {councilNotes?.notes && (
+              <Row label="Notes">
+                <Note>{councilNotes.notes}</Note>
+              </Row>
+            )}
+            {councilNotes?.next_meeting_date && (
+              <Row label="Next Meeting">
+                <Plain>{councilNotes.next_meeting_date}</Plain>
+              </Row>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const notesEditable = (
+    <div className="flex flex-col gap-6">
+      {isBishopric && <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData?.minutes ?? null} />}
+      {isBishopric && (
+        <ActionItemsSection meetingId={meetingId} items={bishopricData?.actionItems ?? []} people={people} />
+      )}
+      {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
+    </div>
+  );
+
   const musicRows = sacramentData?.music ?? [];
   const speakerRows = [
     ...(renderedSlotKinds.has("speaker") ? sacramentData?.speakersAdults ?? [] : []),
@@ -590,91 +675,26 @@ export default async function ArchivedMeetingPage({
         </div>
       )}
 
-      {showRealTimeNotes && (isBishopric || isCouncil) && (
-        <NotesEditToggle
-          canEdit={canEditNotes}
-          readOnly={
-            <div className="flex flex-col gap-6">
-              {isBishopric && bishopricData?.minutes && (
-                <div className="rounded border border-rule bg-surface p-6">
-                  <h2 className="font-display text-xl">Minutes</h2>
-                  <div className="mt-4 flex flex-col gap-2">
-                    {[
-                      { label: "Spiritual Thought", presenter: bishopricData.minutes.spiritual_thought_presenter_id, text: bishopricData.minutes.spiritual_thought_notes },
-                      { label: "Handbook Training", presenter: bishopricData.minutes.handbook_training_presenter_id, text: bishopricData.minutes.handbook_training_topic },
-                    ].map(
-                      (f) =>
-                        (f.text || f.presenter) && (
-                          <Row key={f.label} label={f.label}>
-                            {f.presenter && <Plain>{personName(people, f.presenter)}</Plain>}
-                            {f.text && <Note>{f.text}</Note>}
-                          </Row>
-                        )
-                    )}
-                    {[
-                      { label: "Calendar Review", text: bishopricData.minutes.calendar_review_notes },
-                      { label: "Callings Discussion", text: bishopricData.minutes.callings_discussion_notes },
-                      { label: "Sacrament Meeting Review", text: bishopricData.minutes.sacrament_planning_discussion_notes },
-                      { label: "Young Men Coordination", text: bishopricData.minutes.young_men_coordination_notes },
-                      { label: "Impressions", text: bishopricData.minutes.impressions },
-                      { label: "General Minutes", text: bishopricData.minutes.minutes_body },
-                    ].map((f) => f.text && (
-                      <Row key={f.label} label={f.label}>
-                        <Note>{f.text}</Note>
-                      </Row>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isBishopric && bishopricData && bishopricData.actionItems.length > 0 && (
-                <div className="rounded border border-rule bg-surface p-6">
-                  <h2 className="font-display text-xl">Action Items</h2>
-                  <div className="mt-4 flex flex-col gap-2">
-                    {bishopricData.actionItems.map((item) => (
-                      <div key={item.id} className={ROW}>
-                        <p className={LABEL}>
-                          {item.assigned_to_name ?? "Unassigned"}
-                          {item.due_date ? ` · Due ${item.due_date}` : ""}
-                          {item.completed ? " · Done" : ""}
-                        </p>
-                        <Note>{item.description}</Note>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isCouncil && (councilNotes?.notes || councilNotes?.next_meeting_date) && (
-                <div className="rounded border border-rule bg-surface p-6">
-                  <h2 className="font-display text-xl">Council Notes</h2>
-                  <div className="mt-4 flex flex-col gap-2">
-                    {councilNotes?.notes && (
-                      <Row label="Notes">
-                        <Note>{councilNotes.notes}</Note>
-                      </Row>
-                    )}
-                    {councilNotes?.next_meeting_date && (
-                      <Row label="Next Meeting">
-                        <Plain>{councilNotes.next_meeting_date}</Plain>
-                      </Row>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          }
-          editable={
-            <div className="flex flex-col gap-6">
-              {isBishopric && <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData?.minutes ?? null} />}
-              {isBishopric && (
-                <ActionItemsSection meetingId={meetingId} items={bishopricData?.actionItems ?? []} people={people} />
-              )}
-              {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
-            </div>
-          }
-        />
-      )}
+      {showRealTimeNotes &&
+        (isBishopric || isCouncil) &&
+        (meeting.stage === "archived" ? (
+          // Archived: locked by default, since this is the "finalized
+          // agenda" record -- canEditNotes gates whether the unlock
+          // button shows at all.
+          <NotesEditToggle canEdit={canEditNotes} readOnly={notesReadOnly} editable={notesEditable} />
+        ) : (
+          // Not yet archived: no lock, no button at all (2026-11-05,
+          // the user's own correction -- "the unlock button [should]
+          // be only in past meetings... able to write notes in a
+          // meeting that has not been archived without having the
+          // unlock button"). Reaching this branch already implies
+          // canEditNotes is true -- showRealTimeNotes itself only ever
+          // becomes true pre-archive via `isAdmin` or the `notes`
+          // feature, the exact same two checks canEditNotes makes --
+          // so anyone who can even see this section on a still-open
+          // meeting already has editing rights to it.
+          notesEditable
+        ))}
 
     </div>
   );

@@ -15,13 +15,22 @@ import type { ReactNode } from "react";
  * (not because they hold the `<type>_notes` feature themselves) never
  * gets it, same gate Planning itself uses for these forms.
  *
- * Also the first real way to write notes at all for an account that
+ * **Archived meetings only** -- the caller (`archived/page.tsx`) only
+ * renders this component once `meeting.stage === "archived"`; a still-
+ * open meeting renders `editable` directly instead, no lock/button at
+ * all (2026-11-05, the user's own correction: "I would prefer the
+ * unlock button be only in past meetings. Anyone with notes writing
+ * access... should be able to write notes in a meeting that has not
+ * been archived without having the unlock button"). This component
+ * itself doesn't know about `stage` -- it's purely "show a lock/unlock
+ * toggle around these two renderings," which the archived case still
+ * needs and the live case no longer does.
+ *
+ * Still the first real way to write notes at all for an account that
  * holds `<type>_notes` but not the broader `<type>_planning` --
  * Planning (the only other place these forms render) is gated on
  * `planning`, not `notes`, so someone with notes-only access had no
- * editing surface anywhere, for any meeting, before this. Deliberately
- * not scoped to archived meetings for that reason -- the button shows
- * whenever `canEdit` is true, regardless of the meeting's own stage.
+ * editing surface anywhere, for any meeting, before this.
  *
  * The locked (read-only) view renders visibly dimmed whenever `canEdit`
  * is true -- a plain visual cue that this specific viewer *could*
