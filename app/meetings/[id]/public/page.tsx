@@ -117,7 +117,21 @@ export default async function PublicViewPage({
           className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule/40 py-2 last:border-0"
         >
           <span className="text-ink">{item.heading}</span>
-          {item.detail && <span className="text-right text-ink-muted">{item.detail}</span>}
+          {item.detail && (
+            <span className="text-right text-ink-muted">
+              {item.url ? (
+                // Opens in a new tab (2026-11-05, the user's own
+                // request) -- rel="noopener noreferrer" alongside
+                // target="_blank" so the new tab can't reach back into
+                // this page via window.opener.
+                <a href={item.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">
+                  {item.detail}
+                </a>
+              ) : (
+                item.detail
+              )}
+            </span>
+          )}
         </div>
       ))}
     </div>

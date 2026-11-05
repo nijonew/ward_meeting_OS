@@ -3,10 +3,20 @@ import { getMeetingById } from "@/lib/data/meetings";
 import { getSacramentProgramItems } from "@/lib/data/sacrament-program";
 import { kindOfItemKey } from "@/lib/data/sacrament-program-shared";
 import { getTitlePrefixesForAssignments, formatTitleLastName } from "@/lib/data/person-display";
+import { getHymnalIndex } from "@/lib/data/hymnal";
+import { resolveHymnUrl } from "@/lib/data/hymnal-shared";
 
 export interface PublicOrderItem {
   heading: string;
   detail: string | null;
+  /** The hymn's own official page, when `detail` names one (Opening/
+   *  Sacrament/Intermediate/Closing Hymn only -- never a Musical
+   *  Number, which isn't necessarily in Music Reference at all) and
+   *  Music Reference has a link on file for it -- see migration 101.
+   *  2026-11-05, the user's own request: "I would like for hymns
+   *  titles when shown in the public programs to be hyperlinks to the
+   *  associated hymn pages on the site." */
+  url?: string | null;
 }
 
 export interface PublicSacramentView {
@@ -60,6 +70,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     musicRes,
     rabnmRes,
     programItems,
+    hymnalIndex,
   ] = await Promise.all([
     supabase.rpc("get_meeting_special_format", { p_meeting_id: meetingId }),
     supabase
@@ -83,6 +94,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
       .eq("status", "published"),
     supabase.from("sacrament_rabnm").select("id, detail").eq("meeting_id", meetingId).eq("type", "baby_blessing"),
     getSacramentProgramItems(meetingId),
+    getHymnalIndex(),
   ]);
 
   const meeting = await meetingPromise;
@@ -170,6 +182,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
   items.push({
     heading: "Opening Hymn",
     detail: openingHymn ? `${openingHymn.hymn_number ?? ""} ${openingHymn.piece_name ?? ""}`.trim() : null,
+    url: openingHymn?.hymn_number ? resolveHymnUrl(openingHymn.hymn_number, hymnalIndex) : null,
   });
   items.push({ heading: "Opening Prayer", detail: roleName("opening_prayer") });
 
@@ -203,6 +216,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     detail: sacramentHymn
       ? `Sacrament Hymn: ${sacramentHymn.hymn_number ?? ""} ${sacramentHymn.piece_name ?? ""}`.trim()
       : null,
+    url: sacramentHymn?.hymn_number ? resolveHymnUrl(sacramentHymn.hymn_number, hymnalIndex) : null,
   });
 
   const specialFormat = (formatRes.data as string | null) ?? "standard";
@@ -242,6 +256,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
       items.push({
         heading: "Intermediate Hymn",
         detail: `${musicItem.hymn_number ?? ""} ${musicItem.piece_name ?? ""}`.trim(),
+        url: musicItem.hymn_number ? resolveHymnUrl(musicItem.hymn_number, hymnalIndex) : null,
       });
     } else {
       const performer = musicItem.group_name || (musicItem.individual_id ? nameById.get(musicItem.individual_id) : null);
@@ -256,6 +271,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
   items.push({
     heading: "Closing Hymn",
     detail: closingHymn ? `${closingHymn.hymn_number ?? ""} ${closingHymn.piece_name ?? ""}`.trim() : null,
+    url: closingHymn?.hymn_number ? resolveHymnUrl(closingHymn.hymn_number, hymnalIndex) : null,
   });
   items.push({ heading: "Closing Prayer", detail: roleName("closing_prayer") });
 

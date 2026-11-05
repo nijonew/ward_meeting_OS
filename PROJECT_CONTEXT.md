@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 100
+## Current migration number: 101
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,102 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Hymn titles in the public Sacrament Meeting program are now real
+hyperlinks to the song's own page on churchofjesuschrist.org, opening
+in a new tab -- migration `101`, not yet run, 2026-11-05.** The user's
+own request: "I would like for hymns titles when shown in the public
+programs to be hyperlinks to the associated hymn pages on the
+site... I want for the links to open the music reference in a new tab
+rather than in the tab open to the sacrament program they are
+viewing." Also asked to add it "as a field" on `hymnal_songs` so it's
+part of Music Reference generally, not something computed on the fly.
+
+**Real links, not guessed slugs.** Rather than constructing a URL from
+each title (risky at ~700 entries -- a wrong guess would silently link
+to a 404 or, worse, the wrong song), every one of the three
+collections' real pages
+(`.../media/music/collections/hymns`, `.../hymns-for-home-and-church`,
+`.../childrens-songbook`) was opened directly in the built-in browser
+and its own `<a href>` list read straight out of the DOM via
+`javascript_tool` -- the real, authoritative link for all 699 songs
+currently seeded in this table (341 + 90 + 268, one query per
+collection since each page already lists every song it has via its
+own `limit=500` query param, no pagination needed). Verified the
+site's own `crumbs`/`songListFilters` query params aren't required --
+a bare `.../media/music/songs/<slug>?lang=eng` loads the identical
+page -- so the stored `url` is just that simpler form.
+
+**Found while gathering this: the real collections have grown since
+this table was last seeded.** Hymns for Home and Church now has 90
+songs on the real site (1001-1078, 1201-1212) vs. the 82 this table
+has had since migration `040` (1001-1072, 1201-1210) -- 8 real songs
+(1073-1078, 1211, 1212) exist on the church's own site with no row
+here at all. The Children's Songbook may have a similar small gap too
+(migration `027`'s own note: "a handful of entries where the source's
+own views disagreed were left out rather than guessed at"). Migration
+`101` only ever sets `url` on a (songbook, number) that already has a
+row -- it never inserts a new song, since adding new Music Reference
+entries is a separate decision from "link the songs we already have."
+Ask before adding those 8 (or any Children's Songbook gaps) as new
+rows if that turns out to matter.
+
+**Schema**: new `hymnal_songs.url text` column. New `resolveHymnUrl`
+(`lib/data/hymnal-shared.ts`), the url-returning sibling of the
+existing `resolveHymnTitle` -- same songbook disambiguation (the "C"
+prefix convention), both now share one `findHymnalEntry` lookup
+internally rather than duplicating that logic. `getHymnalIndex()`
+(`lib/data/hymnal.ts`) now also selects `url`.
+
+**New anon-facing RLS policy, the real reason this needed its own
+migration rather than just a column.** `hymnal_songs` has been
+authenticated-only since migration `024` -- fine while Music Reference
+was purely an internal admin lookup, but the public Sacrament Meeting
+program (`/meetings/[id]/public`) is read by genuinely anonymous,
+no-login visitors every week, and would have silently gotten zero
+hymn links without this fix (the query would come back empty under
+RLS, no error, just no `url` ever resolved). Same class of gap, same
+fix, as `sacrament_program_items`'s own anon policy added in migration
+`075` -- this table holds nothing but public-domain song titles/
+numbers/links, nothing sensitive, so a plain `anon` SELECT policy is
+the right, simple fix here too (no security-definer RPC needed, unlike
+`people`, which holds real admin data `get_public_people_names` has to
+stay narrow around).
+
+**Wiring**: `getPublicSacramentView` (`lib/data/public-view.ts`) now
+also fetches `getHymnalIndex()` (folded into the function's existing
+`Promise.all`, no extra round trip beyond the one new query) and
+resolves a `url` for exactly the four hymn-type `PublicOrderItem`s --
+Opening Hymn, the Sacrament Hymn line inside "Administration of the
+Sacrament," Intermediate Hymn, Closing Hymn -- via each one's own
+`hymn_number`. **Deliberately not Musical Number** -- that item's
+`piece_name` is free text the admin typed in directly, not necessarily
+anything in Music Reference at all, so there's no reliable number to
+resolve a link from. `app/meetings/[id]/public/page.tsx` wraps
+`item.detail` in a real `<a href={item.url} target="_blank"
+rel="noopener noreferrer">` whenever `item.url` is set, plain text
+otherwise -- `rel="noopener noreferrer"` alongside `target="_blank"`
+so the new tab can't reach back into the program page via
+`window.opener`, per the user's own "open... in a new tab" request.
+Scoped to the public program only, per the user's own wording ("shown
+in the public programs") -- Planning/Conducting/Archived still show
+plain hymn text, unchanged.
+
+Table Admin's "Music Reference" grid (`lib/admin/registry.ts`) gained
+a plain "Link" column so an admin can review or correct one by hand.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- **confirm migration number `101` is actually free before
+running it**, per this project's own repeated numbering-collision
+history, then ask the user to run it and check: a real Sacrament
+Meeting's public program (logged out, in a private/incognito window)
+shows each hymn's title as a real underlined link, opening the right
+song's own churchofjesuschrist.org page in a new tab; a Musical Number
+stays plain text; and Table Admin's Music Reference grid shows the new
+Link column.
 
 **Youth Teaching Planning reworked into real Teacher/Topic columns with
 a rolling 6-month window and a 5th-Sunday default, plus a brand-new

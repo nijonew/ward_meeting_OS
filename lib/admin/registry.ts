@@ -175,6 +175,9 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       // lettered suffix (e.g. "20a"/"20b" are two different songs).
       { column: "number", label: "Number", type: "text", required: true },
       { column: "title", label: "Title", type: "text", required: true },
+      // The song's own official page, used by the public Sacrament
+      // Meeting program to hyperlink hymn titles -- migration 101.
+      { column: "url", label: "Link", type: "text" },
     ],
   },
 

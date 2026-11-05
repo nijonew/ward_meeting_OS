@@ -24,6 +24,11 @@ export interface HymnalIndexEntry {
   songbook: string;
   number: string;
   title: string;
+  /** The song's own official page on churchofjesuschrist.org, when
+   *  Music Reference has one on file (migration 101) -- null for any
+   *  row that predates that migration or whose number isn't on the
+   *  real site yet. */
+  url?: string | null;
 }
 
 /** Splits a raw hymn-number field's typed value into which songbook it
@@ -47,10 +52,26 @@ export function parseHymnNumberInput(raw: string): { childrens: boolean; number:
  *  it), since a non-match just means a typo, a number not yet in Music
  *  Reference, or an in-progress keystroke. */
 export function resolveHymnTitle(raw: string, index: HymnalIndexEntry[]): string | null {
+  const hit = findHymnalEntry(raw, index);
+  return hit?.title ?? null;
+}
+
+/** Same disambiguation as resolveHymnTitle, but for the song's own
+ *  official page link (migration 101) rather than its title -- used by
+ *  the public program to turn a hymn's title into a hyperlink. Returns
+ *  null whenever there's no match, or the matched row has no url on
+ *  file yet (never written for it, or added to Music Reference after
+ *  migration 101 ran without a link). */
+export function resolveHymnUrl(raw: string, index: HymnalIndexEntry[]): string | null {
+  const hit = findHymnalEntry(raw, index);
+  return hit?.url ?? null;
+}
+
+function findHymnalEntry(raw: string, index: HymnalIndexEntry[]): HymnalIndexEntry | null {
   const parsed = parseHymnNumberInput(raw);
   if (!parsed) return null;
   const hit = parsed.childrens
     ? index.find((e) => e.songbook === "childrens_songbook" && e.number === parsed.number)
     : index.find((e) => e.songbook !== "childrens_songbook" && e.number === parsed.number);
-  return hit?.title ?? null;
+  return hit ?? null;
 }

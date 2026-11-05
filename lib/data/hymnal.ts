@@ -15,7 +15,7 @@ export * from "@/lib/data/hymnal-shared";
  */
 export async function getHymnalIndex(): Promise<HymnalIndexEntry[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("hymnal_songs").select("songbook, number, title");
+  const { data } = await supabase.from("hymnal_songs").select("songbook, number, title, url");
   return (data ?? []) as HymnalIndexEntry[];
 }
 
