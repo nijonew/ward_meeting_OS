@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { usePathname } from "next/navigation";
 import { submitFeedback } from "@/app/feedback-actions";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 const initialState: { error?: string; success?: boolean } = {};
 
@@ -91,15 +92,9 @@ export function FeedbackWidget() {
             className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
           />
 
-          <label className="text-xs text-ink-muted">
-            Screenshot (optional)
-            <input
-              type="file"
-              name="image"
-              accept="image/*"
-              className="mt-1 block w-full text-xs text-ink-muted"
-            />
-          </label>
+          {/* A real styled button, not a bare <input type="file">,
+              since 2026-11-04 -- see ImageUploadField's own comment. */}
+          <ImageUploadField name="image" label="Screenshot (optional)" />
 
           {state.error && <p className="text-xs text-danger">{state.error}</p>}
 

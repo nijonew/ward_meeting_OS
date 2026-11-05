@@ -2050,6 +2050,47 @@ avoid confusing the two.
 
 ## Known open items
 
+**The optional-image file picker on Submit Announcement and the
+Feedback Widget now renders as a real, obviously-clickable button,
+2026-11-04. No migration needed.** The user's own report: "it is not
+easy to determine that it is a button. might be the same thing where
+we have the ability to add an image to the suggestions" -- both fields
+(Submit Announcement's "Image," the Feedback Widget's "Screenshot")
+used a completely bare `<input type="file">`, rendering as whatever
+the browser's own OS-styled file-picker control happens to look like,
+with no styling tying it to this app's own visual language at all.
+
+New shared `components/ImageUploadField.tsx` -- a native file input's
+own "Choose File" button can't be restyled directly (every browser
+ignores most CSS on it), so this uses the standard accessible
+workaround: the real input is visually hidden with `sr-only` (not
+`hidden`/`display:none`, which would drop it from the Tab order
+entirely, since the wrapping `<label>` itself isn't a native tab
+stop), and an ordinary `<span>` styled like this app's own secondary
+buttons (bordered, rounded, `hover:bg-ink/5` -- the same look as
+"Update range," "Cancel," etc. elsewhere in the app) sits next to it
+inside that same `<label>`, which natively forwards a click (or
+keyboard activation) straight to the real input. Shows the chosen
+filename (or "No file chosen") next to the button, and relabels itself
+"Change Image" once something's picked -- both lost when the native
+input's own built-in filename display gets hidden along with it.
+Verified the actual rendered look directly in the built-in browser
+(a standalone static repro, since this app has no local Supabase
+credentials to run the real pages) before shipping, since this was
+specifically a visual-clarity complaint, not just a logic one.
+
+Both `components/submit/AnnouncementForm.tsx` and
+`components/FeedbackWidget.tsx` now render `<ImageUploadField
+name="image" .../>` instead of their own bare inputs -- same `name`
+attribute each action already expects, so neither server action needed
+any change.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` plus the live
+visual repro above -- ask the user to check `/submit/announcement` and
+the Feedback Widget (bottom-right, any logged-in page) and confirm the
+image/screenshot field now shows a clearly bordered "Choose Image"
+button rather than whatever the browser's own default looked like.
+
 **Bug found and fixed 2026-11-04: `DualScrollbar`'s "hide the clone
 once the real scrollbar is visible" feature never actually worked in
 production.** The user's own report, on Manage Announcements, the

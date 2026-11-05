@@ -9,6 +9,7 @@ import {
   OTHER_VALUE,
 } from "@/lib/data/announcement-constants";
 import { RecurrenceToggle } from "@/components/submit/RecurrenceFields";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 // text-base, not text-sm (2026-10-31, mobile-friendliness pass) -- iOS
 // Safari auto-zooms the whole page on focus for any form control whose
@@ -154,11 +155,10 @@ export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) 
       <input type="url" name="link_url" placeholder="Link to event info" className={INPUT_CLASS} />
 
       {/* Optional flyer/photo, 2026-11-01 -- same optional-upload
-          pattern as the Feedback Widget's own screenshot field. */}
-      <label className={LABEL_CLASS}>
-        Image (optional)
-        <input type="file" name="image" accept="image/*" className="mt-1 block w-full text-sm text-ink-muted" />
-      </label>
+          pattern as the Feedback Widget's own screenshot field. A real
+          styled button, not a bare <input type="file">, since
+          2026-11-04 -- see ImageUploadField's own comment. */}
+      <ImageUploadField name="image" />
 
       <button
         type="submit"
