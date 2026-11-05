@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { MeetingTabNav } from "@/components/meetings/MeetingTabNav";
-import { getMeetingById } from "@/lib/data/meetings";
+import { MeetingWeekNav } from "@/components/meetings/MeetingWeekNav";
+import { getMeetingById, getAdjacentMeetingIds } from "@/lib/data/meetings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 function formatMeetingDate(iso: string) {
@@ -104,6 +105,13 @@ export default async function MeetingLayout({
     }
   }
 
+  // Forward/backward week-to-week navigation (2026-11-05, the user's
+  // own request) -- shown for every viewer who reaches this main
+  // branch (admins and calling-based non-admin viewers alike); the
+  // destination meeting's own page re-decides what that viewer is
+  // actually allowed to see, same as clicking into it from /dashboard.
+  const adjacent = await getAdjacentMeetingIds(meeting.meetingType, meeting.date);
+
   const baseTabs = meeting.meetingType === "sacrament-meeting" ? SACRAMENT_TABS : COLLABORATIVE_TABS;
   // Sacrament Meeting alone keeps a conditional 4th tab once archived --
   // its own admin-only full archived-agenda view, a genuinely different
@@ -139,6 +147,8 @@ export default async function MeetingLayout({
             </span>
           </div>
         )}
+
+        <MeetingWeekNav previous={adjacent.previous} next={adjacent.next} />
       </section>
 
       <MeetingTabNav meetingId={meeting.id} tabs={tabs} />

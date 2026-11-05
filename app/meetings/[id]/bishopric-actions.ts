@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireMeetingFeature } from "@/lib/data/meeting-auth";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -26,6 +27,14 @@ export async function saveBishopricMinutes(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
+  // Re-checked here now (2026-11-05) -- this form also renders from
+  // the Archived page's "Edit Notes" unlock, reachable by an account
+  // that holds the `notes` feature but not `planning`, so the old
+  // "the UI path is already gated" assumption no longer holds. See
+  // lib/data/meeting-auth.ts's own doc comment.
+  const authError = await requireMeetingFeature(meetingId, "notes");
+  if (authError) return authError;
+
   const supabase = await createClient();
 
   const field = (name: string) => String(formData.get(name) ?? "").trim() || null;
@@ -72,6 +81,11 @@ export async function saveBishopricAssignments(meetingId: string, formData: Form
 }
 
 export async function addActionItem(meetingId: string, formData: FormData): Promise<ActionResult> {
+  // Same re-check as saveBishopricMinutes, same reason -- also
+  // reachable now from the Archived page's "Edit Notes" unlock.
+  const authError = await requireMeetingFeature(meetingId, "notes");
+  if (authError) return authError;
+
   const supabase = await createClient();
 
   const description = String(formData.get("description") ?? "").trim();
@@ -90,6 +104,11 @@ export async function addActionItem(meetingId: string, formData: FormData): Prom
 }
 
 export async function toggleActionItem(itemId: string, meetingId: string, completed: boolean): Promise<ActionResult> {
+  // Same re-check as saveBishopricMinutes, same reason -- also
+  // reachable now from the Archived page's "Edit Notes" unlock.
+  const authError = await requireMeetingFeature(meetingId, "notes");
+  if (authError) return authError;
+
   const supabase = await createClient();
 
   const { error } = await supabase

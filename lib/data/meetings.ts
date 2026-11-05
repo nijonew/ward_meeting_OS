@@ -336,6 +336,50 @@ export async function getNextTwoSacramentMeetingIds(): Promise<Set<string>> {
 }
 
 /**
+ * The nearest earlier/later meeting of the same type, by date -- for
+ * the "forward and backward arrow" week-to-week navigation on every
+ * meeting page (2026-11-05, the user's own request: "How do I see
+ * previous meetings? Can it be as simple as a forward and backward
+ * arrow..."). Cancelled meetings are still real meeting records and
+ * stay in this chain, matching the Dashboard's own "Show past
+ * meetings" convention of including them rather than skipping them.
+ * Reuses the same `meeting_types!inner(slug)` filter shape
+ * `getOrCreateMeetingId` already established -- PostgREST needs that
+ * `!inner` to let `.eq("meeting_types.slug", ...)` filter on a joined
+ * table's column at all.
+ */
+export async function getAdjacentMeetingIds(
+  meetingTypeSlug: MeetingTypeSlug,
+  dateIso: string
+): Promise<{ previous: { id: string; date: string } | null; next: { id: string; date: string } | null }> {
+  const supabase = await createClient();
+
+  const [{ data: previous }, { data: next }] = await Promise.all([
+    supabase
+      .from("meetings")
+      .select("id, date, meeting_types!inner(slug)")
+      .eq("meeting_types.slug", meetingTypeSlug)
+      .lt("date", dateIso)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("meetings")
+      .select("id, date, meeting_types!inner(slug)")
+      .eq("meeting_types.slug", meetingTypeSlug)
+      .gt("date", dateIso)
+      .order("date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  return {
+    previous: previous ? { id: previous.id as string, date: previous.date as string } : null,
+    next: next ? { id: next.id as string, date: next.date as string } : null,
+  };
+}
+
+/**
  * Finds the meeting of a given type on a given date, or creates one
  * (stage 'template', rotations applied same as any other meeting
  * creation path) if it doesn't exist yet -- so planning can happen

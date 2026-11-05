@@ -20,6 +20,10 @@ import { getAnnouncementsByPlannedElement, type PulledAnnouncement } from "@/lib
 import { splitIntoSections } from "@/lib/data/agenda-rows";
 import { getAnnouncementsForMeetingReview, getPreviousMeetingMinutes } from "@/lib/data/meeting-review";
 import { getTitlePrefixesForAssignments, formatTitleLastName } from "@/lib/data/person-display";
+import { NotesEditToggle } from "@/components/meetings/NotesEditToggle";
+import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
+import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
+import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
 
 /**
  * Read-only meeting view -- built 2026-09-08 to be the calling-based
@@ -213,6 +217,14 @@ export default async function ArchivedMeetingPage({
   // just the narrower `<type>_notes` feature alone.
   const showRealTimeNotes =
     isAdmin || hasFeature(profile, meetingFeature(meeting.meetingType, "notes")) || meeting.stage === "archived";
+
+  // Whether THIS viewer can actually write notes, not just see them --
+  // a strict subset of showRealTimeNotes above (never true when that's
+  // false): someone who only sees notes because the meeting has
+  // archived, with neither the planning nor the notes feature
+  // themselves, never gets an edit button (2026-11-05, see
+  // NotesEditToggle's own doc comment for the full reasoning).
+  const canEditNotes = isAdmin || hasFeature(profile, meetingFeature(meeting.meetingType, "notes"));
 
   const meetingWithType = await meetingWithTypePromise;
   if (!meetingWithType) {
@@ -578,72 +590,90 @@ export default async function ArchivedMeetingPage({
         </div>
       )}
 
-      {showRealTimeNotes && isBishopric && bishopricData?.minutes && (
-        <div className="rounded border border-rule bg-surface p-6">
-          <h2 className="font-display text-xl">Minutes</h2>
-          <div className="mt-4 flex flex-col gap-2">
-            {[
-              { label: "Spiritual Thought", presenter: bishopricData.minutes.spiritual_thought_presenter_id, text: bishopricData.minutes.spiritual_thought_notes },
-              { label: "Handbook Training", presenter: bishopricData.minutes.handbook_training_presenter_id, text: bishopricData.minutes.handbook_training_topic },
-            ].map(
-              (f) =>
-                (f.text || f.presenter) && (
-                  <Row key={f.label} label={f.label}>
-                    {f.presenter && <Plain>{personName(people, f.presenter)}</Plain>}
-                    {f.text && <Note>{f.text}</Note>}
-                  </Row>
-                )
-            )}
-            {[
-              { label: "Calendar Review", text: bishopricData.minutes.calendar_review_notes },
-              { label: "Callings Discussion", text: bishopricData.minutes.callings_discussion_notes },
-              { label: "Sacrament Meeting Review", text: bishopricData.minutes.sacrament_planning_discussion_notes },
-              { label: "Young Men Coordination", text: bishopricData.minutes.young_men_coordination_notes },
-              { label: "Impressions", text: bishopricData.minutes.impressions },
-              { label: "General Minutes", text: bishopricData.minutes.minutes_body },
-            ].map((f) => f.text && (
-              <Row key={f.label} label={f.label}>
-                <Note>{f.text}</Note>
-              </Row>
-            ))}
-          </div>
-        </div>
-      )}
+      {showRealTimeNotes && (isBishopric || isCouncil) && (
+        <NotesEditToggle
+          canEdit={canEditNotes}
+          readOnly={
+            <div className="flex flex-col gap-6">
+              {isBishopric && bishopricData?.minutes && (
+                <div className="rounded border border-rule bg-surface p-6">
+                  <h2 className="font-display text-xl">Minutes</h2>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {[
+                      { label: "Spiritual Thought", presenter: bishopricData.minutes.spiritual_thought_presenter_id, text: bishopricData.minutes.spiritual_thought_notes },
+                      { label: "Handbook Training", presenter: bishopricData.minutes.handbook_training_presenter_id, text: bishopricData.minutes.handbook_training_topic },
+                    ].map(
+                      (f) =>
+                        (f.text || f.presenter) && (
+                          <Row key={f.label} label={f.label}>
+                            {f.presenter && <Plain>{personName(people, f.presenter)}</Plain>}
+                            {f.text && <Note>{f.text}</Note>}
+                          </Row>
+                        )
+                    )}
+                    {[
+                      { label: "Calendar Review", text: bishopricData.minutes.calendar_review_notes },
+                      { label: "Callings Discussion", text: bishopricData.minutes.callings_discussion_notes },
+                      { label: "Sacrament Meeting Review", text: bishopricData.minutes.sacrament_planning_discussion_notes },
+                      { label: "Young Men Coordination", text: bishopricData.minutes.young_men_coordination_notes },
+                      { label: "Impressions", text: bishopricData.minutes.impressions },
+                      { label: "General Minutes", text: bishopricData.minutes.minutes_body },
+                    ].map((f) => f.text && (
+                      <Row key={f.label} label={f.label}>
+                        <Note>{f.text}</Note>
+                      </Row>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-      {showRealTimeNotes && isBishopric && bishopricData && bishopricData.actionItems.length > 0 && (
-        <div className="rounded border border-rule bg-surface p-6">
-          <h2 className="font-display text-xl">Action Items</h2>
-          <div className="mt-4 flex flex-col gap-2">
-            {bishopricData.actionItems.map((item) => (
-              <div key={item.id} className={ROW}>
-                <p className={LABEL}>
-                  {item.assigned_to_name ?? "Unassigned"}
-                  {item.due_date ? ` · Due ${item.due_date}` : ""}
-                  {item.completed ? " · Done" : ""}
-                </p>
-                <Note>{item.description}</Note>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              {isBishopric && bishopricData && bishopricData.actionItems.length > 0 && (
+                <div className="rounded border border-rule bg-surface p-6">
+                  <h2 className="font-display text-xl">Action Items</h2>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {bishopricData.actionItems.map((item) => (
+                      <div key={item.id} className={ROW}>
+                        <p className={LABEL}>
+                          {item.assigned_to_name ?? "Unassigned"}
+                          {item.due_date ? ` · Due ${item.due_date}` : ""}
+                          {item.completed ? " · Done" : ""}
+                        </p>
+                        <Note>{item.description}</Note>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-      {showRealTimeNotes && isCouncil && (councilNotes?.notes || councilNotes?.next_meeting_date) && (
-        <div className="rounded border border-rule bg-surface p-6">
-          <h2 className="font-display text-xl">Council Notes</h2>
-          <div className="mt-4 flex flex-col gap-2">
-            {councilNotes?.notes && (
-              <Row label="Notes">
-                <Note>{councilNotes.notes}</Note>
-              </Row>
-            )}
-            {councilNotes?.next_meeting_date && (
-              <Row label="Next Meeting">
-                <Plain>{councilNotes.next_meeting_date}</Plain>
-              </Row>
-            )}
-          </div>
-        </div>
+              {isCouncil && (councilNotes?.notes || councilNotes?.next_meeting_date) && (
+                <div className="rounded border border-rule bg-surface p-6">
+                  <h2 className="font-display text-xl">Council Notes</h2>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {councilNotes?.notes && (
+                      <Row label="Notes">
+                        <Note>{councilNotes.notes}</Note>
+                      </Row>
+                    )}
+                    {councilNotes?.next_meeting_date && (
+                      <Row label="Next Meeting">
+                        <Plain>{councilNotes.next_meeting_date}</Plain>
+                      </Row>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          }
+          editable={
+            <div className="flex flex-col gap-6">
+              {isBishopric && <BishopricMinutesForm meetingId={meetingId} minutes={bishopricData?.minutes ?? null} />}
+              {isBishopric && (
+                <ActionItemsSection meetingId={meetingId} items={bishopricData?.actionItems ?? []} people={people} />
+              )}
+              {isCouncil && <CouncilNotesForm meetingId={meetingId} notes={councilNotes} />}
+            </div>
+          }
+        />
       )}
 
     </div>

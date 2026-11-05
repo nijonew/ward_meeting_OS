@@ -2050,6 +2050,94 @@ avoid confusing the two.
 
 ## Known open items
 
+**Week-to-week navigation arrows on every meeting page, and an "Edit
+Notes" unlock on the Archived/Public view -- no migration needed,
+2026-11-05.** The user's own question and follow-up request: "How do
+I see previous meetings? Can it be as simple as a forward and backward
+arrow in the meeting planning page to move from week to week? And can
+we include the notes in previous meetings, have everything grayed out
+as in not allowing changes, and then with the push of a button allow
+changes for those with the notes writing access?"
+
+**Answered directly first**: today, the only way to reach a past
+meeting is `/dashboard`'s "Show past meetings" toggle (hidden by
+default, see the earlier 2026-09-09 entry on this), then clicking its
+own date. The new arrows below are an additional, faster path, not a
+replacement for that toggle.
+
+**Week nav**: new `getAdjacentMeetingIds(meetingTypeSlug, dateIso)`
+(`lib/data/meetings.ts`) -- the nearest earlier/later meeting of the
+*same type*, by date (cancelled meetings included, matching the
+Dashboard's own "Show past meetings" convention). New
+`MeetingWeekNav` (`components/meetings/MeetingWeekNav.tsx`) renders
+&larr;/&rarr; links labeled with that adjacent meeting's own short
+date, muted/inert when there's no earlier or later meeting. Wired into
+the shared `app/meetings/[id]/layout.tsx` (not just Planning
+specifically, since it's a strict superset with no extra cost -- every
+meeting sub-page benefits) for every viewer who reaches its main
+chrome branch; the one exception is Sacrament Meeting's own bare
+no-chrome public-viewer branch (a logged-out/non-admin visitor who can
+only ever see today's program), which deliberately keeps no navigation
+at all, consistent with "no early reveal, no browsing" for that one
+case. Each arrow links to the bare `/meetings/<id>` route rather than
+`/planning`/`/archived` directly, so landing there re-runs that OTHER
+meeting's own existing redirect logic (Planning if still open, Archived
+once archived or for a non-admin) -- nothing new to duplicate.
+
+**Notes unlock**: new `NotesEditToggle`
+(`components/meetings/NotesEditToggle.tsx`), wrapping the Archived/
+Public view's existing read-only Minutes/Action Items/Council Notes
+(Bishopric Meeting/Ward Council/Youth Council only -- Sacrament Meeting
+has no notes concept at all, unaffected). A "Edit Notes" button shows
+only for a viewer whose own account actually holds `<type>_notes` (or
+`<type>_planning`, which already implies it) -- clicking it swaps the
+read-only rendering for the exact same `BishopricMinutesForm`/
+`ActionItemsSection`/`CouncilNotesForm` components Planning already
+uses, not a second copy of them. While locked, the read-only block
+renders visibly dimmed (`opacity-60`) for exactly this viewer -- a
+plain "this could be unlocked" cue, not shown to an ordinary viewer who
+could never edit it anyway.
+
+**Deliberately not scoped to archived meetings specifically** -- a
+real, separate gap surfaced while building this: Planning (the only
+*other* place these three forms render) is gated on the broader
+`<type>_planning` feature, not `<type>_notes` -- so an account granted
+only `<type>_notes` ("Bishopric Meeting Note Taking," etc., exactly the
+"notes writing access" the user named) had **no way to write a note at
+all, ever, for any meeting, past or present** before this. The unlock
+button now shows whenever that feature is held, regardless of the
+meeting's own stage, closing that gap for good measure rather than
+just for the literal "previous meetings" case asked about.
+
+**Real, pre-existing security gap found and fixed while exposing this
+second entry point**: `saveBishopricMinutes`, `saveCouncilNotes`,
+`addActionItem`, and `toggleActionItem` (`app/meetings/[id]/bishopric-actions.ts`,
+`app/meetings/[id]/council-actions.ts`) had **no authorization check of
+any kind** -- safe only because Planning's own already-gated form was
+the one and only UI path that could ever reach them. The moment a
+second path (this new unlock button, reachable by a narrower
+notes-only account) could call the same actions, that assumption broke
+-- a forged request could otherwise have called any of the four
+regardless of whether the caller held any real access. New
+`requireMeetingFeature(meetingId, action)` (`lib/data/meeting-auth.ts`)
+resolves the meeting's own type and re-checks `hasFeature`, called first
+thing in all four. **Not a fix for every action in that file** --
+`saveBishopricAssignments`/`setAgendaItemStatus`/`assignAgendaItemToMeeting`
+have the identical pre-existing gap but weren't newly exposed by this
+change, so they're flagged in `meeting-auth.ts`'s own comment rather
+than fixed as a drive-by -- a real security pass would need to close
+all of them at once, a separate task.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: every meeting page now shows &larr;/&rarr; arrows to the
+nearest earlier/later meeting of the same type; a Bishopric Meeting/
+Ward Council/Youth Council's Archived/Public view shows an "Edit Notes"
+button for an account holding that type's own notes (or planning)
+feature, which swaps in the real editable forms and saves correctly;
+and that an ordinary calling-based viewer with neither feature sees the
+read-only notes with no button and no dimming at all.
+
 **Hymn titles in the public Sacrament Meeting program are now real
 hyperlinks to the song's own page on churchofjesuschrist.org, opening
 in a new tab -- migration `101`, not yet run, 2026-11-05.** The user's

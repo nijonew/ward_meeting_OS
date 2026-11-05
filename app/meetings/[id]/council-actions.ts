@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireMeetingFeature } from "@/lib/data/meeting-auth";
 
 // Moved here from lib/data/council-notes.ts, 2026-11-01 -- see that
 // file's own comment for why (CouncilNotesForm.tsx became a Client
@@ -16,6 +17,12 @@ export async function saveCouncilNotes(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
+  // Same re-check as saveBishopricMinutes, same reason -- also
+  // reachable now from the Archived page's "Edit Notes" unlock (see
+  // lib/data/meeting-auth.ts's own doc comment).
+  const authError = await requireMeetingFeature(meetingId, "notes");
+  if (authError) return authError;
+
   const supabase = await createClient();
 
   const { error } = await supabase.from("council_notes").upsert(
