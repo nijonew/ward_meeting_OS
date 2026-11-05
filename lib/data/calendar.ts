@@ -146,19 +146,24 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   total for this date and still needs a day-of-week-sized line here
  *   rather than this function's own collapsed summary.
  *
- * **Plain, un-cancelled "TBD" placeholders don't show here at all,
- * 2026-11-04** -- `fillYouthActivityPlaceholders`
- * (`lib/data/youth-activity-schedule.ts`) now stamps a "TBD" row for
- * every class with nothing covering it, every week, rolling ~3 months
- * out, specifically so the management grids always have something to
- * fill in rather than a blank line. That's genuinely useful on those
- * pages; on a shared calendar it would just be a wall of "`<class>`:
- * TBD" lines for everything nobody's decided yet, which isn't
- * information worth showing someone browsing what's actually
- * happening. A TBD row that's since been CANCELLED still counts --
- * cancelling something, even an unplanned placeholder, is a real fact
- * worth showing (and still feeds the "cancelled for all youth" check
- * above).
+ * **Plain "TBD" placeholders DO show here, reversed 2026-11-05** --
+ * this function originally excluded an un-cancelled "TBD" row
+ * entirely (2026-11-04), on the theory that it was just noise on a
+ * shared calendar. The user's own direct correction, the next day,
+ * laid out exactly what the entry count should be for each way a
+ * week's 6 classes can be combined (1 for Combined YM/YW together, 4
+ * when only one gender is combined that week, 6 when none are) and
+ * was explicit that a class with nothing real planned yet still needs
+ * its own line: "If a class is TBD or cancelled or something there
+ * should still be an entry in the calendar saying 'Teachers: TBD' or
+ * whatever." Hiding TBD broke exactly that -- a class that hadn't been
+ * filled in yet just vanished from the count instead of showing as
+ * "`<class>`: TBD". The per-row title logic right below already
+ * produces exactly that string unmodified; TBD only ever needed to
+ * stop being filtered out, nothing about how a row renders needed to
+ * change. The "cancelled for all youth" collapse right below is
+ * unaffected either way -- it only ever counted rows with
+ * `cancelled = true`, which a plain TBD row never has.
  *
  * **An individual class row is suppressed once a Combined row already
  * covers that same class on the same date, 2026-11-04** (the user's
@@ -181,8 +186,7 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  * matches it exactly, so this can't quietly stop working the moment
  * someone edits one side without the other.
  */
-function buildYouthActivityItems(rawYouthActivities: YouthActivityRow[]): CalendarItem[] {
-  const youthActivities = rawYouthActivities.filter((a) => a.cancelled || a.title !== "TBD");
+function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarItem[] {
   const byDate = new Map<string, YouthActivityRow[]>();
   for (const a of youthActivities) {
     const list = byDate.get(a.activity_date) ?? [];

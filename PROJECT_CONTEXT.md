@@ -2050,6 +2050,42 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calendar's "TBD" exclusion for Youth Activities reversed, 2026-11-05
+-- it broke the real entry-count the user actually wants.** Yesterday's
+decision to hide a plain, un-cancelled "TBD" placeholder from the
+calendar (judged, not asked for) turned out to be wrong -- the user
+laid out precisely what the entry count should be for each way a
+week's 6 classes can be combined: 4 entries when only one gender is
+combined that week (the combined line + the other gender's 3
+individual classes), 1 when both genders share one combined activity,
+6 when nothing's combined, and explicit confirmation that a class with
+nothing real planned yet still needs its own line: "If a class is TBD
+or cancelled or something there should still be an entry in the
+calendar saying 'Teachers: TBD' or whatever." Hiding TBD broke exactly
+that -- an unfilled-in class just vanished from the count instead of
+reading "`<class>`: TBD".
+
+The actual fix is one line -- `buildYouthActivityItems`
+(`lib/data/calendar.ts`) no longer filters a TBD row out before
+grouping; the per-row title logic right below it already produces
+"`<class>`: TBD" unmodified once the row isn't excluded. Everything
+else built the day before (suppressing an individual row once a
+Combined row covers that class, collapsing to one line when literally
+every class is cancelled) was already correct and needed no change --
+verified all four entry-count scenarios plus the "all cancelled"
+collapse directly in a standalone script with synthetic data matching
+the user's own four cases (Combined YW + 3 individual YM including a
+TBD one -> 4; Combined YM + 3 individual YW including two TBD -> 4;
+Combined YM/YW alone -> 1; all 6 individual including TBD and a
+cancelled one -> 6) before shipping, since getting this exact count
+right was the whole point of the request.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` plus the standalone
+scenario verification above -- ask the user to check `/calendar`
+(logged in) against a real week of each shape (one gender combined,
+both combined, neither combined) and confirm the entry count matches,
+with an unfilled class reading "`<class>`: TBD".
+
 **Recurring announcements now show on every real occurrence date on
 the calendar, and "Edit activity" is on every youth activity row, not
 just combined ones -- both 2026-11-04. No migration needed.** Two
