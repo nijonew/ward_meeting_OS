@@ -8,10 +8,10 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * Public Ward Calendar View (2026-11-01) -- no login required, same
  * tier as /announcements/public and /events. Originally scoped via
  * AskUserQuestion to show Sacrament Meeting (day-of only), Youth
- * Activities, Ward Events, and dated Announcements; reworked the same
- * day per the user's own follow-up -- see getCalendarItems' own doc
- * comment for the current scope (every Sacrament Meeting, cancelled
- * ones included with their own reason shown inline; Ward Events and
+ * Activities, Ward Events, and dated Announcements; reworked twice the
+ * same day per the user's own follow-ups -- see getCalendarItems' own
+ * doc comment for the current scope (Sacrament Meeting shows only when
+ * cancelled, with its own reason shown inline; Ward Events and
  * Announcements unchanged).
  *
  * **Youth Activities are logged-in-only, 2026-11-04** -- the page
@@ -40,7 +40,12 @@ function pad(n: number): string {
 }
 
 const KIND_LABELS: Record<CalendarItemKind, string> = {
-  sacrament: "Sacrament Meeting",
+  // "Sacrament Meeting Cancelled," not the bare type name, 2026-11-04 --
+  // this kind only ever shows up when one's cancelled now (see
+  // getCancelledSacramentMeetings, lib/data/calendar.ts), so the plain
+  // "Sacrament Meeting" label would wrongly suggest this dot shows up
+  // every Sunday.
+  sacrament: "Sacrament Meeting Cancelled",
   ward: "Ward Event",
   announcement: "Announcement",
   youth: "Youth Activity",

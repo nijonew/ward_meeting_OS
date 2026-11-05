@@ -27,26 +27,33 @@ export interface CalendarItem {
 interface SacramentMeetingRow {
   id: string;
   date: string;
-  cancelled: boolean;
   cancellation_note: string | null;
 }
 
 /**
- * Every Sacrament Meeting row (any date, any stage, cancelled or
- * not) -- a direct, lean query rather than going through
- * `lib/data/meetings.ts`'s full `Meeting` shape/`mapMeetingRow`,
- * since the calendar only ever needs these four columns. Unlike
- * `getTodaysPublishedSacramentMeeting`, this is NOT scoped to today
- * or to non-archived -- see getCalendarItems' own comment for why
- * that's fine here (showing that a Sunday HAD or WILL HAVE a
- * Sacrament Meeting is not the same as revealing its program).
+ * Only a CANCELLED Sacrament Meeting row -- any date, any stage -- a
+ * direct, lean query rather than going through `lib/data/meetings.ts`'s
+ * full `Meeting` shape/`mapMeetingRow`, since the calendar only ever
+ * needs these three columns.
+ *
+ * **Narrowed to cancelled-only, 2026-11-04** (the user's own request:
+ * "on the calendar, only show sacrament meeting if it is cancelled") --
+ * a direct reversal of the "show every one, cancelled included"
+ * decision from minutes earlier the same day. Every ward holds a
+ * Sacrament Meeting every single week, so showing one on every Sunday
+ * regardless of status was mostly just noise; a CANCELLED one is the
+ * actual exception worth calling out on a calendar. `.eq("cancelled",
+ * true)` is applied right in the query, not filtered in JS after the
+ * fact, since there's no reason left to fetch the ordinary rows at
+ * all.
  */
-async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
+async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, date, cancelled, cancellation_note, meeting_types!inner(slug)")
-    .eq("meeting_types.slug", "sacrament-meeting");
+    .select("id, date, cancellation_note, meeting_types!inner(slug)")
+    .eq("meeting_types.slug", "sacrament-meeting")
+    .eq("cancelled", true);
   if (error || !data) return [];
   return data as unknown as SacramentMeetingRow[];
 }
@@ -55,31 +62,29 @@ async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  * The public Ward Calendar View's own data (2026-11-01, reworked the
  * same day per the user's own follow-up):
  *
- * - **Sacrament Meeting -- every one, cancelled included, 2026-11-01**
- *   (the user's own request: "include all sacrament meetings
- *   including those that are cancelled" -- a reversal of this
- *   function's original "today only" scope). Showing that a given
- *   Sunday HAD or WILL HAVE a Sacrament Meeting is not the same as
- *   revealing that meeting's own program -- every ward holds one
- *   every week, that's not sensitive information on its own -- so
- *   this calendar fact is shown for any date, while the actual
- *   program (what clicking through to `/meetings/[id]/public` shows)
- *   still only opens on the real day, exactly as before; an archived
- *   or not-yet-public meeting's own page already shows a plain
- *   "isn't available right now" message rather than erroring, so
- *   linking every date here is safe regardless of whether that
- *   meeting's program is actually viewable yet.
+ * - **Sacrament Meeting -- cancelled only, 2026-11-04** -- originally
+ *   every one, cancelled included (2026-11-01: "include all sacrament
+ *   meetings including those that are cancelled"), narrowed the same
+ *   way minutes later this same day per the user's own follow-up:
+ *   "only show sacrament meeting if it is cancelled." Every ward holds
+ *   one every single week, so showing it on every Sunday regardless of
+ *   status was mostly noise -- a cancelled one is the real exception
+ *   worth a calendar line. `getCancelledSacramentMeetings` filters to
+ *   `cancelled = true` right in the query. Still links to
+ *   `/meetings/[id]/public`, same as before -- that page already
+ *   shows its own "cancelled for `<reason>`" message rather than
+ *   erroring.
  *
- *   **A cancelled one shows its own reason inline, not struck
- *   through** (the user's own request, same message: "rather than
- *   striking out items that are cancelled can we add '(No Sacrament
- *   Meeting due to...)' after the name of the meeting and then
- *   include the reason for cancellation?") -- `title` itself becomes
- *   "Sacrament Meeting (No Sacrament Meeting due to `<reason>`)",
- *   composed here rather than in the page's own render layer, so the
- *   calendar page doesn't need any cancelled-specific styling at all.
- *   Falls back to "(No Sacrament Meeting)" with no reason clause for
- *   the rare case of a cancellation recorded with no note.
+ *   Shows its own reason inline, not struck through (the user's own
+ *   original request: "rather than striking out items that are
+ *   cancelled can we add '(No Sacrament Meeting due to...)' after the
+ *   name of the meeting and then include the reason for
+ *   cancellation?") -- `title` is "Sacrament Meeting (No Sacrament
+ *   Meeting due to `<reason>`)", composed here rather than in the
+ *   page's own render layer, so the calendar page doesn't need any
+ *   cancelled-specific styling at all. Falls back to "(No Sacrament
+ *   Meeting)" with no reason clause for the rare case of a
+ *   cancellation recorded with no note.
  *
  * - **Youth Activities, logged-in only, 2026-11-04** -- removed
  *   entirely on 2026-11-01 ("lets hold off on including the youth
@@ -223,8 +228,8 @@ function buildYouthActivityItems(rawYouthActivities: YouthActivityRow[]): Calend
 export async function getCalendarItems(): Promise<CalendarItem[]> {
   const { user } = await getSessionUser();
 
-  const [sacramentMeetings, wardEvents, announcements, youthActivities] = await Promise.all([
-    getAllSacramentMeetings(),
+  const [cancelledSacramentMeetings, wardEvents, announcements, youthActivities] = await Promise.all([
+    getCancelledSacramentMeetings(),
     getWardEvents(),
     getPublishedAnnouncements(),
     user ? getYouthActivities() : Promise.resolve([]),
@@ -232,14 +237,11 @@ export async function getCalendarItems(): Promise<CalendarItem[]> {
 
   const items: CalendarItem[] = [];
 
-  for (const meeting of sacramentMeetings) {
-    const title = meeting.cancelled
-      ? `Sacrament Meeting (No Sacrament Meeting${meeting.cancellation_note ? ` due to ${meeting.cancellation_note}` : ""})`
-      : "Sacrament Meeting";
+  for (const meeting of cancelledSacramentMeetings) {
     items.push({
       date: meeting.date,
       time: null,
-      title,
+      title: `Sacrament Meeting (No Sacrament Meeting${meeting.cancellation_note ? ` due to ${meeting.cancellation_note}` : ""})`,
       kind: "sacrament",
       note: null,
       href: `/meetings/${meeting.id}/public`,

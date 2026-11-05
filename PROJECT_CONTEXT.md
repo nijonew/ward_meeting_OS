@@ -2050,6 +2050,32 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calendar now only shows Sacrament Meeting when it's cancelled,
+2026-11-04. No migration needed.** Direct follow-up, same day, to the
+"show every Sacrament Meeting" rework from earlier: "on the calendar,
+only show sacrament meeting if it is cancelled." Every ward holds a
+Sacrament Meeting every single week, so showing one on every Sunday
+regardless of status was mostly noise -- a cancelled one is the real
+exception worth a calendar line.
+
+`getAllSacramentMeetings` renamed `getCancelledSacramentMeetings`
+(`lib/data/calendar.ts`) and filters `.eq("cancelled", true)` right in
+the query, rather than fetching everything and filtering in JS -- no
+reason left to fetch the ordinary rows at all. Still links to
+`/meetings/[id]/public` and still composes the same "(No Sacrament
+Meeting due to `<reason>`)" inline wording built minutes earlier the
+same day. The legend's own label (`app/calendar/page.tsx`) changed
+from the bare "Sacrament Meeting" to "Sacrament Meeting Cancelled" --
+the old label would have wrongly implied this dot shows up every
+Sunday, which it no longer does.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calendar`: an ordinary, un-cancelled Sunday now shows no
+Sacrament Meeting entry at all, a cancelled one still shows "Sacrament
+Meeting (No Sacrament Meeting due to `<reason>`)," and the legend reads
+"Sacrament Meeting Cancelled."
+
 **Bug found and fixed 2026-11-04: a Combined YW activity showed twice
 on the calendar (once collectively, once per class) -- the other two
 Combined types didn't, yet, only because nobody had edited them since
