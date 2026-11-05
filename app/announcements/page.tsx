@@ -98,6 +98,7 @@ export default async function AnnouncementsInboxPage() {
         onUpdate={updateAnnouncementRow}
         onInsert={insertAnnouncementRow}
         onDelete={deleteAnnouncementRow}
+        userId={user?.id ?? null}
       />
 
       {strayAgendaItems.length > 0 && (

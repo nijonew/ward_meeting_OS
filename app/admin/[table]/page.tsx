@@ -78,6 +78,7 @@ export default async function AdminTablePage({ params }: { params: Promise<{ tab
         onInsert={insertRow}
         onDelete={deleteRow}
         deleteLabel={config.archiveRpc ? "Archive" : undefined}
+        userId={user?.id ?? null}
       />
     </main>
   );

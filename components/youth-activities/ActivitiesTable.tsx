@@ -290,6 +290,7 @@ export function ActivitiesTable({
   editable = false,
   deletable = false,
   storageKey,
+  userId,
 }: {
   activities: YouthActivityRow[];
   showGroupColumn?: boolean;
@@ -298,8 +299,12 @@ export function ActivitiesTable({
   editable?: boolean;
   deletable?: boolean;
   storageKey: string;
+  /** The signed-in account's own id, so this table's remembered
+   *  sort/filter is scoped per person rather than shared by whoever
+   *  last touched it on the same browser -- see usePersistedSortFilter. */
+  userId?: string | null;
 }) {
-  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(storageKey);
+  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(storageKey, userId);
   const [state, formAction, pending] = useActionState(saveActivityGrid, initialSaveState);
   const [dirty, setDirty] = useState(false);
   const [lastHandledState, setLastHandledState] = useState(state);

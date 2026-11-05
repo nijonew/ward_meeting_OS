@@ -135,6 +135,7 @@ export default async function CallingPlanningPage({
             people={people}
             callingStatusOptions={callingStatusOptions}
             releaseStatusOptions={releaseStatusOptions}
+            userId={user?.id ?? null}
           />
         )}
       </div>

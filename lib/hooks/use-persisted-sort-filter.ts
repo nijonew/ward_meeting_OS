@@ -21,21 +21,40 @@ interface StoredState<K extends string> {
 // rather than risk that. Bump again if this Set's meaning ever changes.
 const STORAGE_VERSION = "v2";
 
-function versionedKey(storageKey: string): string {
-  return `${storageKey}::${STORAGE_VERSION}`;
+// Scoped per signed-in account, 2026-11-05 (the user's own report: "if
+// anyone changes a filter that sticks" for every later visitor too, now
+// that more than one person uses these pages). localStorage was already
+// per-browser, never shared across different computers -- the real gap
+// was a *shared* browser (several ward members signing in and out of
+// the same device/browser) having no concept of "whose preference this
+// is," so one person's sort/filter carried straight over to the next
+// account that opened the same page there. `userId` is the signed-in
+// Supabase auth user's own id (`user.id`, threaded down from each
+// page's existing `getSessionUser()` call) -- folding it into the key
+// gives each account its own independent bucket on the same browser,
+// while a `null`/missing id (logged out, or a page that somehow renders
+// this before a session resolves) still falls back to one shared
+// "anon" bucket rather than erroring.
+function versionedKey(storageKey: string, userId: string | null | undefined): string {
+  return `${storageKey}::user-${userId ?? "anon"}::${STORAGE_VERSION}`;
 }
 
-function loadState<K extends string>(storageKey: string): StoredState<K> | null {
+function loadState<K extends string>(storageKey: string, userId: string | null | undefined): StoredState<K> | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(versionedKey(storageKey));
+    const raw = window.localStorage.getItem(versionedKey(storageKey, userId));
     return raw ? (JSON.parse(raw) as StoredState<K>) : null;
   } catch {
     return null;
   }
 }
 
-function saveState<K extends string>(storageKey: string, sort: SortState<K>, filters: FiltersState<K>) {
+function saveState<K extends string>(
+  storageKey: string,
+  userId: string | null | undefined,
+  sort: SortState<K>,
+  filters: FiltersState<K>
+) {
   if (typeof window === "undefined") return;
   try {
     const serializedFilters: Partial<Record<K, string[] | null>> = {};
@@ -43,7 +62,7 @@ function saveState<K extends string>(storageKey: string, sort: SortState<K>, fil
     for (const [key, value] of entries) {
       serializedFilters[key] = value == null ? null : [...value];
     }
-    window.localStorage.setItem(versionedKey(storageKey), JSON.stringify({ sort, filters: serializedFilters }));
+    window.localStorage.setItem(versionedKey(storageKey, userId), JSON.stringify({ sort, filters: serializedFilters }));
   } catch {
     // Storage full or unavailable (private browsing, etc.) -- not worth surfacing to the user.
   }
@@ -78,8 +97,16 @@ function saveState<K extends string>(storageKey: string, sort: SortState<K>, fil
  * component -- ActivitiesTable is one shared component rendered on four
  * different pages (Upcoming Activities, Combined YM & YW, Combined YM,
  * Combined YW), each needing its own independent remembered state.
+ *
+ * `userId` additionally scopes that same storage key per signed-in
+ * account (see the per-user comment above `versionedKey`) -- included
+ * in both effects' own dependency lists so that on the rare occasion a
+ * mounted grid's `userId` actually changes (a different account signs
+ * in without a full page reload), it re-reads that account's own saved
+ * state instead of silently continuing to show/persist the previous
+ * account's.
  */
-export function usePersistedSortFilter<K extends string>(storageKey: string) {
+export function usePersistedSortFilter<K extends string>(storageKey: string, userId?: string | null) {
   const [sort, setSort] = useState<SortState<K>>(null);
   const [filters, setFilters] = useState<FiltersState<K>>({});
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -90,25 +117,22 @@ export function usePersistedSortFilter<K extends string>(storageKey: string) {
     // own docs describe -- not the "derive state from a render" anti-
     // pattern react-hooks/set-state-in-effect otherwise warns about.
     /* eslint-disable react-hooks/set-state-in-effect */
-    const saved = loadState<K>(storageKey);
-    if (saved) {
-      setSort(saved.sort ?? null);
-      const restored: FiltersState<K> = {};
-      const entries = Object.entries(saved.filters ?? {}) as [K, string[] | null | undefined][];
-      for (const [key, values] of entries) {
-        restored[key] = values == null ? null : new Set(values);
-      }
-      setFilters(restored);
+    const saved = loadState<K>(storageKey, userId);
+    setSort(saved?.sort ?? null);
+    const restored: FiltersState<K> = {};
+    const entries = Object.entries(saved?.filters ?? {}) as [K, string[] | null | undefined][];
+    for (const [key, values] of entries) {
+      restored[key] = values == null ? null : new Set(values);
     }
+    setFilters(restored);
     setHasHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- storageKey is a stable identity per grid instance
-  }, []);
+  }, [storageKey, userId]);
 
   useEffect(() => {
     if (!hasHydrated) return;
-    saveState(storageKey, sort, filters);
-  }, [storageKey, sort, filters, hasHydrated]);
+    saveState(storageKey, userId, sort, filters);
+  }, [storageKey, userId, sort, filters, hasHydrated]);
 
   return { sort, setSort, filters, setFilters };
 }

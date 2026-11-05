@@ -142,12 +142,17 @@ export function CallingPlanningGridForm({
   people,
   callingStatusOptions,
   releaseStatusOptions,
+  userId,
 }: {
   rows: CallingPlanningRow[];
   callingOptions: CallingOption[];
   people: PersonOption[];
   callingStatusOptions: SelectOption[];
   releaseStatusOptions: SelectOption[];
+  /** The signed-in account's own id, so this grid's remembered
+   *  sort/filter is scoped per person rather than shared by whoever
+   *  last touched it on the same browser -- see usePersistedSortFilter. */
+  userId?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(saveCallingPlanningGrid, initialState);
   const [dirty, setDirty] = useState(false);
@@ -156,7 +161,7 @@ export function CallingPlanningGridForm({
   // usePersistedSortFilter's own doc comment. null (or an unset column
   // key) means every value showing, matching ColumnFilterDropdown's own
   // Excel-style semantics -- see that component's doc comment.
-  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(STORAGE_KEY);
+  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<ColumnKey>(STORAGE_KEY, userId);
   // Raw, in-progress field values, keyed by that field's own `name`
   // attribute ("<rowId>::<column>") -- captured by the form's onChange
   // below, read back by liveCellText for live filtering. See this

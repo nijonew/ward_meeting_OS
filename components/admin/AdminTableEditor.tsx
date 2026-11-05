@@ -132,6 +132,7 @@ export function AdminTableEditor({
   onInsert,
   onDelete,
   deleteLabel,
+  userId,
 }: {
   table: string;
   columns: AdminColumnConfig[];
@@ -150,6 +151,10 @@ export function AdminTableEditor({
    *  AdminTableConfig.archiveRpc), so the button is honest about what
    *  clicking it actually does. */
   deleteLabel?: string;
+  /** The signed-in account's own id, so this table's remembered
+   *  sort/filter is scoped per person rather than shared by whoever
+   *  last touched it on the same browser -- see usePersistedSortFilter. */
+  userId?: string | null;
 }) {
   const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
   const [newRow, setNewRow] = useState<Record<string, unknown>>({});
@@ -159,7 +164,7 @@ export function AdminTableEditor({
   // "Saved." lifecycle every other grid in this app already uses.
   const [justSaved, setJustSaved] = useState(false);
   const [pending, startTransition] = useTransition();
-  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<string>(`table-admin-${table}-sort-filter`);
+  const { sort, setSort, filters, setFilters } = usePersistedSortFilter<string>(`table-admin-${table}-sort-filter`, userId);
   const anyDirty = Object.keys(drafts).length > 0;
 
   const toggleSort = (columnKey: string) => {

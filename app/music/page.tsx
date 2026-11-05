@@ -123,6 +123,7 @@ export default async function MusicPage() {
         onUpdate={updateMusicRow}
         onInsert={insertMusicRow}
         onDelete={deleteMusicRow}
+        userId={user?.id ?? null}
       />
 
       <BulkMusicEntry people={people} />

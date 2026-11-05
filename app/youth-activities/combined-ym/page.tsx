@@ -58,6 +58,7 @@ export default async function CombinedYmActivitiesPage({
           showOverwriteColumn={canManage}
           editable={canManage}
           storageKey="activities-combined-ym"
+          userId={user?.id ?? null}
         />
       </div>
     </main>

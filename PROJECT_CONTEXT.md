@@ -2050,6 +2050,55 @@ avoid confusing the two.
 
 ## Known open items
 
+**Grid sort/filter is now scoped per signed-in account, not shared by
+whoever last touched it on the same browser -- 2026-11-05. No
+migration needed (pure client-side change).** The user's own report:
+"if anyone changes a filter that sticks... now that more users are
+getting into things the filters and sorts would be better on an
+individual basis and preference." `usePersistedSortFilter`
+(`lib/hooks/use-persisted-sort-filter.ts`, built 2026-10-10) was
+already localStorage-backed, which is inherently per-*browser* -- the
+real gap was a *shared* browser (several ward members signing in and
+out of the same device) having no concept of whose preference a saved
+sort/filter actually was, so one person's choice silently became the
+next signed-in account's default too.
+
+The hook now takes an optional second argument, `userId`, folded
+directly into the localStorage key (`${storageKey}::user-${userId ??
+"anon"}::${STORAGE_VERSION}`) -- each signed-in account gets its own
+independent bucket on the same browser; a logged-out/unresolved session
+falls back to one shared "anon" bucket rather than erroring. Both of
+the hook's effects now also depend on `userId`, not just `storageKey`,
+so if a mounted grid's `userId` ever actually changes without a full
+page reload, it re-reads (and from then on persists to) that new
+account's own saved state instead of continuing to show/overwrite the
+previous one's.
+
+`userId` is just `user?.id ?? null` -- the signed-in Supabase auth
+user's own id, already sitting in every relevant page's existing
+`getSessionUser()` call, so no new fetch was needed anywhere. Threaded
+through as a new optional prop on all three components that call this
+hook (`AdminTableEditor`, `CallingPlanningGridForm`, `ActivitiesTable`)
+and from all 7 of their real render sites: `/admin/[table]`,
+`/announcements`, `/music` (all three share `AdminTableEditor`),
+`/calling-planning`, and the four Youth Activities pages that share
+`ActivitiesTable` (Upcoming, Combined YM, Combined YM/YW, Combined YW).
+Since the key format itself changed (gained the `user-<id>` segment),
+every existing saved sort/filter naturally stops matching the new key
+and is effectively reset once this ships -- a one-time, harmless
+side effect (nothing destructive; it's all client-side UI-preference
+cache, not real data), not something that needed its own migration or
+backfill.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean) -- this assistant has no live browser to verify the actual
+per-account behavior. Ask the user to check with two different signed-in
+accounts on the same browser/device: sorting or filtering a column as
+one account, then signing in as the other, should show that second
+account's own (initially blank) sort/filter, not the first account's.
+
 **`callings.title_prefix` narrowed to four fixed values, with
 "Brother/Sister" resolved per the specific holder's own gender --
 2026-11-05. No migration needed (schema untouched -- same nullable

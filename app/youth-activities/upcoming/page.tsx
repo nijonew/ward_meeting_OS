@@ -87,7 +87,7 @@ export default async function UpcomingActivitiesPage() {
       {canManage && <AddActivityForm />}
 
       <div className="rounded border border-rule bg-surface p-6">
-        <ActivitiesTable activities={upcoming} deletable={canManage} storageKey="activities-upcoming" />
+        <ActivitiesTable activities={upcoming} deletable={canManage} storageKey="activities-upcoming" userId={user?.id ?? null} />
       </div>
     </main>
   );
