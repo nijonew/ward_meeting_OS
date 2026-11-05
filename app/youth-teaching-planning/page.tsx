@@ -6,9 +6,14 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses, getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
+/** 6 months out, computed fresh on every render -- "available for the
+ *  next 6 months on a consistent rolling basis" (2026-11-05, the user's
+ *  own request). Never stored, so this naturally slides forward every
+ *  day with no extra code; the "Through" control below still lets
+ *  anyone widen or narrow it for a single visit. */
 function defaultThroughDate(): string {
   const d = new Date();
-  d.setMonth(d.getMonth() + 2);
+  d.setMonth(d.getMonth() + 6);
   return d.toISOString().slice(0, 10);
 }
 
@@ -100,7 +105,7 @@ export default async function YouthTeachingPlanningPage({
   }
 
   const throughDate = rawThrough || defaultThroughDate();
-  const grid = await getTeachingAssignmentGrid(throughDate, [rawClass]);
+  const grid = await getTeachingAssignmentGrid(throughDate, rawClass);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -133,7 +138,7 @@ export default async function YouthTeachingPlanningPage({
         {grid.rows.length === 0 ? (
           <p className="mt-4 text-sm text-ink-muted">No Sundays in this range.</p>
         ) : (
-          <TeachingGridForm classes={grid.classes} rows={grid.rows} />
+          <TeachingGridForm teachingClass={grid.teachingClass} rows={grid.rows} />
         )}
       </div>
     </main>

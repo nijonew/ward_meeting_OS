@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { weeklyDates } from "@/lib/data/cadence";
+import { weeklyDates, nthWeekdayDates } from "@/lib/data/cadence";
 import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
 import { getMountainTimeNow } from "@/lib/data/timezone";
 
@@ -13,48 +13,91 @@ import { getMountainTimeNow } from "@/lib/data/timezone";
 export const TEACHING_CLASS_OPTIONS = YOUTH_ACTIVITY_GROUPS.filter((g) => !g.value.startsWith("Combined"));
 export const TEACHING_CLASSES = TEACHING_CLASS_OPTIONS.map((g) => g.value);
 
+/**
+ * The two adult organizations with their own Sunday teaching slot --
+ * added 2026-11-05 alongside the Teacher/Topic rework, reusing the
+ * exact same `teaching_assignments` table and mechanism as the 6 youth
+ * classes above. Just two more `class_name` values on one shared table,
+ * rendered on their own page (/adult-teaching-planning, side by side)
+ * rather than Youth Teaching Planning's per-class hub -- there's no
+ * open-ended roster of adult classes the way there is youth classes, so
+ * no per-person access-control table is needed for these two; the page
+ * itself is gated by the `adult_teaching_planning` feature alone.
+ */
+export const ADULT_TEACHING_CLASS_OPTIONS = [
+  { value: "Elders Quorum", label: "Elders Quorum" },
+  { value: "Relief Society", label: "Relief Society" },
+];
+export const ADULT_TEACHING_CLASSES = ADULT_TEACHING_CLASS_OPTIONS.map((g) => g.value);
+
+/** Every real `teaching_assignments.class_name` value, youth and adult
+ *  combined -- the one list Table Admin's raw fallback grid needs so
+ *  its Class dropdown covers every row this table can actually hold. */
+export const ALL_TEACHING_CLASS_OPTIONS = [...TEACHING_CLASS_OPTIONS, ...ADULT_TEACHING_CLASS_OPTIONS];
+
+/**
+ * A 5th Sunday's own default Teacher/Topic -- the standard Church
+ * convention of a Bishopric-directed combined lesson on a month's rare
+ * extra Sunday, rather than each organization's regular lesson. Shown
+ * only as a row's pre-filled default when nothing has been saved for
+ * that date yet (see getTeachingAssignmentGrid) -- never written to the
+ * database on its own, so it's freely overwritable before anyone saves,
+ * per the user's own request, and never silently creates a row nobody
+ * asked for.
+ */
+export const FIFTH_SUNDAY_TEACHER = "Bishopric Planned";
+export const FIFTH_SUNDAY_TOPIC = "5th Sunday";
+
 export interface TeachingGridRow {
   classDate: string;
-  cells: Record<string, string>; // class name -> entry text (missing/empty = nothing entered)
+  teacher: string;
+  topic: string;
 }
 
 export interface TeachingGrid {
-  classes: string[];
+  teachingClass: string;
   rows: TeachingGridRow[];
 }
 
 /**
- * One row per upcoming Sunday between today and throughDateISO, whether
- * or not a teaching_assignments row exists yet for it -- same "always
- * show every date, fill in what's real" approach as the Assignment
- * Rotations grid (getAssignmentGrid in lib/data/rotations.ts), just
- * keyed on the calendar's own Sundays instead of scheduled meetings
- * (every Sunday exists whether or not anything else is planned for it).
+ * One row per upcoming Sunday between today and throughDateISO for a
+ * single class, whether or not a teaching_assignments row exists yet
+ * for it -- same "always show every date, fill in what's real" approach
+ * as the Assignment Rotations grid (getAssignmentGrid in
+ * lib/data/rotations.ts), just keyed on the calendar's own Sundays
+ * instead of scheduled meetings (every Sunday exists whether or not
+ * anything else is planned for it).
  *
- * `classes` narrows both the query and the returned grid to a specific
- * subset -- added 2026-09-09 so a single class's own page
- * (/youth-teaching-planning?class=<name>) can render just that one
- * column instead of every class at once. Defaults to every class, the
- * original all-in-one-grid behavior.
+ * **Reworked 2026-11-05** from a multi-class grid (one column per
+ * class) into a single-class, two-field grid (Teacher + Topic columns
+ * for one class) -- every real caller already narrowed to exactly one
+ * class, so this is a simplification, not a capability loss. A Sunday
+ * that's the 5th occurrence of its month (via the same nthWeekdayDates
+ * this app's cadence-rule engines already use) defaults its two fields
+ * to FIFTH_SUNDAY_TEACHER/FIFTH_SUNDAY_TOPIC whenever no real row has
+ * been saved for it yet.
  */
-export async function getTeachingAssignmentGrid(throughDateISO: string, classes: string[] = TEACHING_CLASSES): Promise<TeachingGrid> {
+export async function getTeachingAssignmentGrid(throughDateISO: string, teachingClass: string): Promise<TeachingGrid> {
   // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
   // see lib/data/meetings.ts's autoArchivePastMeetings for why.
   const today = new Date(`${getMountainTimeNow().dateIso}T00:00:00`);
   const through = new Date(`${throughDateISO}T00:00:00`);
   const sundays = weeklyDates(today, through, 0);
 
-  if (sundays.length === 0 || classes.length === 0) {
-    return { classes, rows: [] };
+  if (sundays.length === 0) {
+    return { teachingClass, rows: [] };
   }
+
+  const fifthSundays = new Set(nthWeekdayDates(today, through, 0, 5));
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("teaching_assignments")
-    .select("class_date, class_name, entry")
+    .select("class_date, teacher_name, topic")
     .in("class_date", sundays)
-    .in("class_name", classes);
+    .eq("class_name", teachingClass);
 
+  const byDate = new Map<string, { teacher: string; topic: string }>();
   if (error) {
     // Most likely cause: migration 042 (which creates this table) hasn't
     // been run yet in this environment. Fail soft with an empty grid
@@ -62,19 +105,22 @@ export async function getTeachingAssignmentGrid(throughDateISO: string, classes:
     // server error -- every other read in this app follows the same
     // if (error) convention (see getUpcomingMeetings, getMeetingTypes).
     console.error("getTeachingAssignmentGrid: query failed:", error.message);
-    return { classes, rows: sundays.map((classDate) => ({ classDate, cells: {} })) };
-  }
-
-  const byDate = new Map<string, Record<string, string>>();
-  for (const row of (data ?? []) as { class_date: string; class_name: string; entry: string }[]) {
-    const cells = byDate.get(row.class_date) ?? {};
-    cells[row.class_name] = row.entry;
-    byDate.set(row.class_date, cells);
+  } else {
+    for (const row of (data ?? []) as { class_date: string; teacher_name: string | null; topic: string | null }[]) {
+      byDate.set(row.class_date, { teacher: row.teacher_name ?? "", topic: row.topic ?? "" });
+    }
   }
 
   return {
-    classes,
-    rows: sundays.map((classDate) => ({ classDate, cells: byDate.get(classDate) ?? {} })),
+    teachingClass,
+    rows: sundays.map((classDate) => {
+      const saved = byDate.get(classDate);
+      if (saved) return { classDate, ...saved };
+      if (fifthSundays.has(classDate)) {
+        return { classDate, teacher: FIFTH_SUNDAY_TEACHER, topic: FIFTH_SUNDAY_TOPIC };
+      }
+      return { classDate, teacher: "", topic: "" };
+    }),
   };
 }
 

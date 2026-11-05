@@ -73,11 +73,16 @@ export default async function HomePage() {
     canPlanAnyMeeting || canMeetingSchedule || canMeetingCancellations || canRotations || canSpeakerPrayerHistory;
   const canCallingPlanning = hasFeature(profile, "calling_planning");
   const canAnnouncementManagement = hasFeature(profile, "announcement_management");
+  // Elders Quorum / Relief Society Teaching Planning (2026-11-05) --
+  // an adult-organization tool, so it sits in Administration rather
+  // than the youth-only "Youth program" section above.
+  const canAdultTeachingPlanning = hasFeature(profile, "adult_teaching_planning");
   const canTableAdmin =
     hasFeature(profile, "meeting_templates_admin") ||
     hasFeature(profile, "verify_logins") ||
     Array.from(profile?.features ?? []).some((f) => f.startsWith("table_admin_"));
-  const showAdministration = canMeetingPlanningHub || canCallingPlanning || canAnnouncementManagement || canTableAdmin;
+  const showAdministration =
+    canMeetingPlanningHub || canCallingPlanning || canAnnouncementManagement || canAdultTeachingPlanning || canTableAdmin;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -281,6 +286,12 @@ export default async function HomePage() {
               <Tile
                 title="Manage Announcements"
                 href="/announcements"
+              />
+            )}
+            {canAdultTeachingPlanning && (
+              <Tile
+                title="Elders Quorum / Relief Society Teaching"
+                href="/adult-teaching-planning"
               />
             )}
             {canTableAdmin && (

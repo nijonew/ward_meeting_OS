@@ -12,7 +12,7 @@ import {
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
 import { CALLING_TITLE_PREFIXES } from "@/lib/data/callings";
-import { TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
+import { TEACHING_CLASS_OPTIONS, ALL_TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
 import { sweepPastAnnouncements } from "@/lib/data/announcements";
 import {
   ANNOUNCEMENT_ORGANIZATIONS,
@@ -607,6 +607,21 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     columns: [
       { column: "person_id", label: "Person", type: "foreign_key", required: true, foreignKey: PERSON_FK },
       { column: "class_name", label: "Class", type: "select", required: true, options: TEACHING_CLASS_OPTIONS },
+    ],
+  },
+
+  teaching_assignments: {
+    table: "teaching_assignments",
+    label: "Teaching Assignments",
+    description:
+      "Raw-data fallback for troubleshooting or a bulk fix -- use Youth Teaching Planning or Elders Quorum / Relief Society Teaching Planning for everyday work. One row per (Sunday, class) actually filled in; a class with nothing entered yet simply has no row here.",
+    requiredFeature: "table_admin_teaching_assignments",
+    orderBy: { column: "class_date", ascending: true },
+    columns: [
+      { column: "class_date", label: "Sunday", type: "date", required: true },
+      { column: "class_name", label: "Class", type: "select", required: true, options: ALL_TEACHING_CLASS_OPTIONS },
+      { column: "teacher_name", label: "Teacher", type: "text" },
+      { column: "topic", label: "Topic", type: "text" },
     ],
   },
 };

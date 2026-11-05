@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 099
+## Current migration number: 100
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,121 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Youth Teaching Planning reworked into real Teacher/Topic columns with
+a rolling 6-month window and a 5th-Sunday default, plus a brand-new
+Elders Quorum / Relief Society Teaching Planning page -- migration
+`100`, not yet run, 2026-11-05.** The user's own request: "I would like
+to have a field that shows the date for the sunday meeting, the name
+of the teacher, and a topic for the lesson. I want this available for
+the next 6 months on a consistent rolling basis. Where there is a
+fifth sunday I want the sunday marked as potentially a 'Bishopric
+Planned' in the teacher field with the topic field saying '5th
+Sunday.' These would be overwritable by those planning. I would also
+like a similar page for Elders Quorum and Relief Society Teaching
+Planning. They would be the same page and would be side by side in
+separate tables."
+
+**Schema**: `teaching_assignments.entry` (a single free-text field that
+had always informally held "a name, a lesson topic, or both" per
+migration 042's own comment) is renamed to `teacher_name`, and a real
+new `topic text` column added -- the grid's two fields now map
+directly onto two real columns instead of one shared string. The
+rename is wrapped in a `do $$ ... $$` block checking
+`information_schema.columns` rather than a bare `rename column`, since
+Postgres has no `rename column if exists` and a second run would
+otherwise fail once `entry` no longer exists. `teacher_name`'s old
+`not null` constraint is dropped -- a row can now exist with only a
+topic chosen and no teacher decided yet.
+
+**Teacher/Topic, not one combined field**:
+`getTeachingAssignmentGrid` (`lib/data/teaching-assignments.ts`) was
+reworked from a multi-class grid (one column per class, each a single
+free-text cell) into a single-class, two-field grid -- every real
+caller had already narrowed to exactly one class since the 2026-09-09
+per-class-hub rework, so this is a simplification, not a capability
+loss. `TeachingGridRow` is now `{ classDate, teacher, topic }`, and
+`TeachingGridForm` (`components/youth-teaching-planning/TeachingGridForm.tsx`)
+renders three real columns (Sunday/Teacher/Topic) instead of one
+column per class, with the class itself carried as a hidden
+`class_name` field rather than encoded into each cell's own field
+name.
+
+**Rolling 6-month window**: `defaultThroughDate()` on both
+`/youth-teaching-planning` and the new `/adult-teaching-planning`
+changed from +2 months to +6 months -- computed fresh on every render
+(never stored), so it naturally slides forward every day with no extra
+code needed for "a consistent rolling basis." The existing "Through"
+date control still lets anyone widen or narrow it for a single visit.
+
+**5th-Sunday default**: new `FIFTH_SUNDAY_TEACHER = "Bishopric
+Planned"`/`FIFTH_SUNDAY_TOPIC = "5th Sunday"` constants
+(`lib/data/teaching-assignments.ts`). `getTeachingAssignmentGrid`
+computes every 5th Sunday in the requested range via
+`nthWeekdayDates(today, through, 0, 5)` -- the same cadence-math
+helper this app's other rule engines already use, not a new
+day-of-month calculation -- and uses the two defaults as a row's
+`teacher`/`topic` values **only when no real row has been saved for
+that date yet**. Nothing is written to the database until someone
+actually saves the grid -- a 5th Sunday a planner leaves untouched
+saves exactly that default as the real row the first time Save is
+clicked; one they edit first saves their own values instead. This
+matches "potentially... overwritable" literally: the default is only
+ever a pre-filled suggestion, never auto-inserted on its own the way
+Youth Activities' own "TBD" placeholder sweep is.
+
+**New `/adult-teaching-planning`**, gated on a new
+`adult_teaching_planning` feature (nobody gets it automatically --
+grant it via `/admin/calling-features` as the usual one-time
+bootstrapping step). Unlike Youth Teaching Planning, there's no
+open-ended roster of classes for Elders Quorum/Relief Society -- just
+these two fixed organizations -- so this is one page, one feature
+gate, rendering both tables side by side (`grid lg:grid-cols-2`,
+stacking on a narrow screen) rather than a hub + per-class
+drill-down. Reuses the exact same `teaching_assignments` table and
+`getTeachingAssignmentGrid`/`TeachingGridForm`/`saveTeachingGrid`
+mechanism as the youth classes -- "Elders Quorum" and "Relief Society"
+are simply two more `class_name` values on the one shared table, with
+the identical 5th-Sunday default applied too (inferred, not
+explicitly asked for this one page specifically, but the same real
+Church convention of a Bishopric-directed 5th-Sunday combined lesson
+applies to these two organizations as much as to youth classes --
+flag if this should be turned off for this page specifically).
+`saveTeachingGrid` (`app/youth-teaching-planning/actions.ts`, kept as
+the one shared action for both pages) branches its own access check on
+whether the submitted `class_name` is one of the two adult ones
+(`adult_teaching_planning` feature, no per-class restriction) or a
+youth one (`youth_teaching_planning` feature + the existing
+`youth_class_teachers` per-person check) -- the save mechanism itself
+is otherwise identical either way.
+
+New "Elders Quorum / Relief Society Teaching" tile on the landing
+page's Administration section (an adult-organization tool, not a
+youth one, so it sits there rather than in the youth-only "Youth
+program" section).
+
+**Table Admin raw fallback**: new `teaching_assignments` registry
+entry (`lib/admin/registry.ts`), gated on a new
+`table_admin_teaching_assignments` feature, same "bespoke page for
+everyday work, this grid for troubleshooting/a bulk fix" convention as
+every other table in this app -- its Class dropdown covers every real
+value (`ALL_TEACHING_CLASS_OPTIONS`, youth + adult combined), since
+this one raw grid has to handle every row the shared table can hold.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- **confirm migration number `100` is actually free before
+running it**, per this project's own repeated numbering-collision
+history, then ask the user to run it, grant `adult_teaching_planning`
+to whoever should manage the new page, and check: `/youth-teaching-planning`
+now shows separate Teacher/Topic columns with a 6-month-out default
+range; an untouched 5th Sunday pre-fills "Bishopric Planned"/"5th
+Sunday" in both fields and actually saves that way if left alone;
+editing either field before saving replaces the default correctly; and
+`/adult-teaching-planning` shows Elders Quorum and Relief Society as
+two side-by-side tables with the same behavior.
 
 **Grid sort/filter is now scoped per signed-in account, not shared by
 whoever last touched it on the same browser -- 2026-11-05. No

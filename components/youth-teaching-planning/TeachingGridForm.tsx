@@ -28,23 +28,26 @@ function formatDate(iso: string) {
  * render time. Root-caused 2026-09-08 against a "page couldn't load"
  * report -- see the identical fix in AssignmentGridForm.tsx.
  *
- * `classes` is usually a single-item array now (2026-09-09, moved from
- * /teaching-calendar to /youth-teaching-planning's per-class pages) --
- * left as an array rather than a single `class` prop since nothing else
- * about this component needs to change to support that narrowing.
+ * **Reworked 2026-11-05**: one class per instance, with real Teacher
+ * and Topic columns (previously a single, class-named column holding
+ * one combined free-text field) -- the user's own request. `teachingClass`
+ * is carried as a hidden field so saveTeachingGrid knows which
+ * class_name every row in this one submit belongs to; every other field
+ * name is just "<date>::teacher"/"<date>::topic". Reused as-is by both
+ * Youth Teaching Planning's per-class page and the new
+ * /adult-teaching-planning page (Elders Quorum and Relief Society,
+ * rendered as two separate instances of this same component side by
+ * side) -- the mechanism is identical, only the class differs.
  *
- * **Row contrast, 2026-10-10** (the user's own report: "rows blend
- * together quite a bit") -- `even:bg-accent-soft` zebra striping plus
- * `hover:bg-accent/15`, applied identically across every "favorite
- * grid format" page in this app -- see CallingPlanningGridForm's own
- * comment for the full reasoning (including why gray striping was
- * revised to this warm accent tint).
+ * Row contrast (2026-10-10, `even:bg-accent-soft`/`hover:bg-accent/15`)
+ * is unchanged -- see CallingPlanningGridForm's own comment for the
+ * full reasoning.
  */
 export function TeachingGridForm({
-  classes,
+  teachingClass,
   rows,
 }: {
-  classes: string[];
+  teachingClass: string;
   rows: TeachingGridRow[];
 }) {
   const [state, formAction, pending] = useActionState(saveTeachingGrid, initialState);
@@ -60,39 +63,47 @@ export function TeachingGridForm({
 
   return (
     <form action={formAction} onChange={() => setDirty(true)}>
+      <input type="hidden" name="class_name" value={teachingClass} />
       <div className="mt-4">
         <DualScrollbar>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                Sunday
-              </th>
-              {classes.map((c) => (
-                <th key={c} className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                  {c}
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                  Sunday
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.classDate} className="border-t border-rule-strong/40 even:bg-accent-soft hover:bg-accent/15">
-                <td className="px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
-                {classes.map((c) => (
-                  <td key={c} className="px-2 py-1.5 align-top">
+                <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                  Teacher
+                </th>
+                <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                  Topic
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.classDate} className="border-t border-rule-strong/40 even:bg-accent-soft hover:bg-accent/15">
+                  <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
+                  <td className="px-2 py-1.5 align-top">
                     <input
                       type="text"
-                      name={`${row.classDate}::${c}`}
-                      defaultValue={row.cells[c] ?? ""}
+                      name={`${row.classDate}::teacher`}
+                      defaultValue={row.teacher}
                       className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     />
                   </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td className="px-2 py-1.5 align-top">
+                    <input
+                      type="text"
+                      name={`${row.classDate}::topic`}
+                      defaultValue={row.topic}
+                      className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </DualScrollbar>
       </div>
 
