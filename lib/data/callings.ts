@@ -1,6 +1,29 @@
 import { createClient } from "@/lib/supabase/server";
 import { personName } from "@/lib/data/calling-planning";
 
+/**
+ * The only four values `callings.title_prefix` should ever hold going
+ * forward (2026-11-05, the user's own request) -- confirmed directly
+ * with the user before building this: NOT just "Brother/Sister" and
+ * "President" on their own (that would have left Presiding/Conducting's
+ * "Bishop `<name>`" and Visiting Authorities' "Elder `<name>`" with
+ * nowhere to come from, since both are already read from this exact
+ * column -- see `getTitlePrefixesForAssignments`,
+ * `lib/data/person-display.ts`). "Brother/Sister" is a real, live
+ * value here, not just a label -- `getTitlePrefixesForAssignments`
+ * resolves it per the specific person actually holding the calling,
+ * "Brother" for a male holder and "Sister" for a female one, at the
+ * moment a title is displayed, not at the moment this is set. A
+ * calling can still have no title at all -- the field stays nullable,
+ * same as before.
+ */
+export const CALLING_TITLE_PREFIXES = [
+  { value: "President", label: "President" },
+  { value: "Bishop", label: "Bishop" },
+  { value: "Elder", label: "Elder" },
+  { value: "Brother/Sister", label: "Brother/Sister" },
+] as const;
+
 export interface CallingOption {
   id: string;
   name: string;

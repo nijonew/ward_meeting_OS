@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getAllCallings } from "@/lib/data/callings";
+import { getAllCallings, CALLING_TITLE_PREFIXES } from "@/lib/data/callings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { createCalling } from "@/app/callings/actions";
 
@@ -48,12 +48,18 @@ export default async function CallingsListPage({
             required
             className="flex-1 rounded border border-rule bg-transparent px-3 py-2 text-sm"
           />
-          <input
-            type="text"
+          <select
             name="title_prefix"
-            placeholder="Title prefix (optional)"
+            defaultValue=""
             className="flex-1 rounded border border-rule bg-transparent px-3 py-2 text-sm"
-          />
+          >
+            <option value="">No title prefix</option>
+            {CALLING_TITLE_PREFIXES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
           <button
             type="submit"
             className="rounded border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"

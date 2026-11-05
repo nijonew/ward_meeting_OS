@@ -51,6 +51,18 @@ export function formatTitleFullName(fullName: string, titlePrefix: string | null
  * since been released from the calling that originally resolved them,
  * correctly falls through to a plain name rather than a stale or
  * incorrect title.
+ *
+ * **A matched `title_prefix` of literally "Brother/Sister" resolves per
+ * the specific holder's own gender, 2026-11-05** (the user's own
+ * request, once `title_prefix` was narrowed to four fixed values --
+ * see `CALLING_TITLE_PREFIXES`, `lib/data/callings.ts`, for why "Bishop"
+ * and "Elder" stay literal while this one doesn't): "Brother" for
+ * `people.gender === "male"`, "Sister" for `"female"`. A person with no
+ * gender on file (most of this ward's existing rows predate that field)
+ * falls back to no title at all -- the plain name -- rather than
+ * guessing one over the other, same "don't assume" principle the
+ * Conducting script's own pronoun resolution already established for
+ * exactly this gap (`pronounsFor`, `lib/data/conducting-rows.ts`).
  */
 export async function getTitlePrefixesForAssignments(
   meetingTypeSlug: MeetingTypeSlug,
@@ -156,6 +168,19 @@ export async function getTitlePrefixesForAssignments(
   }
   const callingsById = new Map(callings.map((c) => [c.id, c]));
 
+  // Only fetched when at least one matched calling could actually need
+  // it -- most callings' own title_prefix is "Bishop"/"Elder"/"President"
+  // or null, none of which need a person's gender at all.
+  const needsGender = callings.some((c) => c.title_prefix === "Brother/Sister");
+  const genderById = new Map<string, string | null>();
+  if (needsGender) {
+    const personIds = Array.from(new Set(pairs.map((p) => p.personId)));
+    const { data: peopleRows } = await supabase.from("people").select("id, gender").in("id", personIds);
+    for (const p of (peopleRows ?? []) as { id: string; gender: string | null }[]) {
+      genderById.set(p.id, p.gender);
+    }
+  }
+
   for (const { elementKey, personId } of pairs) {
     const key = `${elementKey}::${personId}`;
     if (result.has(key)) continue;
@@ -179,6 +204,11 @@ export async function getTitlePrefixesForAssignments(
     if (ids && !titlePrefix) {
       const match = ids.map((id) => callingsById.get(id)).find((c) => c?.current_holder_id === personId);
       if (match?.title_prefix) titlePrefix = match.title_prefix;
+    }
+
+    if (titlePrefix === "Brother/Sister") {
+      const gender = genderById.get(personId);
+      titlePrefix = gender === "male" ? "Brother" : gender === "female" ? "Sister" : null;
     }
 
     if (titlePrefix) result.set(key, titlePrefix);

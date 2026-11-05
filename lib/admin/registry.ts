@@ -11,6 +11,7 @@ import {
   slotLabel,
 } from "@/lib/data/sacrament-constants";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
+import { CALLING_TITLE_PREFIXES } from "@/lib/data/callings";
 import { TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
 import { sweepPastAnnouncements } from "@/lib/data/announcements";
 import {
@@ -276,7 +277,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     orderBy: { column: "sort_order", ascending: true },
     columns: [
       { column: "name", label: "Name", type: "text", required: true },
-      { column: "title_prefix", label: "Title Prefix", type: "text" },
+      { column: "title_prefix", label: "Title Prefix", type: "select", options: [...CALLING_TITLE_PREFIXES] },
       { column: "current_holder_id", label: "Current Holder", type: "foreign_key", foreignKey: PERSON_FK },
       { column: "sort_order", label: "Sort Order", type: "number" },
       { column: "active", label: "Active", type: "boolean" },

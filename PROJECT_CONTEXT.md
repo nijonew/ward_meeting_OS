@@ -2050,6 +2050,74 @@ avoid confusing the two.
 
 ## Known open items
 
+**`callings.title_prefix` narrowed to four fixed values, with
+"Brother/Sister" resolved per the specific holder's own gender --
+2026-11-05. No migration needed (schema untouched -- same nullable
+text column, just a constrained UI now, matching this app's own
+established "the app code is the real source of truth for admin
+vocabulary, never a DB-side CHECK constraint" convention after one too
+many production incidents from the opposite choice).** The user's own
+request: "change it to two options in a dropdown: 'Brother/Sister' and
+'President'. If 'Brother/Sister' is selected... use 'Brother' for male
+members and 'Sister' for female members that hold the calling."
+
+Checked first, since this field already has a real, live, shipped use
+beyond ordinary callings (2026-10-21/31): it's exactly what makes the
+Conducting script say "Bishop Nielsen" for Presiding and "Elder Smith"
+for Visiting Authorities (`getTitlePrefixesForAssignments`,
+`lib/data/person-display.ts`, reads this same column). Restricting it
+to only two values would have silently broken both. Confirmed via
+`AskUserQuestion`: four fixed values, not two -- `CALLING_TITLE_PREFIXES`
+(`lib/data/callings.ts`) is `President`/`Bishop`/`Elder`/`Brother/Sister`,
+no free-text escape hatch. The field stays nullable (a calling can
+still have no title at all).
+
+**"Brother/Sister" is a real, live value stored on the calling, not
+just a dropdown label** -- resolved per the SPECIFIC person actually
+holding it, at the moment a title is displayed, not at the moment it's
+set, so it stays correct automatically as a calling changes hands.
+`getTitlePrefixesForAssignments` (`lib/data/person-display.ts`) now
+checks whether any matched calling's `title_prefix` is literally
+"Brother/Sister" and, only then, fetches `people.gender` for the
+pairs' own person ids (one small extra query, skipped entirely for
+every meeting where nothing actually needs it) -- "Brother" for
+`gender === "male"`, "Sister" for `"female"`. A person with no gender
+on file (most of this ward's existing rows predate that field) falls
+back to no title at all, the plain name, rather than guessing one over
+the other -- the same "don't assume" principle the Conducting script's
+own pronoun resolution already established for the identical gap
+(`pronounsFor`, `lib/data/conducting-rows.ts`). `Bishop`/`Elder`/
+`President` are unaffected, still shown literally.
+
+Both places a calling's `title_prefix` is actually set switched from a
+free-text input to this same constrained dropdown: `/callings`' own
+"Add Calling" form, and Table Admin's raw Callings grid (`type:
+"select"`, not `type: "text"`) -- the latter is documented as the
+fallback for everything the dedicated pages don't cover, so leaving it
+as free text would have let an out-of-vocabulary value back in through
+the side door.
+
+**Not independently verified**: whether every calling's own CURRENT
+`title_prefix` value already matches one of these four exactly (case-
+sensitive) -- this assistant has no live database access. If an
+existing value doesn't match (e.g. stored as "bishop" lowercase, or
+something else entirely), Table Admin's own `select` cell would show
+it as blank/unselected rather than erroring or losing the underlying
+data -- re-picking the right option there fixes it. Ask the user to
+check the Bishop calling, the Stake Presidency callings, and any
+Visiting-Authority-style callings (Stake High Councilor seats) still
+show their correct title ("Bishop `<name>`" / "President `<name>`" /
+"Elder `<name>`") on a real Conducting script before assuming
+everything carried over cleanly.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to also set a real calling's own Title Prefix to "Brother/Sister" (one
+held by a person with their gender recorded) and confirm the
+Conducting script shows "Brother `<name>`" or "Sister `<name>`"
+correctly, and that a calling with no title prefix set still shows a
+plain name as before.
+
 **Calendar's "TBD" exclusion for Youth Activities reversed, 2026-11-05
 -- it broke the real entry-count the user actually wants.** Yesterday's
 decision to hide a plain, un-cancelled "TBD" placeholder from the
