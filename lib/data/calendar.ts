@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWardEvents } from "@/lib/data/ward-events";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
-import { getYouthActivities } from "@/lib/data/youth-activities";
+import { getYouthActivities, type YouthActivityRow } from "@/lib/data/youth-activities";
+import { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 
 export type CalendarItemKind = "sacrament" | "ward" | "announcement" | "youth";
@@ -89,9 +90,8 @@ async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   account, `getSessionUser()`'s own `user`), not on a specific
  *   feature/role -- matches the user's own literal "someone is logged
  *   in," and this calendar has no other per-item role gating to be
- *   consistent with. Same cancelled-reason-in-title treatment as
- *   Sacrament Meeting above, since `youth_activities` carries the same
- *   `cancelled`/`cancellation_note` shape.
+ *   consistent with. See `buildYouthActivityItems`'s own comment for
+ *   how each one is titled and how a ward-wide cancellation collapses.
  * - **Ward Events**: `getWardEvents()`, unfiltered -- the same call
  *   `/events` already makes with no login gate; RLS already limits
  *   an anonymous visitor to `status = 'published'` rows (see that
@@ -106,6 +106,77 @@ async function getAllSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   cadence engine already does elsewhere), not implied by what was
  *   asked for here.
  */
+/**
+ * "Can we put the group name in front of the activity title? And if
+ * the activity is cancelled for all youth can we just put 'Youth
+ * Activities Cancelled due to (reason)' rather than a line for each
+ * group?" (the user's own request, 2026-11-04).
+ *
+ * Groups the raw rows by date first, since the "all youth" check needs
+ * to see every row for a day at once, not one row at a time:
+ * - Expands each row's own `group_name` to the real class(es) it
+ *   actually covers (`classesForCombinedGroup` -- a Combined pseudo-
+ *   group covers several classes in one row; an individual class
+ *   covers only itself) and unions every CANCELLED row's own coverage
+ *   into one set for the day.
+ * - If that set covers every one of the 6 real classes
+ *   (`ACTIVITY_CLASSES`) -- whether that took one shared Combined row
+ *   cancelled outright, or several individual/partial rows adding up
+ *   to the same thing -- the whole day collapses into one item,
+ *   "Youth Activities Cancelled due to `<reason>`" (every distinct
+ *   reason among those rows, joined, for the rare case two different
+ *   cancellations together add up to "everyone"), replacing every
+ *   per-row line for that date.
+ * - Otherwise, each row renders on its own line, titled
+ *   "`<group_name>`: `<title>`" -- a cancelled one keeps the existing
+ *   "(Cancelled due to `<reason>`)" suffix, since cancellation isn't
+ *   total for this date and still needs a day-of-week-sized line here
+ *   rather than this function's own collapsed summary.
+ */
+function buildYouthActivityItems(youthActivities: YouthActivityRow[]): CalendarItem[] {
+  const byDate = new Map<string, YouthActivityRow[]>();
+  for (const a of youthActivities) {
+    const list = byDate.get(a.activity_date) ?? [];
+    list.push(a);
+    byDate.set(a.activity_date, list);
+  }
+
+  const items: CalendarItem[] = [];
+  for (const [date, rows] of byDate) {
+    const cancelledClasses = new Set<string>();
+    for (const r of rows) {
+      if (!r.cancelled) continue;
+      for (const cls of classesForCombinedGroup(r.group_name) ?? [r.group_name]) {
+        cancelledClasses.add(cls);
+      }
+    }
+
+    if (ACTIVITY_CLASSES.every((cls) => cancelledClasses.has(cls))) {
+      const reasons = Array.from(
+        new Set(rows.filter((r) => r.cancelled && r.cancellation_note).map((r) => r.cancellation_note as string))
+      );
+      items.push({
+        date,
+        time: null,
+        title: `Youth Activities Cancelled${reasons.length > 0 ? ` due to ${reasons.join("; ")}` : ""}`,
+        kind: "youth",
+        note: null,
+        href: null,
+      });
+      continue;
+    }
+
+    for (const r of rows) {
+      const title = r.cancelled
+        ? `${r.group_name}: ${r.title} (Cancelled${r.cancellation_note ? ` due to ${r.cancellation_note}` : ""})`
+        : `${r.group_name}: ${r.title}`;
+      items.push({ date, time: r.activity_time, title, kind: "youth", note: r.group_name, href: null });
+    }
+  }
+
+  return items;
+}
+
 export async function getCalendarItems(): Promise<CalendarItem[]> {
   const { user } = await getSessionUser();
 
@@ -155,19 +226,7 @@ export async function getCalendarItems(): Promise<CalendarItem[]> {
     });
   }
 
-  for (const a of youthActivities) {
-    const title = a.cancelled
-      ? `${a.title} (Cancelled${a.cancellation_note ? ` due to ${a.cancellation_note}` : ""})`
-      : a.title;
-    items.push({
-      date: a.activity_date,
-      time: a.activity_time,
-      title,
-      kind: "youth",
-      note: a.group_name,
-      href: null,
-    });
-  }
+  items.push(...buildYouthActivityItems(youthActivities));
 
   return items;
 }

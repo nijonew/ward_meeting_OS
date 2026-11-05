@@ -2050,6 +2050,41 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calendar's Youth Activity items now lead with the group name, and a
+ward-wide cancellation collapses into one line, 2026-11-04. No
+migration needed.** Direct follow-up to the "logged-in only" calendar
+work from minutes earlier, same day: "can we put the group name in
+front of the activity title? and if the activity is cancelled for all
+youth can we just put 'Youth Activities Cancelled due to (reason)'
+rather than a line for each group?"
+
+New `buildYouthActivityItems()` (`lib/data/calendar.ts`) replaces the
+simple one-row-in-one-item-out loop -- see that function's own comment
+for the full design. Groups the day's raw rows first, since "cancelled
+for all youth" has to look at every row for that date at once: expands
+each cancelled row's own `group_name` to the real class(es) it actually
+covers (`classesForCombinedGroup` -- a Combined pseudo-group covers
+several at once; an individual class covers only itself) and unions
+that across the day. If the union covers all 6 real classes
+(`ACTIVITY_CLASSES`) -- whether from one shared Combined row cancelled
+outright, or several individual/partial rows adding up to the same
+thing -- the whole day becomes one item, "Youth Activities Cancelled
+due to `<reason>`" (every distinct reason among those rows, joined, for
+the rare case two different cancellations together add up to
+"everyone"), replacing every per-row line. Otherwise, each row still
+renders on its own line, now titled "`<group_name>`: `<title>`" -- a
+cancelled one (when the day isn't a full ward-wide cancellation) keeps
+its existing "(Cancelled due to `<reason>`)" suffix.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calendar` while logged in: an ordinary youth activity now
+reads "`<group>`: `<title>`"; a week cancelled for every youth group
+(either a single Combined row, or several classes adding up to all of
+them) shows one "Youth Activities Cancelled due to `<reason>`" line
+instead of several; and a week where only some groups are cancelled
+still shows each group's own line.
+
 **Youth Activities re-added to the Ward Calendar View, logged-in only,
 2026-11-04. No migration needed.** The calendar (`/calendar`, built
 2026-11-01) had Youth Activities removed entirely on day one, per the
