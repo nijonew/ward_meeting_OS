@@ -2050,6 +2050,78 @@ avoid confusing the two.
 
 ## Known open items
 
+**A persistent side navigation menu, built on top of the dashboard
+reorganization above -- no migration needed, 2026-11-05.** The user's
+own follow-up request, right after the dashboard reorg shipped: "With
+the improved categories, I would like to improve navigation by adding
+a menu on the side with the categories and the features associated
+with those categories from our cleanup."
+
+**New `lib/data/nav-sections.ts`'s `getNavSections()`** is the real
+piece of this -- My meetings/Announcements/Meeting Planning/Youth
+program/Admin, factored out of `app/page.tsx` into one shared,
+`cache()`-wrapped function (same fix already applied to
+`getSessionUser`/`getWardName`/`getMeetingById`, since the home page
+now calls it both directly and indirectly through `AppHeader` in the
+same request) rather than re-derived in two places, per this app's own
+documented "Single Source of Truth" design principle
+(architecture.md). `app/page.tsx` itself was refactored to consume
+this function for those five sections instead of its own parallel
+copy of the identical gating logic -- the home page's tile grid is
+unchanged in every other respect (same tiles, same hrefs, same order);
+only where the gating logic lives moved. **Deliberately excludes "This
+week"** -- that tier's three tiles are either genuinely public (no
+login) or carry real per-request state the home page still computes
+fresh on its own (which specific Sacrament Meeting is today's/early-
+access, the disabled-vs-linked Youth Activities tile for a logged-out
+visitor) -- there's no single stable URL for "today's Sacrament
+Meeting program" to hand a persistent nav, so that one tile stays
+reachable only from the home page itself.
+
+**New `components/NavDrawer.tsx`** (a Client Component, for its own
+open/closed state) + **`AppHeader.tsx`** rendering it with
+`getNavSections()`'s data plus a small hand-written "This week" group
+(Announcements and Calendar always; Youth Activities only when signed
+in -- the one tier `getNavSections()` doesn't cover, given a stable
+link exists for everything in it except the one dynamic tile already
+explained above). A toggle button (three bars, left of the wordmark)
+opens a slide-in panel + dimmed overlay listing every section the
+signed-in account actually has, each link going straight to its real
+destination -- closes on an overlay click, a link click, Escape, or
+simply navigating away (compared against the pathname during render,
+not inside a `useEffect`, to avoid the exact `react-hooks/set-state-
+in-effect` violation this app's own grid forms already had to work
+around the same way).
+
+**Rendered from `AppHeader` specifically, not a new root-layout
+component**, since that's the one component already proven to render
+on nearly every page in the app -- the drawer shows up everywhere
+`AppHeader` already does, and is absent exactly where `AppHeader`
+already deliberately has no chrome at all (the pre-auth pages, and the
+bare-chrome Sacrament-Meeting-public-only branch of
+`app/meetings/[id]/layout.tsx`), with no per-page wiring needed either
+way. Chosen over a persistent layout column pushing page content over
+-- this app has no shared two-column wrapper on any page today, and
+reworking every page's own `<main>` to make room for one would have
+been a much larger, riskier change than a single overlay-drawer
+component sitting on top of the existing layout unchanged.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only -- this
+assistant has no local Supabase credentials to run a live preview
+(same standing gap as everything else in this project), and this
+session's sandbox also can't expose a local static file server to
+screenshot the drawer's own markup directly; the overlay+fixed-panel
+technique and the color tokens used match this app's own existing
+`DualScrollbar` precedent closely enough to be confident in the
+structure, but the actual visual result is unverified. Ask the user to
+check: the hamburger button appears to the left of the ward name on
+every page that already shows the header; clicking it opens a slide-in
+panel on the left listing every section/tile the signed-in account
+actually has (matching the home page's own tiles exactly); clicking a
+link, the overlay, the &times;, or Escape all close it; and that a
+logged-out visitor still sees a working toggle with just the public
+"This week" links (Announcements, Calendar).
+
 **Bug found and fixed 2026-11-05: a Sacrament Meeting viewer who can
 neither plan nor conduct could land on a dead-end message instead of
 the real public program.** The user's own report: "When someone has

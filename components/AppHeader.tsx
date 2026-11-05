@@ -3,6 +3,8 @@ import { signOut } from "@/app/auth/actions";
 import { getWardName } from "@/lib/data/ward-settings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
+import { getNavSections, type NavSection } from "@/lib/data/nav-sections";
+import { NavDrawer } from "@/components/NavDrawer";
 
 /**
  * Shared top bar: wordmark (links home), a right-aligned context tag, and
@@ -33,13 +35,41 @@ import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
  * shows the account's current features in a plain title tooltip --
  * useful for the same debugging moment, without adding visible
  * clutter to the header itself.
+ *
+ * Gained a persistent side nav toggle, 2026-11-05 (the user's own
+ * request: "adding a menu on the side with the categories and the
+ * features associated with those categories from our cleanup").
+ * Renders `NavDrawer` (a Client Component, for its own open/closed
+ * state) with `getNavSections()`'s already-resolved, already-gated
+ * data -- the same My meetings/Announcements/Meeting Planning/Youth
+ * program/Admin categories the landing page itself now sources from
+ * that same function -- plus a small hand-written "This week" group
+ * (Calendar and public Announcements always; Youth Activities only
+ * when signed in) for the one tier that function deliberately doesn't
+ * cover (see its own doc comment for why). Since this component
+ * already renders on nearly every page, the drawer needs no separate
+ * wiring anywhere else to show up everywhere `AppHeader` does.
  */
 export async function AppHeader({ tag }: { tag?: string }) {
-  const [{ user, profile }, wardName] = await Promise.all([getSessionUser(), getWardName()]);
+  const [{ user, profile }, wardName, featureSections] = await Promise.all([
+    getSessionUser(),
+    getWardName(),
+    getNavSections(),
+  ]);
   const canVerifyLogins = hasFeature(profile, "verify_logins");
   const unverifiedCount = canVerifyLogins ? await getUnverifiedProfileCount() : 0;
   const whoAmI = profile?.display_name || profile?.email || null;
   const featureList = profile && profile.features.size > 0 ? Array.from(profile.features).sort().join(", ") : "no features";
+
+  const thisWeekSection: NavSection = {
+    title: "This week",
+    links: [
+      { title: "Announcements", href: "/announcements/public" },
+      { title: "Calendar", href: "/calendar" },
+      ...(user ? [{ title: "Youth Activities", href: "/youth-activities?readonly=1" }] : []),
+    ],
+  };
+  const navSections = [thisWeekSection, ...featureSections];
 
   return (
     <>
@@ -68,13 +98,16 @@ export async function AppHeader({ tag }: { tag?: string }) {
           with flex-wrap, keeps everything on screen without changing
           anything about the existing side-by-side layout at sm+. */}
       <header className="flex flex-col gap-2 border-b border-rule pb-6 sm:flex-row sm:items-baseline sm:justify-between">
-        <Link
-          href="/"
-          prefetch={false}
-          className="font-display text-xl tracking-tight text-ink transition-colors hover:text-ink-muted"
-        >
-          {wardName} Ward
-        </Link>
+        <div className="flex items-center gap-3">
+          <NavDrawer sections={navSections} />
+          <Link
+            href="/"
+            prefetch={false}
+            className="font-display text-xl tracking-tight text-ink transition-colors hover:text-ink-muted"
+          >
+            {wardName} Ward
+          </Link>
+        </div>
         <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           {tag && <span className="font-mono text-xs uppercase tracking-wider text-ink-muted">{tag}</span>}
           {whoAmI && (
