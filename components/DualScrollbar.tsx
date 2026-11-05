@@ -46,18 +46,35 @@ import { useEffect, useRef, useState } from "react";
  * reason to exist is reaching a scrollbar that's currently off-screen
  * -- once you've scrolled far enough down that the table's own bottom
  * edge (where its native scrollbar lives) is back in view, showing
- * both is exactly the redundant double-scrollbar the user flagged. A
- * zero-height sentinel sits right at the bottom of the real scrollable
- * content; an `IntersectionObserver` watching it toggles the clone
- * off the instant that point enters the viewport, and back on once it
- * scrolls back out (in either direction -- scrolling further down
- * past a short table, or back up away from a tall one's own bottom).
+ * both is exactly the redundant double-scrollbar the user flagged.
+ *
+ * **Rewritten 2026-11-04 -- the original `IntersectionObserver`
+ * version never reliably hid itself in production.** The user's own
+ * report, the first time this was actually exercised live since it
+ * shipped: "a scroll bar that follows the screen up and down and when
+ * it gets to the bottom it sits on a scroll bar that is stuck to the
+ * bottom of the table" -- i.e. the clone kept following, right on top
+ * of the real one, instead of disappearing once the real one was
+ * reachable. The original approach watched a zero-height sentinel
+ * placed right after the table, INSIDE the scroller -- but a classic,
+ * space-reserving horizontal scrollbar (the Windows-style scrollbar
+ * this ward's own admins are on) renders BELOW that point, inside the
+ * scroller's own border-box, as reserved space the sentinel never
+ * actually accounted for -- a proxy for the real scrollbar's position,
+ * not the position itself, and evidently not a reliable enough one.
+ *
+ * Replaced with a direct, synchronous measurement of the real thing
+ * that matters: on every scroll and resize, `scroller`'s own
+ * `getBoundingClientRect().bottom` -- which inherently includes
+ * whatever space the real scrollbar reserves, no proxy needed -- is
+ * compared against `window.innerHeight` to decide whether the native
+ * scrollbar is actually on screen. No `IntersectionObserver`, no
+ * sentinel element.
  */
 export function DualScrollbar({ children }: { children: React.ReactNode }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cloneRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [nativeVisible, setNativeVisible] = useState(false);
@@ -66,12 +83,20 @@ export function DualScrollbar({ children }: { children: React.ReactNode }) {
     const scroller = scrollRef.current;
     const clone = cloneRef.current;
     const spacer = spacerRef.current;
-    const sentinel = sentinelRef.current;
-    if (!scroller || !clone || !spacer || !sentinel) return;
+    if (!scroller || !clone || !spacer) return;
 
     const syncSize = () => {
       spacer.style.width = `${scroller.scrollWidth}px`;
       setHasOverflow(scroller.scrollWidth > scroller.clientWidth + 1);
+    };
+
+    // The scroller's OWN bottom edge -- which already includes
+    // whatever height the real scrollbar itself reserves -- rather
+    // than a proxy marker placed before it. Checked on every scroll
+    // (not just once) since the comparison is against the viewport,
+    // which moves on every tick.
+    const checkNativeVisible = () => {
+      setNativeVisible(scroller.getBoundingClientRect().bottom <= window.innerHeight);
     };
 
     const onScrollerScroll = () => {
@@ -88,10 +113,16 @@ export function DualScrollbar({ children }: { children: React.ReactNode }) {
     };
 
     syncSize();
+    checkNativeVisible();
     scroller.addEventListener("scroll", onScrollerScroll);
     clone.addEventListener("scroll", onCloneScroll);
+    window.addEventListener("scroll", checkNativeVisible, { passive: true });
+    window.addEventListener("resize", checkNativeVisible);
 
-    const resizeObserver = new ResizeObserver(syncSize);
+    const resizeObserver = new ResizeObserver(() => {
+      syncSize();
+      checkNativeVisible();
+    });
     resizeObserver.observe(scroller);
     // The direct child (the real table) is what actually changes
     // width when a column grows or a save re-renders wider content --
@@ -99,14 +130,12 @@ export function DualScrollbar({ children }: { children: React.ReactNode }) {
     // outer box stays the same size.
     if (scroller.firstElementChild) resizeObserver.observe(scroller.firstElementChild);
 
-    const intersectionObserver = new IntersectionObserver(([entry]) => setNativeVisible(entry.isIntersecting));
-    intersectionObserver.observe(sentinel);
-
     return () => {
       scroller.removeEventListener("scroll", onScrollerScroll);
       clone.removeEventListener("scroll", onCloneScroll);
+      window.removeEventListener("scroll", checkNativeVisible);
+      window.removeEventListener("resize", checkNativeVisible);
       resizeObserver.disconnect();
-      intersectionObserver.disconnect();
     };
   }, []);
 
@@ -116,7 +145,6 @@ export function DualScrollbar({ children }: { children: React.ReactNode }) {
     <div className="relative">
       <div ref={scrollRef} className="overflow-x-auto">
         {children}
-        <div ref={sentinelRef} aria-hidden="true" />
       </div>
       <div
         ref={cloneRef}

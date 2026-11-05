@@ -2050,6 +2050,45 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-04: `DualScrollbar`'s "hide the clone
+once the real scrollbar is visible" feature never actually worked in
+production.** The user's own report, on Manage Announcements, the
+first time this got exercised live since it shipped: "a scroll bar
+that follows the screen up and down and when it gets to the bottom it
+sits on a scroll bar that is stuck to the bottom of the table" -- the
+sticky clone kept following instead of disappearing once the real one
+was reachable, exactly the double-scrollbar the original 2026-10-25
+fix was supposed to prevent.
+
+Confirmed by actually reproducing the mechanism in an isolated static
+HTML page in the built-in browser (this app has no local Supabase
+credentials, so the real pages can't run here at all) -- the original
+version's own `IntersectionObserver` watched a zero-height sentinel
+placed right after the table, INSIDE the scroller. That's a PROXY for
+where the real scrollbar sits, not the real position: a classic,
+space-reserving horizontal scrollbar (the kind this ward's own admins
+see on Windows) renders BELOW that sentinel, inside the scroller's own
+border-box, as reserved space the sentinel never accounted for. The
+repro showed the two can genuinely disagree -- not a reliable enough
+signal to hang "hide the duplicate" on.
+
+Rewritten (`components/DualScrollbar.tsx`) to measure the real thing
+directly instead of a proxy: on every scroll and resize, compares the
+scroller's OWN `getBoundingClientRect().bottom` (which inherently
+includes whatever space the real scrollbar reserves) against
+`window.innerHeight`. No sentinel element, no `IntersectionObserver`.
+Verified the new calculation transitions cleanly and exactly where
+expected across a range of scroll positions in the same repro before
+shipping.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, plus the
+live repro above (this is the one piece of this change actually
+visually verified in a browser, not just statically reasoned about) --
+ask the user to check `/announcements` (and any other "favorite grid
+format" page wide enough to scroll) and confirm the second scrollbar
+disappears cleanly once the real one scrolls into view, with no
+overlap.
+
 **Calendar now only shows Sacrament Meeting when it's cancelled,
 2026-11-04. No migration needed.** Direct follow-up, same day, to the
 "show every Sacrament Meeting" rework from earlier: "on the calendar,
