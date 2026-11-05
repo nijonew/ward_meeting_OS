@@ -2075,19 +2075,41 @@ site's own `crumbs`/`songListFilters` query params aren't required --
 a bare `.../media/music/songs/<slug>?lang=eng` loads the identical
 page -- so the stored `url` is just that simpler form.
 
-**Found while gathering this: the real collections have grown since
-this table was last seeded.** Hymns for Home and Church now has 90
-songs on the real site (1001-1078, 1201-1212) vs. the 82 this table
-has had since migration `040` (1001-1072, 1201-1210) -- 8 real songs
-(1073-1078, 1211, 1212) exist on the church's own site with no row
-here at all. The Children's Songbook may have a similar small gap too
-(migration `027`'s own note: "a handful of entries where the source's
-own views disagreed were left out rather than guessed at"). Migration
-`101` only ever sets `url` on a (songbook, number) that already has a
-row -- it never inserts a new song, since adding new Music Reference
-entries is a separate decision from "link the songs we already have."
-Ask before adding those 8 (or any Children's Songbook gaps) as new
-rows if that turns out to matter.
+**Found while gathering this, and folded into migration `101` the same
+day (the user's own follow-up: "update migration 101 to include the
+new songs in Hymns for Home and Church and any adjustments to the
+children's songbook") -- the real collections have grown, and
+drifted, since this table was last seeded.** Hymns for Home and Church
+now has 90 songs on the real site (1001-1078, 1201-1212) vs. the 82
+this table had since migration `040` (1001-1072, 1201-1210) -- the 8
+real songs in between (1073-1078, 1211, 1212) are now inserted by
+`101` itself, before its own url backfill runs, so they pick up a link
+in the same migration. The Children's Songbook had three real, exact
+discrepancies against the real site (confirmed by diffing migration
+`027`'s own seeded (number, title) pairs against a fresh scrape of the
+real collection page, not guessed): `236` ("'Give,' Said the Little
+Stream") was never seeded at all -- one of the "handful of entries...
+left out" migration 027's own comment already flagged, now inserted;
+`22` was seeded under the wrong number (the real site's identical-title
+song is `22a`, with `22b` already correctly seeded separately) --
+renumbered, not re-inserted as a duplicate; `40` duplicated `40b`'s own
+already-correctly-seeded content under a number that doesn't exist on
+the real site at all (only `40a`/`40b` do) -- dropped outright. **One
+real, if narrow, risk from that last fix, flagged in the migration's
+own comment**: a `sacrament_music`/`meeting_element_notes` row already
+saved with `hymn_number = 'C40'` (the Children's-Songbook-prefix
+convention) would stop resolving a title/link after this -- this
+assistant has no live database access to check whether any row is
+actually affected; ask the user to re-pick "C40a"/"C40b" specifically
+if one turns out to be. The remaining 34 Children's Songbook titles
+differed from migration 027's original transcription only in wording/
+punctuation (curly vs. straight apostrophes, and a "(Round)"/
+"(Appropriate for Parents and Leaders)" suffix the real site includes
+that the original terse transcription dropped) -- synced to match the
+real site exactly, except `136`, flagged specifically since it's a
+real rename rather than punctuation: migration 027 seeded "As I Have
+Loved You (Love One Another)," the real site now titles it plainly
+"Love One Another."
 
 **Schema**: new `hymnal_songs.url text` column. New `resolveHymnUrl`
 (`lib/data/hymnal-shared.ts`), the url-returning sibling of the

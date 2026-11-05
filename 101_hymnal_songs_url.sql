@@ -14,20 +14,6 @@
 -- those aren't required -- a bare `?lang=eng` loads the exact same
 -- page), just `https://www.churchofjesuschrist.org<path>?lang=eng`.
 --
--- Only ever sets `url` on a (songbook, number) pair that already has a
--- row in hymnal_songs -- it never inserts a new song. The real
--- collection pages turned out to have a few more songs than this table
--- currently knows about (Hymns for Home and Church: numbers 1073-1078
--- and 1211-1212, added to the real collection after migration 040
--- originally seeded this table's 82 rows; the Children's Songbook may
--- have a small number of its own gaps too, per migration 027's own
--- note that a handful of entries were deliberately left out where the
--- source's own views disagreed). Those extra numbers simply get no
--- `url` written, same as every other column here that's blank until a
--- real row exists -- ask before adding them as new Music Reference
--- rows, since that's a different, separate decision from "link the
--- songs we already have."
---
 -- Also adds a narrow anon-facing SELECT policy -- `hymnal_songs` had
 -- authenticated-only RLS before this (migration 024), which would have
 -- silently hidden every hymn link from a genuinely anonymous, no-login
@@ -37,8 +23,55 @@
 -- non-sensitive reference data `sacrament_program_items` already got
 -- an identical fix for (migration 075).
 --
--- Idempotent: safe to re-run (add column if not exists, drop/create
--- policy, and the bulk update always sets the same value).
+-- **Amended in place, same day, before ever being run** -- the real
+-- collection pages turned out to have more songs than this table
+-- already knew about, and two Children's Songbook rows turned out to
+-- be real transcription errors from migration 027's original seed, not
+-- just missing links. All confirmed directly against the real site's
+-- own listing (the same scrape this migration's own url data comes
+-- from), not guessed:
+--
+-- - Hymns for Home and Church has grown since migration 040 originally
+--   seeded this table's 82 rows -- 8 more songs now exist on the real
+--   site (1073-1078, 1211-1212) with no row here at all. Inserted
+--   below, before the url backfill, so they pick up their own link in
+--   the same migration run.
+-- - Children's Songbook #236, "'Give,' Said the Little Stream," was
+--   never seeded at all -- one of the "handful of entries... left out"
+--   migration 027's own comment already flagged. Inserted below for
+--   the same reason.
+-- - Children's Songbook #22 was seeded as "A Prayer Song" -- but the
+--   real site has no bare #22 at all; it's #22a (the exact same title)
+--   and #22b ("A Prayer," already correctly seeded separately). #22 is
+--   renumbered to #22a below, not re-inserted as a duplicate.
+-- - Children's Songbook #40 was seeded as "The Shepherd's Carol
+--   (Round)" -- the real site has no bare #40 either; only #40a
+--   ("There Was Starlight on the Hillside") and #40b ("The Shepherd's
+--   Carol"), both already correctly seeded separately. #40's title is
+--   just a duplicate of #40b under a number that doesn't exist on the
+--   real site -- dropped below, not renumbered, since #40b already
+--   covers it. **If any `sacrament_music`/`meeting_element_notes` row
+--   anywhere already has a saved `hymn_number` of literally "C40"**
+--   (the Children's-Songbook-prefix convention), it will stop
+--   resolving a title/link after this -- ask the user to re-pick
+--   "C40a" or "C40b" specifically for that row, same as every other
+--   lettered number already requires. This assistant has no live
+--   database access to check whether any row is actually affected.
+-- - The remaining 34 Children's Songbook titles differ only in
+--   wording/punctuation from migration 027's original transcription
+--   (curly vs. straight apostrophes, and a "(Round)" or "(Appropriate
+--   for Parents and Leaders)" suffix the real site includes that the
+--   original terse transcription dropped) -- synced to match the real
+--   site's current title exactly below. One of these, #136, is a real
+--   rename, not just punctuation: migration 027 seeded "As I Have
+--   Loved You (Love One Another)," but the real site now titles it
+--   plainly "Love One Another" -- flagging this one specifically in
+--   case the longer form was deliberate and should be kept.
+--
+-- Idempotent throughout: safe to re-run (add column if not exists,
+-- drop/create policy, every insert below is `on conflict do nothing`,
+-- the renumbering/delete/title-sync statements are no-ops once already
+-- applied, and the final bulk url update always sets the same value).
 
 alter table hymnal_songs add column if not exists url text;
 
@@ -47,6 +80,80 @@ create policy "public read hymnal_songs"
   on hymnal_songs for select
   to anon
   using (true);
+
+-- New Hymns for Home and Church songs, added to the real collection
+-- since migration 040 (confirmed run first).
+insert into hymnal_songs (songbook, number, title) values
+  ('hymns_for_home_and_church', '1073', 'Be Thou My Vision'),
+  ('hymns_for_home_and_church', '1074', 'Our Savior Brings Us Joy'),
+  ('hymns_for_home_and_church', '1075', 'Jesus Is the Strength of Youth'),
+  ('hymns_for_home_and_church', '1076', 'How I Love the House of God'),
+  ('hymns_for_home_and_church', '1077', 'God’s Armor'),
+  ('hymns_for_home_and_church', '1078', 'Seek Peace'),
+  ('hymns_for_home_and_church', '1211', 'O Come, O Come, Emmanuel'),
+  ('hymns_for_home_and_church', '1212', 'A Quiet Night')
+on conflict (songbook, number) do nothing;
+
+-- One Children's Songbook song migration 027 never seeded at all.
+insert into hymnal_songs (songbook, number, title) values
+  ('childrens_songbook', '236', '“Give,” Said the Little Stream')
+on conflict (songbook, number) do nothing;
+
+-- #22 was seeded under the wrong number -- the real site's #22 is
+-- #22a (identical title); only renumbers a row that's still at the
+-- old number, so a second run is a no-op.
+update hymnal_songs
+set number = '22a'
+where songbook = 'childrens_songbook' and number = '22' and title = 'A Prayer Song';
+
+-- #40 duplicated #40b's content under a number that doesn't exist on
+-- the real site (which only has #40a/#40b) -- #40b already covers it.
+delete from hymnal_songs
+where songbook = 'childrens_songbook' and number = '40' and title = 'The Shepherd''s Carol (Round)';
+
+-- Title-text corrections to match the real site exactly (curly
+-- apostrophes, "(Round)"/"(Appropriate for Parents and Leaders)"
+-- suffixes the original transcription dropped, and #136's real
+-- rename -- see this file's own header comment for that one).
+update hymnal_songs as h
+set title = v.title
+from (values
+  ('11', 'I’m Thankful to Be Me'),
+  ('12', 'A Child’s Prayer'),
+  ('21a', 'For Health and Strength (Round)'),
+  ('21b', 'For Thy Bounteous Blessings (Round)'),
+  ('30a', 'This Is God’s House'),
+  ('40b', 'The Shepherd’s Carol'),
+  ('44', 'Mary’s Lullaby'),
+  ('74', 'I Feel My Savior’s Love'),
+  ('78', 'I’m Trying to Be like Jesus'),
+  ('97', 'God’s Love'),
+  ('106', 'The Still, Small Voice'),
+  ('107', 'Listen, Listen (Round)'),
+  ('120', 'Nephi’s Courage'),
+  ('136', 'Love One Another'),
+  ('140', 'I’ll Walk with You'),
+  ('150a', 'I’m Glad to Pay a Tithing'),
+  ('164', 'I Will Follow God’s Plan'),
+  ('172', 'We’ll Bring the World His Truth'),
+  ('180', 'How Dear to God Are Little Children (Appropriate for Parents and Leaders)'),
+  ('182', 'How Will They Know? (Appropriate for Parents and Leaders)'),
+  ('197b', 'Quickly I’ll Obey'),
+  ('198b', 'When We’re Helping'),
+  ('210', 'Daddy’s Homecoming'),
+  ('216', 'Little Pioneer Children (Round)'),
+  ('239', 'Because It’s Spring'),
+  ('246', 'It’s Autumntime'),
+  ('253a', 'Sing a Song (Round)'),
+  ('254b', 'Our Door Is Always Open (Round)'),
+  ('255', 'Come with Me to Primary (Round)'),
+  ('259', 'We’re All Together Again'),
+  ('266', 'If You’re Happy'),
+  ('276', 'Do as I’m Doing'),
+  ('280', 'Healthy, Wealthy, and Wise (Round)'),
+  ('285', 'You’ve Had a Birthday (Round)')
+) as v(number, title)
+where h.songbook = 'childrens_songbook' and h.number = v.number;
 
 update hymnal_songs as h
 set url = v.url
