@@ -111,6 +111,28 @@ function realActivityId(id: string): string {
   return sep === -1 ? id : id.slice(0, sep);
 }
 
+/**
+ * Where "Edit activity" should point for ANY row, not just a
+ * Combined-sourced one, 2026-11-04 (the user's own request: "I want an
+ * 'Edit Activity' button for every activity, not just the combined
+ * activities"). Three cases:
+ * - An exploded row (`source_group_name` set -- only happens on
+ *   Upcoming Activities) -> the real Combined page it was drawn from.
+ * - A raw row whose own `group_name` IS one of the three Combined
+ *   pseudo-groups (only happens on a Combined-group page itself,
+ *   rendered read-only, e.g. the public `?readonly=1` link) -> that
+ *   same page -- a harmless self-link, not reachable any other way
+ *   from here.
+ * - Anything else -- an ordinary individual class, which (given the
+ *   two cases above) can only ever appear on Upcoming Activities --
+ *   the per-class Manage grid for that one class.
+ */
+function editHrefFor(row: YouthActivityRow): string {
+  const combinedSource = row.source_group_name ?? (classesForCombinedGroup(row.group_name) ? row.group_name : null);
+  if (combinedSource) return COMBINED_GROUP_PATHS[combinedSource] ?? "/youth-activities";
+  return `/youth-activities/manage/classes?class=${encodeURIComponent(row.group_name)}`;
+}
+
 /** Same convention as CallingPlanningGridForm's sortable headers --
  *  nulls/blanks always sort last regardless of direction. */
 function compareText(a: string, b: string): number {
@@ -436,12 +458,9 @@ export function ActivitiesTable({
                   {!row.cancelled && !row.confirmed && (
                     <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">Tentative</span>
                   )}
-                  {row.source_group_name && (
+                  {!editable && (
                     <div className="mt-1">
-                      <Link
-                        href={COMBINED_GROUP_PATHS[row.source_group_name] ?? "/youth-activities"}
-                        className="text-[11px] font-medium text-accent hover:underline"
-                      >
+                      <Link href={editHrefFor(row)} className="text-[11px] font-medium text-accent hover:underline">
                         Edit activity &rarr;
                       </Link>
                     </div>

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMountainTimeNow } from "@/lib/data/timezone";
 import { deleteStorageImageAtUrl } from "@/lib/storage/image-cleanup";
 import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib/data/announcement-constants";
+import { weeklyDates, nthWeekdayDates, monthlyDateDates } from "@/lib/data/cadence";
 
 /**
  * Archives any "published" announcement whose own date range has
@@ -218,11 +219,68 @@ function formatMonthDay(iso: string): string {
   return `${month} ${ordinal(d.getDate())}`;
 }
 
-interface RecurrenceFields {
+export interface RecurrenceFields {
   recurrence: string | null;
   recurrence_day_of_week: number | null;
   recurrence_nth_occurrence: number | null;
   recurrence_day_of_month: number | null;
+}
+
+/**
+ * Every real calendar date a recurring announcement actually falls on,
+ * within `[rangeStartIso, rangeEndIso]` (inclusive) AND within the
+ * series' own active window (`start_date` through `end_date`, or
+ * unbounded going forward when `end_date` is null -- migration 083's
+ * own "ongoing" meaning, see `sweepPastAnnouncements`'s own comment on
+ * this same meaning). Returns `[]` for a non-recurring item (callers
+ * should use its plain `start_date` instead) or one with no
+ * `start_date` at all (nothing to anchor a cadence to).
+ *
+ * Built 2026-11-04 for the Ward Calendar View specifically (the user's
+ * own report: "events that recur are not showing up for each
+ * occurrence in the calendar") -- the public Announcements LIST page
+ * deliberately still shows a recurring item as one row with its own
+ * cadence phrase ("Weekly on Sundays, starting September 6"), which
+ * this doesn't change; a literal list of every date would be the wrong
+ * shape there. The calendar is different -- it's a grid of individual
+ * days, so a recurring item genuinely needs a dot on every day it
+ * actually happens, not just its own series-start date.
+ *
+ * Bounded to the given range on purpose, not "every occurrence ever" --
+ * an ongoing series has no real upper bound at all, so expanding its
+ * full history/future would be unbounded. Callers pass the calendar's
+ * own currently-displayed month grid (plus its leading/trailing days
+ * from adjacent months) as the range; the three cadence shapes reuse
+ * the exact same date math `/meeting-schedule`'s own cadence engine
+ * already relies on (`lib/data/cadence.ts`), not a second, drifted
+ * copy of month-boundary handling.
+ */
+export function announcementOccurrenceDates(
+  a: RecurrenceFields & { start_date: string | null; end_date: string | null },
+  rangeStartIso: string,
+  rangeEndIso: string
+): string[] {
+  if (!a.recurrence || !a.start_date) return [];
+
+  const seriesStart = new Date(`${a.start_date}T00:00:00`);
+  const seriesEnd = a.end_date ? new Date(`${a.end_date}T00:00:00`) : null;
+  const rangeStart = new Date(`${rangeStartIso}T00:00:00`);
+  const rangeEnd = new Date(`${rangeEndIso}T00:00:00`);
+
+  const effectiveStart = seriesStart > rangeStart ? seriesStart : rangeStart;
+  const effectiveEnd = seriesEnd && seriesEnd < rangeEnd ? seriesEnd : rangeEnd;
+  if (effectiveStart > effectiveEnd) return [];
+
+  if (a.recurrence === "weekly") {
+    return weeklyDates(effectiveStart, effectiveEnd, a.recurrence_day_of_week ?? 0);
+  }
+  if (a.recurrence === "monthly_nth_weekday") {
+    return nthWeekdayDates(effectiveStart, effectiveEnd, a.recurrence_day_of_week ?? 0, a.recurrence_nth_occurrence ?? 1);
+  }
+  if (a.recurrence === "monthly_date") {
+    return monthlyDateDates(effectiveStart, effectiveEnd, a.recurrence_day_of_month ?? 1);
+  }
+  return [];
 }
 
 /**

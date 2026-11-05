@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWardEvents } from "@/lib/data/ward-events";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
+import { announcementOccurrenceDates } from "@/lib/data/announcements";
 import { getYouthActivities, type YouthActivityRow } from "@/lib/data/youth-activities";
 import { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
@@ -102,14 +103,21 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   an anonymous visitor to `status = 'published'` rows (see that
  *   function's own comment).
  * - **Announcements**: `getPublishedAnnouncements()`, the same list
- *   `/announcements/public` shows, placed on its own `start_date`.
- *   **Known simplification**: a recurring announcement (migration 083)
- *   only renders once, on the series' own start date, labeled
- *   "Recurring" -- expanding its own cadence into every real occurrence
- *   on the calendar would be a genuinely separate feature (real
- *   occurrence generation, the same kind of work `/meeting-schedule`'s
- *   cadence engine already does elsewhere), not implied by what was
- *   asked for here.
+ *   `/announcements/public` shows. A one-time item places one item on
+ *   its own `start_date`, same as always. **A recurring one expands
+ *   into a real item on every date it actually falls on, 2026-11-04**
+ *   (the user's own report: "events that recur are not showing up for
+ *   each occurrence in the calendar" -- the original version showed it
+ *   once, on the series' own start date only, same shape as the public
+ *   Announcements LIST page's own single row -- fine there, since that
+ *   page already states the cadence in words ("Weekly on Sundays..."),
+ *   but wrong for a day-by-day grid, where a recurring item needs a dot
+ *   on every day it happens). `announcementOccurrenceDates`
+ *   (`lib/data/announcements.ts`) computes those real dates, bounded to
+ *   `[rangeStartIso, rangeEndIso]` -- the caller's own currently-
+ *   displayed month grid -- since an ongoing series (`end_date` left
+ *   null on purpose) has no real upper bound to expand against
+ *   otherwise.
  */
 /**
  * "Can we put the group name in front of the activity title? And if
@@ -225,7 +233,14 @@ function buildYouthActivityItems(rawYouthActivities: YouthActivityRow[]): Calend
   return items;
 }
 
-export async function getCalendarItems(): Promise<CalendarItem[]> {
+/**
+ * `rangeStartIso`/`rangeEndIso` bound how far a recurring announcement
+ * gets expanded into real per-occurrence items -- see
+ * `announcementOccurrenceDates`'s own comment. Callers pass their own
+ * currently-displayed range (the calendar page's own month grid,
+ * including its leading/trailing days from adjacent months).
+ */
+export async function getCalendarItems(rangeStartIso: string, rangeEndIso: string): Promise<CalendarItem[]> {
   const { user } = await getSessionUser();
 
   const [cancelledSacramentMeetings, wardEvents, announcements, youthActivities] = await Promise.all([
@@ -260,13 +275,19 @@ export async function getCalendarItems(): Promise<CalendarItem[]> {
   }
 
   for (const an of announcements) {
+    if (an.recurrence) {
+      for (const date of announcementOccurrenceDates(an, rangeStartIso, rangeEndIso)) {
+        items.push({ date, time: an.start_time, title: an.title, kind: "announcement", note: null, href: null });
+      }
+      continue;
+    }
     if (!an.start_date) continue; // nothing to place on the grid
     items.push({
       date: an.start_date,
       time: an.start_time,
       title: an.title,
       kind: "announcement",
-      note: an.recurrence ? "Recurring" : null,
+      note: null,
       href: null,
     });
   }

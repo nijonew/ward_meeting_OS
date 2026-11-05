@@ -1,6 +1,10 @@
 /**
  * Pure date-computation helpers shared by every cadence-rule feature
- * (Meeting Schedule, Youth Activity Schedule, Ward Event Schedule).
+ * (Meeting Schedule, Youth Activity Schedule, Ward Event Schedule), plus
+ * `monthlyDateDates` below (added 2026-11-04 for the Announcement
+ * recurrence expansion in lib/data/announcements.ts -- a different
+ * cadence vocabulary than the three shapes above, but the same kind of
+ * pure date math, so it lives here rather than a second copy elsewhere).
  * Extracted from lib/data/meeting-schedule.ts so the three cadence
  * shapes (weekly / nth_weekday / relative) stay defined in exactly one
  * place -- a second, drifted copy of this date math would be a real bug
@@ -46,6 +50,26 @@ export function nthWeekdayDates(start: Date, end: Date, dayOfWeek: number, nth: 
     const picked = nthOccurrenceInMonth(cursor.getFullYear(), cursor.getMonth(), dayOfWeek, nth);
     if (picked && picked >= start && picked <= end) {
       dates.push(toISODate(picked));
+    }
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return dates;
+}
+
+/** Every occurrence of a fixed day-of-month (e.g. "the 15th") between
+ *  start and end, inclusive -- skips any month that doesn't have that
+ *  day at all (e.g. the 31st in a 30-day month) rather than letting
+ *  `Date`'s own rollover silently land it on the 1st-2nd of the next
+ *  month instead. */
+export function monthlyDateDates(start: Date, end: Date, dayOfMonth: number): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+
+  while (cursor <= last) {
+    const candidate = new Date(cursor.getFullYear(), cursor.getMonth(), dayOfMonth);
+    if (candidate.getMonth() === cursor.getMonth() && candidate >= start && candidate <= end) {
+      dates.push(toISODate(candidate));
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }

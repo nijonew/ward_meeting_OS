@@ -2050,6 +2050,59 @@ avoid confusing the two.
 
 ## Known open items
 
+**Recurring announcements now show on every real occurrence date on
+the calendar, and "Edit activity" is on every youth activity row, not
+just combined ones -- both 2026-11-04. No migration needed.** Two
+direct requests in one message.
+
+1. **"events that recur are not showing up for each occurrence in the
+   calendar."** `/calendar` had only ever placed a recurring
+   announcement once, on its own series-start date -- fine on the
+   public Announcements LIST page (which already states the cadence in
+   words, "Weekly on Sundays..."), wrong for a day-by-day grid, where a
+   recurring item needs a dot on every day it actually happens. New
+   `announcementOccurrenceDates()` (`lib/data/announcements.ts`)
+   expands a recurring item's real cadence into the actual dates it
+   falls on, reusing the exact same date math `/meeting-schedule`'s own
+   cadence engine already relies on (`weeklyDates`/`nthWeekdayDates`,
+   `lib/data/cadence.ts`) rather than a second, drifted copy -- plus a
+   new `monthlyDateDates` added there for the one shape Announcements
+   has that Meeting Schedule doesn't ("the 15th of the month").
+   Deliberately bounded to a caller-supplied date range, not "every
+   occurrence ever" -- an ongoing series (`end_date` left null on
+   purpose, see the migration 083 entry above) has no real upper bound
+   to expand against otherwise. `getCalendarItems()` now takes that
+   range as two required params; `app/calendar/page.tsx` computes its
+   own `gridStart`/`gridEnd` (the currently-displayed month's full
+   grid, leading/trailing days included) BEFORE calling it instead of
+   after, and passes both through. Verified the actual date math
+   directly -- a standalone script exercising all three recurrence
+   shapes (weekly, monthly-nth-weekday, monthly-date, including a
+   month with no 31st and a series with a real past end date) against
+   hand-checked expected dates, since this is exactly the kind of
+   fiddly month-boundary logic this app has gotten wrong before.
+2. **"I want an 'Edit Activity' button for every activity, not just
+   the combined activities."** The link built earlier the same day
+   only appeared for a Combined-sourced row on Upcoming Activities.
+   New `editHrefFor()` (`components/youth-activities/ActivitiesTable.tsx`)
+   covers every case: an exploded Combined row -> its real Combined
+   page; a raw row whose own `group_name` IS a Combined pseudo-group
+   (only reachable on a Combined-group page rendered read-only, e.g.
+   the public `?readonly=1` link) -> that same page, a harmless
+   self-link; anything else -- an ordinary individual class, which can
+   only ever appear here on Upcoming Activities -- the per-class
+   Manage grid for that one class. Shown whenever a row isn't already
+   editable inline (`!editable`), so it never appears redundantly on
+   the three Combined-group pages' own editable grid.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` plus the live date-
+math verification above -- ask the user to check `/calendar` (logged
+in) for a recurring announcement across a couple of months and confirm
+it shows a dot on every real occurrence, not just its original start
+date, and that `/youth-activities/upcoming` now shows a working "Edit
+activity" link on every row, individual classes included, pointing to
+the right page either way.
+
 **Bug found and fixed 2026-11-04: a recurring, open-ended announcement
 (no defined end date -- migration 083's own "ongoing" meaning)
 disappeared within a day or so of being submitted, instead of staying

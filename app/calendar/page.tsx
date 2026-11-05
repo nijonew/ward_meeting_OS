@@ -24,7 +24,11 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * refetch. `getCalendarItems()` fetches every source unfiltered by
  * month (none of them are large enough in a single ward for that to
  * matter) and this page buckets them by date server-side once per
- * render.
+ * render -- **except a recurring announcement's own per-occurrence
+ * expansion, 2026-11-04**, which does need the displayed range (this
+ * page's own `gridStart`/`gridEnd`, computed before calling
+ * `getCalendarItems` now instead of after) -- see that function's own
+ * comment for why an ongoing series can't expand without one.
  *
  * **Accepted mobile tradeoff**: a 7-column month grid needs real width
  * to stay legible -- this wraps in the same `overflow-x-auto` pattern
@@ -93,23 +97,27 @@ export default async function CalendarPage({
   const month =
     Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12 ? requestedMonth : todayMonth;
 
-  const items = await getCalendarItems();
-  const itemsByDate = new Map<string, CalendarItem[]>();
-  for (const item of items) {
-    const list = itemsByDate.get(item.date);
-    if (list) list.push(item);
-    else itemsByDate.set(item.date, [item]);
-  }
-
   // Full weeks only -- start on the Sunday on/before the 1st, end on
   // the Saturday on/after the month's own last day, so every month
-  // renders 4-6 complete rows with no partial trailing week.
+  // renders 4-6 complete rows with no partial trailing week. Computed
+  // before getCalendarItems now (2026-11-04), not after -- it needs
+  // this same range to bound a recurring announcement's own expansion.
   const firstOfMonth = new Date(year, month - 1, 1);
   const lastOfMonth = new Date(year, month, 0);
   const gridStart = new Date(firstOfMonth);
   gridStart.setDate(gridStart.getDate() - firstOfMonth.getDay());
   const gridEnd = new Date(lastOfMonth);
   gridEnd.setDate(gridEnd.getDate() + (6 - lastOfMonth.getDay()));
+  const gridStartIso = `${gridStart.getFullYear()}-${pad(gridStart.getMonth() + 1)}-${pad(gridStart.getDate())}`;
+  const gridEndIso = `${gridEnd.getFullYear()}-${pad(gridEnd.getMonth() + 1)}-${pad(gridEnd.getDate())}`;
+
+  const items = await getCalendarItems(gridStartIso, gridEndIso);
+  const itemsByDate = new Map<string, CalendarItem[]>();
+  for (const item of items) {
+    const list = itemsByDate.get(item.date);
+    if (list) list.push(item);
+    else itemsByDate.set(item.date, [item]);
+  }
 
   const days: { iso: string; day: number; inMonth: boolean; isToday: boolean }[] = [];
   const cursor = new Date(gridStart);
