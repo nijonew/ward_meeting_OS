@@ -2050,6 +2050,53 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-05: a Sacrament Meeting viewer who can
+neither plan nor conduct could land on a dead-end message instead of
+the real public program.** The user's own report: "When someone has
+ability to view upcoming sacrament meetings but don't have ability to
+plan/conduct I would like them to only see the public view sacrament
+meetings."
+
+Traced the path: the bare `/meetings/[id]` route (and, since
+2026-11-05, the week-nav arrows that link to it -- see that entry
+below) always redirects straight to `/meetings/[id]/planning`, on the
+documented assumption that "Planning's own existing gate already
+handles everything that needs to happen from here -- redirecting a
+non-admin to the read-only view." That's true for Bishopric Meeting/
+Ward Council/Youth Council, whose `/archived` really is a working
+calling-based read-only viewer -- but Sacrament Meeting has no such
+viewer at all (Vision workflow, reaffirmed 2026-09-08: "no calling-
+based access to a Sacrament Meeting... archived stays admin-only").
+Planning's own redirect for a non-planner sent every meeting type to
+`/archived` unconditionally, so a Sacrament Meeting viewer (holding
+`sacrament_program_view`, or the otherwise-unused `sacrament_viewing`
+feature, but neither `sacrament_planning` nor `sacrament_conducting`)
+landed on `/archived`'s own dead-end message for this case -- "This
+meeting's program is available at its public page... Archived
+Sacrament Meetings are admin-only" -- with a link they had to click
+themselves, instead of the real program. (The normal tile-driven path,
+`/dashboard?type=sacrament-meeting&readonly=1`'s own `MeetingRow`,
+already routed this same account straight to `/public` correctly --
+this gap only ever showed up via the bare route, a direct/bookmarked
+link to `/planning`, or the brand-new week-nav arrows.)
+
+Fixed in `app/meetings/[id]/planning/page.tsx`'s own non-admin
+redirect: for Sacrament Meeting specifically, sends this viewer to
+`/conducting` (if they hold `sacrament_conducting`) or `/public`
+otherwise -- real content either way, never the dead end. Every other
+meeting type is unchanged, still redirected to `/archived`, since that
+page genuinely is their real calling-based read-only viewer.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- ask the user to check: an account holding only
+`sacrament_program_view` (no planning/conducting) who navigates
+directly to a Sacrament Meeting's bare `/meetings/<id>` URL, or
+follows a week-nav arrow to one, now lands on that meeting's real
+public program instead of an admin-only message.
+
 **Calendar gained a "My Meetings" source (Bishopric Meeting/Ward
 Council/Youth Council occurrences this account is invited to by
 calling, plus Youth Council for every youth leader regardless of

@@ -114,8 +114,33 @@ export default async function PlanningViewPage({
   // meeting's assignments/music/speakers/free-text elements; everyone
   // lacking the feature gets redirected to the read-only view, which
   // enforces its own calling-based access and stage rules from there.
+  //
+  // **Sacrament Meeting is its own real exception, 2026-11-05** (the
+  // user's own report: "When someone has ability to view upcoming
+  // sacrament meetings but don't have ability to plan/conduct I would
+  // like them to only see the public view sacrament meetings").
+  // Sacrament Meeting has no calling-based read-only viewer at all --
+  // its own `/archived` gate (Vision workflow, reaffirmed 2026-09-08)
+  // is admin-only once archived and, while it isn't, just points this
+  // exact viewer back at Public with a link rather than showing any
+  // real content. Redirecting here to `/archived` for a Sacrament
+  // Meeting viewer was therefore always a dead end, not a real
+  // destination -- only reachable at all because the bare
+  // `/meetings/<id>` route (and, since 2026-11-05, the week-nav
+  // arrows that link to it) default unconditionally to this page. Send
+  // this viewer straight to the one place they can actually see real
+  // content instead: Conducting if they hold that feature, Public
+  // otherwise. Every other meeting type is unchanged -- `/archived` IS
+  // their real calling-based read-only viewer, not a dead end.
   const isAdmin = hasFeature(profile, meetingFeature(meeting.meetingType, "planning"));
   if (!isAdmin) {
+    if (meeting.meetingType === "sacrament-meeting") {
+      redirect(
+        hasFeature(profile, "sacrament_conducting")
+          ? `/meetings/${meetingId}/conducting`
+          : `/meetings/${meetingId}/public`
+      );
+    }
     redirect(`/meetings/${meetingId}/archived`);
   }
   // Archived meetings are read-only from here on -- see
