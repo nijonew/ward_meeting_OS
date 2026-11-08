@@ -2050,6 +2050,56 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-08: "Edit activity" on Upcoming
+Activities could route a Combined YW/YM activity to the wrong page,
+and editing it there silently never touched the real Combined
+activity.** The user's own report: "I wanted to edit a combined
+activity for YW and used the 'edit activity' button -- it took me to a
+table to edit for just that YW class. I edited it and it didn't change
+the combined activity. I would have expected 'edit activity' to have
+taken me to the 'combined YW' planning page... because that is the
+type of activity."
+
+Root cause: `overwriteClassesFromCombined` (`app/youth-activities/actions.ts`)
+stamps a real, independent copy of a Combined activity onto each
+attending class's own `youth_activities` row -- on creation, on every
+edit of the Combined row, and via the manual "Overwrite" button -- so
+that each class's own per-class grid has something real to show.
+Once that stamp exists, `resolveForClass`'s own "this class's own row
+wins" precedence (`lib/data/class-activities-shared.ts`) correctly
+prefers it for DISPLAY -- but `explodeActivitiesByClass` (what powers
+Upcoming Activities) used that exact same precedence to decide
+`source_group_name`, the one field `editHrefFor`
+(`components/youth-activities/ActivitiesTable.tsx`) checks to route
+"Edit activity." Once a class had its own stamped row, `source_group_name`
+went back to `null`, routing to that class's own per-class Manage grid
+instead of the Combined page -- and editing there (as documented)
+only ever touches that one class's own independent copy, never the
+shared "Combined YW" row or the other two YW classes' own copies,
+exactly matching "it didn't change the combined activity."
+
+Fixed in `explodeActivitiesByClass`: `source_group_name` is now also
+set to whichever Combined row still covers this class on the same
+date (checked the same way `resolveForClass` already does -- Combined
+YM/YW first, then this class's own single-gender Combined type) even
+when that class's own individual row is what's actually displayed --
+not just when the row's displayed content came from Combined directly.
+`editHrefFor` needed no change at all; it already preferred
+`source_group_name` first. In practice the only way an individual row
+and a Combined row both exist for the same class on the same date is
+this exact stamp mechanism (a combined week's own TBD-placeholder
+sweep already skips any date a Combined row covers), so this is safe
+-- "Edit activity" now keeps pointing at the Combined page for as long
+as a Combined row exists for that date at all, falling back to the
+per-class grid only once no Combined row covers it anymore.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/youth-activities/upcoming`: a Combined YW (or YM, or
+YM/YW) activity's own class rows should now show "Edit activity"
+linking to the real Combined page, and an edit made there should
+correctly show up across every attending class afterward.
+
 **Bug found and fixed 2026-11-08: a pulled announcement never
 disappeared from a Sacrament Meeting's own Announcements block once
 it lapsed, whether that meeting had already happened or not -- and

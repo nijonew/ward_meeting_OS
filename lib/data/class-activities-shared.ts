@@ -104,6 +104,27 @@ export function resolveForClass<T extends { group_name: string }>(
  * she couldn't change an already-entered activity. `ActivitiesTable`
  * uses this field to point back at the one real page where that row
  * can actually be edited, via `COMBINED_GROUP_PATHS` above.
+ *
+ * **Also set whenever a Combined row still covers this class on this
+ * same date, even once that class's own individual row has won display
+ * precedence, 2026-11-08** (the user's own report: "I wanted to edit a
+ * combined activity for YW and used the 'edit activity' button -- it
+ * took me to a table to edit for just that YW class. I edited it and
+ * it didn't change the combined activity... I would have expected
+ * 'edit activity' to have taken me to the 'combined YW' planning page
+ * because that is the type of activity"). Root cause: once a Combined
+ * activity is created or edited, `overwriteClassesFromCombined` stamps
+ * a real, independent copy onto each attending class's own row -- from
+ * that moment on, `resolveForClass`'s own "this class's own row wins"
+ * precedence means this function stopped marking it as Combined-sourced
+ * at all, even though the real "Combined YW" row (its actual source,
+ * and the one place the user thinks of as "the" activity) still sits
+ * right there for the same date. `source_group_name` now also resolves
+ * to that still-present Combined row's own `group_name` in exactly this
+ * case, so `editHrefFor` keeps routing to the Combined page the user
+ * expects for as long as a Combined row for this date exists at all --
+ * only once no Combined row covers this class/date anymore does editing
+ * fall back to the per-class grid.
  */
 export function explodeActivitiesByClass(activities: YouthActivityRow[]): YouthActivityRow[] {
   const byDate = new Map<string, Map<string, YouthActivityRow>>();
@@ -120,12 +141,16 @@ export function explodeActivitiesByClass(activities: YouthActivityRow[]): YouthA
       if (!source) continue;
 
       const isCombined = source.group_name !== className;
+      const combinedCoverer = isCombined
+        ? source.group_name
+        : (byGroup.get("Combined YM/YW") ?? byGroup.get(combinedTypeForClass(className)))?.group_name ?? null;
+
       result.push({
         ...source,
         id: isCombined ? `${source.id}::${className}` : source.id,
         group_name: className,
         notes: isCombined ? [`${source.group_name} activity.`, source.notes].filter(Boolean).join(" ") : source.notes,
-        source_group_name: isCombined ? source.group_name : null,
+        source_group_name: combinedCoverer,
       });
     }
   }

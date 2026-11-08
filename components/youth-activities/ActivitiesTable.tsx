@@ -117,15 +117,23 @@ function realActivityId(id: string): string {
  * 'Edit Activity' button for every activity, not just the combined
  * activities"). Three cases:
  * - An exploded row (`source_group_name` set -- only happens on
- *   Upcoming Activities) -> the real Combined page it was drawn from.
+ *   Upcoming Activities) -> the real Combined page it was drawn from,
+ *   whether this row's own displayed content actually came from that
+ *   Combined row or from this class's own individual row that's still
+ *   covered by one on the same date (2026-11-08, see
+ *   `explodeActivitiesByClass`'s own comment on this exact case --
+ *   routing to the per-class grid there led to a real, reported edit
+ *   that silently never touched the Combined activity the user
+ *   actually meant to change).
  * - A raw row whose own `group_name` IS one of the three Combined
  *   pseudo-groups (only happens on a Combined-group page itself,
  *   rendered read-only, e.g. the public `?readonly=1` link) -> that
  *   same page -- a harmless self-link, not reachable any other way
  *   from here.
- * - Anything else -- an ordinary individual class, which (given the
- *   two cases above) can only ever appear on Upcoming Activities --
- *   the per-class Manage grid for that one class.
+ * - Anything else -- an ordinary individual class with no Combined row
+ *   covering it on this date at all, which (given the two cases above)
+ *   can only ever appear on Upcoming Activities -- the per-class
+ *   Manage grid for that one class.
  */
 function editHrefFor(row: YouthActivityRow): string {
   const combinedSource = row.source_group_name ?? (classesForCombinedGroup(row.group_name) ? row.group_name : null);
