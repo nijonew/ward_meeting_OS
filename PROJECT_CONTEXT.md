@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 102
+## Current migration number: 103
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,96 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Teaching schedules split into real viewing-only "Lessons" pages and
+edit-capable Planning pages, migration `103`, not yet run, 2026-11-08.**
+The user's own request: "I want to have a different setup for 'YM/YW
+Teaching Planning' (formerly youth teaching planning) and 'YM/YW
+Lessons'. Lessons is for viewing for logged in youth and adults and it
+should show date, topic, teacher but no edit ability, and it shows up
+in the 'my meetings' areas. Planning is for just that, planning, and
+it shows the same info but with edit ability and it shows up in my
+calling for those with access given they have the permissions based on
+calling. Same thing for relief society & priesthood teaching
+planning." This reverses the 2026-11-08 "My meetings" change earlier
+the same day, which had put the real, edit-capable Planning pages
+under BOTH "My meetings" and "My calling" since neither teaching tool
+had ever had a genuine viewing/editing split -- this request builds
+that split for real instead.
+
+Two scope questions were confirmed directly via `AskUserQuestion`
+before building anything:
+1. **YM/YW Lessons' own layout**: one combined page, all 6 classes at
+   once (matching how Elders Quorum/Relief Society Teaching Planning
+   already shows its two classes side by side) -- not a hub with a
+   tile per class mirroring Planning's own structure, since there's no
+   access restriction to gate per-class here anyway (every tile would
+   show for every viewer regardless).
+2. **"Priesthood" naming**: the user's own "relief society & priesthood
+   teaching planning" phrasing was confirmed to mean keeping the
+   existing "Elders Quorum" name exactly as it is -- not a rename, and
+   not a new/different class. The new adult Lessons page is "Elders
+   Quorum / Relief Society Lessons," matching the existing Planning
+   page's own established name.
+
+**New `components/youth-teaching-planning/TeachingGridReadOnly.tsx`**
+-- the plain, read-only counterpart to `TeachingGridForm` (no inputs,
+no save button, a Server Component since there's no interactivity at
+all). Column order is Topic before Teacher here specifically, per the
+user's own literal wording ("date, topic, teacher") -- deliberately
+different from `TeachingGridForm`'s own Teacher-then-Topic order,
+which wasn't asked to change.
+
+**New `/ym-yw-lessons`** -- login required, but genuinely open to any
+signed-in account with no feature or `youth_class_teachers` check at
+all (unlike Planning's own per-class access control) -- reuses the
+exact same `getTeachingAssignmentGrid` data layer Planning already
+uses for all 6 `TEACHING_CLASS_OPTIONS` at once, rendered in a
+`lg:grid-cols-2` layout. **New `/adult-teaching-lessons`** -- the
+identical treatment for Elders Quorum/Relief Society, mirroring
+`/adult-teaching-planning`'s own two-tables-side-by-side layout
+exactly, just read-only. Neither page needed a new server action --
+both are pure reads.
+
+**`lib/data/nav-sections.ts`'s "My meetings" section now always shows
+for any signed-in account**, not just one that attends a meeting or
+teaches a class -- its own two new unconditional links, "YM/YW
+Lessons" and "Elders Quorum / Relief Society Lessons," are genuinely
+open to anyone, a different access rule than every other link in this
+section. The Youth/Adult teaching-schedule links this section gained
+earlier the same day are removed from here entirely -- "My meetings"
+is viewing, full stop; editing moved to be "My calling"-only again.
+"My calling" is otherwise unchanged -- still gated exactly as it
+already was (the real `youth_teaching_planning`/`adult_teaching_planning`
+features, plus a real `youth_class_teachers` row for youth), just with
+its youth link's label updated to match the rename below.
+
+**"Youth Teaching Planning" renamed "YM/YW Teaching Planning"** on
+every user-facing string in `/youth-teaching-planning` itself (the
+`AppHeader` tag, the `<h1>`, every back-link and no-access message) --
+still the exact same route, same feature key
+(`youth_teaching_planning`, left untouched so no existing
+`calling_features` grant needs to change), same access control, only
+the display text changed. **Migration `103`** (not yet run) carries
+the identical rename into `/admin/calling-features`' own checklist
+label (`features.label`, migration 060's original seed) -- the
+underlying `key` column is untouched. Two Table Admin description
+strings (`youth_class_teachers`, `teaching_assignments`) were updated
+to match and to mention the new Lessons pages as the real place to
+view (not just the raw grid or Planning).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `103` is actually free before running it**, then ask
+the user to check: `/ym-yw-lessons` and `/adult-teaching-lessons` both
+load for ANY signed-in account (including one with no calling/feature
+at all) and show Date/Topic/Teacher with no edit controls; "My
+meetings" now shows both Lessons tiles unconditionally while "My
+calling" still only shows the real Planning tiles for an account that
+actually holds the feature; `/youth-teaching-planning` reads "YM/YW
+Teaching Planning" everywhere; and `/admin/calling-features`'
+checklist shows "YM/YW Teaching Planning" instead of "Youth Teaching
+Planning" for that same calling-feature grant.
 
 **A daily cron sweep for announcements, and "Pending" eliminated
 entirely from the announcements/agenda_items status vocabulary,

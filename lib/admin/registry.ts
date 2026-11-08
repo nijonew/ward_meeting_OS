@@ -608,7 +608,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "youth_class_teachers",
     label: "Youth Class Teachers",
     description:
-      "Who may view/edit which class's schedule on Youth Teaching Planning. Bishopric and Young Women Presidency already see every (or every YW) class regardless of rows here -- this only matters for narrowing everyone else down to specific class(es) they're assigned to teach.",
+      "Who may edit which class's schedule on YM/YW Teaching Planning (viewing itself needs no row here at all -- YM/YW Lessons is open to anyone signed in). Bishopric and Young Women Presidency already see every (or every YW) class regardless of rows here -- this only matters for narrowing everyone else down to specific class(es) they're assigned to teach.",
     requiredFeature: "table_admin_youth_class_teachers",
     orderBy: { column: "created_at", ascending: false },
     columns: [
@@ -621,7 +621,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "teaching_assignments",
     label: "Teaching Assignments",
     description:
-      "Raw-data fallback for troubleshooting or a bulk fix -- use Youth Teaching Planning or Elders Quorum / Relief Society Teaching Planning for everyday work. One row per (Sunday, class) actually filled in; a class with nothing entered yet simply has no row here.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- use YM/YW Teaching Planning or Elders Quorum / Relief Society Teaching Planning for everyday editing (or the read-only YM/YW Lessons / Elders Quorum / Relief Society Lessons pages, open to anyone signed in, for viewing). One row per (Sunday, class) actually filled in; a class with nothing entered yet simply has no row here.",
     requiredFeature: "table_admin_teaching_assignments",
     orderBy: { column: "class_date", ascending: true },
     columns: [

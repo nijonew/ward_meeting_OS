@@ -29,15 +29,24 @@ function defaultThroughDate(): string {
  *
  * The hub view gained an explicit "&larr; Home" back link (2026-09-09)
  * per the user's own request; the single-class view already had its
- * own "&larr; Youth Teaching Planning" link back to this hub.
+ * own "&larr; ..." link back to this hub.
  *
  * **Back link restored to "&larr; Home," 2026-11-08** -- had pointed
  * at `/youth-activity-planning` since 2026-10-10, when this page was
  * only reachable through that hub's own "Youth Teaching Management"
  * tile. That tile is gone now (`lib/data/nav-sections.ts`'s own
  * comment has the full story) -- this hub is reached directly from
- * Home again, via "My meetings"/"My calling," so the back link points
- * there again too.
+ * Home again, via "My calling," so the back link points there again
+ * too.
+ *
+ * **Renamed "YM/YW Teaching Planning," same day** -- still this exact
+ * page, same route, same `youth_teaching_planning` feature/
+ * `youth_class_teachers` access control, just new display text. The
+ * user's own request split this page's two audiences apart for real:
+ * a plain, read-only "YM/YW Lessons" page (`/ym-yw-lessons`, open to
+ * any signed-in account) now covers "viewing," shown under "My
+ * meetings" -- this page stays the real, edit-capable "planning" half,
+ * under "My calling" only, unchanged in every other respect.
  */
 export default async function YouthTeachingPlanningPage({
   searchParams,
@@ -50,8 +59,8 @@ export default async function YouthTeachingPlanningPage({
   if (!hasFeature(profile, "youth_teaching_planning")) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Youth Teaching Planning" />
-        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to youth teaching planning.</p>
+        <AppHeader tag="YM/YW Teaching Planning" />
+        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to YM/YW teaching planning.</p>
       </main>
     );
   }
@@ -64,13 +73,13 @@ export default async function YouthTeachingPlanningPage({
   if (!rawClass) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Youth Teaching Planning" />
+        <AppHeader tag="YM/YW Teaching Planning" />
 
         <Link href="/" className="mt-6 text-xs text-ink-muted hover:text-ink">
           &larr; Home
         </Link>
 
-        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">Youth Teaching Planning</h1>
+        <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">YM/YW Teaching Planning</h1>
 
         {accessibleClasses.length === 0 ? (
           <p className="mt-6 text-sm text-ink-muted">
@@ -97,10 +106,10 @@ export default async function YouthTeachingPlanningPage({
   if (!accessibleClasses.includes(rawClass)) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="Youth Teaching Planning" />
+        <AppHeader tag="YM/YW Teaching Planning" />
         <p className="mt-10 text-ink-muted">You don&rsquo;t have access to that class.</p>
         <Link href="/youth-teaching-planning" className="mt-4 text-sm text-ink-muted hover:text-ink">
-          &larr; Youth Teaching Planning
+          &larr; YM/YW Teaching Planning
         </Link>
       </main>
     );
@@ -111,11 +120,11 @@ export default async function YouthTeachingPlanningPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
-      <AppHeader tag="Youth Teaching Planning" />
+      <AppHeader tag="YM/YW Teaching Planning" />
 
       <section className="mt-4">
         <Link href="/youth-teaching-planning" className="text-xs text-ink-muted hover:text-ink">
-          &larr; Youth Teaching Planning
+          &larr; YM/YW Teaching Planning
         </Link>
         <h1 className="rise-in mt-2 font-display text-3xl leading-tight sm:text-4xl">{rawClass}</h1>
       </section>

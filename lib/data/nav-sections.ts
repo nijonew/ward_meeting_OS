@@ -58,28 +58,32 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
   const canTeachYouth = hasFeature(profile, "youth_teaching_planning");
   const canTeachAdult = hasFeature(profile, "adult_teaching_planning");
 
-  // Youth/Adult teaching schedules joined "My meetings," 2026-11-08
-  // (the user's own request: "Move teaching schedules to 'my
-  // meetings'"). A teacher's own weekly schedule is genuinely the same
-  // kind of thing as every other tile in this section -- something
-  // they personally show up to and fill in -- unlike the broader
-  // cross-class management view the SAME pages also serve for
-  // Bishopric/YW Presidency, which joins "My calling" below instead.
-  // There's no separate "schedule" vs. "management" page or feature in
-  // this app -- both destinations are the identical hub either way,
-  // just surfaced under two different headings for the two different
-  // audiences the user named.
-  if (attendsMeetings || canTeachYouth || canTeachAdult) {
-    const links: NavLink[] = visibleMeetingTypes.map((slug) => ({
-      title: MEETING_TYPE_LABELS[slug],
-      href: `/dashboard?type=${slug}`,
-    }));
+  // "My meetings" always shows now, for any signed-in account at all
+  // (2026-11-08, replacing the Youth/Adult teaching-schedule links
+  // this section gained 2026-11-08 the first time around) -- the user's
+  // own request: "YM/YW Lessons" and "Relief Society & Priesthood
+  // [Elders Quorum] Lessons" are plain, read-only date/topic/teacher
+  // views, open to "logged in youth and adults" generally, not scoped
+  // to a calling or a `youth_class_teachers` assignment the way editing
+  // is. These are genuinely different, brand-new pages
+  // (`/ym-yw-lessons`, `/adult-teaching-lessons`) from the real
+  // Planning pages below -- not the same destination with different
+  // labels -- so a teacher who ALSO has edit rights sees both: their
+  // own read-only schedule here, and the editable grid under "My
+  // calling".
+  {
+    const links: NavLink[] = [
+      { title: "YM/YW Lessons", href: "/ym-yw-lessons" },
+      { title: "Elders Quorum / Relief Society Lessons", href: "/adult-teaching-lessons" },
+      ...visibleMeetingTypes.map((slug) => ({
+        title: MEETING_TYPE_LABELS[slug],
+        href: `/dashboard?type=${slug}`,
+      })),
+    ];
     if (attendsMeetings) links.push({ title: "Meeting Agenda Items", href: "/submit/agenda-item" });
     if (hasFeature(profile, "sacrament_program_view")) {
       links.push({ title: "Sacrament Meeting Programs", href: "/dashboard?type=sacrament-meeting&readonly=1" });
     }
-    if (canTeachYouth) links.push({ title: "Youth Teaching Planning", href: "/youth-teaching-planning" });
-    if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
     sections.push({ title: "My meetings", links });
   }
 
@@ -102,20 +106,22 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
   const canCallingPlanning = hasFeature(profile, "calling_planning");
   const isMusicPlanner = hasFeature(profile, "sacrament_music");
   // "My calling," renamed from "Meeting Planning" (2026-11-08, the
-  // user's own request) -- also gains Youth Teaching Planning
-  // alongside the Elders Quorum/Relief Society Teaching tile that was
-  // already here, per the same request's "teaching schedule
-  // management for youth and adults" half: both teaching tools' own
-  // broader, cross-class management view (for Bishopric/YW Presidency,
-  // who manage every class rather than just their own) lives here,
-  // same pages "My meetings" above links to for the single-class
-  // teacher's own weekly schedule -- see that section's own comment.
+  // user's own request) -- also gains YM/YW Teaching Planning
+  // (renamed from "Youth Teaching Planning" the same day, 2026-11-08,
+  // per the user's own new naming) alongside the Elders Quorum/Relief
+  // Society Teaching tile that was already here: both teaching tools'
+  // own broader, edit-capable planning view (for whoever actually
+  // teaches, or for Bishopric/YW Presidency managing every class) lives
+  // here -- genuinely gated by the real planning feature (and, for
+  // youth, a real `youth_class_teachers` assignment), unlike the new
+  // read-only "Lessons" links under "My meetings" above, which are open
+  // to anyone signed in.
   if (canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canTeachYouth || canTeachAdult) {
     const links: NavLink[] = [];
     if (canMeetingPlanningHub) links.push({ title: "Meeting Planning", href: "/meeting-planning" });
     if (canCallingPlanning) links.push({ title: "Calling Planning", href: "/calling-planning" });
     if (isMusicPlanner) links.push({ title: "Sacrament Meeting Music Planning", href: "/music" });
-    if (canTeachYouth) links.push({ title: "Youth Teaching Planning", href: "/youth-teaching-planning" });
+    if (canTeachYouth) links.push({ title: "YM/YW Teaching Planning", href: "/youth-teaching-planning" });
     if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
     sections.push({ title: "My calling", links });
   }
