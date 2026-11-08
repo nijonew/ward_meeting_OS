@@ -252,7 +252,14 @@ export default async function ArchivedMeetingPage({
     getRoleAssignments(meetingId, roleTable),
     getElementNotes(meetingId),
     isSacrament ? getSacramentPlanningData(meetingId) : Promise.resolve(null),
-    isSacrament ? getAnnouncementsByPlannedElement(meetingId) : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
+    // includeArchived: true -- an archived meeting's own Announcements
+    // block is a real historical record and should keep showing
+    // exactly what it had, even once the announcement itself has since
+    // lapsed (2026-11-08) -- unlike Planning/Conducting, which default
+    // to hiding a since-archived announcement.
+    isSacrament
+      ? getAnnouncementsByPlannedElement(meetingId, { includeArchived: true })
+      : Promise.resolve(new Map<string, PulledAnnouncement[]>()),
     // The next three only need meetingId/isBishopric/isCouncil -- folded
     // into this same wave instead of three more sequential awaits after
     // it (2026-10-31, chasing the user's own "this app is extremely

@@ -2050,6 +2050,98 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-08: a pulled announcement never
+disappeared from a Sacrament Meeting's own Announcements block once
+it lapsed, whether that meeting had already happened or not -- and
+the public page's own archive sweep had a silent failure mode that
+could explain the same symptom there too.** The user's own report:
+"What are older announcements still showing up in sacrament meeting
+planning after they have passed? ...and they remain in announcements
+too." This repeats, with more specifics, a symptom this file's own
+2026-11-04 entry had already flagged and left unresolved ("I have an
+already-passed-date announcement still showing up" -- every reader
+checked clean at the time, and the one thing actually wrong with it
+that day pushed the opposite direction).
+
+**Root cause, confirmed by reading the code (no live database access
+to reproduce directly): `getAnnouncementsByPlannedElement`
+(`lib/data/sacrament-announcements.ts`) -- what Planning, Conducting,
+and the Archived view all call to render a meeting's own already-
+pulled announcements -- never checked the linked announcement's own
+`status` at all.** Once an announcement is pulled into a meeting
+(manually, or by `autoPullSacramentAnnouncements`'s own auto-pull
+sweep), nothing anywhere ever stopped showing it there, even long
+after `sweepPastAnnouncements` flips its `status` to `archived` once
+its own date range ends -- a stale pull just sat in
+`sacrament_announcement_pulls` forever, since nothing removed it
+either. For an *archived* meeting this is actually the documented,
+correct behavior (its own Announcements block is a deliberate
+historical record of exactly what it had) -- but for a meeting still
+in Planning, or being Conducted, continuing to show an announcement
+that's already expired is exactly the bug reported.
+
+Fixed in two parts:
+1. **`getAnnouncementsByPlannedElement` now takes an optional
+   `{ includeArchived?: boolean }`**, defaulting to `false` -- a pull
+   whose announcement's own `status` isn't `"published"` is filtered
+   out by default. Planning and Conducting both call it with no
+   options, so they now correctly stop showing it. The Archived view
+   passes `{ includeArchived: true }` explicitly, preserving its own
+   historical-record behavior unchanged.
+2. **New `removeLapsedAnnouncementPulls(meetingId)`**, called from
+   `autoPullSacramentAnnouncements` right after `sweepPastAnnouncements`
+   -- actually deletes a meeting's own stale `sacrament_announcement_pulls`
+   row once its announcement archives, rather than just hiding it from
+   display. Only ever reached for a meeting that hasn't archived yet
+   (this function is only called from the Planning page, which
+   redirects away from an archived meeting before it ever gets here),
+   so an archived meeting's own historical pulls are never touched by
+   this -- matching part 1's own split.
+
+**A second, independent gap found while tracing this, not yet
+confirmed as the actual cause of "they remain in announcements too"
+(the public `/announcements/public` page, which does correctly call
+`sweepPastAnnouncements` and filter on `status = "published"`):**
+`sweepPastAnnouncements`'s own final archive `UPDATE` never checked
+for an error at all. This project has a long, repeated history of
+undocumented RLS policies (created directly in the Supabase SQL
+editor before this repo's migration history started) silently
+blocking a write that looked completely safe in application code --
+migrations `038`/`041`/`063`/`067`/`068`/`069`/`075`/`078` are all
+this exact story. If something like that is blocking this specific
+`UPDATE`, an announcement's `status` would never actually flip to
+`archived` no matter how long ago its date passed, which would
+explain it staying visible as "published" literally everywhere --
+the public page, Manage Announcements, and the Sacrament Meeting
+"call in an announcement" dropdown -- with nothing anywhere ever
+having said so. Now logs `console.error("sweepPastAnnouncements:
+archive update failed:", ...)` on a failed update, matching this
+app's own established error-surfacing convention elsewhere, so a
+real block would at least show up in Vercel's logs instead of
+vanishing silently. **Not confirmed** -- this assistant has no live
+database access to check whether an RLS policy is actually the
+problem here, or whether this update has in fact always succeeded
+and the real explanation is confined to the already-pulled-announcements
+bug above. If an announcement is still showing as "published" on
+`/announcements/public` after this ships, check Vercel's function
+logs for this exact error message -- if it's there, that confirms an
+RLS policy needs fixing (the same kind of fix those seven migrations
+above already made); if it's not there, the update is succeeding and
+this wasn't the explanation after all.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: a Sacrament Meeting still in Planning (or being Conducted)
+that has an announcement pulled in whose own date has since passed no
+longer shows it, while an *already-archived* meeting's own
+Announcements block still shows exactly what it had at the time; and
+whether an announcement that was reported "still showing up" on
+`/announcements/public` itself is now correctly archived once its own
+Planning page is next visited (which runs the cleanup) or once
+`sweepPastAnnouncements` next runs from that public page's own load --
+and if it's genuinely still stuck as "published," check Vercel's logs
+for the new error message above.
+
 **Five requests worked through in order, 2026-11-08 ("Upcoming
 things:").** No migration needed for any of them -- all pure
 application-code changes.

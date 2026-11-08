@@ -102,13 +102,21 @@ export async function sweepPastAnnouncements(): Promise<void> {
   if (lapsed.length === 0) return;
 
   await Promise.all(lapsed.map((a) => deleteStorageImageAtUrl(supabase, a.image_url as string | null)));
-  await supabase
+  const { error } = await supabase
     .from("announcements")
     .update({ status: "archived", image_url: null })
     .in(
       "id",
       lapsed.map((a) => a.id as string)
     );
+  // This update's own error was never checked before 2026-11-08 -- a
+  // real block (e.g. an undocumented RLS policy restricting UPDATEs on
+  // this table, this app's own most-repeated bug class) would have
+  // failed completely silently, leaving a lapsed announcement showing
+  // as "published" everywhere forever with no sign anything was
+  // wrong. Surfaced here rather than swallowed, matching every other
+  // lazy sweep's own error-logging convention in this app.
+  if (error) console.error("sweepPastAnnouncements: archive update failed:", error.message);
 }
 
 function ordinal(day: number): string {

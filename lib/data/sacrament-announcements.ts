@@ -112,24 +112,83 @@ export async function getPullableAnnouncements(meetingId: string): Promise<Pulle
  * Move Up/Down mechanism as Ward Business's Callings/Releases
  * (migration 090). Scoped per `planned_element_id` so a meeting with
  * more than one Announcements block (migration 074) reorders each
- * block independently. */
-export async function getAnnouncementsByPlannedElement(meetingId: string): Promise<Map<string, PulledAnnouncement[]>> {
+ * block independently.
+ *
+ * **Filters out a since-archived announcement by default, 2026-11-08**
+ * (the user's own report: "older announcements still showing up in
+ * sacrament meeting planning after they have passed... and they
+ * remain in announcements too"). This function never checked the
+ * linked announcement's own `status` at all -- once pulled into a
+ * meeting (manually, or by `autoPullSacramentAnnouncements` below),
+ * nothing here ever stopped showing it, even long after
+ * `sweepPastAnnouncements` flips it to `archived`. Planning and
+ * Conducting both call this with no options, so they now correctly
+ * stop showing a pull once its announcement lapses; the Archived
+ * view passes `{ includeArchived: true }` explicitly, since an
+ * already-archived meeting's own Announcements block is meant to keep
+ * showing exactly what it had at the time (a real, deliberate
+ * historical record, not a live view) regardless of what's happened
+ * to the announcement since. */
+export async function getAnnouncementsByPlannedElement(
+  meetingId: string,
+  options: { includeArchived?: boolean } = {}
+): Promise<Map<string, PulledAnnouncement[]>> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("sacrament_announcement_pulls")
-    .select(`planned_element_id, sort_order, announcements(${ANNOUNCEMENT_COLUMNS})`)
+    .select(`planned_element_id, sort_order, announcements(${ANNOUNCEMENT_COLUMNS}, status)`)
     .eq("meeting_id", meetingId)
     .order("sort_order", { ascending: true });
 
   const result = new Map<string, PulledAnnouncement[]>();
   for (const row of (data ?? []) as { planned_element_id: string; announcements: unknown }[]) {
-    const announcement = toPulledAnnouncement(row.announcements);
+    const raw = Array.isArray(row.announcements) ? row.announcements[0] : row.announcements;
+    const status = (raw as { status?: string } | null)?.status;
+    if (!options.includeArchived && status !== "published") continue;
+    const announcement = toPulledAnnouncement(raw);
     if (!announcement) continue;
     const list = result.get(row.planned_element_id);
     if (list) list.push(announcement);
     else result.set(row.planned_element_id, [announcement]);
   }
   return result;
+}
+
+/**
+ * Deletes any pull for this meeting whose announcement has since
+ * lapsed/archived -- without this, the filter above would just hide a
+ * stale pull from this meeting's own Announcements block forever
+ * rather than actually cleaning it up, and it would keep counting
+ * against this meeting's own pull list (e.g. `getPullableAnnouncements`'s
+ * "already here" check) with no way for an admin to see or remove it.
+ * Called from `autoPullSacramentAnnouncements` below, right after
+ * `sweepPastAnnouncements` -- only ever reached from the Planning page,
+ * which redirects away from an archived meeting before it ever gets
+ * here, so an archived meeting's own historical pulls (read with
+ * `includeArchived: true` above) are never touched by this.
+ */
+async function removeLapsedAnnouncementPulls(meetingId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("sacrament_announcement_pulls")
+    .select("announcement_id, announcements(status)")
+    .eq("meeting_id", meetingId);
+
+  type Row = { announcement_id: string; announcements: { status?: string } | { status?: string }[] | null };
+  const staleIds = ((data ?? []) as Row[])
+    .filter((row) => {
+      const a = Array.isArray(row.announcements) ? row.announcements[0] : row.announcements;
+      return a?.status !== "published";
+    })
+    .map((row) => row.announcement_id);
+
+  if (staleIds.length === 0) return;
+
+  await supabase
+    .from("sacrament_announcement_pulls")
+    .delete()
+    .eq("meeting_id", meetingId)
+    .in("announcement_id", staleIds);
 }
 
 /** New pulls always land at the end of their own block's list -- same
@@ -213,6 +272,7 @@ interface AnnouncementSweepCandidate {
 
 export async function autoPullSacramentAnnouncements(meetingId: string, meetingDateIso: string): Promise<void> {
   await sweepPastAnnouncements();
+  await removeLapsedAnnouncementPulls(meetingId);
   const supabase = await createClient();
 
   const { data: block } = await supabase
