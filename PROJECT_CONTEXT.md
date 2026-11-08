@@ -2050,6 +2050,133 @@ avoid confusing the two.
 
 ## Known open items
 
+**Five requests worked through in order, 2026-11-08 ("Upcoming
+things:").** No migration needed for any of them -- all pure
+application-code changes.
+
+1. **"Sluggish again" -- bug found and fixed: the persistent side nav
+   (shipped minutes earlier the same day) ran its own queries on every
+   single page load.** Root cause: `AppHeader.tsx` -- which renders on
+   nearly every page in the app -- called `getNavSections()` eagerly,
+   so every page view paid for `getVisibleMeetingTypesForUser`'s own
+   queries whether or not anyone ever opened the menu. Fixed by making
+   `NavDrawer` fetch those sections itself, lazily, only the first time
+   it's actually opened -- via a new `app/nav-actions.ts`'s
+   `getFeatureNavSections()` (a plain exported Server Action, called
+   directly from the Client Component, same pattern
+   `ConductingScriptView` already uses for its own poll). `AppHeader`
+   now only builds the cheap, already-free "This week" group (from the
+   `user` check it already does) and passes that down; the rest of the
+   drawer's sections show a brief "Loading..." the first time someone
+   actually clicks the hamburger, then stay cached in that component's
+   own state for the rest of the page view. The home page's own tile
+   grid is unaffected -- it still calls `getNavSections()` directly and
+   eagerly, since it always needs to show those tiles with no click
+   required.
+2. **Teaching schedules split between "My meetings" and "Meeting
+   Planning" (renamed "My calling").** The user's own words: "Move
+   teaching schedules to 'my meetings' but teaching schedule management
+   for youth and adults to 'meeting planning' but change the title from
+   meeting planning to 'my calling'." Neither Youth Teaching Planning
+   nor Elders Quorum/Relief Society Teaching has a real "viewing" page
+   distinct from "management" in this app -- both are the same page for
+   everyone holding the feature, whether that's one teacher's own
+   class or Bishopric/YW Presidency managing every class. Rather than
+   building a new access split that doesn't exist anywhere else in
+   this app, both destinations now appear under BOTH headings:
+   `lib/data/nav-sections.ts`'s "My meetings" section gains Youth
+   Teaching Planning (`youth_teaching_planning`) and Elders Quorum/
+   Relief Society Teaching (`adult_teaching_planning`) tiles -- framed
+   as a teacher's own weekly schedule, the same kind of thing as every
+   other tile already there; its "Meeting Planning" section (renamed
+   "My calling") gains Youth Teaching Planning too, alongside the
+   Elders Quorum/Relief Society Teaching tile that was already there --
+   framed as the broader cross-class management view. "My meetings"
+   itself is now also shown to an account that teaches but doesn't
+   attend any of the three collaborative meeting types, which it
+   wouldn't have been before. The now-redundant "Youth Teaching
+   Management" tile inside `/youth-activity-planning` (the only
+   existing entry point into Youth Teaching Planning before this) is
+   removed outright -- it had no real connection to youth activities
+   specifically, only ever placed there because "Youth program" was the
+   one section both tools happened to share. `/youth-teaching-planning`'s
+   own hub-view back link reverts from "&larr; Youth Activity Planning"
+   to "&larr; Home," matching every other page reached directly from
+   Home/the sidebar. `/meeting-planning` (the actual hub page behind
+   the "Meeting Planning" tile) keeps its own name unchanged -- only the
+   home-page/sidebar SECTION heading above it reads "My calling" now,
+   not the hub page itself.
+3. **"Speaker and prayer history needs to include the speakers and
+   prayers from sacrament meetings already archived in this app."**
+   Checked `getSpeakerPrayerHistory()` (`lib/data/speaker-prayer-history.ts`)
+   carefully against this -- it already does exactly this (built
+   2026-10-21): every archived Sacrament Meeting's own
+   `sacrament_assignments`/`sacrament_speakers_adults/youth` rows,
+   merged with the `speaker_prayer_history_import` table, with an
+   ongoing dedup so a later-archiving meeting can't double up with an
+   already-logged import row. Re-verified the column names, the
+   `confirmed = true` filters, and the dedup keys against the current
+   schema while rebuilding the page for item 4 below and found nothing
+   wrong -- this assistant has no live database access to confirm
+   against real data, so if a SPECIFIC known-archived meeting's real
+   speaker or prayer still doesn't show up after this ships, that's
+   the concrete example to report back rather than "it's not working"
+   in general -- that would point at something this review didn't
+   catch.
+4. **Speaker & Prayer History split into three separate pages, each
+   with its own tile.** The user's own words: "Put the speaker and
+   prayer tables on separate tables with their own tiles that show up
+   in their own page when speaker and prayer history tile is selected
+   in meeting planning." `/speaker-prayer-history` (still the same
+   entry point from Meeting Planning/My calling) is now a hub with
+   three tiles -- Speakers (Adults), Speakers (Youth), Prayers --
+   replacing the old single page that rendered all three history lists
+   side by side in one `grid-cols-3` row. Each tile lands on its own
+   full page (`/speaker-prayer-history/adults|youth|prayers`), same
+   one-tile-per-destination pattern already used by
+   `/youth-teaching-planning` and `/meeting-agendas`. `HistoryListCard`
+   (the Due box + full history list for one category) and
+   `speakerBucket` were extracted out of the old combined page into
+   `components/speaker-prayer-history/HistoryListCard.tsx`; a new
+   `components/speaker-prayer-history/SpeakerPrayerCategoryPage.tsx`
+   is the shared body all three new routes render (gate, fetch, filter,
+   the add-entry form) -- each route file is just that component called
+   with a different title/category/filter. `getSpeakerPrayerHistory()`
+   itself is completely unchanged, reused as-is by all three. The
+   "Log a Missed or Pre-App Turn" add form appears on all three pages
+   unchanged (it was never filtered by category to begin with).
+   `app/speaker-prayer-history/actions.ts`'s three write actions now
+   revalidate all four real routes (the hub plus the three category
+   pages) instead of just the one path that used to be the whole page --
+   each is now a separate route segment, not reachable by a single
+   `revalidatePath` call the way one page's own sections were.
+5. **Removed "Recognitions & Advancements Planning"
+   (`sacrament_rabnm_planning`) from Table Admin, keeping
+   `sacrament_rabnm` ("Recognitions / Advancements / Baptisms / New
+   Members," under Sacrament Meeting Content) exactly as it was** --
+   the user's own explicit distinction between the two. `/rabnm-planning`
+   (the dedicated add/remove-row planning page) is now the only way to
+   manage this pool -- it already covered everyday use, and the raw
+   grid's one real extra capability (hand-editing `announced_meeting_id`)
+   was never a safe thing to touch directly anyway, since Ward
+   Business's own pull/remove actions are what set it correctly. Pure
+   registry removal -- the underlying `sacrament_rabnm_planning` table
+   and the `table_admin_sacrament_rabnm_planning` feature are both left
+   completely untouched, so nothing is lost if this ever needs to come
+   back as a troubleshooting fallback later.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: the menu toggle still works correctly after the perf fix
+(brief "Loading..." on first click, instant on reopen); "My meetings"
+now shows Youth Teaching Planning/Elders Quorum & Relief Society
+Teaching tiles (for whoever holds either feature) and the section below
+it reads "My calling"; `/speaker-prayer-history` shows three tiles
+leading to three full pages, each still showing real archived-meeting
+data mixed with any manually-logged entries; and that
+`/admin/sacrament_rabnm_planning` is gone from the Table Admin index
+while `/admin/sacrament_rabnm` is untouched.
+
 **A persistent side navigation menu, built on top of the dashboard
 reorganization above -- no migration needed, 2026-11-05.** The user's
 own follow-up request, right after the dashboard reorg shipped: "With

@@ -3,7 +3,7 @@ import { signOut } from "@/app/auth/actions";
 import { getWardName } from "@/lib/data/ward-settings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
-import { getNavSections, type NavSection } from "@/lib/data/nav-sections";
+import type { NavSection } from "@/lib/data/nav-sections";
 import { NavDrawer } from "@/components/NavDrawer";
 
 /**
@@ -40,22 +40,23 @@ import { NavDrawer } from "@/components/NavDrawer";
  * request: "adding a menu on the side with the categories and the
  * features associated with those categories from our cleanup").
  * Renders `NavDrawer` (a Client Component, for its own open/closed
- * state) with `getNavSections()`'s already-resolved, already-gated
- * data -- the same My meetings/Announcements/Meeting Planning/Youth
- * program/Admin categories the landing page itself now sources from
- * that same function -- plus a small hand-written "This week" group
- * (Calendar and public Announcements always; Youth Activities only
- * when signed in) for the one tier that function deliberately doesn't
- * cover (see its own doc comment for why). Since this component
- * already renders on nearly every page, the drawer needs no separate
- * wiring anywhere else to show up everywhere `AppHeader` does.
+ * state) with a small hand-written "This week" group (Calendar and
+ * public Announcements always; Youth Activities only when signed in)
+ * -- the rest of the categories (My meetings/Announcements/Meeting
+ * Planning/Youth program/Admin, from `getNavSections()`) are fetched
+ * by `NavDrawer` itself, lazily, only once the drawer is actually
+ * opened.
+ *
+ * **Deliberately NOT fetched here, 2026-11-08** -- this component
+ * renders on nearly every page in the app, so calling
+ * `getNavSections()` eagerly here (as a first pass briefly did) meant
+ * every single page load paid for its underlying queries whether or
+ * not anyone ever opened the menu. The user's own report, right after
+ * that shipped: "Sluggish again." See `app/nav-actions.ts`'s own
+ * comment for the lazy fetch this was replaced with.
  */
 export async function AppHeader({ tag }: { tag?: string }) {
-  const [{ user, profile }, wardName, featureSections] = await Promise.all([
-    getSessionUser(),
-    getWardName(),
-    getNavSections(),
-  ]);
+  const [{ user, profile }, wardName] = await Promise.all([getSessionUser(), getWardName()]);
   const canVerifyLogins = hasFeature(profile, "verify_logins");
   const unverifiedCount = canVerifyLogins ? await getUnverifiedProfileCount() : 0;
   const whoAmI = profile?.display_name || profile?.email || null;
@@ -69,7 +70,6 @@ export async function AppHeader({ tag }: { tag?: string }) {
       ...(user ? [{ title: "Youth Activities", href: "/youth-activities?readonly=1" }] : []),
     ],
   };
-  const navSections = [thisWeekSection, ...featureSections];
 
   return (
     <>
@@ -99,7 +99,7 @@ export async function AppHeader({ tag }: { tag?: string }) {
           anything about the existing side-by-side layout at sm+. */}
       <header className="flex flex-col gap-2 border-b border-rule pb-6 sm:flex-row sm:items-baseline sm:justify-between">
         <div className="flex items-center gap-3">
-          <NavDrawer sections={navSections} />
+          <NavDrawer thisWeekSection={thisWeekSection} />
           <Link
             href="/"
             prefetch={false}

@@ -37,23 +37,23 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
  * `/events`, or the de-emphasized text link at the bottom of this page),
  * just no longer a tile on this hub.
  *
- * **Youth Teaching Management** is a relabeling of what this hub
- * previously called "Youth Teaching Calendar" -- same destination
- * (`/youth-teaching-planning`, unrenamed internally; see that page's
- * own doc comment), just matching the user's own new wording for this
- * tile specifically. The old, separate `comingSoon` "Youth Teaching
- * Management" stub (for assigning teachers to classes, a genuinely
- * different, never-built idea -- see that file's prior doc comment in
- * git history) is dropped along with every other now-hidden tile; ask
- * before building that one for real if it turns out to still be wanted
- * under a different name.
+ * **"Youth Teaching Management" removed outright, 2026-11-08** (the
+ * user's own request, moving teaching planning into "My meetings"/"My
+ * calling" instead -- see `lib/data/nav-sections.ts`'s own comment for
+ * the full reasoning): this hub's own tile was always just a
+ * relabeling of what it previously called "Youth Teaching Calendar,"
+ * the same `/youth-teaching-planning` destination either way -- it has
+ * no real connection to youth ACTIVITIES specifically (it was only
+ * ever placed here, 2026-10-10, because "Youth program" was the one
+ * section both tools happened to share before this reorg). The
+ * destination page itself is completely unaffected; only this one
+ * now-redundant entry point into it is gone.
  */
 export default async function YouthActivityPlanningPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
   const canManageActivities = hasFeature(profile, "youth_activity_planning");
-  const canTeachingPlanning = hasFeature(profile, "youth_teaching_planning");
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
@@ -80,12 +80,6 @@ export default async function YouthActivityPlanningPage() {
             title="Combined Young Men Activities"
             href="/youth-activities/combined-ym"
           />
-          {canTeachingPlanning && (
-            <Tile
-              title="Youth Teaching Management"
-              href="/youth-teaching-planning"
-            />
-          )}
           {canManageActivities && (
             <Tile
               title="All-Youth Activity Cancellations"

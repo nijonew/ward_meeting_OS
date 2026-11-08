@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getFeatureNavSections } from "@/app/nav-actions";
 import type { NavSection } from "@/lib/data/nav-sections";
 
 /**
@@ -21,20 +22,29 @@ import type { NavSection } from "@/lib/data/nav-sections";
  * reworking every page's own `<main>` wrapper (this app has no shared
  * two-column layout anywhere today), while an overlay drawer only ever
  * needs this one component. Closes on: clicking the overlay, clicking
- * a link (via `onNavigate`), pressing Escape, or navigating away (the
- * `pathname` effect) -- that last one matters because `usePathname()`
- * doesn't force anything to close on its own; without it, following a
- * link that doesn't trigger a real page reload (a client-side Next.js
+ * a link, pressing Escape, or navigating away (the pathname comparison
+ * below) -- that last one matters because `usePathname()` doesn't
+ * force anything to close on its own; without it, following a link
+ * that doesn't trigger a real page reload (a client-side Next.js
  * navigation) would leave the drawer sitting open over the new page.
  *
- * `sections` arrives already fully resolved and permission-filtered
- * from the server (`getNavSections()`, via `AppHeader`) -- this
- * component does no gating of its own, same division of labor as every
- * other Server-fetches/Client-renders split already in this app (e.g.
- * `ConductingViewPage`/`ConductingScriptView`).
+ * `thisWeekSection` arrives already resolved from `AppHeader` (free --
+ * built straight from the session check that component already does).
+ * Every other category (My meetings/Announcements/Meeting Planning/
+ * Youth program/Admin, from `getNavSections()`) is fetched here
+ * instead, lazily, the first time the drawer is actually opened --
+ * **not** eagerly from `AppHeader` on every page render, 2026-11-08.
+ * The first version did fetch everything eagerly; since `AppHeader`
+ * renders on nearly every page, that meant every single page load
+ * paid for `getVisibleMeetingTypesForUser`'s own queries whether or
+ * not anyone ever opened the menu -- the user's own report, right
+ * after that shipped: "Sluggish again." Paying that cost only on the
+ * actual click, once per page view, is the fix.
  */
-export function NavDrawer({ sections }: { sections: NavSection[] }) {
+export function NavDrawer({ thisWeekSection }: { thisWeekSection: NavSection }) {
   const [open, setOpen] = useState(false);
+  const [featureSections, setFeatureSections] = useState<NavSection[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const pathname = usePathname();
 
   // Closes on navigation by comparing the path against its own last-
@@ -61,11 +71,22 @@ export function NavDrawer({ sections }: { sections: NavSection[] }) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
+  async function handleOpen() {
+    setOpen(true);
+    if (featureSections !== null || loading) return;
+    setLoading(true);
+    const sections = await getFeatureNavSections();
+    setFeatureSections(sections);
+    setLoading(false);
+  }
+
+  const sections = [thisWeekSection, ...(featureSections ?? [])];
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         aria-label="Open navigation menu"
         aria-expanded={open}
         className="flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[3px] rounded border border-rule text-ink-muted transition-colors hover:border-rule-strong hover:text-ink"
@@ -118,6 +139,7 @@ export function NavDrawer({ sections }: { sections: NavSection[] }) {
                   </ul>
                 </div>
               ))}
+              {loading && <p className="text-xs text-ink-muted">Loading&hellip;</p>}
             </div>
           </nav>
         </>

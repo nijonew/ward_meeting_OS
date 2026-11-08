@@ -4,7 +4,6 @@ import {
   BISHOPRIC_ASSIGNMENT_ROLES,
   MUSIC_TYPES,
   RABNM_TYPES,
-  RABNM_PLANNING_TYPES,
   SPECIAL_FORMATS,
   SPEAKER_SLOTS_ADULT,
   SPEAKER_SLOTS_YOUTH,
@@ -491,7 +490,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "sacrament_rabnm",
     label: "Recognitions / Advancements / Baptisms / New Members",
     description:
-      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday use, add these from that meeting's own Planning view instead (Callings/Releases pull from Calling Planning; Recognitions/Advancements/Baptisms/New Members/Baby Blessings pull from the Recognitions & Advancements Planning pool, below). Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to whoever holds the sacrament_rabnm feature.",
+      "Raw-data fallback for troubleshooting or a bulk fix -- for everyday use, add these from that meeting's own Planning view instead (Callings/Releases pull from Calling Planning; Recognitions/Advancements/Baptisms/New Members/Baby Blessings pull from the Recognitions & Advancements Planning pool at /rabnm-planning). Which person(s) are attached lives in a separate join table this grid can't reach yet (see registry.ts comment on sacrament_rabnm_people) -- add/edit those from the meeting's own planning page instead, which also restricts adding/removing entries to whoever holds the sacrament_rabnm feature.",
     requiredFeature: "table_admin_sacrament_rabnm",
     columns: [
       { column: "meeting_id", label: "Meeting", type: "foreign_key", required: true, foreignKey: MEETING_FK("sacrament-meeting") },
@@ -503,21 +502,14 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     ],
   },
 
-  sacrament_rabnm_planning: {
-    table: "sacrament_rabnm_planning",
-    label: "Recognitions & Advancements Planning",
-    description:
-      "The standing pool of not-yet-announced Recognitions/Advancements/Baptisms/New Members/Baby Blessings (migration 082) -- for everyday add/remove use, use the Recognitions & Advancements Planning page instead; this grid is the full sortable/filterable fallback for a bulk fix. Which person(s) are attached lives in a separate join table this grid can't reach (sacrament_rabnm_planning_people) -- add/edit those from the planning page or Ward Business instead. announced_meeting_id is set automatically once a row is pulled into a meeting's Ward Business -- clearing it by hand here puts the row back in the pool without removing it from that meeting.",
-    requiredFeature: "table_admin_sacrament_rabnm_planning",
-    columns: [
-      { column: "type", label: "Type", type: "select", required: true, options: [...RABNM_PLANNING_TYPES] },
-      { column: "baby_name", label: "Baby's Name", type: "text" },
-      { column: "detail", label: "Detail", type: "text" },
-      { column: "event_date", label: "Event Date", type: "date" },
-      { column: "planned_meeting_date", label: "Planned For", type: "date" },
-      { column: "announced_meeting_id", label: "Announced In Meeting", type: "foreign_key", foreignKey: MEETING_FK("sacrament-meeting") },
-    ],
-  },
+  // "Recognitions & Advancements Planning" (sacrament_rabnm_planning)
+  // removed from this registry outright, 2026-11-08 (the user's own
+  // explicit request -- not the table right above this comment,
+  // sacrament_rabnm, which they confirmed should stay). /rabnm-planning
+  // is now the only way to manage this pool; see that page's own doc
+  // comment. The underlying table and the table_admin_sacrament_rabnm_planning
+  // feature are both left untouched -- this is a pure removal of one
+  // registry entry, not a schema or feature-catalog change.
 
   sacrament_speakers_adults: {
     table: "sacrament_speakers_adults",

@@ -14,6 +14,23 @@ async function requireSpeakerPrayerHistoryFeature(): Promise<{ error: string } |
 }
 
 /**
+ * Split across four real routes now (the hub + one page per category,
+ * 2026-11-08) -- a plain single `revalidatePath("/speaker-prayer-history")`
+ * no longer reaches the three sub-pages where every write below
+ * actually shows up, since they're separate route segments, not the
+ * same page under a shared layout. Revalidating all four explicitly is
+ * simpler and more certain than relying on Next's own `"layout"` option
+ * correctly cascading across sibling routes with no shared layout file
+ * to anchor it.
+ */
+function revalidateSpeakerPrayerHistoryPaths() {
+  revalidatePath("/speaker-prayer-history");
+  revalidatePath("/speaker-prayer-history/adults");
+  revalidatePath("/speaker-prayer-history/youth");
+  revalidatePath("/speaker-prayer-history/prayers");
+}
+
+/**
  * The ongoing way to log a missed or pre-app speaker/prayer turn
  * directly on /speaker-prayer-history, without needing Table Admin --
  * writes to speaker_prayer_history_import (migration 079, 2026-10-21)
@@ -43,7 +60,7 @@ export async function addSpeakerPrayerHistoryEntry(_prevState: unknown, formData
   });
 
   if (error) return { error: error.message };
-  revalidatePath("/speaker-prayer-history");
+  revalidateSpeakerPrayerHistoryPaths();
   return { success: true };
 }
 
@@ -59,7 +76,7 @@ export async function deleteSpeakerPrayerHistoryEntry(entryId: string): Promise<
   const supabase = await createClient();
   const { error } = await supabase.from("speaker_prayer_history_import").delete().eq("id", entryId);
   if (error) return { error: error.message };
-  revalidatePath("/speaker-prayer-history");
+  revalidateSpeakerPrayerHistoryPaths();
   return { success: true };
 }
 
@@ -91,6 +108,6 @@ export async function toggleDueFlag(personId: string, category: DueCategory, due
     if (error) return { error: error.message };
   }
 
-  revalidatePath("/speaker-prayer-history");
+  revalidateSpeakerPrayerHistoryPaths();
   return { success: true };
 }

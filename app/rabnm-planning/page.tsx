@@ -21,9 +21,19 @@ import { RabnmPlanningCategorySection } from "@/components/rabnm-planning/RabnmP
  * Deliberately a simple add-a-row/remove-a-row list per category, no
  * bulk save, no sort/filter -- matching Teaching Program's own
  * simplicity rather than the "favorite grid format" (the user's own
- * explicit choice). The full sortable/filterable grid-with-Save-All-
- * Changes treatment of this same pool lives at Table Admin's
- * sacrament_rabnm_planning entry instead.
+ * explicit choice).
+ *
+ * **This is now the only way to manage this pool, 2026-11-08** -- the
+ * Table Admin raw-data fallback (`sacrament_rabnm_planning`) was
+ * removed from the registry per the user's own request: this page
+ * already covers everyday add/remove, and the fallback's one real
+ * extra capability (editing `announced_meeting_id` directly) was never
+ * a safe thing to hand-edit anyway -- it's set automatically by Ward
+ * Business's own pull/remove actions. `sacrament_rabnm` -- a
+ * genuinely different table (the real announced Recognitions/
+ * Advancements/Baptisms/New Members rows once pulled into a specific
+ * meeting, not this standing pool) -- keeps its own Table Admin entry
+ * unchanged.
  */
 export default async function RabnmPlanningPage() {
   const { user, profile } = await getSessionUser();

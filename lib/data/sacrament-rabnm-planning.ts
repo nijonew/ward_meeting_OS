@@ -32,8 +32,9 @@ function peopleFromJoin(rel: unknown): { id: string; name: string }[] {
  * remove-row planning page (/rabnm-planning). Mirrors
  * getAllCallingPlanningRows's own shape, scoped down to just the pool
  * (not a flat history) since this page has no "already announced"
- * view of its own -- Table Admin's sacrament_rabnm_planning entry is
- * where a historical or in-progress row can still be seen.
+ * view of its own -- `/rabnm-planning` is the only place this pool is
+ * managed now (the Table Admin fallback was removed 2026-11-08, see
+ * that page's own doc comment).
  */
 export async function getRabnmPlanningPool(): Promise<Record<RabnmPlanningType, RabnmPlanningRow[]>> {
   const supabase = await createClient();

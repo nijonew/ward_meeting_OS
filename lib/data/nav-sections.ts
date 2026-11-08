@@ -55,16 +55,31 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
 
   const visibleMeetingTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
   const attendsMeetings = visibleMeetingTypes.length > 0;
+  const canTeachYouth = hasFeature(profile, "youth_teaching_planning");
+  const canTeachAdult = hasFeature(profile, "adult_teaching_planning");
 
-  if (attendsMeetings) {
+  // Youth/Adult teaching schedules joined "My meetings," 2026-11-08
+  // (the user's own request: "Move teaching schedules to 'my
+  // meetings'"). A teacher's own weekly schedule is genuinely the same
+  // kind of thing as every other tile in this section -- something
+  // they personally show up to and fill in -- unlike the broader
+  // cross-class management view the SAME pages also serve for
+  // Bishopric/YW Presidency, which joins "My calling" below instead.
+  // There's no separate "schedule" vs. "management" page or feature in
+  // this app -- both destinations are the identical hub either way,
+  // just surfaced under two different headings for the two different
+  // audiences the user named.
+  if (attendsMeetings || canTeachYouth || canTeachAdult) {
     const links: NavLink[] = visibleMeetingTypes.map((slug) => ({
       title: MEETING_TYPE_LABELS[slug],
       href: `/dashboard?type=${slug}`,
     }));
-    links.push({ title: "Meeting Agenda Items", href: "/submit/agenda-item" });
+    if (attendsMeetings) links.push({ title: "Meeting Agenda Items", href: "/submit/agenda-item" });
     if (hasFeature(profile, "sacrament_program_view")) {
       links.push({ title: "Sacrament Meeting Programs", href: "/dashboard?type=sacrament-meeting&readonly=1" });
     }
+    if (canTeachYouth) links.push({ title: "Youth Teaching Planning", href: "/youth-teaching-planning" });
+    if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
     sections.push({ title: "My meetings", links });
   }
 
@@ -86,17 +101,26 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
     canPlanAnyMeeting || canMeetingSchedule || canMeetingCancellations || canRotations || canSpeakerPrayerHistory;
   const canCallingPlanning = hasFeature(profile, "calling_planning");
   const isMusicPlanner = hasFeature(profile, "sacrament_music");
-  const canAdultTeachingPlanning = hasFeature(profile, "adult_teaching_planning");
-  if (canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canAdultTeachingPlanning) {
+  // "My calling," renamed from "Meeting Planning" (2026-11-08, the
+  // user's own request) -- also gains Youth Teaching Planning
+  // alongside the Elders Quorum/Relief Society Teaching tile that was
+  // already here, per the same request's "teaching schedule
+  // management for youth and adults" half: both teaching tools' own
+  // broader, cross-class management view (for Bishopric/YW Presidency,
+  // who manage every class rather than just their own) lives here,
+  // same pages "My meetings" above links to for the single-class
+  // teacher's own weekly schedule -- see that section's own comment.
+  if (canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canTeachYouth || canTeachAdult) {
     const links: NavLink[] = [];
     if (canMeetingPlanningHub) links.push({ title: "Meeting Planning", href: "/meeting-planning" });
     if (canCallingPlanning) links.push({ title: "Calling Planning", href: "/calling-planning" });
     if (isMusicPlanner) links.push({ title: "Sacrament Meeting Music Planning", href: "/music" });
-    if (canAdultTeachingPlanning) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
-    sections.push({ title: "Meeting Planning", links });
+    if (canTeachYouth) links.push({ title: "Youth Teaching Planning", href: "/youth-teaching-planning" });
+    if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
+    sections.push({ title: "My calling", links });
   }
 
-  const isYouthLeader = hasFeature(profile, "youth_teaching_planning") || hasFeature(profile, "youth_activity_planning");
+  const isYouthLeader = hasFeature(profile, "youth_activity_planning");
   if (isYouthLeader) {
     sections.push({ title: "Youth program", links: [{ title: "Youth Activity Planning", href: "/youth-activity-planning" }] });
   }
