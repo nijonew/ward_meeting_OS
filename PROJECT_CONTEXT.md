@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 101
+## Current migration number: 102
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,100 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**A daily cron sweep for announcements, and "Pending" eliminated
+entirely from the announcements/agenda_items status vocabulary,
+migration `102`, not yet run, 2026-11-08.** Direct follow-up to the
+investigation above -- the user's own two requests: "Can we add a
+mechanism that sweeps announcements on a set interval? I don't want to
+slow things down so please make a suggestion," and "let's eliminate
+the pending state in all places. That assumes someone will gate it
+forward. That isn't going to happen regularly."
+
+**The interval sweep.** Every sweep that existed before today
+(`sweepPastAnnouncements`) only ever ran as a side effect of someone
+loading one of four specific pages (the public page, Manage
+Announcements, Table Admin, a Sacrament Meeting's own Planning page) --
+if none of those happened to be visited after an announcement's own
+date passed, nothing ever archived it, which is exactly what the user
+found happening to several real announcements. New
+`app/api/cron/sweep-announcements/route.ts`, triggered by a new
+**Vercel Cron Job** (`vercel.json`) once a day -- a genuinely separate,
+out-of-band scheduled invocation on Vercel's own clock, never part of
+or adding any latency to an actual page request, which is what the
+user's own "I don't want to slow things down" asked for. Daily, not
+more often, since an announcement almost always lapses by *date*, not
+by the exact hour -- the existing lazy sweeps, still fully intact and
+unchanged, already catch same-day time-of-day lapsing promptly on
+their own; this is purely a backstop guaranteeing nothing sits stale
+for more than a day even when nobody visits anything.
+
+**A new, deliberate exception to this app's own "every table's RLS
+uses the anon key, never service role" rule** (architecture.md's own
+Section 10/RLS note) -- the first use of a service-role client
+anywhere in this app, and scoped to exactly this one route. A Vercel
+Cron invocation has no session or cookies at all, so it would
+otherwise run as a plain anonymous request -- and this table's own RLS
+policies were never written down in any tracked migration in the
+first place (confirmed by grepping every migration file touching
+`announcements` -- none of them ever create a policy on the table
+itself, only on sibling tables like `sacrament_announcement_pulls`),
+so there's no way to know from the code alone whether an anon UPDATE
+on it has ever actually been allowed to succeed. This is plausibly the
+real explanation for "other announcements... had not been set to
+archive" in the first place -- if the anon-triggered sweep (e.g. from
+the public page, which needs no login at all) has been silently
+failing this whole time, archiving would only ever have happened on
+the rare occasion an *authenticated* admin page got opened instead.
+New `lib/supabase/service-role.ts` (`createServiceRoleClient`) --
+bypasses RLS entirely, guaranteeing the archive write can never be
+silently blocked either way. `sweepPastAnnouncements`
+(`lib/data/announcements.ts`) now takes an optional client override;
+every existing call site is completely unaffected, still building its
+usual cookie-based anon client when no override is passed.
+
+**Two new Vercel environment variables are required before any of
+this can work -- this assistant has no Vercel access to add them**:
+`CRON_SECRET` (any random string -- Vercel automatically attaches it
+as `Authorization: Bearer <value>` to its own cron requests once this
+env var exists, which the route checks before doing anything at all,
+so a stray or forged request to this path can't trigger it) and
+`SUPABASE_SERVICE_ROLE_KEY` (the real `service_role` key from
+Supabase's dashboard -> Project Settings -> API -- not the anon key
+this app uses everywhere else). Without either one set, the route
+exists but does nothing but return 401.
+
+**"Pending" eliminated.** Neither real submission path
+(`submitAnnouncement`/`submitAgendaItem`, both in
+`app/submit/actions.ts`) has ever created a "pending" row -- both have
+always published immediately, confirmed by reading both functions
+directly -- so "Pending" only ever existed as a value someone could
+manually pick in the shared `SUBMISSION_STATUSES` Status dropdown
+(`lib/admin/registry.ts`, used by both the `announcements` and
+`agenda_items` Table Admin/Manage Announcements grids), with nothing
+in the app that ever moved a row back out of it. Removed from that
+one shared list entirely -- "Published" is now the first/default
+option for a brand-new row added through either grid. **Migration
+`102`** (not yet run) is the matching one-time cleanup: flips any row
+still sitting at `pending` in either table to `published`, so the one
+real stuck row doesn't end up showing its Status cell as blank once
+the dropdown no longer has a matching option for it.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `102` is actually free before running it**, then ask
+the user to: run the migration; add `CRON_SECRET` and
+`SUPABASE_SERVICE_ROLE_KEY` as new Vercel environment variables and
+redeploy; confirm `/announcements`/`/admin/announcements` no longer
+offer "Pending" as a Status option and the previously-stuck
+announcement now shows "Published"; and, a day or so after deploying,
+confirm in Vercel's own Cron Jobs dashboard that
+`/api/cron/sweep-announcements` actually ran and returned a 200 (not a
+401, which would mean one of the two new env vars isn't set yet) --
+and separately report back whether any announcement that was stuck as
+"still showing past its date" before this shipped is now correctly
+archived, which would help confirm or rule out the anon-RLS theory
+above.
 
 **Bug found and fixed 2026-11-08: "Edit activity" on Upcoming
 Activities could route a Combined YW/YM activity to the wrong page,

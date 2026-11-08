@@ -79,9 +79,22 @@ import { weeklyDates, nthWeekdayDates, monthlyDateDates } from "@/lib/data/caden
  * recurrence or not. A recurring row with `end_date` actually SET
  * (a series with a real, defined end) is unaffected -- it still
  * archives correctly once that real end date passes.
+ *
+ * **Takes an optional client override, 2026-11-08** -- every call site
+ * before this ran as whoever happened to be viewing the page that
+ * triggered it (often a logged-out visitor on `/announcements/public`,
+ * which is itself a real, un-investigated reason a stale announcement
+ * might never have actually archived -- an anon UPDATE on this table
+ * has no tracked, documented RLS policy backing it either way). The
+ * new daily cron sweep (`app/api/cron/sweep-announcements`) has no
+ * session or cookies at all to build an anon client from, so it passes
+ * a service-role client instead (`lib/supabase/service-role.ts`),
+ * which bypasses RLS entirely and is guaranteed to succeed regardless.
+ * Every existing call site is unaffected -- omitting the argument still
+ * builds the usual cookie-based anon client exactly as before.
  */
-export async function sweepPastAnnouncements(): Promise<void> {
-  const supabase = await createClient();
+export async function sweepPastAnnouncements(client?: Awaited<ReturnType<typeof createClient>>): Promise<void> {
+  const supabase = client ?? (await createClient());
   const { dateIso: today, timeIso: now } = getMountainTimeNow();
 
   const { data } = await supabase

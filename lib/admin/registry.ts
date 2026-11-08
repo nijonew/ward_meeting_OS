@@ -57,8 +57,20 @@ const SONGBOOKS = [
 const SPEAKER_SLOT_OPTIONS_ADULT = SPEAKER_SLOTS_ADULT.map((s) => ({ value: s, label: slotLabel(s) }));
 const SPEAKER_SLOT_OPTIONS_YOUTH = SPEAKER_SLOTS_YOUTH.map((s) => ({ value: s, label: slotLabel(s) }));
 
+/**
+ * "Pending" removed entirely, 2026-11-08 (the user's own words: "let's
+ * eliminate the pending state in all places. That assumes someone will
+ * gate it forward. That isn't going to happen regularly."). Neither
+ * real submission path (`submitAnnouncement`/`submitAgendaItem`, both
+ * in `app/submit/actions.ts`) has ever created a "pending" row --
+ * both have always published immediately -- so this only ever existed
+ * as a manually-settable value in this Status dropdown, with nothing
+ * in the app that ever moved a row back out of it. A real row was
+ * found stuck there in production; migration 102 flips any row still
+ * sitting at `pending` in either table to `published` now that the
+ * option itself is gone from both grids.
+ */
 const SUBMISSION_STATUSES = [
-  { value: "pending", label: "Pending" },
   { value: "published", label: "Published" },
   { value: "archived", label: "Archived" },
 ];
