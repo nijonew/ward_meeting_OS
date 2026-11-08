@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { getWardName } from "@/lib/data/ward-settings";
 import { getTodaysPublishedSacramentMeeting, getEarlyAccessSacramentMeeting } from "@/lib/data/meetings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getNavSections } from "@/lib/data/nav-sections";
@@ -25,7 +24,6 @@ export const metadata: Metadata = {
  */
 export default async function HomePage() {
   const { user, profile } = await getSessionUser();
-  const wardName = await getWardName();
 
   const todaysSacramentMeeting = await getTodaysPublishedSacramentMeeting();
   // Early-access second path (2026-10-24, see getEarlyAccessSacramentMeeting's
@@ -50,11 +48,16 @@ export default async function HomePage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
       <AppHeader />
 
+      {/* The ward name used to repeat here as its own <h1>, directly
+          below AppHeader's own "<ward name> Ward" wordmark -- removed
+          2026-11-08 (the user's own report: "it is at the top of the
+          page twice... keep it in the header but remove it from the
+          top of the mid section"). This section now only ever renders
+          the sign-in status messages below, when there's one to show. */}
       <section className="mt-10">
-        <h1 className="font-display text-3xl leading-tight sm:text-4xl">{wardName} Ward</h1>
-        {!user && <p className="mt-2 text-ink-muted">Sign in for meeting and planning tools.</p>}
+        {!user && <p className="text-ink-muted">Sign in for meeting and planning tools.</p>}
         {user && !profile?.isLinked && (
-          <p className="mt-2 text-sm text-ink-muted">
+          <p className="text-sm text-ink-muted">
             You&rsquo;re signed in, but an admin still needs to verify your account before you
             have access to anything else.
           </p>

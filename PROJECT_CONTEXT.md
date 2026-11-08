@@ -2050,6 +2050,23 @@ avoid confusing the two.
 
 ## Known open items
 
+**The ward name no longer repeats on the landing page, 2026-11-08. No
+migration needed.** The user's own report: "it is at the top of the
+page twice... keep it in the header but remove it from the top of the
+mid section." `AppHeader`'s own wordmark already reads "`<ward name>`
+Ward" on every page -- `app/page.tsx` had its own second, duplicate
+`<h1>{wardName} Ward</h1>` directly below it, left over from before
+the header itself carried the ward name (2026-10-03). Removed that
+`<h1>` (and the now-unused `getWardName()` call/import that only fed
+it) -- the section it sat in stays, now showing only the sign-in
+status message when there's one to show (logged out, or logged in but
+not yet linked to a person).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/` and confirm the ward name shows exactly once, in the
+header, with no second heading underneath it.
+
 **Teaching schedules split into real viewing-only "Lessons" pages and
 edit-capable Planning pages, migration `103`, not yet run, 2026-11-08.**
 The user's own request: "I want to have a different setup for 'YM/YW
