@@ -2050,6 +2050,49 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-14: submitting an announcement (or an
+agenda item) could create two rows from one real submission. No
+migration needed.** The user's own report: "submitting an announcement
+adds it twice."
+
+Root cause: both `AnnouncementForm.tsx` and `AgendaItemForm.tsx`
+(`components/submit/`) have always been a plain `<form
+action={onSubmit}>` with a bare `<button type="submit">Submit</button>`
+-- never disabled, no "Submitting..." feedback of any kind while the
+Server Action (`submitAnnouncement`/`submitAgendaItem`,
+`app/submit/actions.ts`) is actually running. Neither action returns
+until its own `redirect()` fires at the very end, so there's a real
+window -- longer on a slow connection -- where the button still looks
+perfectly clickable. A second click (a genuine double-click, or an
+impatient second tap after a pause with no visible response, the same
+"no confidence a click was received" complaint this app has already
+hit once before for page navigation, see the 2026-10-12 `app/loading.tsx`
+entry below) fires the identical action a second time, inserting a
+second row before the first one's redirect ever lands.
+
+New `components/submit/SubmitButton.tsx` -- a small Client Component
+using `useFormStatus()` (from `react-dom`, reads the nearest parent
+`<form>`'s own pending state) to disable itself and show
+"Submitting..." the instant a submission starts. Needed no change to
+either Server Action's own signature, unlike switching to
+`useActionState` would have (that also requires a `prevState` param
+and a returned state object) -- both actions keep their existing plain
+`(formData: FormData) => Promise<void>` shape. Both forms' own bare
+`<button type="submit">` replaced with this one shared component.
+
+**Scoped to these two forms specifically, not a sweep of every form in
+the app** -- they're the exact same shared pattern in the same feature
+area, and the one the user actually reported; other plain
+`action={...}` forms elsewhere may have the identical latent gap but
+weren't audited here.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/submit/announcement` and `/submit/agenda-item`: clicking
+Submit should immediately disable the button and show "Submitting...",
+re-enabling only once the page actually redirects, so a second click
+during that window can no longer fire a second insert.
+
 **The ward name no longer repeats on the landing page, 2026-11-08. No
 migration needed.** The user's own report: "it is at the top of the
 page twice... keep it in the header but remove it from the top of the

@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/announcement-constants";
 import { RecurrenceToggle } from "@/components/submit/RecurrenceFields";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { SubmitButton } from "@/components/submit/SubmitButton";
 
 // text-base, not text-sm (2026-10-31, mobile-friendliness pass) -- iOS
 // Safari auto-zooms the whole page on focus for any form control whose
@@ -160,12 +161,7 @@ export function AnnouncementForm({ onSubmit }: { onSubmit: (formData: FormData) 
           2026-11-04 -- see ImageUploadField's own comment. */}
       <ImageUploadField name="image" />
 
-      <button
-        type="submit"
-        className="mt-1 w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-      >
-        Submit
-      </button>
+      <SubmitButton />
     </form>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit/SubmitButton";
+
 const TIME_NEEDED_OPTIONS = ["1-2 Minutes", "3-5 Minutes", "6+ Minutes"];
 // text-base, not text-sm (2026-10-31, mobile-friendliness pass) -- same
 // fix as AnnouncementForm.tsx's identical constant: iOS Safari
@@ -58,12 +60,7 @@ export function AgendaItemForm({
         ))}
       </select>
 
-      <button
-        type="submit"
-        className="mt-1 w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-      >
-        Submit
-      </button>
+      <SubmitButton />
     </form>
   );
 }
