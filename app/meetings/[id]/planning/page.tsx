@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import dynamic from "next/dynamic";
 import { getMeetingById } from "@/lib/data/meetings";
 import {
   getMeetingWithType,
@@ -34,11 +35,20 @@ import {
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { getWardBusinessSectionOrder, WARD_BUSINESS_SECTION_KEYS } from "@/lib/data/ward-settings";
 import { savePlanningInfo } from "@/app/meetings/[id]/planning/actions";
-import { AgendaElementsManager } from "@/components/planning/AgendaElementsManager";
 import { CombinedAgendaGrids } from "@/components/planning/CombinedAgendaGrids";
-import { SacramentProgramSection } from "@/components/planning/SacramentProgramSection";
 import { CollaborativeMeetingBody } from "@/components/planning/CollaborativeMeetingBody";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+
+// Dynamically imported (2026-11-14, pre-launch performance pass) --
+// see the identical note on RotationMemberList in app/rotations/page.tsx.
+// This is the single most-opened page in the app, so keeping dnd-kit
+// out of its own shared-chunk footprint matters most here.
+const AgendaElementsManager = dynamic(() =>
+  import("@/components/planning/AgendaElementsManager").then((mod) => mod.AgendaElementsManager),
+);
+const SacramentProgramSection = dynamic(() =>
+  import("@/components/planning/SacramentProgramSection").then((mod) => mod.SacramentProgramSection),
+);
 
 /**
  * The planning view, rebuilt 2026-09-09 around a single agenda grid --

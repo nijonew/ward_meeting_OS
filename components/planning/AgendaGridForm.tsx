@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { saveAgendaGrid } from "@/app/meetings/[id]/agenda-actions";
 import { FIELD_SEPARATOR, type AgendaRow } from "@/lib/data/agenda-rows";
@@ -8,8 +9,22 @@ import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
-import { WardBusinessField } from "@/components/planning/WardBusinessField";
-import { AnnouncementsField } from "@/components/planning/AnnouncementsField";
+
+// Dynamically imported (2026-11-14, pre-launch performance pass) --
+// both pull in @dnd-kit/core/sortable/utilities for their own Move
+// Up/Down drag handles, which otherwise gets hoisted into the JS
+// chunk shared by every page, including ones that never render
+// either field. Splitting them into their own on-demand chunks keeps
+// that weight off routes that don't need it. No `ssr: false` -- this
+// file is already a Client Component, and both fields are real
+// agenda content (not a decorative widget), so skipping SSR would
+// just mean a visible pop-in on first paint for no real benefit.
+const WardBusinessField = dynamic(() =>
+  import("@/components/planning/WardBusinessField").then((mod) => mod.WardBusinessField),
+);
+const AnnouncementsField = dynamic(() =>
+  import("@/components/planning/AnnouncementsField").then((mod) => mod.AnnouncementsField),
+);
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";

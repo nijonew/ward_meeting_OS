@@ -2156,21 +2156,50 @@ rendering now prefetches only the "This week" section (checked by
 reference against the `thisWeekSection` prop) and leaves every
 feature section below it at `prefetch={false}`, unchanged.
 
-**Deliberately not done this pass, flagged as a possible follow-up**:
-dynamically importing (`next/dynamic`, `ssr: false`) the handful of
-Client Components that pull in `@dnd-kit/core`/`sortable`/`utilities`
-(~15-16kB gzipped, used by drag-reorder controls across 7 Client
-Components on several otherwise-unrelated routes) to shrink the
-initial JS payload those routes ship; and the same cross-request
-caching treatment for the admin-only `features` catalog
-(`getFeatureCatalogByCategory()`, `lib/data/calling-features.ts`) and
-`admin_select_options` (`getSelectOptions()`,
-`lib/data/select-options.ts`). Both are real, available, zero-cost
-wins -- skipped here only because they touch admin-only traffic, not
-the whole-congregation path this specific request was about, and
-because getting the higher-impact fixes above verified and shipped
-before launch mattered more than squeezing out every last win in one
-pass.
+**Both of the two items deferred above were built the same day, right
+after the first half shipped** -- the user asked to finish them.
+
+**5. The 7 Client Components that pull in `@dnd-kit/core`/`sortable`/
+`utilities` (~15-16kB gzipped) are now dynamically imported
+(`next/dynamic`) at every one of their real call sites**
+(`components/planning/AgendaGridForm.tsx` for `WardBusinessField`/
+`AnnouncementsField`; `app/rotations/page.tsx` for
+`RotationMemberList`; `app/admin/meeting-templates/page.tsx` for
+`DefaultTemplateElementList`; `app/meetings/[id]/template/page.tsx`
+for `TemplateElementList`; `app/meetings/[id]/planning/page.tsx` for
+`AgendaElementsManager`/`SacramentProgramSection`) -- instead of a
+plain static `import`, which was letting webpack hoist dnd-kit into
+the JS chunk shared by every page, including the many routes that
+never render any of these 7 components at all. **Deliberately without
+`ssr: false`** -- four of the five call sites are Server Components,
+where Next.js outright forbids `ssr: false` on a dynamic import
+(allowed only in a Client Component); and even on the one Client-
+Component call site (`AgendaGridForm.tsx`), skipping SSR for
+`WardBusinessField`/`AnnouncementsField` would mean real agenda
+content visibly popping in after the initial paint instead of
+rendering immediately, for no real gain -- the actual goal here (keep
+dnd-kit out of the shared/common chunk) is achieved by `next/dynamic`
+giving each component its own on-demand chunk either way, with or
+without `ssr: false`.
+
+**6. The admin-only `features` catalog and `admin_select_options` now
+get the same cross-request `unstable_cache` treatment as Music
+Reference/`ward_settings` above.** `getFeatureCatalogByCategory()`
+(`lib/data/calling-features.ts`) -- read on every `/admin/calling-features`
+page load, changes only when a migration adds a brand-new feature --
+is now cached for 5 minutes via the same `createCacheableClient`
+pattern. `getSelectOptions()` (`lib/data/select-options.ts`) -- the
+admin-editable dropdown-option-list reader shared by
+`CallingPlanningGridForm` and Table Admin's generic grid -- is cached
+the same way, keyed per `fieldKey` (`unstable_cache` folds a wrapped
+function's own arguments into its cache key automatically, so each
+field's option list gets its own independent 5-minute cache entry).
+**Deliberately NOT applied to `getCallingFeatureKeys()`** (same file)
+-- that one reflects which features a *specific* calling currently
+holds, something this app's own admin tools change routinely, so
+caching it would show a stale pre-checked state on the Calling
+Features checklist for up to 5 minutes after a real save -- a genuine
+correctness regression, not a safe win like the other two.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
 database-access gap as everything else in this project (no `.env.local`
@@ -2178,11 +2207,18 @@ in this working copy, so no live dev-server/browser check was
 possible) -- ask the user to check, once deployed: the app generally
 feels less laggy click-to-click, especially the landing page and the
 public Sacrament Meeting program; a change made directly in Table
-Admin to the ward's own display name or to Music Reference shows up
-within about 5 minutes everywhere, not instantly (expected, and should
-be mentioned to whoever edits those if they're used to seeing an
-immediate change); and that the landing page's four "This week" tiles
-still navigate correctly with no console errors.
+Admin to the ward's own display name, Music Reference, the features
+catalog, or any `admin_select_options` dropdown list shows up within
+about 5 minutes everywhere, not instantly (expected, and should be
+mentioned to whoever edits those if they're used to seeing an
+immediate change); that saving a calling's checked features on
+`/admin/calling-features` still reflects immediately, with no delay
+(unlike the other three, which should lag up to 5 minutes); that the
+landing page's four "This week" tiles still navigate correctly with no
+console errors; and that every page with a drag-to-reorder control
+(Rotation Order, Ward Business, Announcements, Speakers & Music/
+Teaching Program, both Agenda Elements editors) still drags and
+reorders correctly, just as before.
 
 **Teaching Schedules access rebuilt around calling-based scope
 checkboxes, migration `104`, not yet run, 2026-11-14.** The user's own

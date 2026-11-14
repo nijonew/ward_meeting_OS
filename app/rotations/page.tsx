@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAllRotations, getAssignmentGrid, gridColumnsFor, type RotationRow } from "@/lib/data/rotations";
@@ -7,10 +8,19 @@ import { getCallingsForMeetingType, type CallingOption } from "@/lib/data/callin
 import { PushRotationForm } from "@/components/rotations/PushRotationForm";
 import { PushFixedRolesForm } from "@/components/rotations/PushFixedRolesForm";
 import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
-import { RotationMemberList } from "@/components/rotations/RotationMemberList";
 import { syncRotation, addRotationMember } from "@/app/rotations/actions";
 import type { MeetingTypeSlug } from "@/lib/types";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+
+// Dynamically imported, not a static import (2026-11-14, pre-launch
+// performance pass) -- pulls in @dnd-kit/core/sortable/utilities for
+// its own drag-reorder handles, which otherwise gets hoisted into the
+// JS chunk shared by every page. No `ssr: false` (not allowed in a
+// Server Component anyway) -- this still renders in the initial HTML,
+// just as its own separately-loaded chunk.
+const RotationMemberList = dynamic(() =>
+  import("@/components/rotations/RotationMemberList").then((mod) => mod.RotationMemberList),
+);
 
 const ELEMENT_LABELS: Record<string, string> = {
   conducting: "Conducting",

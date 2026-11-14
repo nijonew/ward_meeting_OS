@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createCacheableClient } from "@/lib/supabase/cacheable-client";
 import type { Feature } from "@/lib/supabase/get-session-user";
 
 export interface FeatureCatalogItem {
@@ -35,18 +37,37 @@ const CATEGORY_ORDER = [
  * within its category -- feeds the Calling Features checklist
  * (`/admin/calling-features`). Read-only reference data; the catalog
  * itself is edited by adding a migration, not through the app.
+ *
+ * **Wrapped in `unstable_cache`, 2026-11-14 pre-launch performance
+ * pass** -- this table changes only when a migration adds a brand-new
+ * feature, essentially never on its own, so there's no reason to
+ * query it fresh every time an admin opens the Calling Features page.
+ * A 5-minute cross-request cache is plenty -- a newly-added feature
+ * showing up a few minutes late the first time this page is opened
+ * after a migration is a non-issue. Deliberately NOT applied to
+ * `getCallingFeatureKeys` below -- that one reflects which features a
+ * SPECIFIC calling currently holds, which this app's own admin tools
+ * change routinely, and showing a stale pre-checked state for 5
+ * minutes after a real save would be a genuine correctness regression.
  */
-export async function getFeatureCatalogByCategory(): Promise<FeatureCategory[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("features")
-    .select("key, label, category, sort_order")
-    .order("sort_order");
+const fetchFeatureCatalogRows = unstable_cache(
+  async (): Promise<{ key: string; label: string; category: string }[]> => {
+    const supabase = createCacheableClient();
+    const { data, error } = await supabase
+      .from("features")
+      .select("key, label, category, sort_order")
+      .order("sort_order");
+    return error || !data ? [] : (data as { key: string; label: string; category: string }[]);
+  },
+  ["feature-catalog"],
+  { revalidate: 300 },
+);
 
-  if (error || !data) return [];
+export async function getFeatureCatalogByCategory(): Promise<FeatureCategory[]> {
+  const data = await fetchFeatureCatalogRows();
 
   const byCategory = new Map<string, FeatureCatalogItem[]>();
-  for (const row of data as { key: string; label: string; category: string }[]) {
+  for (const row of data) {
     const list = byCategory.get(row.category) ?? [];
     list.push({ key: row.key as Feature, label: row.label });
     byCategory.set(row.category, list);

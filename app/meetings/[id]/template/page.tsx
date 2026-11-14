@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
@@ -10,8 +11,13 @@ import {
   getPlannedElements,
 } from "@/lib/data/meeting-elements";
 import { addTemplateElement } from "@/app/meetings/[id]/template-actions";
-import { TemplateElementList } from "@/components/planning/TemplateElementList";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+
+// Dynamically imported (2026-11-14, pre-launch performance pass) --
+// see the identical note on RotationMemberList in app/rotations/page.tsx.
+const TemplateElementList = dynamic(() =>
+  import("@/components/planning/TemplateElementList").then((mod) => mod.TemplateElementList),
+);
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {

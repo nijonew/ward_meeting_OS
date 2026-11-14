@@ -1,13 +1,19 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getMeetingTypes } from "@/lib/data/meeting-types";
 import { getApplicableElements, getTemplateElements } from "@/lib/data/meeting-elements";
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { addDefaultTemplateElement } from "./actions";
-import { DefaultTemplateElementList } from "@/components/admin/DefaultTemplateElementList";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+
+// Dynamically imported (2026-11-14, pre-launch performance pass) --
+// see the identical note on RotationMemberList in app/rotations/page.tsx.
+const DefaultTemplateElementList = dynamic(() =>
+  import("@/components/admin/DefaultTemplateElementList").then((mod) => mod.DefaultTemplateElementList),
+);
 
 function TabLink({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
