@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses, getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
@@ -39,14 +39,16 @@ function defaultThroughDate(): string {
  * Home again, via "My calling," so the back link points there again
  * too.
  *
- * **Renamed "YM/YW Teaching Planning," same day** -- still this exact
- * page, same route, same `youth_teaching_planning` feature/
- * `youth_class_teachers` access control, just new display text. The
- * user's own request split this page's two audiences apart for real:
- * a plain, read-only "YM/YW Lessons" page (`/ym-yw-lessons`, open to
- * any signed-in account) now covers "viewing," shown under "My
- * meetings" -- this page stays the real, edit-capable "planning" half,
- * under "My calling" only, unchanged in every other respect.
+ * **Renamed "YM/YW Teaching Planning," 2026-11-08** -- still this exact
+ * page, same route, just new display text.
+ *
+ * **Access rebuilt calling-based, 2026-11-14** -- the old blanket
+ * `youth_teaching_planning` feature gate is gone (see
+ * `getAccessibleClasses`'s own doc comment, lib/data/teaching-assignments.ts,
+ * for the full redesign). There's no separate "doesn't have access"
+ * message any more -- any signed-in account reaches this hub, and
+ * `accessibleClasses` being empty IS the "no access" state, shown
+ * below with the real reason instead of a generic one.
  */
 export default async function YouthTeachingPlanningPage({
   searchParams,
@@ -56,16 +58,7 @@ export default async function YouthTeachingPlanningPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "youth_teaching_planning")) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
-        <AppHeader tag="YM/YW Teaching Planning" />
-        <p className="mt-10 text-ink-muted">Your account doesn&rsquo;t have access to YM/YW teaching planning.</p>
-      </main>
-    );
-  }
-
-  const accessibleClasses = await getAccessibleClasses(user.id);
+  const accessibleClasses = await getAccessibleClasses(user.id, profile?.features);
   const { through: rawThrough, class: rawClass } = await searchParams;
 
   // Hub view: no class picked yet -- show one tile per class this

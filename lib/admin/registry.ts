@@ -608,7 +608,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "youth_class_teachers",
     label: "Youth Class Teachers",
     description:
-      "Who may edit which class's schedule on YM/YW Teaching Planning (viewing itself needs no row here at all -- YM/YW Lessons is open to anyone signed in). There is no automatic bypass for anyone, Bishopric and Young Women Presidency included -- every person who should see or edit a class, even every class at once, needs a real row here for each class they should access.",
+      "A narrower, per-person exception alongside the calling-based scopes in Calling Features' own 'Teaching Schedules' category (migration 104) -- grant a specific person access to a specific class here only when it's an exception to what their calling already grants (e.g. a one-off substitute teacher). For the normal case of letting a whole calling manage a class (or every class, or every YW/YM class), use Calling Features instead -- it's additive with rows here, not a replacement for them. Viewing itself needs no row here at all -- YM/YW Lessons is open to anyone signed in.",
     requiredFeature: "table_admin_youth_class_teachers",
     orderBy: { column: "created_at", ascending: false },
     columns: [

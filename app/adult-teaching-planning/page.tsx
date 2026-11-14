@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
-import { getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
+import { getSessionUser } from "@/lib/supabase/get-session-user";
+import { getAccessibleClasses, getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
 /** 6 months out, computed fresh on every render -- same rolling
@@ -30,6 +30,15 @@ function defaultThroughDate(): string {
  * (see FIFTH_SUNDAY_TEACHER/FIFTH_SUNDAY_TOPIC) -- a 5th-Sunday
  * combined lesson is the same real convention for these two
  * organizations as it is for the youth classes.
+ *
+ * **Access rebuilt calling-based and split per organization,
+ * 2026-11-14** -- the old blanket `adult_teaching_planning` feature
+ * always showed both tables to anyone holding it; a calling can now
+ * be granted Elders Quorum, Relief Society, or both independently (see
+ * `getAccessibleClasses`'s own doc comment, lib/data/teaching-assignments.ts).
+ * A calling that already held the old feature was carried over to both
+ * new scopes by migration `104`, so nobody using this page lost access
+ * when this shipped.
  */
 export default async function AdultTeachingPlanningPage({
   searchParams,
@@ -39,12 +48,17 @@ export default async function AdultTeachingPlanningPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (!hasFeature(profile, "adult_teaching_planning")) {
+  const accessibleClasses = await getAccessibleClasses(user.id, profile?.features);
+  const canSeeEldersQuorum = accessibleClasses.includes("Elders Quorum");
+  const canSeeReliefSociety = accessibleClasses.includes("Relief Society");
+
+  if (!canSeeEldersQuorum && !canSeeReliefSociety) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
         <AppHeader tag="Elders Quorum / Relief Society Teaching Planning" />
         <p className="mt-10 text-ink-muted">
-          Your account doesn&rsquo;t have access to Elders Quorum / Relief Society teaching planning.
+          You haven&rsquo;t been assigned to teach Elders Quorum or Relief Society yet. Ask the Bishopric
+          if you think this is wrong.
         </p>
       </main>
     );
@@ -54,8 +68,8 @@ export default async function AdultTeachingPlanningPage({
   const throughDate = rawThrough || defaultThroughDate();
 
   const [eqGrid, rsGrid] = await Promise.all([
-    getTeachingAssignmentGrid(throughDate, "Elders Quorum"),
-    getTeachingAssignmentGrid(throughDate, "Relief Society"),
+    canSeeEldersQuorum ? getTeachingAssignmentGrid(throughDate, "Elders Quorum") : null,
+    canSeeReliefSociety ? getTeachingAssignmentGrid(throughDate, "Relief Society") : null,
   ]);
 
   return (
@@ -87,7 +101,11 @@ export default async function AdultTeachingPlanningPage({
         </form>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Single column when only one organization is actually granted
+          (2026-11-14) -- side-by-side only made sense when every
+          viewer always saw both. */}
+      <div className={eqGrid && rsGrid ? "grid gap-6 lg:grid-cols-2" : "grid gap-6"}>
+        {eqGrid && (
         <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Elders Quorum</h2>
           {eqGrid.rows.length === 0 ? (
@@ -96,7 +114,9 @@ export default async function AdultTeachingPlanningPage({
             <TeachingGridForm teachingClass={eqGrid.teachingClass} rows={eqGrid.rows} />
           )}
         </div>
+        )}
 
+        {rsGrid && (
         <div className="rounded border border-rule bg-surface p-6">
           <h2 className="font-display text-xl">Relief Society</h2>
           {rsGrid.rows.length === 0 ? (
@@ -105,6 +125,7 @@ export default async function AdultTeachingPlanningPage({
             <TeachingGridForm teachingClass={rsGrid.teachingClass} rows={rsGrid.rows} />
           )}
         </div>
+        )}
       </div>
     </main>
   );

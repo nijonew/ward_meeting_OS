@@ -25,6 +25,7 @@ const CATEGORY_ORDER = [
   "Ward Council",
   "Youth Council",
   "Tools",
+  "Teaching Schedules",
   "Table Admin",
 ];
 

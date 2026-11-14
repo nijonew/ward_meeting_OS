@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 103
+## Current migration number: 104
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,106 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Teaching Schedules access rebuilt around calling-based scope
+checkboxes, migration `104`, not yet run, 2026-11-14.** The user's own
+request: "New plan for teachers. I want to permit certain callings to
+enter teaching schedules. So a calling will have the option to assign
+teachers for all youth, all YW, all YM, specific classes already in
+the dropdown, relief society, elders quorum, any/all. These should be
+check boxes. Teachers will then be plugged in by these people." Direct
+follow-up to the same day's "missing link" report just below (a Table
+Admin description, now stale again -- see its own corrected text) --
+the real fix for "I should be able to add those" is this feature, not
+just a documentation correction.
+
+**No new table, no new admin page -- reused the existing Calling
+Features checklist (`/admin/calling-features`) wholesale**, the exact
+same checkbox-per-calling UI already used for every other granular
+capability in this app. 12 new `features` catalog rows under a brand
+new category, "Teaching Schedules" (added to `CATEGORY_ORDER`,
+`lib/data/calling-features.ts`): `teaching_schedule_all` (any/all),
+`teaching_schedule_all_youth`, `teaching_schedule_all_ym`,
+`teaching_schedule_all_yw`, one per real class (`teaching_schedule_deacons`/
+`_teachers`/`_priests`/`_gatherers_of_light`/`_messengers_of_hope`/
+`_builders_of_faith`), and `teaching_schedule_elders_quorum`/
+`_relief_society`. New `TEACHING_SCOPE_FEATURES`
+(`lib/data/teaching-assignments.ts`) maps each key to the real class
+name(s) it grants -- `teaching_schedule_all`'s own list is simply
+`ALL_TEACHING_CLASS_OPTIONS`, so "any/all" needs no special-casing
+anywhere else, it's just the broadest entry in the same table every
+other scope is.
+
+**Replaces the two blanket features entirely, not alongside them.**
+`youth_teaching_planning`/`adult_teaching_planning` are dropped from
+both the `Feature` union (`lib/supabase/get-session-user.ts`) and the
+`features` catalog (migration `104`'s own `delete from features`,
+cascading away every existing grant of either) -- after this ships,
+nothing in the app checks either one any more, so leaving them
+checkable would silently do nothing and mislead whoever checks them,
+same reasoning as migration `061`'s identical cleanup of two features
+that had nothing real left attached to them.
+
+**Rewritten `getAccessibleClasses(userId, features?)`**
+(`lib/data/teaching-assignments.ts`) is now the one real resolver both
+Teaching Planning pages, `saveTeachingGrid`, and `nav-sections.ts`'s
+own "can teach" checks all go through -- unions (1) every class any of
+the account's currently-held callings' scope features resolve to, and
+(2) the pre-existing `youth_class_teachers` table, **left completely
+untouched, not retired**: a specific person already assigned a
+specific class there keeps working with zero disruption, now a
+narrower per-person exception (e.g. a one-off substitute teacher)
+alongside the broader calling-based grants rather than the only
+mechanism. `features` is optional, mirroring
+`getVisibleMeetingTypesForUser`'s own established convention.
+
+**`/youth-teaching-planning`**: the old blanket "doesn't have access"
+early-return is gone -- any signed-in account now reaches the hub, and
+an empty `accessibleClasses` list alone produces the (already-existing)
+"You haven't been assigned to teach a class yet" message, which now
+correctly describes the real reason instead of a generic one.
+`saveTeachingGrid` (`app/youth-teaching-planning/actions.ts`) no longer
+branches on adult-vs-youth at all -- both now resolve through the same
+unified `getAccessibleClasses` call, a real simplification.
+
+**`/adult-teaching-planning` split per organization for the first
+time** -- it used to show both Elders Quorum and Relief Society
+unconditionally to anyone holding the one old feature; now each table
+renders only if the resolved scope actually covers it, with a single-
+column layout when only one applies, and the same "haven't been
+assigned" message (naming both organizations) when neither does.
+
+**No access gap for anyone currently using either page**: migration
+`104` carries every calling that already held `adult_teaching_planning`
+over to BOTH new adult scopes automatically (an exact equivalent, not
+a guess -- that page always showed both organizations unconditionally
+to anyone holding the old feature, so granting both new scopes
+reproduces the identical access). The youth side needed no equivalent
+carry-over at all -- the real per-class restriction there has always
+come from `youth_class_teachers`, not the blanket feature, and that
+table is untouched, so every existing individual teacher keeps working
+immediately with nothing to re-grant.
+
+**`lib/data/calendar.ts`'s own `isYouthLeader`-style check** (Youth
+Council showing up on `/calendar` for every youth leader regardless of
+calling) also moved off the retired `youth_teaching_planning` feature
+onto the same calling-based resolution -- "teaches youth" now means
+holding any teaching scope covering at least one YM/YW class, unioned
+with `youth_activity_planning` exactly as before.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `104` is actually free before running it**, per this
+project's own repeated numbering-collision history, then ask the user
+to run it and check: an existing Elders Quorum/Relief Society teacher's
+account still sees exactly what they saw before; an existing youth
+class teacher's own `youth_class_teachers` row still works unchanged;
+granting a calling `teaching_schedule_all_yw` on
+`/admin/calling-features` (its new "Teaching Schedules" category) lets
+anyone holding that calling manage all three YW classes without any
+`youth_class_teachers` row at all; and that `/calendar`'s Youth Council
+inclusion still works correctly for an account holding only a teaching
+scope (no `youth_activity_planning`).
 
 **Every button that fires a real mutation now shows pending feedback
 and disables itself while in flight, 2026-11-14 -- a full-app

@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { weeklyDates, nthWeekdayDates } from "@/lib/data/cadence";
 import { YOUTH_ACTIVITY_GROUPS } from "@/lib/data/youth-activity-constants";
+import { YM_CLASS_NAMES, YW_CLASS_NAMES } from "@/lib/data/class-activities-shared";
 import { getMountainTimeNow } from "@/lib/data/timezone";
+import type { Feature } from "@/lib/supabase/get-session-user";
 
 /**
  * The 6 real YM/YW classes -- excludes the "Combined ..." pseudo-values
@@ -34,6 +36,30 @@ export const ADULT_TEACHING_CLASSES = ADULT_TEACHING_CLASS_OPTIONS.map((g) => g.
  *  combined -- the one list Table Admin's raw fallback grid needs so
  *  its Class dropdown covers every row this table can actually hold. */
 export const ALL_TEACHING_CLASS_OPTIONS = [...TEACHING_CLASS_OPTIONS, ...ADULT_TEACHING_CLASS_OPTIONS];
+
+/**
+ * Which real class(es) each "Teaching Schedules" calling-feature key
+ * (migration `104`, 2026-11-14) grants -- the checkbox design the user
+ * asked for: "all youth, all YW, all YM, specific classes already in
+ * the dropdown, relief society, elders quorum, any/all." A calling can
+ * hold any combination; `getAccessibleClasses` below unions whichever
+ * of these match against every feature the signed-in account's active
+ * callings currently grant.
+ */
+export const TEACHING_SCOPE_FEATURES: { key: Feature; classes: readonly string[] }[] = [
+  { key: "teaching_schedule_all", classes: ALL_TEACHING_CLASS_OPTIONS.map((c) => c.value) },
+  { key: "teaching_schedule_all_youth", classes: TEACHING_CLASSES },
+  { key: "teaching_schedule_all_ym", classes: YM_CLASS_NAMES },
+  { key: "teaching_schedule_all_yw", classes: YW_CLASS_NAMES },
+  { key: "teaching_schedule_deacons", classes: ["Deacons"] },
+  { key: "teaching_schedule_teachers", classes: ["Teachers"] },
+  { key: "teaching_schedule_priests", classes: ["Priests"] },
+  { key: "teaching_schedule_gatherers_of_light", classes: ["Gatherers of Light"] },
+  { key: "teaching_schedule_messengers_of_hope", classes: ["Messengers of Hope"] },
+  { key: "teaching_schedule_builders_of_faith", classes: ["Builders of Faith"] },
+  { key: "teaching_schedule_elders_quorum", classes: ["Elders Quorum"] },
+  { key: "teaching_schedule_relief_society", classes: ["Relief Society"] },
+];
 
 /**
  * A 5th Sunday's own default Teacher/Topic -- the standard Church
@@ -144,19 +170,47 @@ export async function getTaughtClassesForUser(userId: string): Promise<string[]>
 }
 
 /**
- * The real access-control entry point for Youth Teaching Planning.
- * Originally (2026-09-09) Bishopric and Young Women Presidency got a
- * role-based bypass straight to every class / every YW class
- * respectively, with no youth_class_teachers row needed. That bypass
- * had nowhere to attach once roles were eliminated in favor of
- * granular per-calling features (2026-10-04) -- the user's own call,
- * when asked, was to drop it rather than hardcode a calling-name
- * substitute: every class anyone should see, Bishopric and YW
- * Presidency included, now needs a real youth_class_teachers row, the
- * exact same mechanism every other class-specific teacher already
- * uses. Seed those rows once (directly in Supabase or Table Admin) for
- * whoever should see every class or every YW class.
+ * The real access-control entry point for both Teaching Planning pages
+ * (youth and adult) -- redesigned 2026-11-14 to a genuinely
+ * calling-based model, the user's own request: "I want to permit
+ * certain callings to enter teaching schedules... all youth, all YW,
+ * all YM, specific classes already in the dropdown, relief society,
+ * elders quorum, any/all. These should be checkboxes. Teachers will
+ * then be plugged in by these people." A calling now grants one or
+ * more of the 12 scope features above (migration `104`), assigned via
+ * the existing Calling Features checklist (/admin/calling-features,
+ * its own new "Teaching Schedules" category) -- no new admin page
+ * needed.
+ *
+ * This replaces the earlier role-based bypass removed 2026-10-04 (when
+ * roles were eliminated in favor of granular per-calling features) --
+ * that removal left NO way for Bishopric/YW Presidency/anyone else to
+ * see more than one class at a time without a tedious per-person,
+ * per-class row; this is the real fix for that gap, not a reversal of
+ * it.
+ *
+ * Unions two independent sources, same "two paths to the same access"
+ * shape as getVisibleMeetingTypesForUser: (1) every class any
+ * currently-held calling's scope features resolve to, and (2) the
+ * pre-existing youth_class_teachers table -- left completely
+ * untouched, not retired, so a specific person already assigned a
+ * specific class there keeps working with zero disruption. It's now a
+ * narrower, per-person exception alongside the broader calling-based
+ * grants (e.g. a one-off substitute teacher), not the only mechanism.
+ *
+ * `features` is optional (mirrors getVisibleMeetingTypesForUser's own
+ * convention) -- omitting it just skips the calling-based half and
+ * falls back to youth_class_teachers alone.
  */
-export async function getAccessibleClasses(userId: string): Promise<string[]> {
-  return getTaughtClassesForUser(userId);
+export async function getAccessibleClasses(userId: string, features?: Set<Feature>): Promise<string[]> {
+  const fromCallings = new Set<string>();
+  if (features) {
+    for (const scope of TEACHING_SCOPE_FEATURES) {
+      if (features.has(scope.key)) {
+        for (const className of scope.classes) fromCallings.add(className);
+      }
+    }
+  }
+  const fromPersonRows = await getTaughtClassesForUser(userId);
+  return Array.from(new Set([...fromCallings, ...fromPersonRows]));
 }

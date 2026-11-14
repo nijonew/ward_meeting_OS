@@ -61,8 +61,24 @@ export type Feature =
   | "announcement_adding"
   | "announcement_management"
   | "calling_planning"
-  | "youth_teaching_planning"
-  | "adult_teaching_planning"
+  // Teaching Schedules -- replaces the old blanket
+  // youth_teaching_planning/adult_teaching_planning features (migration
+  // `104`, 2026-11-14): a calling now grants one or more specific
+  // scopes directly, checkbox-style, via /admin/calling-features. See
+  // TEACHING_SCOPE_FEATURES (lib/data/teaching-assignments.ts) for how
+  // each key maps to real class names.
+  | "teaching_schedule_all"
+  | "teaching_schedule_all_youth"
+  | "teaching_schedule_all_ym"
+  | "teaching_schedule_all_yw"
+  | "teaching_schedule_deacons"
+  | "teaching_schedule_teachers"
+  | "teaching_schedule_priests"
+  | "teaching_schedule_gatherers_of_light"
+  | "teaching_schedule_messengers_of_hope"
+  | "teaching_schedule_builders_of_faith"
+  | "teaching_schedule_elders_quorum"
+  | "teaching_schedule_relief_society"
   | "youth_activity_planning"
   | "ward_event_planning"
   | "meeting_schedule"

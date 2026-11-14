@@ -4,6 +4,7 @@ import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
 import { announcementOccurrenceDates } from "@/lib/data/announcements";
 import { getYouthActivities, type YouthActivityRow } from "@/lib/data/youth-activities";
 import { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
+import { getAccessibleClasses, TEACHING_CLASSES } from "@/lib/data/teaching-assignments";
 import { getSessionUser, hasFeature, type SessionProfile } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
@@ -301,12 +302,14 @@ async function getPersonalMeetingOccurrences(
  *   Youth Council meeting to show up in the calendar view of all youth
  *   leaders"). Reuses the exact same `isYouthLeader` feature check
  *   `app/page.tsx` already defines for its own "Youth program"
- *   section (`youth_teaching_planning` or `youth_activity_planning`) --
- *   a youth leader's own calling very often doesn't map to Youth
- *   Council via `meeting_type_members` at all (that mapping is about
- *   who sits ON the council, not who leads a youth program it
- *   discusses), so this is a real, separate inclusion rule, not
- *   redundant with the calling-based path above.
+ *   section -- holding `youth_activity_planning`, or any calling-based
+ *   teaching scope covering at least one YM/YW class (migration `104`,
+ *   2026-11-14, replacing the old blanket `youth_teaching_planning`
+ *   feature check here). A youth leader's own calling very often
+ *   doesn't map to Youth Council via `meeting_type_members` at all
+ *   (that mapping is about who sits ON the council, not who leads a
+ *   youth program it discusses), so this is a real, separate
+ *   inclusion rule, not redundant with the calling-based path above.
  */
 async function resolvePersonalMeetingTypes(userId: string, profile: SessionProfile | null): Promise<MeetingTypeSlug[]> {
   const slugs = new Set<MeetingTypeSlug>();
@@ -316,7 +319,9 @@ async function resolvePersonalMeetingTypes(userId: string, profile: SessionProfi
     if (PERSONAL_MEETING_TYPES.includes(slug)) slugs.add(slug);
   }
 
-  if (hasFeature(profile, "youth_teaching_planning") || hasFeature(profile, "youth_activity_planning")) {
+  const accessibleTeachingClasses = await getAccessibleClasses(userId, profile?.features);
+  const teachesYouth = accessibleTeachingClasses.some((c) => (TEACHING_CLASSES as readonly string[]).includes(c));
+  if (teachesYouth || hasFeature(profile, "youth_activity_planning")) {
     slugs.add("youth-council");
   }
 

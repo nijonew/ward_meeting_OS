@@ -2,6 +2,7 @@ import { cache } from "react";
 import { getSessionUser, hasAnyFeature, hasFeature } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import { allMeetingFeatures } from "@/lib/data/meeting-features";
+import { getAccessibleClasses, TEACHING_CLASSES, ADULT_TEACHING_CLASSES } from "@/lib/data/teaching-assignments";
 import { MEETING_TYPE_LABELS } from "@/lib/types";
 
 export interface NavLink {
@@ -55,8 +56,15 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
 
   const visibleMeetingTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
   const attendsMeetings = visibleMeetingTypes.length > 0;
-  const canTeachYouth = hasFeature(profile, "youth_teaching_planning");
-  const canTeachAdult = hasFeature(profile, "adult_teaching_planning");
+  // Calling-based teaching scopes replaced the two blanket features
+  // here (migration `104`, 2026-11-14) -- see getAccessibleClasses's
+  // own doc comment. "Can teach" now means the resolved class list
+  // actually contains at least one class of that kind.
+  const accessibleTeachingClasses = await getAccessibleClasses(user.id, profile?.features);
+  const canTeachYouth = accessibleTeachingClasses.some((c) => (TEACHING_CLASSES as readonly string[]).includes(c));
+  const canTeachAdult = accessibleTeachingClasses.some((c) =>
+    (ADULT_TEACHING_CLASSES as readonly string[]).includes(c),
+  );
 
   // "My meetings" always shows now, for any signed-in account at all
   // (2026-11-08, replacing the Youth/Adult teaching-schedule links
