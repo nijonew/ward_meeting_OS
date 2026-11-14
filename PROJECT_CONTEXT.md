@@ -2050,6 +2050,55 @@ avoid confusing the two.
 
 ## Known open items
 
+**Stale Table Admin description corrected 2026-11-14, prompted by a
+user report that turned out to be working as designed.** The user's
+own report: "I go to enter youth teachers and get this note: You
+haven't been assigned to teach a class yet... I should be able to add
+those. what is the missing link?"
+
+Not a bug -- the current code (`getAccessibleClasses`/
+`getTaughtClassesForUser`, `lib/data/teaching-assignments.ts`) really
+does have no bypass of any kind, exactly as that function's own doc
+comment already says: the Bishopric/YW-Presidency automatic bypass was
+deliberately dropped on 2026-10-04 when this app moved from role-based
+permissions to granular per-calling features, and the user's own
+answer at the time was not to replace it with a hardcoded calling-name
+substitute. Every person who should see or edit a class -- Bishopric
+and YW Presidency included -- needs a real row in `youth_class_teachers`
+(one row per person + class) before `/youth-teaching-planning` will
+show them anything for it.
+
+The real, fixable problem was that `lib/admin/registry.ts`'s own
+`youth_class_teachers` Table Admin description still claimed the
+opposite -- "Bishopric and Young Women Presidency already see every
+(or every YW) class regardless of rows here" -- a leftover from before
+the 2026-10-04 bypass removal that was never updated to match. Reading
+that line is exactly what would lead an admin to assume they shouldn't
+need to add themselves a row, which is the most likely explanation for
+"I should be able to add those." Corrected to state plainly that there
+is no bypass for anyone.
+
+**The actual fix for the user's immediate problem is adding a row,
+not a code change**: open Table Admin (`/admin`) -> "Youth Class
+Teachers" -> add a new row picking the person and the class -- repeat
+once per person/class combination that should have access (an account
+that should see every class needs one row per class, since there's no
+single "all classes" value). If "Youth Class Teachers" doesn't appear
+in the `/admin` table list at all, that account doesn't yet hold the
+`table_admin_youth_class_teachers` feature on any of its callings --
+grant it via `/admin/calling-features` first (itself requires already
+holding `table_admin_calling_features` on some calling, the usual
+one-time bootstrapping situation this app's features model always
+needs). Viewing a class's schedule read-only needs none of this --
+`/ym-yw-lessons` (and `/adult-teaching-lessons` for Elders Quorum/
+Relief Society) is already open to any signed-in account with no row
+required at all; only *editing* a specific class on
+`/youth-teaching-planning` needs a `youth_class_teachers` row.
+
+No migration needed -- pure description-text fix. Confirmed via
+`tsc`/`eslint`/`next build --webpack` only, same no-live-database-
+access gap as everything else in this project.
+
 **Bug found and fixed 2026-11-14: submitting an announcement (or an
 agenda item) could create two rows from one real submission. No
 migration needed.** The user's own report: "submitting an announcement

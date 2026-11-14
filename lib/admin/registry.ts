@@ -608,7 +608,7 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
     table: "youth_class_teachers",
     label: "Youth Class Teachers",
     description:
-      "Who may edit which class's schedule on YM/YW Teaching Planning (viewing itself needs no row here at all -- YM/YW Lessons is open to anyone signed in). Bishopric and Young Women Presidency already see every (or every YW) class regardless of rows here -- this only matters for narrowing everyone else down to specific class(es) they're assigned to teach.",
+      "Who may edit which class's schedule on YM/YW Teaching Planning (viewing itself needs no row here at all -- YM/YW Lessons is open to anyone signed in). There is no automatic bypass for anyone, Bishopric and Young Women Presidency included -- every person who should see or edit a class, even every class at once, needs a real row here for each class they should access.",
     requiredFeature: "table_admin_youth_class_teachers",
     orderBy: { column: "created_at", ascending: false },
     columns: [
