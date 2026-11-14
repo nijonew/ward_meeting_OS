@@ -1,5 +1,6 @@
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createCacheableClient } from "@/lib/supabase/cacheable-client";
 
 /**
  * The ward's own display name, shown as "<name> Ward" in the header
@@ -19,13 +20,27 @@ import { createClient } from "@/lib/supabase/server";
  * getSessionUser/getMeetingById) -- `AppHeader` calls this on nearly
  * every page already, and several pages (the landing page, `/login`)
  * also call it directly for their own heading, duplicating the same
- * query within one request.
+ * query within one request. **Also wrapped in `unstable_cache`
+ * (2026-11-14 pre-launch performance pass)** for a cross-request,
+ * 5-minute cache on top of that -- this one row is read on nearly
+ * every page view app-wide and changes essentially never, so there's
+ * no reason to hit the database for it more than once every 5 minutes.
+ * The outer `cache()` and this function's own signature are unchanged;
+ * nothing downstream needed to change.
  */
-export const getWardName = cache(async (): Promise<string> => {
-  try {
-    const supabase = await createClient();
+const fetchWardName = unstable_cache(
+  async (): Promise<string> => {
+    const supabase = createCacheableClient();
     const { data } = await supabase.from("ward_settings").select("ward_name").limit(1).maybeSingle();
     return data?.ward_name?.trim() || "Ward";
+  },
+  ["ward-name"],
+  { revalidate: 300 },
+);
+
+export const getWardName = cache(async (): Promise<string> => {
+  try {
+    return await fetchWardName();
   } catch {
     return "Ward";
   }
@@ -96,11 +111,22 @@ export function normalizeWardBusinessSectionOrder(
   return [...kept, ...missing];
 }
 
-export const getWardBusinessSectionOrder = cache(async (): Promise<WardBusinessSectionKey[]> => {
-  try {
-    const supabase = await createClient();
+// Same `unstable_cache` treatment as getWardName just above, same
+// reasoning (2026-11-14) -- this row also changes essentially never
+// and is read on every Sacrament Meeting Planning page load.
+const fetchWardBusinessSectionOrder = unstable_cache(
+  async (): Promise<WardBusinessSectionKey[]> => {
+    const supabase = createCacheableClient();
     const { data } = await supabase.from("ward_settings").select("ward_business_section_order").limit(1).maybeSingle();
     return normalizeWardBusinessSectionOrder(data?.ward_business_section_order as string[] | null | undefined);
+  },
+  ["ward-business-section-order"],
+  { revalidate: 300 },
+);
+
+export const getWardBusinessSectionOrder = cache(async (): Promise<WardBusinessSectionKey[]> => {
+  try {
+    return await fetchWardBusinessSectionOrder();
   } catch {
     return [...WARD_BUSINESS_SECTION_KEYS];
   }

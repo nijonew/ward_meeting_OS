@@ -154,18 +154,27 @@ export async function getTeachingAssignmentGrid(throughDateISO: string, teaching
  * Which class(es) a signed-in account may view/edit on
  * /youth-teaching-planning -- resolves auth user -> people row (via
  * people.profile_id) -> youth_class_teachers rows -> class names. Mirrors
- * getVisibleMeetingTypesForUser's exact shape (lib/data/meeting-type-access.ts).
+ * getVisibleMeetingTypesForUser's exact shape (lib/data/meeting-type-access.ts),
+ * including its same optional `personId` short-circuit (2026-11-14
+ * performance pass) -- pass `profile.personId` from an already-resolved
+ * getSessionUser() to skip the `people` lookup below entirely.
  * Returns an empty list for an account with no matched `people` row, or
  * one with no assignments yet -- callers should treat that as "no
  * classes," not an error.
  */
-export async function getTaughtClassesForUser(userId: string): Promise<string[]> {
+export async function getTaughtClassesForUser(userId: string, personId?: string | null): Promise<string[]> {
   const supabase = await createClient();
 
-  const { data: person } = await supabase.from("people").select("id").eq("profile_id", userId).maybeSingle();
-  if (!person) return [];
+  let resolvedPersonId: string | null;
+  if (personId !== undefined) {
+    resolvedPersonId = personId;
+  } else {
+    const { data: person } = await supabase.from("people").select("id").eq("profile_id", userId).maybeSingle();
+    resolvedPersonId = person?.id ?? null;
+  }
+  if (!resolvedPersonId) return [];
 
-  const { data } = await supabase.from("youth_class_teachers").select("class_name").eq("person_id", person.id);
+  const { data } = await supabase.from("youth_class_teachers").select("class_name").eq("person_id", resolvedPersonId);
   return Array.from(new Set((data ?? []).map((r) => r.class_name as string)));
 }
 
@@ -200,9 +209,15 @@ export async function getTaughtClassesForUser(userId: string): Promise<string[]>
  *
  * `features` is optional (mirrors getVisibleMeetingTypesForUser's own
  * convention) -- omitting it just skips the calling-based half and
- * falls back to youth_class_teachers alone.
+ * falls back to youth_class_teachers alone. `personId` (optional,
+ * 2026-11-14 performance pass) is threaded straight through to
+ * getTaughtClassesForUser -- see that function's own comment.
  */
-export async function getAccessibleClasses(userId: string, features?: Set<Feature>): Promise<string[]> {
+export async function getAccessibleClasses(
+  userId: string,
+  features?: Set<Feature>,
+  personId?: string | null,
+): Promise<string[]> {
   const fromCallings = new Set<string>();
   if (features) {
     for (const scope of TEACHING_SCOPE_FEATURES) {
@@ -211,6 +226,6 @@ export async function getAccessibleClasses(userId: string, features?: Set<Featur
       }
     }
   }
-  const fromPersonRows = await getTaughtClassesForUser(userId);
+  const fromPersonRows = await getTaughtClassesForUser(userId, personId);
   return Array.from(new Set([...fromCallings, ...fromPersonRows]));
 }

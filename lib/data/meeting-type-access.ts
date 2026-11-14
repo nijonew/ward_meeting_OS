@@ -48,8 +48,18 @@ const ALL_MEETING_TYPE_SLUGS: MeetingTypeSlug[] = [
  * other callers (submitAgendaItem/submitAnnouncement's own access
  * checks, and /meetings/[id]/archived's real access-control gate), this
  * list IS the actual access boundary, not just a UI convenience.
+ *
+ * `personId` (optional, 2026-11-14 performance pass) lets a caller that
+ * already resolved this via getSessionUser() (`profile.personId`) skip
+ * the `people` lookup below entirely -- pass `undefined` (the default)
+ * to keep looking it up here as before, a real id to use it directly,
+ * or `null` to mean "already confirmed unlinked, don't bother querying."
  */
-export async function getVisibleMeetingTypesForUser(userId: string, features?: Set<Feature>): Promise<MeetingTypeSlug[]> {
+export async function getVisibleMeetingTypesForUser(
+  userId: string,
+  features?: Set<Feature>,
+  personId?: string | null,
+): Promise<MeetingTypeSlug[]> {
   const supabase = await createClient();
   const slugs = new Set<MeetingTypeSlug>();
 
@@ -65,8 +75,15 @@ export async function getVisibleMeetingTypesForUser(userId: string, features?: S
     }
   }
 
-  const { data: person } = await supabase.from("people").select("id").eq("profile_id", userId).maybeSingle();
-  if (person) {
+  let resolvedPersonId: string | null;
+  if (personId !== undefined) {
+    resolvedPersonId = personId;
+  } else {
+    const { data: person } = await supabase.from("people").select("id").eq("profile_id", userId).maybeSingle();
+    resolvedPersonId = person?.id ?? null;
+  }
+
+  if (resolvedPersonId) {
     // Filters through the embedded `callings` relationship rather than a
     // direct column filter on meeting_type_members, mirroring the exact
     // query shape lib/data/rotations.ts already uses successfully for
@@ -75,7 +92,7 @@ export async function getVisibleMeetingTypesForUser(userId: string, features?: S
     const { data: rows } = await supabase
       .from("meeting_type_members")
       .select("meeting_types(slug), callings!inner(current_holder_id, active)")
-      .eq("callings.current_holder_id", person.id)
+      .eq("callings.current_holder_id", resolvedPersonId)
       .eq("callings.active", true);
 
     for (const row of (rows ?? []) as unknown[]) {

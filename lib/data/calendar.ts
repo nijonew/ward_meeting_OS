@@ -314,12 +314,18 @@ async function getPersonalMeetingOccurrences(
 async function resolvePersonalMeetingTypes(userId: string, profile: SessionProfile | null): Promise<MeetingTypeSlug[]> {
   const slugs = new Set<MeetingTypeSlug>();
 
-  const visible = await getVisibleMeetingTypesForUser(userId, profile?.features);
+  // Resolved concurrently, each passed the personId getSessionUser()
+  // already looked up, so neither re-queries `people` by profile_id a
+  // second time in this request (2026-11-14 performance pass --
+  // /calendar is fully public and hit by every signed-in visitor).
+  const [visible, accessibleTeachingClasses] = await Promise.all([
+    getVisibleMeetingTypesForUser(userId, profile?.features, profile?.personId),
+    getAccessibleClasses(userId, profile?.features, profile?.personId),
+  ]);
   for (const slug of visible) {
     if (PERSONAL_MEETING_TYPES.includes(slug)) slugs.add(slug);
   }
 
-  const accessibleTeachingClasses = await getAccessibleClasses(userId, profile?.features);
   const teachesYouth = accessibleTeachingClasses.some((c) => (TEACHING_CLASSES as readonly string[]).includes(c));
   if (teachesYouth || hasFeature(profile, "youth_activity_planning")) {
     slugs.add("youth-council");

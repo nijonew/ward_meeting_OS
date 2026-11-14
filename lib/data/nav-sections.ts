@@ -54,13 +54,19 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
 
   const sections: NavSection[] = [];
 
-  const visibleMeetingTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
+  // Resolved concurrently, each passed the personId getSessionUser()
+  // already looked up, so neither re-queries `people` by profile_id a
+  // second/third time in this request (2026-11-14 performance pass --
+  // this function runs on nearly every page via AppHeader).
+  const [visibleMeetingTypes, accessibleTeachingClasses] = await Promise.all([
+    getVisibleMeetingTypesForUser(user.id, profile?.features, profile?.personId),
+    // Calling-based teaching scopes replaced the two blanket features
+    // here (migration `104`, 2026-11-14) -- see getAccessibleClasses's
+    // own doc comment. "Can teach" now means the resolved class list
+    // actually contains at least one class of that kind.
+    getAccessibleClasses(user.id, profile?.features, profile?.personId),
+  ]);
   const attendsMeetings = visibleMeetingTypes.length > 0;
-  // Calling-based teaching scopes replaced the two blanket features
-  // here (migration `104`, 2026-11-14) -- see getAccessibleClasses's
-  // own doc comment. "Can teach" now means the resolved class list
-  // actually contains at least one class of that kind.
-  const accessibleTeachingClasses = await getAccessibleClasses(user.id, profile?.features);
   const canTeachYouth = accessibleTeachingClasses.some((c) => (TEACHING_CLASSES as readonly string[]).includes(c));
   const canTeachAdult = accessibleTeachingClasses.some((c) =>
     (ADULT_TEACHING_CLASSES as readonly string[]).includes(c),

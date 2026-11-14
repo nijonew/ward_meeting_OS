@@ -2050,6 +2050,140 @@ avoid confusing the two.
 
 ## Known open items
 
+**Pre-launch performance pass, 2026-11-14 -- no migration needed.**
+The user's own request, right before opening the app up to the whole
+congregation: "The performance needs to improve considerable. What
+ways can the performance be meaningfully improved so that there is
+less lag between clicks? This needs to be improvement without cost if
+possible." Scoped explicitly to zero-added-cost fixes -- nothing here
+adds a paid tier to Vercel or Supabase, both still on their free
+plans.
+
+Investigated via three parallel research passes before touching
+anything: a backend round-trip audit (every data-layer function,
+looking for N+1s and sequential `await`s that should be `Promise.all`),
+a catalog-data-caching audit (which small, rarely-changing tables get
+re-queried on every page load with nothing to show for it), and a
+client-bundle/prefetch audit (what's actually shipped to the browser
+and when). Database indexes were considered and explicitly ruled out
+-- this app's tables are sized for a single ward (tens to low hundreds
+of rows each), nowhere near where a missing index would be the real
+bottleneck; not worth the risk of touching schema this close to
+launch for no measurable gain.
+
+**1. A redundant `people` lookup, fetched up to 3 times in one
+request, on the two highest-traffic signed-in pages.** `getSessionUser()`
+(`lib/supabase/get-session-user.ts`) already resolves the signed-in
+account's own `people` row (by `profile_id`) -- but
+`getVisibleMeetingTypesForUser` (`lib/data/meeting-type-access.ts`)
+and `getTaughtClassesForUser`/`getAccessibleClasses`
+(`lib/data/teaching-assignments.ts`) each re-ran that identical query
+themselves, with no way to know it had already been done. Both
+`getNavSections()` (`lib/data/nav-sections.ts`, called by `AppHeader`
+on nearly every page) and `resolvePersonalMeetingTypes()`
+(`lib/data/calendar.ts`, called by the fully-public `/calendar` page
+for any signed-in visitor) called both of these one after another,
+sequentially -- meaning up to 2 extra round trips, run one at a time,
+on top of the one `getSessionUser()` itself already did.
+
+`SessionProfile` (`lib/supabase/get-session-user.ts`) gained a new
+`personId: string | null` field -- the same `person.id` that function
+already resolves, just not thrown away afterward. All three
+downstream functions gained a matching optional `personId` parameter
+(`undefined` keeps the old self-querying behavior for any caller not
+yet updated; a real id or `null` skips the query entirely) and both
+hot call sites now pass `profile.personId` through and run the two
+calls as one `Promise.all` instead of two sequential `await`s --
+cutting what was 3 sequential round trips down to 1.
+
+**2. The single highest-traffic page in the app had an avoidable
+sequential pair at the very top of the function.**
+`app/meetings/[id]/public/page.tsx` -- the public Sacrament Meeting
+program, opened by the whole congregation every Sunday, no login
+required -- called `getSessionUser()` then `getMeetingById()`
+one after another despite neither depending on the other's result.
+Converted to `Promise.all`. A second, lower-traffic sequential pair
+further down the same function (`getSacramentPlanningData()` then
+`getNextTwoSacramentMeetingIds()`, only reached on the narrower
+early-access-preview branch) got the same fix while in there.
+
+**3. Two small, read-mostly tables were queried fresh on nearly every
+page load with nothing caching the result across requests.** Music
+Reference (`hymnal_songs`, ~700 rows, read by `getHymnalIndex()` in
+`lib/data/hymnal.ts`) is hit by every Sunday's public program load
+*and* every admin Planning page -- real-time freshness was never
+needed here, since this table is admin-maintained reference data a
+meeting's own planning never writes to. The ward's own display name
+and Ward Business subsection order (`ward_settings`, a one-row
+singleton table, read by `getWardName()`/`getWardBusinessSectionOrder()`
+in `lib/data/ward-settings.ts`) are read on nearly every page via
+`AppHeader` and every Sacrament Meeting Planning page, and change
+essentially never.
+
+All three are now wrapped in Next.js's `unstable_cache` with a 5-minute
+revalidation window, on top of (not instead of) their existing
+per-request React `cache()` wrapper -- a change to either table still
+shows up within 5 minutes with no action needed, and an admin editing
+either through Table Admin doesn't need to be told to wait, since 5
+minutes is already the kind of delay nobody would notice outside of
+testing. `unstable_cache` can't call anything that reads `cookies()`/
+`headers()` (a Next.js restriction), which rules out this app's usual
+cookie-aware Supabase client (`lib/supabase/server.ts`) -- new
+`lib/supabase/cacheable-client.ts` (`createCacheableClient`) is a
+plain anon-key client with no cookie plumbing, mirroring
+`lib/supabase/service-role.ts`'s exact shape but with the anon key
+instead of the service-role key, since both tables already have their
+own anon-facing RLS policy covering exactly this read (no need to
+bypass RLS the way the service-role client does for the cron sweep).
+
+**4. Link prefetching, re-enabled on a small, bounded set of
+high-traffic links.** Prefetching was disabled app-wide
+(`prefetch={false}`) on 2026-10-12, after a hub page with a dozen-plus
+tiles flooded the connection pool with simultaneous background
+prefetches, delaying the actual click someone was waiting on. That
+reasoning holds for the hub/admin pages, whose own tile counts have
+only grown since (15-25+ links for an admin's own feature-section
+list in the side nav) -- but it was costing something real on the
+*landing page's* own small, fixed "This week" tier (Sacrament Meeting
+Program, Announcements, Calendar, Youth Activities -- 3-4 tiles, the
+very first thing every visitor clicks) and the matching "This week"
+group in the persistent side nav (`components/NavDrawer.tsx`).
+`Tile` (`components/Tile.tsx`) gained an optional `prefetch` prop,
+defaulting to `false` everywhere (so every other tile in the app is
+completely unaffected) -- set `true` only on those same four
+landing-page tiles (`app/page.tsx`). `NavDrawer.tsx`'s own link
+rendering now prefetches only the "This week" section (checked by
+reference against the `thisWeekSection` prop) and leaves every
+feature section below it at `prefetch={false}`, unchanged.
+
+**Deliberately not done this pass, flagged as a possible follow-up**:
+dynamically importing (`next/dynamic`, `ssr: false`) the handful of
+Client Components that pull in `@dnd-kit/core`/`sortable`/`utilities`
+(~15-16kB gzipped, used by drag-reorder controls across 7 Client
+Components on several otherwise-unrelated routes) to shrink the
+initial JS payload those routes ship; and the same cross-request
+caching treatment for the admin-only `features` catalog
+(`getFeatureCatalogByCategory()`, `lib/data/calling-features.ts`) and
+`admin_select_options` (`getSelectOptions()`,
+`lib/data/select-options.ts`). Both are real, available, zero-cost
+wins -- skipped here only because they touch admin-only traffic, not
+the whole-congregation path this specific request was about, and
+because getting the higher-impact fixes above verified and shipped
+before launch mattered more than squeezing out every last win in one
+pass.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project (no `.env.local`
+in this working copy, so no live dev-server/browser check was
+possible) -- ask the user to check, once deployed: the app generally
+feels less laggy click-to-click, especially the landing page and the
+public Sacrament Meeting program; a change made directly in Table
+Admin to the ward's own display name or to Music Reference shows up
+within about 5 minutes everywhere, not instantly (expected, and should
+be mentioned to whoever edits those if they're used to seeing an
+immediate change); and that the landing page's four "This week" tiles
+still navigate correctly with no console errors.
+
 **Teaching Schedules access rebuilt around calling-based scope
 checkboxes, migration `104`, not yet run, 2026-11-14.** The user's own
 request: "New plan for teachers. I want to permit certain callings to

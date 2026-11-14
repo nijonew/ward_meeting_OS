@@ -38,8 +38,11 @@ export default async function PublicViewPage({
   // on their role. Bishopric keeps unconditional any-stage/any-date
   // preview regardless (building the program comes before it's ready);
   // everyone else still only ever sees it on the actual day.
-  const { profile } = await getSessionUser();
-  const meeting = await getMeetingById(meetingId);
+  // Resolved concurrently -- neither depends on the other's result
+  // (2026-11-14 pre-launch performance pass; this is the single
+  // highest-traffic page in the app, viewed by the whole congregation
+  // every Sunday).
+  const [{ profile }, meeting] = await Promise.all([getSessionUser(), getMeetingById(meetingId)]);
   if (!meeting) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;
   }
@@ -89,8 +92,12 @@ export default async function PublicViewPage({
       // that flag, "an in-between type of access to allow someone to
       // prepare a printed program." Neither check short-circuits the
       // other; either one being true is enough.
-      const readyForPublic = (await getSacramentPlanningData(meetingId)).planning?.ready_for_public ?? false;
-      const withinNextTwo = (await getNextTwoSacramentMeetingIds()).has(meetingId);
+      const [planningData, nextTwoIds] = await Promise.all([
+        getSacramentPlanningData(meetingId),
+        getNextTwoSacramentMeetingIds(),
+      ]);
+      const readyForPublic = planningData.planning?.ready_for_public ?? false;
+      const withinNextTwo = nextTwoIds.has(meetingId);
       if (!readyForPublic && !withinNextTwo) {
         return <p className="text-ink-muted">This program isn&rsquo;t available right now.</p>;
       }

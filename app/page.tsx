@@ -68,15 +68,22 @@ export default async function HomePage() {
       <section className="mt-8">
         <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">This week</p>
         <TileGrid>
+            {/* prefetch (2026-11-14, pre-launch performance pass) --
+                this whole tier is a small, fixed 3-4 tiles, the very
+                first thing every visitor clicks; see Tile.tsx's own
+                comment for why this is a safe exception to the
+                2026-10-12 "every tile defaults to no prefetch" fix. */}
             {todaysSacramentMeeting ? (
               <Tile
                 title="Sacrament Meeting Program"
                 href={`/meetings/${todaysSacramentMeeting.id}/public`}
+                prefetch
               />
             ) : earlyAccessSacramentMeeting ? (
               <Tile
                 title="Sacrament Meeting Program"
                 href={`/meetings/${earlyAccessSacramentMeeting.id}/public`}
+                prefetch
               />
             ) : (
               <Tile
@@ -85,11 +92,11 @@ export default async function HomePage() {
                 disabledLabel="Available on the day of the meeting"
               />
             )}
-          <Tile title="Announcements" href="/announcements/public" />
+          <Tile title="Announcements" href="/announcements/public" prefetch />
           {/* Ward Calendar View, 2026-11-01 -- public, no login, same
               tier as the two tiles above (scoped via AskUserQuestion:
               "Public, no login" + "Everything public"). */}
-          <Tile title="Calendar" href="/calendar" />
+          <Tile title="Calendar" href="/calendar" prefetch />
           {/* Requires login (2026-10-07, the user's own request) --
               unlike the rest of this tier, grayed out with a specific
               reason rather than "Coming soon" for a logged-out
@@ -115,6 +122,7 @@ export default async function HomePage() {
             title="Youth Activities"
             href={user ? "/youth-activities?readonly=1" : undefined}
             disabledLabel={user ? undefined : "Please log in to see youth activities"}
+            prefetch={Boolean(user)}
           />
           {/* "Scheduled Events" (the merged Youth Activities + Ward
               Events listing, /events) removed from the landing page

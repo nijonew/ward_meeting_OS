@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createCacheableClient } from "@/lib/supabase/cacheable-client";
 import { resolveHymnTitle, type HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 
 export * from "@/lib/data/hymnal-shared";
@@ -12,11 +13,32 @@ export * from "@/lib/data/hymnal-shared";
  * faster than a server action per keystroke. See
  * lib/data/hymnal-shared.ts's resolveHymnTitle for how a raw input
  * string (e.g. "223", "C20") is matched against it.
+ *
+ * **Wrapped in `unstable_cache`, 2026-11-14 pre-launch performance
+ * pass.** This table is read-only from the app's own perspective (it's
+ * admin-maintained reference data, not something a meeting's own
+ * planning writes to) and this is the single highest-traffic query in
+ * the app -- every Sunday's public program load, plus every admin
+ * Planning page, all fetch the same ~700 rows fresh every time. A
+ * 5-minute cross-request cache means at most one real query per 5
+ * minutes app-wide, not one per page view. `unstable_cache` can't call
+ * anything that reads `cookies()`/`headers()`, so this uses a plain
+ * anon-key client (`createCacheableClient`) instead of the app's usual
+ * cookie-aware one -- safe here since `hymnal_songs` already has its
+ * own anon-facing RLS policy covering exactly this read.
  */
+const fetchHymnalIndex = unstable_cache(
+  async (): Promise<HymnalIndexEntry[]> => {
+    const supabase = createCacheableClient();
+    const { data } = await supabase.from("hymnal_songs").select("songbook, number, title, url");
+    return (data ?? []) as HymnalIndexEntry[];
+  },
+  ["hymnal-index"],
+  { revalidate: 300 },
+);
+
 export async function getHymnalIndex(): Promise<HymnalIndexEntry[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("hymnal_songs").select("songbook, number, title, url");
-  return (data ?? []) as HymnalIndexEntry[];
+  return fetchHymnalIndex();
 }
 
 /**

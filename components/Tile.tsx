@@ -11,6 +11,14 @@ interface TileProps {
    *  rather than "not built yet"). Only shown while the tile is
    *  disabled. */
   disabledLabel?: string;
+  /** Opts this one tile back into Next.js's normal Link prefetching
+   *  (2026-11-14, pre-launch performance pass). Every tile defaults to
+   *  `prefetch={false}` per the 2026-10-12 fix below -- but that
+   *  reasoning was about a HUB page with a dozen-plus tiles firing
+   *  prefetches at once; the home page's own small, fixed "This week"
+   *  tier (3-4 tiles, the very first thing everyone clicks) is a safe,
+   *  worthwhile exception. Leave this off everywhere else. */
+  prefetch?: boolean;
 }
 
 /**
@@ -26,7 +34,7 @@ interface TileProps {
  * `disabledLabel`/`comingSoon`'s own status caption below survives,
  * since that's the one category of tile text the user asked to keep.
  */
-export function Tile({ title, href, comingSoon, disabledLabel }: TileProps) {
+export function Tile({ title, href, comingSoon, disabledLabel, prefetch = false }: TileProps) {
   const isDisabled = comingSoon || !href;
 
   const card = (
@@ -65,7 +73,7 @@ export function Tile({ title, href, comingSoon, disabledLabel }: TileProps) {
           directly via the Network tab), so there's essentially nothing
           to gain from prefetching here and a lot to lose from the
           request-pileup it was causing. */}
-      <Link href={href} prefetch={false} className="block h-full">
+      <Link href={href} prefetch={prefetch} className="block h-full">
         {card}
       </Link>
     </li>

@@ -126,9 +126,21 @@ export function NavDrawer({ thisWeekSection }: { thisWeekSection: NavSection }) 
                   <ul className="mt-2 flex flex-col gap-1">
                     {section.links.map((link) => (
                       <li key={link.href}>
+                        {/* prefetch is on for "This week" only, off for
+                            every feature section below it (2026-11-14,
+                            pre-launch performance pass). "This week" is
+                            a small, fixed 2-3 link group; the feature
+                            sections can run to 15-25+ links for an
+                            admin account -- prefetching all of those at
+                            once is exactly the request flood the
+                            2026-10-12 `prefetch={false}` fix (see
+                            Tile.tsx) was built to stop. Reference
+                            equality against the `thisWeekSection` prop
+                            (included directly in `sections` above)
+                            tells the two apart safely. */}
                         <Link
                           href={link.href}
-                          prefetch={false}
+                          prefetch={section === thisWeekSection}
                           onClick={() => setOpen(false)}
                           className="block rounded px-2 py-1.5 text-sm text-ink transition-colors hover:bg-accent-soft"
                         >

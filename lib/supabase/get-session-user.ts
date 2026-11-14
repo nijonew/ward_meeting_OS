@@ -127,6 +127,14 @@ export interface SessionProfile {
   isLinked: boolean;
   display_name: string | null;
   email: string | null;
+  /** The linked `people` row's id, already resolved here -- lets a
+   *  caller that would otherwise re-query `people` by `profile_id` a
+   *  second or third time in the same request
+   *  (getVisibleMeetingTypesForUser, getAccessibleClasses) skip that
+   *  query entirely by passing this straight through
+   *  (2026-11-14 pre-launch performance pass). `null` means genuinely
+   *  unlinked, not "not resolved yet." */
+  personId: string | null;
 }
 
 /** `profile?.features.has("sacrament_planning")` reads fine inline,
@@ -209,6 +217,7 @@ export const getSessionUser = cache(async () => {
     isLinked: Boolean(person),
     display_name: person?.name ?? (profileRow?.display_name as string | null) ?? null,
     email: (profileRow?.email as string | null) ?? null,
+    personId: person?.id ?? null,
   };
   return { user, profile };
 });
