@@ -34,10 +34,21 @@ export async function getForeignKeyOptions(
   labelColumn: string
 ): Promise<AdminOption[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from(table)
-    .select(`${valueColumn}, ${labelColumn}`)
-    .order(labelColumn);
+  let query = supabase.from(table).select(`${valueColumn}, ${labelColumn}`).order(labelColumn);
+  // Excludes archived people from every raw person-reference dropdown
+  // in Table Admin (Callings' own "Current Holder" included) -- bug
+  // fix, 2026-11-14, the user's own report: "archived people showing
+  // up in dropdowns for callings." Scoped to the `people` table only,
+  // same per-table special-casing this function already has for
+  // `meetings` (see getMeetingFkOptions below) -- every other FK
+  // target (meeting_types, features, etc.) has no equivalent concept
+  // of "archived" and shouldn't be filtered. See getActivePeople
+  // (lib/data/people.ts) for the matching fix on every bespoke page's
+  // own person pickers, which don't go through this function.
+  if (table === "people") {
+    query = query.is("archived_at", null);
+  }
+  const { data } = await query;
 
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
     value: String(row[valueColumn]),

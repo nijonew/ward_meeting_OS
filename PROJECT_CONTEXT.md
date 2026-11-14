@@ -2050,6 +2050,59 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-14: archived people still showed up in
+every dropdown that picks a person, callings included. No migration
+needed.** The user's own report: "I have archived people showing up
+in dropdowns for callings. check all dropdowns to exclude archived
+individuals."
+
+Audited every place in the app that queries `people` to build a
+picker (grepped every `.from("people")` call and every `.eq("active",
+true)` filter) before touching anything, rather than patching the one
+spot the report named. Root cause, confirmed directly: `archive_person()`
+(migration `091`, `/admin/archived-people`'s "Archive" action) clears
+a person's calling and login link and sets `archived_at`, but
+deliberately never touches `active` -- so an archived person still
+reads as `active = true`, and anything filtering on `active` alone
+(which is everything that filters at all) kept showing them. Two real
+gaps, both fixed, together covering every person-picker in the app:
+
+1. **`getActivePeople()` (`lib/data/people.ts`)** -- the one shared
+   function nearly every bespoke page's own person picker reads from
+   (Verify Logins, Speaker & Prayer History's "Log a Missed or
+   Pre-App Turn," `/admin/person-callings`'s "Assign Callings" picker,
+   `/music`, `/rabnm-planning`, Calling Planning's Candidates/Release-
+   person pickers, and every meeting's own agenda-grid fallback person
+   list) -- now also excludes `archived_at is not null`, not just
+   `active = false`.
+2. **`getForeignKeyOptions()` (`lib/admin/table-data.ts`)** -- the
+   generic resolver behind every Table Admin `foreign_key` column
+   pointing at `people` (12 of them across the registry, Callings'
+   own "Current Holder" included -- almost certainly the literal
+   dropdown the user's report named) -- now excludes archived rows
+   too, scoped to `table === "people"` specifically (the same kind of
+   per-table special-case this function already has for `meetings`,
+   see `getMeetingFkOptions` right below it) so no other foreign-key
+   target (meeting types, features, etc.) is affected.
+
+**Checked and confirmed NOT affected, left unchanged**: `personOptionsByIds`/
+`getScopedFkOptions` (`lib/data/rotations.ts`/`lib/admin/table-data.ts`)
+only ever resolve an id set that already came from a calling's
+*current* holder (`computeEligiblePersonIds` and friends) -- archiving
+already clears `current_holder_id`, so an archived person's id can
+never reach either of these in the first place; filtering them too
+would be a no-op. `getScopedFkOptions` specifically also turned out to
+be dead code -- no column in the current registry actually declares
+`scopedBy` anymore.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: an archived person no longer appears in Table Admin's
+Callings grid "Current Holder" dropdown, `/admin/person-callings`'s
+own person picker, or any other person-picker across the app; and
+that a person who's since been restored from `/admin/archived-people`
+shows up again everywhere, immediately.
+
 **Pre-launch performance pass, 2026-11-14 -- no migration needed.**
 The user's own request, right before opening the app up to the whole
 congregation: "The performance needs to improve considerable. What
