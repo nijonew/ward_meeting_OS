@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { CancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
+import { CancelMeetingButton, UncancelMeetingButton } from "@/components/dashboard/CancelMeetingButton";
 import { DeleteMeetingButton } from "@/components/dashboard/DeleteMeetingButton";
 import { getMeetingTypes, getUpcomingMeetings } from "@/lib/data/meetings";
 import { getUnassignedAgendaItems } from "@/lib/data/bishopric-meeting";
@@ -11,6 +11,7 @@ import { allMeetingFeatures, meetingFeature } from "@/lib/data/meeting-features"
 import { assignAgendaItemToMeeting } from "@/app/meetings/[id]/bishopric-actions";
 import { cancelMeeting, uncancelMeeting, deleteMeeting } from "@/app/dashboard/actions";
 import { MEETING_TYPE_LABELS, type Meeting, type MeetingTypeSlug } from "@/lib/types";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 function formatMeetingDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -163,14 +164,7 @@ function MeetingRow({
                 on the meeting's own stage. */}
             {meeting.stage !== "archived" &&
               (meeting.cancelled ? (
-                <form action={uncancel}>
-                  <button
-                    type="submit"
-                    className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
-                  >
-                    Un-cancel
-                  </button>
-                </form>
+                <UncancelMeetingButton uncancelAction={uncancel} />
               ) : (
                 <CancelMeetingButton meetingId={meeting.id} cancelAction={cancel} />
               ))}
@@ -367,12 +361,12 @@ export default async function DashboardPage({
                         </option>
                       ))}
                     </select>
-                    <button
-                      type="submit"
+                    <FormSubmitButton
+                      pendingLabel="Assigning..."
                       className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-paper hover:bg-accent-deep"
                     >
                       Assign
-                    </button>
+                    </FormSubmitButton>
                   </form>
                 </li>
               );

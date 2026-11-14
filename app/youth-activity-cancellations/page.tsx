@@ -8,6 +8,7 @@ import {
   addYouthActivityCancellationAction,
   deleteYouthActivityCancellationAction,
 } from "@/app/youth-activity-cancellations/actions";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -85,9 +86,9 @@ export default async function YouthActivityCancellationsPage() {
                     </span>
                   </span>
                   <form action={remove}>
-                    <button type="submit" className="text-xs text-danger/70 hover:text-danger">
+                    <FormSubmitButton pendingLabel="Deleting..." className="text-xs text-danger/70 hover:text-danger">
                       Delete
-                    </button>
+                    </FormSubmitButton>
                   </form>
                 </li>
               );
@@ -148,12 +149,12 @@ export default async function YouthActivityCancellationsPage() {
             </div>
           </fieldset>
 
-          <button
-            type="submit"
+          <FormSubmitButton
+            pendingLabel="Adding..."
             className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
           >
             Add Cancellation
-          </button>
+          </FormSubmitButton>
         </form>
       </div>
     </main>

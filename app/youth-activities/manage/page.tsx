@@ -16,6 +16,7 @@ import {
 import { YouthActivityScheduleManager } from "@/components/schedule/YouthActivityScheduleManager";
 import { GenerateForm } from "@/components/schedule/GenerateForm";
 import { GenerateYouthActivitiesForm } from "@/components/youth-activities/GenerateYouthActivitiesForm";
+import { SubmitButton } from "@/components/submit/SubmitButton";
 
 /**
  * Split out of /youth-activities itself (2026-10-11, the user's own
@@ -190,12 +191,7 @@ export default async function YouthActivitiesManagePage() {
             />
           </label>
 
-          <button
-            type="submit"
-            className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-          >
-            Add &amp; Publish
-          </button>
+          <SubmitButton>Add &amp; Publish</SubmitButton>
         </form>
       </div>
 

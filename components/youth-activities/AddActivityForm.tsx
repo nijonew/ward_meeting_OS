@@ -1,12 +1,16 @@
 import { addYouthActivity } from "@/app/youth-activities/actions";
 import { YOUTH_ACTIVITY_GROUPS, YOUTH_DEVELOPMENT_CATEGORIES } from "@/lib/data/youth-activity-constants";
+import { SubmitButton } from "@/components/submit/SubmitButton";
 
 /**
  * "I would like to have a way to add an activity row on the combined
  * activity tables" (the user's own request, 2026-10-11). A trimmed
  * copy of the Manage page's own Add Activity form, same plain
- * server-action-as-form-action pattern (no pending/success state,
- * matching that form's own existing behavior exactly) -- Group is
+ * server-action-as-form-action pattern -- both now use the shared
+ * SubmitButton (2026-11-14, see that component's own comment) rather
+ * than a bare submit button, so a double-click can't fire
+ * addYouthActivity twice before the first insert's redirect lands.
+ * Group is
  * fixed to whichever Combined type the page already is (a hidden
  * field, not a dropdown; there's nothing to choose, the page itself
  * already says which one) rather than a new, separate server action --
@@ -143,12 +147,7 @@ export function AddActivityForm({ groupName }: { groupName?: string }) {
           </select>
         </label>
 
-        <button
-          type="submit"
-          className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-        >
-          Add &amp; Publish
-        </button>
+        <SubmitButton>Add &amp; Publish</SubmitButton>
       </form>
     </div>
   );

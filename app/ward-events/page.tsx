@@ -12,6 +12,7 @@ import {
 } from "@/app/ward-events/schedule-actions";
 import { WardEventScheduleManager } from "@/components/schedule/WardEventScheduleManager";
 import { GenerateForm } from "@/components/schedule/GenerateForm";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -76,14 +77,17 @@ export default async function WardEventsPage() {
                           {item.status}
                         </span>
                         <form action={toggleStatus}>
-                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                          <FormSubmitButton
+                            pendingLabel={item.status === "published" ? "Unpublishing..." : "Publishing..."}
+                            className="text-xs text-ink-muted hover:text-ink"
+                          >
                             {item.status === "published" ? "Unpublish" : "Publish"}
-                          </button>
+                          </FormSubmitButton>
                         </form>
                         <form action={remove}>
-                          <button type="submit" className="text-xs text-danger/70 hover:text-danger">
+                          <FormSubmitButton pendingLabel="Deleting..." className="text-xs text-danger/70 hover:text-danger">
                             Delete
-                          </button>
+                          </FormSubmitButton>
                         </form>
                       </span>
                     )}
@@ -149,12 +153,12 @@ export default async function WardEventsPage() {
               />
             </label>
 
-            <button
-              type="submit"
+            <FormSubmitButton
+              pendingLabel="Adding..."
               className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
             >
               Add &amp; Publish
-            </button>
+            </FormSubmitButton>
           </form>
         </div>
       )}

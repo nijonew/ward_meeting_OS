@@ -11,6 +11,7 @@ import {
 } from "@/lib/data/meeting-elements";
 import { addTemplateElement } from "@/app/meetings/[id]/template-actions";
 import { TemplateElementList } from "@/components/planning/TemplateElementList";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -115,9 +116,9 @@ export default async function TemplatePage({
                 >
                   <span className="text-ink">{el.label}</span>
                   <form action={add}>
-                    <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                    <FormSubmitButton pendingLabel="Adding..." className="text-xs text-ink-muted hover:text-ink">
                       Add
-                    </button>
+                    </FormSubmitButton>
                   </form>
                 </div>
               );

@@ -38,6 +38,7 @@ import { AgendaElementsManager } from "@/components/planning/AgendaElementsManag
 import { CombinedAgendaGrids } from "@/components/planning/CombinedAgendaGrids";
 import { SacramentProgramSection } from "@/components/planning/SacramentProgramSection";
 import { CollaborativeMeetingBody } from "@/components/planning/CollaborativeMeetingBody";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 /**
  * The planning view, rebuilt 2026-09-09 around a single agenda grid --
@@ -471,9 +472,9 @@ export default async function PlanningViewPage({
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+          <FormSubmitButton pendingLabel="Saving..." className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
             Save
-          </button>
+          </FormSubmitButton>
         </form>
       )}
 

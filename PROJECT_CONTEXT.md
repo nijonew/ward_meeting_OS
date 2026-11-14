@@ -2050,6 +2050,105 @@ avoid confusing the two.
 
 ## Known open items
 
+**Every button that fires a real mutation now shows pending feedback
+and disables itself while in flight, 2026-11-14 -- a full-app
+generalization of the same-day Submit Announcement/Agenda Item fix.**
+The user's own request: "Can we ensure all buttons have some kind of
+reaction once they are pushed so we don't get double pushing?"
+
+A systematic sweep (every `type="submit"`, every `<form action=`,
+every `useTransition`-backed one-shot action button, every
+`window.confirm`-guarded button) across the whole app. Most of this
+app's existing "favorite grid format" Save All Changes buttons and
+one-shot Delete/Remove/Push-style buttons were already correct --
+spot-checked a representative sample (`AdminTableEditor.tsx`,
+`CallingFeaturesForm.tsx`, `PersonCallingsForm.tsx`,
+`BishopricMinutesForm.tsx`/`CouncilNotesForm.tsx`, every grid in
+`/calling-planning`/`/rotations`/`/youth-teaching-planning`/Youth
+Activities, every `DeleteMeetingButton.tsx`/`RotationMemberList.tsx`/
+`ArchivedPersonRow.tsx`/`VerifyLoginRow.tsx`-style one-shot action) and
+confirmed each one already disables itself and relabels ("Saving...",
+"Deleting...", etc.) while its own action is in flight.
+
+**New shared `components/FormSubmitButton.tsx`** -- a
+`useFormStatus()`-based submit button taking its own `children`/
+`pendingLabel`/`className`, for the one real, repeated gap this sweep
+actually found: a plain `<form action={inlineServerActionClosure}>`
+with a bare, never-disabled `<button type="submit">`, no pending
+feedback at all. This exact shape turned out to repeat across more
+than a dozen Server Component pages -- enough to justify one small
+shared component (per this app's own "don't introduce an abstraction
+unless the duplication is real" principle) rather than a dozen
+near-identical one-off wrappers, the same reasoning that already
+produced `components/submit/SubmitButton.tsx` for the narrower
+Submit-Announcement-shaped case. `components/submit/SubmitButton.tsx`
+itself is untouched -- it already covers "no custom label/class
+needed," `FormSubmitButton` covers everything that needs a custom one.
+
+**Fixed, grouped by feature area:**
+- **Dashboard meeting lifecycle**: Cancel and Un-cancel
+  (`components/dashboard/CancelMeetingButton.tsx` -- Un-cancel used to
+  be bare inline JSX in `app/dashboard/page.tsx` itself, since a
+  Server Component page can't call `useFormStatus`; pulled out into
+  this file alongside its paired Cancel button as a new
+  `UncancelMeetingButton`), and the Unassigned Agenda Items panel's
+  "Assign" button.
+- **Sign out**: pulled out of `AppHeader` (an async Server Component
+  that renders on nearly every page) into a new small
+  `components/SignOutButton.tsx` client component, for the same
+  reason Un-cancel needed its own file.
+- **Calling Planning / Callings roster**: "+ Start New Calling Change"
+  (`/calling-planning`), "Add Calling" (`/callings`).
+- **Meeting templates**: "Add" on both the per-meeting Agenda Elements
+  editor (`/meetings/[id]/template`) and the shared default-template
+  admin page (`/admin/meeting-templates`); the Sacrament Meeting
+  Planning page's own "Save" for its Format picker.
+- **Rotations**: "Sync from callings/standing attendees" and "Add" (a
+  calling onto a rotation's member list), both on `/rotations`.
+- **Meeting Cancellations / Ward Events / Youth Activity
+  Cancellations**: every bare Add/Delete/Publish/Unpublish button on
+  `/meeting-cancellations`, `/ward-events`, and
+  `/youth-activity-cancellations`.
+- **Announcements**: Publish/Archive on the stray-agenda-items
+  fallback list (`/announcements`).
+- **Youth Activities**: "Add & Publish" on both the Manage page's own
+  Add Activity form and its trimmed copy on the three Combined-group
+  pages (`AddActivityForm.tsx`) -- the latter's own doc comment had
+  explicitly flagged "no pending/success state" as a known gap before
+  this.
+- **Action Items**: the "Add" button on a Bishopric Meeting/Ward
+  Council/Youth Council's Action Items form
+  (`components/bishopric/ActionItemsSection.tsx`).
+
+**Deliberately left alone:**
+- Every drag-reorder control (`DragReorderGroup`/`useReorderAction`) --
+  a drop fires once per drag gesture, not per repeatable click, and
+  the list already updates optimistically before the save resolves;
+  a double-drop is two separate gestures, each a complete, idempotent
+  reorder write, not a duplicate-insert risk.
+- `NotesEditToggle.tsx`'s lock/unlock button -- pure local client
+  state (which rendering to show), no server action at all.
+- Every `method="get"` filter form (date-range "Through"/"Update
+  range" pickers, the Calling Features/Merge People/Person Callings
+  "Load" pickers, Meeting Reminder Email's own meeting selector) --
+  these just change a query param and re-render; there's no mutation
+  to double-fire.
+- Plain navigation (`<Link>`s, a button that only redirects) -- this
+  app's own global `app/loading.tsx` already shows "Loading…" on every
+  navigation.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: double-clicking Cancel/Un-cancel/Delete on `/dashboard` now
+shows "Cancelling..."/"Un-cancelling..."/"Deleting..." and can't be
+clicked a second time mid-request; Sign out shows "Signing out..."
+and disables itself; "+ Start New Calling Change" on `/calling-planning`,
+"Add Calling" on `/callings`, and Add on `/meeting-cancellations`/
+`/ward-events`/`/youth-activity-cancellations` all show their own
+"Adding..." state; and that a Combined-group page's "Add & Publish"
+button (previously flagged as having no pending state at all) now
+disables itself too.
+
 **Stale Table Admin description corrected 2026-11-14, prompted by a
 user report that turned out to be working as designed.** The user's
 own report: "I go to enter youth teachers and get this note: You

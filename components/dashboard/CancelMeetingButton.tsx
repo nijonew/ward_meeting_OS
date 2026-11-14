@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 /**
  * Cancel, as a real button rather than plain text (2026-09-09, the
@@ -42,9 +43,9 @@ export function CancelMeetingButton({
   return (
     <form action={cancelAction} className="flex items-center gap-2">
       <input type="hidden" name="id" value={meetingId} />
-      <button type="submit" className={BUTTON_CLASS}>
+      <FormSubmitButton pendingLabel="Cancelling..." className={BUTTON_CLASS}>
         Cancel
-      </button>
+      </FormSubmitButton>
       <input
         type="text"
         name="cancellation_note"
@@ -52,6 +53,26 @@ export function CancelMeetingButton({
         autoFocus
         className="w-40 rounded border border-rule bg-paper px-1.5 py-1 text-[11px] text-ink"
       />
+    </form>
+  );
+}
+
+/**
+ * Un-cancel's own counterpart (2026-11-14) -- was plain inline JSX in
+ * app/dashboard/page.tsx (a bare `<form action={uncancel}>` with a
+ * bare submit button, no pending feedback at all), but a Server
+ * Component page can't call useFormStatus directly, so it's pulled
+ * out into this file alongside its paired Cancel button above.
+ */
+export function UncancelMeetingButton({ uncancelAction }: { uncancelAction: () => Promise<void> }) {
+  return (
+    <form action={uncancelAction}>
+      <FormSubmitButton
+        pendingLabel="Un-cancelling..."
+        className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5"
+      >
+        Un-cancel
+      </FormSubmitButton>
     </form>
   );
 }

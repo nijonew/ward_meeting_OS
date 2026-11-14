@@ -6,6 +6,7 @@ import { getAdminTableConfig } from "@/lib/admin/registry";
 import { getAdminRows, resolveColumnsWithLiveOptions, resolveForeignKeyOptions } from "@/lib/admin/table-data";
 import { AdminTableEditor } from "@/components/admin/AdminTableEditor";
 import { setSubmissionStatus, updateAnnouncementRow, insertAnnouncementRow, deleteAnnouncementRow } from "@/app/announcements/actions";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 /**
  * Rebuilt 2026-10-12 (the user's own report: "Manage announcements...
@@ -137,16 +138,16 @@ export default async function AnnouncementsInboxPage() {
                       </span>
                       {item.status !== "published" && (
                         <form action={publish}>
-                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                          <FormSubmitButton pendingLabel="Publishing..." className="text-xs text-ink-muted hover:text-ink">
                             Publish
-                          </button>
+                          </FormSubmitButton>
                         </form>
                       )}
                       {item.status !== "archived" && (
                         <form action={archive}>
-                          <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                          <FormSubmitButton pendingLabel="Archiving..." className="text-xs text-ink-muted hover:text-ink">
                             Archive
-                          </button>
+                          </FormSubmitButton>
                         </form>
                       )}
                     </span>

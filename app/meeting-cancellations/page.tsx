@@ -5,6 +5,7 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { MEETING_TYPE_LABELS, type MeetingTypeSlug } from "@/lib/types";
 import { addMeetingCancellationAction, deleteMeetingCancellationAction } from "@/app/meeting-cancellations/actions";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 const ALL_MEETING_TYPES: MeetingTypeSlug[] = [
   "sacrament-meeting",
@@ -82,9 +83,9 @@ export default async function MeetingCancellationsPage() {
                     {affected.length > 0 && <span className="text-ink-muted"> &middot; {affected.join(", ")}</span>}
                   </span>
                   <form action={remove}>
-                    <button type="submit" className="text-xs text-danger/70 hover:text-danger">
+                    <FormSubmitButton pendingLabel="Deleting..." className="text-xs text-danger/70 hover:text-danger">
                       Delete
-                    </button>
+                    </FormSubmitButton>
                   </form>
                 </li>
               );
@@ -145,12 +146,12 @@ export default async function MeetingCancellationsPage() {
             Also cancel youth activities in this date range
           </label>
 
-          <button
-            type="submit"
+          <FormSubmitButton
+            pendingLabel="Adding..."
             className="w-fit rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
           >
             Add Cancellation
-          </button>
+          </FormSubmitButton>
         </form>
       </div>
     </main>

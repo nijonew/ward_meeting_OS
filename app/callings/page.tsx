@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { getAllCallings, CALLING_TITLE_PREFIXES } from "@/lib/data/callings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { createCalling } from "@/app/callings/actions";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 export default async function CallingsListPage({
   searchParams,
@@ -60,12 +61,12 @@ export default async function CallingsListPage({
               </option>
             ))}
           </select>
-          <button
-            type="submit"
+          <FormSubmitButton
+            pendingLabel="Adding..."
             className="rounded border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
           >
             Add Calling
-          </button>
+          </FormSubmitButton>
         </form>
       </div>
 

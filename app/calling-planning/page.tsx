@@ -14,6 +14,7 @@ import { getSelectOptions } from "@/lib/data/select-options";
 import { createCallingPlanningEntry } from "@/app/calling-planning/actions";
 import { CallingPlanningGridForm } from "@/components/calling-planning/CallingPlanningGridForm";
 import { PushCallingForm } from "@/components/calling-planning/PushCallingForm";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 export default async function CallingPlanningPage({
   searchParams,
@@ -118,12 +119,12 @@ export default async function CallingPlanningPage({
               className="mt-1 block rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
             />
           </label>
-          <button
-            type="submit"
+          <FormSubmitButton
+            pendingLabel="Starting..."
             className="rounded bg-accent px-4 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent-deep"
           >
             + Start New Calling Change
-          </button>
+          </FormSubmitButton>
         </form>
 
         {rows.length === 0 ? (

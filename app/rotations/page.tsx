@@ -10,6 +10,7 @@ import { AssignmentGridForm } from "@/components/rotations/AssignmentGridForm";
 import { RotationMemberList } from "@/components/rotations/RotationMemberList";
 import { syncRotation, addRotationMember } from "@/app/rotations/actions";
 import type { MeetingTypeSlug } from "@/lib/types";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 const ELEMENT_LABELS: Record<string, string> = {
   conducting: "Conducting",
@@ -121,9 +122,9 @@ function RotationCard({ rotation, callings }: { rotation: RotationRow; callings:
         </div>
         {rotation.eligibility_source !== "manual" && (
           <form action={sync}>
-            <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+            <FormSubmitButton pendingLabel="Syncing..." className="text-xs text-ink-muted hover:text-ink">
               Sync from {rotation.eligibility_source === "calling_names" ? "callings" : "standing attendees"}
-            </button>
+            </FormSubmitButton>
           </form>
         )}
       </div>
@@ -151,9 +152,12 @@ function RotationCard({ rotation, callings }: { rotation: RotationRow; callings:
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded border border-accent px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10">
+          <FormSubmitButton
+            pendingLabel="Adding..."
+            className="rounded border border-accent px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10"
+          >
             Add
-          </button>
+          </FormSubmitButton>
         </form>
       )}
 

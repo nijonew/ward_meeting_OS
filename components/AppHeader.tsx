@@ -5,6 +5,7 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getUnverifiedProfileCount } from "@/lib/data/profile-verification";
 import type { NavSection } from "@/lib/data/nav-sections";
 import { NavDrawer } from "@/components/NavDrawer";
+import { SignOutButton } from "@/components/SignOutButton";
 
 /**
  * Shared top bar: wordmark (links home), a right-aligned context tag, and
@@ -116,14 +117,7 @@ export async function AppHeader({ tag }: { tag?: string }) {
             </span>
           )}
           {user ? (
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="font-mono text-xs uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
-              >
-                Sign out
-              </button>
-            </form>
+            <SignOutButton signOutAction={signOut} />
           ) : (
             <Link
               href="/login"

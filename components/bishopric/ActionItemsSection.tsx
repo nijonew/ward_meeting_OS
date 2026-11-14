@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { addActionItem, toggleActionItem } from "@/app/meetings/[id]/bishopric-actions";
 import type { ActionItemRow } from "@/lib/data/bishopric-meeting";
 import type { PersonOption } from "@/lib/data/people";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 /**
  * **Converted to a Client Component, 2026-11-01** -- needed once
@@ -102,12 +103,12 @@ export function ActionItemsSection({
           name="due_date"
           className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
         />
-        <button
-          type="submit"
+        <FormSubmitButton
+          pendingLabel="Adding..."
           className="rounded bg-accent px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
         >
           Add
-        </button>
+        </FormSubmitButton>
       </form>
     </div>
   );

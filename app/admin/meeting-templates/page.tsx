@@ -7,6 +7,7 @@ import { getApplicableElements, getTemplateElements } from "@/lib/data/meeting-e
 import { SPECIAL_FORMATS } from "@/lib/data/sacrament-constants";
 import { addDefaultTemplateElement } from "./actions";
 import { DefaultTemplateElementList } from "@/components/admin/DefaultTemplateElementList";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 
 function TabLink({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
@@ -126,9 +127,9 @@ export default async function MeetingTemplatesAdminPage({
                 >
                   <span className="text-ink">{el.label}</span>
                   <form action={add}>
-                    <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+                    <FormSubmitButton pendingLabel="Adding..." className="text-xs text-ink-muted hover:text-ink">
                       Add
-                    </button>
+                    </FormSubmitButton>
                   </form>
                 </div>
               );
