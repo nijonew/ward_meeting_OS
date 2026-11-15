@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 104
+## Current migration number: 105
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,69 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**One-time data sweep: FSY Magazine topics pre-filled for 5 of the 6
+youth classes, migration `105`, not yet run, 2026-11-14.** The user's
+own request, given in these exact words: "pre-fill all youth topics
+in all classes based on the date with the '(Month) -
+(Fast/Second/Third/Last) Sunday - FSY Magazine'. This first sweep can
+skip the priests until May, but the rest need to begin with the
+pre-fill starting tomorrow. First Sundays are called Fast Sundays. The
+fourth sundays will be called Last Sunday. Fifth sundays are already
+filled in and shouldn't be touched."
+
+Pure SQL, no application code touched -- `getTeachingAssignmentGrid`
+(`lib/data/teaching-assignments.ts`) already reads whatever's in
+`teaching_assignments.topic` as-is; this just populates real rows for
+it to find, the same "pre-fill real data via a one-time migration,
+not a code change" pattern as every other bulk import in this file's
+own history (049, 067, 069, 073, 079, etc.).
+
+Covers **5 of the 6 real classes -- Deacons, Teachers, Gatherers of
+Light, Messengers of Hope, Builders of Faith.** Priests are excluded
+entirely from this sweep, per the user's own words -- their pre-fill
+starts in May (2027) and is a separate, later task, not inserted here
+at all, not even for May itself.
+
+**Date range: 2026-11-15 (tomorrow, confirmed to land on a real
+Sunday) through 2027-05-14** -- the same rolling "today + 6 months"
+window `getTeachingAssignmentGrid` already defaults every Teaching
+Planning page to. A literal start date, not `current_date + 1`, since
+each date's own real Sunday-of-the-month alignment (1st/2nd/3rd/4th)
+is the entire point of this sweep and shouldn't silently shift if the
+migration happens to be run a day or two late. A later sweep can
+extend the window further once it's close to running out, and can
+pick up Priests starting in May at the same time.
+
+**Topic text**: `<Month> - <Fast|Second|Third|Last> Sunday - FSY
+Magazine`, keyed off which occurrence of Sunday a date is within its
+own month -- 1st = Fast, 2nd = Second, 3rd = Third, 4th = Last
+(literally the 4th occurrence, whether or not that month goes on to
+have a 5th). **5th Sundays are never touched** -- excluded from the
+generated date list entirely, matching the user's own instruction
+that they're "already filled in" (this app's own `FIFTH_SUNDAY_TOPIC`
+default, `"5th Sunday"`, already shows live for any 5th Sunday with no
+real row saved yet, so there was nothing here for this migration to
+fill in).
+
+**Idempotent, and never clobbers real data**: `on conflict (class_date,
+class_name) do update ... where teaching_assignments.topic is null or
+trim(teaching_assignments.topic) = ''` -- a brand-new row gets the
+computed topic; an existing row only gets overwritten if its own topic
+is still blank. A second run of this same migration, or a topic a real
+teacher has since typed in by hand, is never overwritten.
+
+No application code changed -- nothing to `tsc`/`eslint`/`next build`
+for this one. **Confirm migration number `105` is actually free before
+running it**, per this project's own repeated numbering-collision
+history, then ask the user to run it and check: each of the 5 covered
+classes on `/youth-teaching-planning` shows a pre-filled Topic for
+every upcoming Sunday from tomorrow through mid-May 2027, reading
+correctly (e.g. "November - Third Sunday - FSY Magazine" for
+2026-11-15, "November - Last Sunday - FSY Magazine" for 2026-11-22);
+that 2026-11-29 (a real 5th Sunday) is untouched, still showing the
+existing "5th Sunday" default; and that the Priests class shows no
+pre-filled topics at all from this sweep.
 
 **Bug found and fixed 2026-11-14: archived people still showed up in
 every dropdown that picks a person, callings included. No migration
