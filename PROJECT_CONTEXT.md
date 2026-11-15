@@ -2050,6 +2050,25 @@ avoid confusing the two.
 
 ## Known open items
 
+**Teacher column dropped from both read-only Lessons pages, no
+migration needed, 2026-11-14.** The user's own request, right after
+confirming migration 105's topic pre-fill landed correctly: "Let's
+not show the teacher in the public view of the teaching planning
+lists." `TeachingGridReadOnly.tsx` -- the one shared component behind
+both `/ym-yw-lessons` and `/adult-teaching-lessons` -- now renders
+only Sunday and Topic; the Teacher column (header and cell) is
+removed entirely. `TeachingGridForm.tsx`'s own editable grid (under
+"My calling") is untouched and still shows Teacher alongside Topic --
+this only affects the plain viewing pages, not who's actually
+assigned. `row.teacher` itself is untouched in the data layer, simply
+no longer rendered by this one component.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/ym-yw-lessons` and `/adult-teaching-lessons` and confirm
+each class's table now shows only Sunday and Topic, with no Teacher
+column at all.
+
 **"Youth program" eliminated from the landing page and both menus;
 both read-only Lessons pages moved into "This week" -- no migration
 needed, 2026-11-14.** The user's own request, given in these exact

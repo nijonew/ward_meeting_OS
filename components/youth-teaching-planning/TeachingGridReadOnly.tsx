@@ -17,10 +17,15 @@ function formatDate(iso: string) {
  * topic, teacher but no edit ability"). A Server Component, not a
  * Client Component, since there's no interactivity here at all.
  *
- * Column order is Topic before Teacher here specifically, per that
- * same request's literal wording ("date, topic, teacher") --
- * deliberately different from `TeachingGridForm`'s own Teacher-then-
- * Topic order, which wasn't asked to change.
+ * **Teacher column dropped, 2026-11-14** -- the user's own request,
+ * right after confirming the Topic pre-fill sweep (migration 105)
+ * landed correctly: "Let's not show the teacher in the public view of
+ * the teaching planning lists." Only Date and Topic remain on both
+ * pages that render this component (`/ym-yw-lessons`,
+ * `/adult-teaching-lessons`) -- `TeachingGridForm`'s own editable grid
+ * (Teacher + Topic, under "My calling") is unaffected, still shows
+ * who's assigned; `row.teacher` itself is untouched in the data layer,
+ * simply no longer rendered here.
  */
 export function TeachingGridReadOnly({ rows }: { rows: TeachingGridRow[] }) {
   return (
@@ -35,9 +40,6 @@ export function TeachingGridReadOnly({ rows }: { rows: TeachingGridRow[] }) {
               <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                 Topic
               </th>
-              <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
-                Teacher
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -45,7 +47,6 @@ export function TeachingGridReadOnly({ rows }: { rows: TeachingGridRow[] }) {
               <tr key={row.classDate} className="border-t border-rule-strong/40 even:bg-accent-soft hover:bg-accent/15">
                 <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
                 <td className="px-2 py-2 align-top text-xs text-ink">{row.topic || "—"}</td>
-                <td className="px-2 py-2 align-top text-xs text-ink">{row.teacher || "—"}</td>
               </tr>
             ))}
           </tbody>
