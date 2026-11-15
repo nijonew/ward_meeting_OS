@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
-import { getAccessibleClasses, getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
+import { getAccessibleClasses, getTeachingAssignmentGrid, TEACHING_CLASSES } from "@/lib/data/teaching-assignments";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
 /** 6 months out, computed fresh on every render -- "available for the
@@ -49,6 +49,22 @@ function defaultThroughDate(): string {
  * message any more -- any signed-in account reaches this hub, and
  * `accessibleClasses` being empty IS the "no access" state, shown
  * below with the real reason instead of a generic one.
+ *
+ * **Bug found and fixed 2026-11-14, same day: a calling holding
+ * `teaching_schedule_all`/`_elders_quorum`/`_relief_society` showed
+ * Elders Quorum and/or Relief Society as tiles on this page too.**
+ * `getAccessibleClasses` deliberately unions every class a calling's
+ * features resolve to -- youth AND adult -- since `/adult-teaching-planning`
+ * needs that same union to decide which of its own two tables to show.
+ * This hub never narrowed that list back down to just the 6 real youth
+ * classes before rendering tiles (or before checking a `?class=`
+ * param), so an account with broad teaching access saw the adult
+ * organizations mixed in here, and could even reach one directly by
+ * URL. Filtered to `TEACHING_CLASSES` right after resolving access --
+ * the editable Elders Quorum/Relief Society tables stay exactly where
+ * they already correctly are, `/adult-teaching-planning` (not the
+ * read-only `/adult-teaching-lessons`, which has no feature gate at
+ * all and was never meant to hold anything editable).
  */
 export default async function YouthTeachingPlanningPage({
   searchParams,
@@ -58,7 +74,9 @@ export default async function YouthTeachingPlanningPage({
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const accessibleClasses = await getAccessibleClasses(user.id, profile?.features);
+  const accessibleClasses = (await getAccessibleClasses(user.id, profile?.features)).filter((c) =>
+    TEACHING_CLASSES.includes(c),
+  );
   const { through: rawThrough, class: rawClass } = await searchParams;
 
   // Hub view: no class picked yet -- show one tile per class this
