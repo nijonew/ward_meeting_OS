@@ -389,6 +389,17 @@ export async function getAdjacentMeetingIds(
  * first. Pass `cache` when resolving many dates in one call (e.g. a bulk
  * import) to avoid a repeat lookup/insert for the same date.
  *
+ * **`cache` is keyed by `(meetingTypeSlug, dateIso)` together, not
+ * just `dateIso`, 2026-11-15** -- found and fixed while building
+ * agenda-item submission's own multi-meeting support, which was about
+ * to become the first caller to ever share one cache across more than
+ * one meeting type in a single call. Every existing caller only ever
+ * passes one fixed type per cache instance (`app/music/actions.ts`'s
+ * bulk entry is always `"sacrament-meeting"`), so this was a latent
+ * bug with no real-world trigger until now, not a regression --
+ * date-only keying would have silently returned a Bishopric Meeting's
+ * own id for a same-date Ward Council lookup, or vice versa.
+ *
  * **Bug found and fixed 2026-10-16** (the user's own report: a foreign
  * key violation on `sacrament_announcement_pulls_planned_element_id_fkey`
  * trying to pull a previously-used announcement into a meeting): unlike
@@ -411,8 +422,9 @@ export async function getOrCreateMeetingId(
   meetingTypeSlug: MeetingTypeSlug,
   cache?: Map<string, string>
 ): Promise<string | null> {
-  if (cache?.has(dateIso)) {
-    return cache.get(dateIso)!;
+  const cacheKey = `${meetingTypeSlug}::${dateIso}`;
+  if (cache?.has(cacheKey)) {
+    return cache.get(cacheKey)!;
   }
 
   const supabase = await createClient();
@@ -425,7 +437,7 @@ export async function getOrCreateMeetingId(
     .maybeSingle();
 
   if (existing) {
-    cache?.set(dateIso, existing.id as string);
+    cache?.set(cacheKey, existing.id as string);
     return existing.id as string;
   }
 
@@ -462,7 +474,7 @@ export async function getOrCreateMeetingId(
         .eq("meeting_types.slug", meetingTypeSlug)
         .maybeSingle();
       if (winner) {
-        cache?.set(dateIso, winner.id as string);
+        cache?.set(cacheKey, winner.id as string);
         return winner.id as string;
       }
     }
@@ -481,7 +493,7 @@ export async function getOrCreateMeetingId(
     ),
   ]);
 
-  cache?.set(dateIso, created.id as string);
+  cache?.set(cacheKey, created.id as string);
   return created.id as string;
 }
 

@@ -27,9 +27,10 @@ import { AgendaItemForm } from "@/components/submit/AgendaItemForm";
 export default async function SubmitAgendaItemPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string; error?: string }>;
+  searchParams: Promise<{ success?: string; error?: string; warning?: string }>;
 }) {
-  const { success, error } = await searchParams;
+  const { success, error, warning } = await searchParams;
+  const successCount = success ? Number(success) : 0;
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
@@ -57,11 +58,13 @@ export default async function SubmitAgendaItemPage({
           </p>
         ) : (
           <>
-            {success && (
+            {successCount > 0 && (
               <p className="mt-4 rounded border border-rule bg-surface p-4 text-sm text-ink">
-                Thanks. Your agenda item has been added.
+                Thanks. Your agenda item has been added to {successCount}{" "}
+                {successCount === 1 ? "meeting" : "meetings"}.
               </p>
             )}
+            {warning && <p className="mt-2 text-sm text-ink-muted">{warning}</p>}
             {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
             <AgendaItemForm meetingTypes={meetingTypes} onSubmit={submitAgendaItem} />

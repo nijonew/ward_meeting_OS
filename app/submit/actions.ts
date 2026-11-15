@@ -125,15 +125,44 @@ export async function submitAnnouncement(formData: FormData) {
  * **moved behind login and calling-gated 2026-09-09** (the user's own
  * request: "make it available only to those who attend meetings"), so
  * the submitter is a known signed-in account now, not a self-reported
- * name/email. A specific meeting type + date instead of picking "some
- * meeting" later, one description field (no separate title), and how
- * much time is needed. Resolves straight to a real meeting (creating
- * it via getOrCreateMeetingId if that date doesn't have one yet, same
- * as Table Admin's calendar picker) instead of leaving meeting_id null
+ * name/email. One description field (no separate title) and how much
+ * time is needed, shared across every target below. Resolves each
+ * target straight to a real meeting (creating one via
+ * getOrCreateMeetingId if that date doesn't have one yet, same as
+ * Table Admin's calendar picker) instead of leaving meeting_id null
  * for an admin to sort out afterward. Published immediately -- included
  * by default, per the workflow -- rather than starting pending; an
  * admin can still archive it from the meeting's own Agenda Items
  * section.
+ *
+ * **Multiple meeting/date targets, 2026-11-15** (the user's own
+ * request: "a way to select multiple meeting dates for agenda items
+ * as well as multiple meeting types on multiple dates"). `AgendaItemForm`
+ * now renders one row of `meeting_type`/`meeting_date` per target, all
+ * sharing the same field names -- `formData.getAll(...)` returns
+ * same-named fields in document order, and every row renders its type
+ * select immediately before its own date input, so zipping the two
+ * arrays positionally reproduces exactly the rows the user built.
+ * Blank rows (missing type or date -- shouldn't happen from the real
+ * form, but a defensive check regardless) and exact duplicate
+ * (type, date) pairs are dropped before anything else runs.
+ *
+ * **Authorization is checked for every target before anything is
+ * written** -- a crafted POST naming one allowed type and one the
+ * account has no access to is rejected outright, not partially
+ * honored; this is a real access boundary (same reasoning the
+ * original single-target version already had), and "insert what you
+ * can, skip the rest" would be the wrong default for an authorization
+ * failure specifically. Once every target is confirmed authorized, each
+ * one resolves/creates its own meeting and gets its own `agenda_items`
+ * row independently (`Promise.all` -- different (date, type) pairs
+ * can never collide with each other under migration 107's own unique
+ * constraint, so there's no shared-resource race to serialize against).
+ * A failure at THIS stage (a meeting that couldn't be created, a
+ * one-off insert error) is reported as a partial success instead of
+ * discarding everything that did go through -- unlike the
+ * authorization check above, a per-target write failure here is
+ * independent of every other target's own result.
  *
  * Re-checks meeting-type access server-side (not just the page's own
  * filtered <select>) via the same getVisibleMeetingTypesForUser used
@@ -150,43 +179,78 @@ export async function submitAgendaItem(formData: FormData) {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
 
-  const meetingTypeSlug = String(formData.get("meeting_type") ?? "") as MeetingTypeSlug;
-  const dateIso = String(formData.get("meeting_date") ?? "");
+  const typeInputs = formData.getAll("meeting_type").map((v) => String(v));
+  const dateInputs = formData.getAll("meeting_date").map((v) => String(v));
   const description = String(formData.get("description") ?? "").trim();
   const timeNeeded = String(formData.get("time_needed") ?? "");
 
-  if (!meetingTypeSlug || !dateIso || !description) {
-    redirect(`/submit/agenda-item?error=${encodeURIComponent("Meeting, date, and description are required.")}`);
+  if (!description) {
+    redirect(`/submit/agenda-item?error=${encodeURIComponent("A description is required.")}`);
+  }
+
+  const seen = new Set<string>();
+  const targets: { meetingTypeSlug: MeetingTypeSlug; dateIso: string }[] = [];
+  const pairCount = Math.max(typeInputs.length, dateInputs.length);
+  for (let i = 0; i < pairCount; i++) {
+    const meetingTypeSlug = (typeInputs[i] ?? "").trim() as MeetingTypeSlug;
+    const dateIso = (dateInputs[i] ?? "").trim();
+    if (!meetingTypeSlug || !dateIso) continue;
+    const key = `${meetingTypeSlug}::${dateIso}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    targets.push({ meetingTypeSlug, dateIso });
+  }
+
+  if (targets.length === 0) {
+    redirect(`/submit/agenda-item?error=${encodeURIComponent("At least one meeting and date is required.")}`);
   }
 
   const allowedTypes = await getVisibleMeetingTypesForUser(user.id, profile?.features);
-  if (!allowedTypes.includes(meetingTypeSlug)) {
+  const disallowed = targets.find((t) => !allowedTypes.includes(t.meetingTypeSlug));
+  if (disallowed) {
     redirect(
       `/submit/agenda-item?error=${encodeURIComponent(
-        "You don't have access to submit an agenda item for that meeting."
+        `You don't have access to submit an agenda item for ${disallowed.meetingTypeSlug.replace(/-/g, " ")}.`
       )}`
     );
   }
 
-  const meetingId = await getOrCreateMeetingId(dateIso, meetingTypeSlug);
-  if (!meetingId) {
-    redirect(`/submit/agenda-item?error=${encodeURIComponent("Could not find or create that meeting.")}`);
+  const results = await Promise.all(
+    targets.map(async (target) => {
+      const meetingId = await getOrCreateMeetingId(target.dateIso, target.meetingTypeSlug);
+      if (!meetingId) return { ok: false as const, target };
+
+      const { error } = await supabase.from("agenda_items").insert({
+        title: deriveTitle(description),
+        body: description,
+        submitted_by_name: profile?.display_name || user.email || "(not given)",
+        submitted_by_email: profile?.email || user.email || "",
+        status: "published",
+        meeting_id: meetingId,
+        time_needed: TIME_NEEDED_OPTIONS.includes(timeNeeded) ? timeNeeded : null,
+      });
+
+      return error ? { ok: false as const, target } : { ok: true as const, meetingId };
+    })
+  );
+
+  const succeeded = results.filter((r) => r.ok) as { ok: true; meetingId: string }[];
+  const failed = results.filter((r) => !r.ok) as { ok: false; target: { meetingTypeSlug: string; dateIso: string } }[];
+
+  succeeded.forEach((r) => revalidatePath(`/meetings/${r.meetingId}/planning`));
+
+  if (succeeded.length === 0) {
+    redirect(`/submit/agenda-item?error=${encodeURIComponent("Could not find or create any of those meetings.")}`);
   }
 
-  const { error } = await supabase.from("agenda_items").insert({
-    title: deriveTitle(description),
-    body: description,
-    submitted_by_name: profile?.display_name || user.email || "(not given)",
-    submitted_by_email: profile?.email || user.email || "",
-    status: "published",
-    meeting_id: meetingId,
-    time_needed: TIME_NEEDED_OPTIONS.includes(timeNeeded) ? timeNeeded : null,
-  });
-
-  if (error) {
-    redirect(`/submit/agenda-item?error=${encodeURIComponent(error.message)}`);
+  const params = new URLSearchParams({ success: String(succeeded.length) });
+  if (failed.length > 0) {
+    params.set(
+      "warning",
+      `Could not add it to: ${failed
+        .map((r) => `${r.target.meetingTypeSlug.replace(/-/g, " ")} (${r.target.dateIso})`)
+        .join(", ")}.`
+    );
   }
-
-  revalidatePath(`/meetings/${meetingId}/planning`);
-  redirect("/submit/agenda-item?success=1");
+  redirect(`/submit/agenda-item?${params.toString()}`);
 }

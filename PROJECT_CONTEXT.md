@@ -2050,6 +2050,82 @@ avoid confusing the two.
 
 ## Known open items
 
+**Agenda item submission can now target several meetings at once --
+no migration needed, 2026-11-15.** The user's own request: "I want a
+way to have a way to select multiple meeting dates for agenda items
+as well as multiple meeting types on multiple dates." Before this,
+`/submit/agenda-item` could only ever write one `agenda_items` row at
+a time, against exactly one meeting-type + date pair -- getting the
+same item onto, say, both Bishopric Meeting and Ward Council, or onto
+two different Sunday's Bishopric Meetings, meant filling out and
+submitting the whole form again from scratch for each one.
+
+**`AgendaItemForm.tsx`** now renders a repeatable list of plain
+meeting-type + date rows above the shared Description/Time Needed
+fields -- "+ Add another meeting" adds a row, each row can pick any
+of the account's own allowed meeting types independently (so rows can
+freely mix types, not just repeat the same one on different dates),
+and any row (not just the last one) can be removed. Every row reuses
+the identical field names (`meeting_type`/`meeting_date`) rather than
+a per-row-indexed name -- `FormData.getAll(...)` always returns
+same-named fields in document order, and each row renders its type
+select immediately before its own date input, so the server action
+can zip the two arrays back together positionally and reproduce
+exactly the rows built on screen. This is a one-shot, always-blank
+form (unlike a Save-All-Changes grid), so there's no uncontrolled-
+persisted-value risk in letting a row be removed from the middle of
+the list, the way several of this app's other "+ Add another" lists
+have to restrict themselves to removing only the last row.
+
+**`submitAgendaItem`** (`app/submit/actions.ts`) rebuilt around a
+`targets: { meetingTypeSlug, dateIso }[]` list instead of one pair --
+blank rows and exact duplicate (type, date) pairs are dropped before
+anything else runs. **Authorization is checked for every target
+before any write happens**: if even one target names a meeting type
+the account doesn't actually have access to (re-checked server-side
+via the same `getVisibleMeetingTypesForUser` this action already
+used), the whole submission is rejected outright, naming which type --
+deliberately all-or-nothing here, unlike the write step below, since
+"insert what you can get away with" is the wrong default for an
+authorization failure. Once every target clears that check, each one
+resolves/creates its own meeting and inserts its own `agenda_items`
+row independently via `Promise.all` -- safe to run concurrently since
+different (date, type) pairs can never collide with each other under
+migration 107's own unique constraint on `meetings(date, meeting_type_id)`.
+A failure at this second stage (a meeting that couldn't be resolved,
+a one-off insert error) is reported as a partial success rather than
+discarding every target that did succeed -- the success message now
+reads "added to N meeting(s)," with a separate line naming anything
+that didn't go through, rather than the old fixed "has been added."
+
+**A real, latent bug found and fixed while building this, in
+`getOrCreateMeetingId`'s own optional `cache` parameter** (`lib/data/meetings.ts`)
+-- it has always been keyed by `dateIso` alone, never by meeting type
+too. Every existing caller only ever passed one fixed meeting type per
+cache instance (the bulk Sacrament Meeting Music import is the only
+real user of this parameter today), so this had no real-world trigger
+until this feature -- agenda-item submission is the first caller that
+could resolve more than one meeting type within a single request, and
+without this fix, requesting a same-date Ward Council meeting right
+after a same-date Bishopric Meeting (sharing one cache) would have
+silently returned the Bishopric Meeting's own id for the second
+lookup. Fixed to key by `` `${meetingTypeSlug}::${dateIso}` `` instead
+-- in the end, `submitAgendaItem` doesn't even pass a cache (every
+target is already deduplicated by the time it calls this function, so
+there's nothing for one to save), but the fix closes the gap for any
+future caller that does.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project (this
+working copy still has no `.env.local`, so no live browser check was
+possible) -- ask the user to check `/submit/agenda-item`: "+ Add
+another meeting" adds a second row with its own independent meeting-
+type dropdown and date picker; removing a row (including one that
+isn't last) works; submitting with two or more rows -- including a mix
+of meeting types -- creates the agenda item on every one of those
+meetings' own Planning pages; and that the success message correctly
+says how many meetings it was added to.
+
 **Two concurrency pinch points fixed ahead of the app's first real
 multi-user rollout -- migration `107`, not yet run, 2026-11-14.** The
 user asked a direct analytical question first: "What are pinch points
