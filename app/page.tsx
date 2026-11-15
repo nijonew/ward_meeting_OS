@@ -55,7 +55,22 @@ export default async function HomePage() {
           top of the mid section"). This section now only ever renders
           the sign-in status messages below, when there's one to show. */}
       <section className="mt-10">
-        {!user && <p className="text-ink-muted">Sign in for meeting and planning tools.</p>}
+        {/* Expanded, 2026-11-14 (the user's own request): "a note...
+            that says something to the effect of them needing to log
+            in and be verified by an admin to view tools other than
+            sacrament meeting programs and announcements." The old,
+            shorter line ("Sign in for meeting and planning tools")
+            never mentioned the admin-verification step at all, which
+            is the real reason a freshly signed-up account doesn't see
+            anything yet -- someone could otherwise sign in, see
+            nothing happened, and assume it's broken. */}
+        {!user && (
+          <p className="text-sm text-ink-muted">
+            Sign in for meeting and planning tools. After signing in, an admin still needs
+            to verify your account before you can see anything beyond the Sacrament
+            Meeting Program and Announcements above.
+          </p>
+        )}
         {user && !profile?.isLinked && (
           <p className="text-sm text-ink-muted">
             You&rsquo;re signed in, but an admin still needs to verify your account before you

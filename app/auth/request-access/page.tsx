@@ -54,6 +54,15 @@ const initialState: { error?: string; success?: boolean } = {};
  * had happened. On success, the form is now replaced entirely by a
  * dedicated confirmation screen stating plainly to go open the email
  * instead of expecting this page to do anything further.
+ *
+ * **Confirmation screen reworded, 2026-11-14** (the user's own
+ * request): names the real sending address
+ * (`syracuseheritagewardbishopric@gmail.com`) so it's recognizable in
+ * an inbox, explicitly calls out checking spam/junk (not just "spam"),
+ * and spells out what's actually being confirmed (the email address
+ * just entered, not an account itself) and what access looks like in
+ * the meantime (Sacrament Meeting Program and Announcements only,
+ * same as anyone not signed in, until an admin verifies the account).
  */
 export default function RequestAccessPage() {
   const [state, formAction, pending] = useActionState(requestAccess, initialState);
@@ -64,17 +73,21 @@ export default function RequestAccessPage() {
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
         <h1 className="font-display text-2xl">Check your email</h1>
         <p className="mt-2 text-sm text-ink">
-          We sent a verification link to <strong>{email || "your email address"}</strong>.
-          Open that email and click the link in it to verify your address -- this page
-          won&rsquo;t do that for you.
-        </p>
-        <p className="mt-2 text-sm text-ink-muted">
-          Once you&rsquo;ve verified it, an admin will review your request and set up your
-          access. You&rsquo;ll be able to sign in with the email and password you just chose
-          once that&rsquo;s done.
+          We sent a confirmation email to <strong>{email || "your email address"}</strong>{" "}
+          from <strong>syracuseheritagewardbishopric@gmail.com</strong>, asking you to
+          confirm the email address you just entered. Open that email and click the link
+          in it -- this page won&rsquo;t do that for you.
         </p>
         <p className="mt-2 text-xs text-ink-muted">
-          Don&rsquo;t see it? Check your spam folder, or wait a few minutes and try again.
+          Don&rsquo;t see it? Check your spam or junk mail folder -- it sometimes lands
+          there -- or wait a few minutes and try again.
+        </p>
+        <p className="mt-2 text-sm text-ink-muted">
+          Once you&rsquo;ve confirmed it, an admin will review your request and verify
+          you. Until then, you&rsquo;ll only be able to see the Sacrament Meeting Program
+          and Announcements -- the same as anyone who isn&rsquo;t signed in at all. You&rsquo;ll
+          be able to sign in with the email and password you just chose once you&rsquo;re
+          verified.
         </p>
         <Link href="/login" className="mt-6 text-xs text-ink-muted hover:text-ink">
           &larr; Back to sign in

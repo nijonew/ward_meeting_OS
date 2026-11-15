@@ -2050,6 +2050,44 @@ avoid confusing the two.
 
 ## Known open items
 
+**Clearer sign-in/verification messaging on the landing page and the
+self-serve sign-up confirmation screen -- no migration needed,
+2026-11-14.** The user's own request, in two parts:
+1. "Add a note to the landing page of those not logged in that says
+   something to the effect of them needing to log in and be verified
+   by an admin to view tools other than sacrament meeting programs and
+   announcements." The landing page's old logged-out message ("Sign
+   in for meeting and planning tools") never mentioned the admin-
+   verification step at all -- someone could sign in, see nothing
+   happened, and reasonably assume something was broken.
+   `app/page.tsx`'s own logged-out message now reads: "Sign in for
+   meeting and planning tools. After signing in, an admin still needs
+   to verify your account before you can see anything beyond the
+   Sacrament Meeting Program and Announcements above."
+2. "Can we also have a reminder to check email, including junk mail
+   boxes, for the email coming from
+   syracuseheritagewardbishopric@gmail.com that will ask them to
+   authenticate the email address they entered and that they will
+   then be verified by an admin before they can see more than
+   sacrament meeting programs and announcements... on the page that
+   shows after they enter login info and request verification" --
+   confirmed this is `/auth/request-access`'s own "Check your email"
+   confirmation screen (built 2026-10-19, replacing an easy-to-miss
+   inline message). Reworded to name the real sending address
+   directly, call out spam AND junk mail specifically (not just
+   "spam"), state plainly that what's being confirmed is the email
+   address just entered (not an account), and spell out what access
+   looks like in the meantime (Sacrament Meeting Program and
+   Announcements only, same as a logged-out visitor, until an admin
+   verifies the account) rather than leaving that implicit.
+
+Both are pure copy changes -- no logic, access control, or email-
+sending mechanism touched. No migration needed -- confirmed via
+`tsc`/`eslint`/`next build --webpack` only, same no-live-browser gap as
+everything else in this project. Ask the user to check `/` while
+logged out and `/auth/request-access` after submitting a real sign-up,
+and confirm both read correctly.
+
 **Bug found and fixed 2026-11-14: scrolling a `SearchableSelect`/
 `SuggestedTextField` suggestion list closed the dropdown instead of
 scrolling it. No migration needed.** The user's own report, the same
