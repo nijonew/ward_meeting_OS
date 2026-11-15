@@ -78,6 +78,12 @@ export interface TeachingGridRow {
   classDate: string;
   teacher: string;
   topic: string;
+  /** Second-hour class cancellations (2026-11-14) -- true only when a
+   *  real row exists for this date/class with `cancelled = true`;
+   *  always false for a synthesized blank or 5th-Sunday-default row
+   *  (see getTeachingAssignmentGrid below). */
+  cancelled: boolean;
+  cancellationNote: string | null;
 }
 
 export interface TeachingGrid {
@@ -102,6 +108,13 @@ export interface TeachingGrid {
  * this app's cadence-rule engines already use) defaults its two fields
  * to FIFTH_SUNDAY_TEACHER/FIFTH_SUNDAY_TOPIC whenever no real row has
  * been saved for it yet.
+ *
+ * **Gained `cancelled`/`cancellationNote`, 2026-11-14** -- driven by
+ * Meeting Cancellations' new "cancel second-hour classes" option (see
+ * `sweepMeetingCancellations`, lib/data/meeting-cancellations.ts).
+ * Whenever a real row exists for a date, its own `cancelled` value
+ * wins outright -- including over the 5th-Sunday default, since a
+ * cancelled 5th Sunday shouldn't still show "Bishopric Planned."
  */
 export async function getTeachingAssignmentGrid(throughDateISO: string, teachingClass: string): Promise<TeachingGrid> {
   // Mountain Time, not the server's own UTC clock (2026-10-20 bugfix) --
@@ -119,11 +132,11 @@ export async function getTeachingAssignmentGrid(throughDateISO: string, teaching
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("teaching_assignments")
-    .select("class_date, teacher_name, topic")
+    .select("class_date, teacher_name, topic, cancelled, cancellation_note")
     .in("class_date", sundays)
     .eq("class_name", teachingClass);
 
-  const byDate = new Map<string, { teacher: string; topic: string }>();
+  const byDate = new Map<string, { teacher: string; topic: string; cancelled: boolean; cancellationNote: string | null }>();
   if (error) {
     // Most likely cause: migration 042 (which creates this table) hasn't
     // been run yet in this environment. Fail soft with an empty grid
@@ -132,8 +145,19 @@ export async function getTeachingAssignmentGrid(throughDateISO: string, teaching
     // if (error) convention (see getUpcomingMeetings, getMeetingTypes).
     console.error("getTeachingAssignmentGrid: query failed:", error.message);
   } else {
-    for (const row of (data ?? []) as { class_date: string; teacher_name: string | null; topic: string | null }[]) {
-      byDate.set(row.class_date, { teacher: row.teacher_name ?? "", topic: row.topic ?? "" });
+    for (const row of (data ?? []) as {
+      class_date: string;
+      teacher_name: string | null;
+      topic: string | null;
+      cancelled: boolean;
+      cancellation_note: string | null;
+    }[]) {
+      byDate.set(row.class_date, {
+        teacher: row.teacher_name ?? "",
+        topic: row.topic ?? "",
+        cancelled: row.cancelled,
+        cancellationNote: row.cancellation_note,
+      });
     }
   }
 
@@ -143,9 +167,15 @@ export async function getTeachingAssignmentGrid(throughDateISO: string, teaching
       const saved = byDate.get(classDate);
       if (saved) return { classDate, ...saved };
       if (fifthSundays.has(classDate)) {
-        return { classDate, teacher: FIFTH_SUNDAY_TEACHER, topic: FIFTH_SUNDAY_TOPIC };
+        return {
+          classDate,
+          teacher: FIFTH_SUNDAY_TEACHER,
+          topic: FIFTH_SUNDAY_TOPIC,
+          cancelled: false,
+          cancellationNote: null,
+        };
       }
-      return { classDate, teacher: "", topic: "" };
+      return { classDate, teacher: "", topic: "", cancelled: false, cancellationNote: null };
     }),
   };
 }

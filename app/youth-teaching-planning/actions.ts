@@ -7,16 +7,24 @@ import { getAccessibleClasses } from "@/lib/data/teaching-assignments";
 
 type SaveGridActionResult = { error?: string; success?: boolean };
 
-/** Grid field names are "<classDate>::teacher"/"<classDate>::topic" so
- *  one <form> can carry every row's two fields at once, same convention
- *  as the Assignment Rotations grid (parseGridFieldName in
+/** Grid field names are "<classDate>::teacher"/"<classDate>::topic"/
+ *  "<classDate>::cancelled"/"<classDate>::cancellation_note" so one
+ *  <form> can carry every row's fields at once, same convention as the
+ *  Assignment Rotations grid (parseGridFieldName in
  *  app/rotations/actions.ts). ":" never appears in an ISO date, so this
- *  can't collide/misparse. */
-function parseFieldName(name: string): { classDate: string; field: "teacher" | "topic" } | null {
+ *  can't collide/misparse. The latter two were added 2026-11-14 for
+ *  second-hour class cancellations -- `cancellation_note` has no real
+ *  input of its own on this grid (set by the cancellation sweep, see
+ *  lib/data/meeting-cancellations.ts), just a hidden field round-
+ *  tripping whatever it already was so an unrelated edit elsewhere on
+ *  the same submit can't silently clear it. */
+function parseFieldName(
+  name: string
+): { classDate: string; field: "teacher" | "topic" | "cancelled" | "cancellation_note" } | null {
   const idx = name.indexOf("::");
   if (idx === -1) return null;
   const field = name.slice(idx + 2);
-  if (field !== "teacher" && field !== "topic") return null;
+  if (field !== "teacher" && field !== "topic" && field !== "cancelled" && field !== "cancellation_note") return null;
   return { classDate: name.slice(0, idx), field };
 }
 
@@ -48,18 +56,18 @@ export async function saveTeachingGrid(_prevState: unknown, formData: FormData):
   // user.
   if (!accessibleClasses.includes(className)) return { error: "Not authorized for that class." };
 
-  const byDate = new Map<string, { teacher: string; topic: string }>();
+  const byDate = new Map<string, { teacher: string; topic: string; cancelled: string; cancellation_note: string }>();
   for (const [name, value] of formData.entries()) {
     const parsed = parseFieldName(name);
     if (!parsed) continue;
-    const entry = byDate.get(parsed.classDate) ?? { teacher: "", topic: "" };
+    const entry = byDate.get(parsed.classDate) ?? { teacher: "", topic: "", cancelled: "false", cancellation_note: "" };
     entry[parsed.field] = String(value).trim();
     byDate.set(parsed.classDate, entry);
   }
 
   const supabase = await createClient();
 
-  for (const [classDate, { teacher, topic }] of byDate) {
+  for (const [classDate, { teacher, topic, cancelled, cancellation_note }] of byDate) {
     const { error: deleteError } = await supabase
       .from("teaching_assignments")
       .delete()
@@ -67,12 +75,19 @@ export async function saveTeachingGrid(_prevState: unknown, formData: FormData):
       .eq("class_name", className);
     if (deleteError) return { error: deleteError.message };
 
-    if (teacher || topic) {
+    const isCancelled = cancelled === "true";
+    // A cancelled row with no teacher/topic still needs to be
+    // reinserted (2026-11-14) -- otherwise saving this grid for any
+    // unrelated reason would silently delete the cancellation sweep's
+    // own placeholder row along with it.
+    if (teacher || topic || isCancelled) {
       const { error: insertError } = await supabase.from("teaching_assignments").insert({
         class_date: classDate,
         class_name: className,
         teacher_name: teacher || null,
         topic: topic || null,
+        cancelled: isCancelled,
+        cancellation_note: isCancelled ? cancellation_note || null : null,
       });
       if (insertError) return { error: insertError.message };
     }
@@ -80,5 +95,7 @@ export async function saveTeachingGrid(_prevState: unknown, formData: FormData):
 
   revalidatePath("/youth-teaching-planning");
   revalidatePath("/adult-teaching-planning");
+  revalidatePath("/ym-yw-lessons");
+  revalidatePath("/adult-teaching-lessons");
   return { success: true };
 }

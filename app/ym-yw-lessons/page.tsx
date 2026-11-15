@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getTeachingAssignmentGrid, TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
+import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { TeachingGridReadOnly } from "@/components/youth-teaching-planning/TeachingGridReadOnly";
 
 /** 6 months out, computed fresh on every render -- same rolling
@@ -46,6 +47,11 @@ export default async function YmYwLessonsPage({
 
   const { through: rawThrough } = await searchParams;
   const throughDate = rawThrough || defaultThroughDate();
+
+  // Lazy sweep (2026-11-14) -- see /youth-teaching-planning's own
+  // comment on this exact same call for why it's done here rather than
+  // inside getTeachingAssignmentGrid itself.
+  await sweepMeetingCancellations();
 
   const grids = await Promise.all(TEACHING_CLASS_OPTIONS.map((c) => getTeachingAssignmentGrid(throughDate, c.value)));
 

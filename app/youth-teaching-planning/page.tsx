@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses, getTeachingAssignmentGrid, TEACHING_CLASSES } from "@/lib/data/teaching-assignments";
+import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
 /** 6 months out, computed fresh on every render -- "available for the
@@ -127,6 +128,13 @@ export default async function YouthTeachingPlanningPage({
   }
 
   const throughDate = rawThrough || defaultThroughDate();
+  // Lazy sweep, same pattern as every other cancellation list in this
+  // app (autoArchivePastMeetings, sweepYouthActivityCancellations) --
+  // called here rather than inside getTeachingAssignmentGrid itself to
+  // avoid a circular import between this file's own data layer and
+  // meeting-cancellations.ts (which needs ALL_TEACHING_CLASS_OPTIONS
+  // from here). Cheap no-op when there's nothing scheduled to cancel.
+  await sweepMeetingCancellations();
   const grid = await getTeachingAssignmentGrid(throughDate, rawClass);
 
   return (

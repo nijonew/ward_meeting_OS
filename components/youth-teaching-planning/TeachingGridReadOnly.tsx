@@ -26,6 +26,11 @@ function formatDate(iso: string) {
  * (Teacher + Topic, under "My calling") is unaffected, still shows
  * who's assigned; `row.teacher` itself is untouched in the data layer,
  * simply no longer rendered here.
+ *
+ * **Second-hour class cancellations shown, 2026-11-14** -- same
+ * "Cancelled" badge + reason styling `ActivitiesTable.tsx` already
+ * uses for a cancelled youth activity, "shown, not hidden" rather than
+ * blanking the row entirely.
  */
 export function TeachingGridReadOnly({ rows }: { rows: TeachingGridRow[] }) {
   return (
@@ -46,7 +51,16 @@ export function TeachingGridReadOnly({ rows }: { rows: TeachingGridRow[] }) {
             {rows.map((row) => (
               <tr key={row.classDate} className="border-t border-rule-strong/40 even:bg-accent-soft hover:bg-accent/15">
                 <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
-                <td className="px-2 py-2 align-top text-xs text-ink">{row.topic || "—"}</td>
+                <td className="px-2 py-2 align-top text-xs text-ink">
+                  {row.cancelled ? (
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-danger">Cancelled</span>
+                  ) : (
+                    row.topic || "—"
+                  )}
+                  {row.cancelled && row.cancellationNote && (
+                    <div className="mt-1 text-xs text-danger">Cancelled: {row.cancellationNote}</div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -26,6 +26,12 @@ export async function addMeetingCancellationAction(formData: FormData): Promise<
     revalidatePath("/dashboard");
     revalidatePath("/youth-activities");
     revalidatePath("/events");
+    // Second-hour class cancellations (2026-11-14) touch
+    // teaching_assignments, read by all four of these.
+    revalidatePath("/youth-teaching-planning");
+    revalidatePath("/adult-teaching-planning");
+    revalidatePath("/ym-yw-lessons");
+    revalidatePath("/adult-teaching-lessons");
   }
   return result;
 }

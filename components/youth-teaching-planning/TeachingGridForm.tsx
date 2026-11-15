@@ -42,6 +42,19 @@ function formatDate(iso: string) {
  * Row contrast (2026-10-10, `even:bg-accent-soft`/`hover:bg-accent/15`)
  * is unchanged -- see CallingPlanningGridForm's own comment for the
  * full reasoning.
+ *
+ * **Gained a Cancelled column, 2026-11-14** -- second-hour class
+ * cancellations (see Meeting Cancellations' own new checkbox,
+ * lib/data/meeting-cancellations.ts). Same hidden-"false"-before-the-
+ * real-checkbox convention as every other boolean toggle in this app's
+ * grids (e.g. ActivitiesTable's own Confirmed column) -- an unchecked
+ * box submits nothing on its own, so without the fallback, unchecking
+ * it would never actually save `false`. A row's own `cancellationNote`
+ * (set by the cancellation sweep, not editable here) rides along as a
+ * hidden field purely so an ordinary Teacher/Topic edit elsewhere on
+ * the same grid can't accidentally clear it on save -- saveTeachingGrid
+ * deletes and reinserts every submitted row regardless of which fields
+ * actually changed.
  */
 export function TeachingGridForm({
   teachingClass,
@@ -78,12 +91,20 @@ export function TeachingGridForm({
                 <th className="px-2 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
                   Topic
                 </th>
+                <th className="px-2 py-2 text-center font-mono text-[10px] uppercase tracking-wider text-ink-muted/70">
+                  Cancelled
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.classDate} className="border-t border-rule-strong/40 even:bg-accent-soft hover:bg-accent/15">
-                  <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-ink">{formatDate(row.classDate)}</td>
+                  <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-ink">
+                    {formatDate(row.classDate)}
+                    {row.cancelled && (
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-danger">Cancelled</div>
+                    )}
+                  </td>
                   <td className="px-2 py-1.5 align-top">
                     <input
                       type="text"
@@ -99,6 +120,19 @@ export function TeachingGridForm({
                       defaultValue={row.topic}
                       className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     />
+                    {row.cancelled && row.cancellationNote && (
+                      <div className="mt-1 text-xs text-danger">Cancelled: {row.cancellationNote}</div>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-center align-top">
+                    <input type="hidden" name={`${row.classDate}::cancelled`} value="false" />
+                    <input
+                      type="checkbox"
+                      name={`${row.classDate}::cancelled`}
+                      value="true"
+                      defaultChecked={row.cancelled}
+                    />
+                    <input type="hidden" name={`${row.classDate}::cancellation_note`} value={row.cancellationNote ?? ""} />
                   </td>
                 </tr>
               ))}

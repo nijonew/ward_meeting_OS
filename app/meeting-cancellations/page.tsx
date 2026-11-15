@@ -70,6 +70,7 @@ export default async function MeetingCancellationsPage() {
               const affected = [
                 ...c.meeting_type_slugs.map((slug) => MEETING_TYPE_LABELS[slug] ?? slug),
                 ...(c.cancel_youth_activities ? ["Youth Activities"] : []),
+                ...(c.cancel_second_hour_classes ? ["Second-Hour Classes"] : []),
               ];
               return (
                 <li
@@ -144,6 +145,19 @@ export default async function MeetingCancellationsPage() {
           <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" name="cancel_youth_activities" />
             Also cancel youth activities in this date range
+          </label>
+
+          {/* Second-hour class cancellations (2026-11-14, the user's
+              own request): "cancel only the second hour of church
+              meetings... on certain sundays sacrament meeting is held
+              but no second hour classes." Independent of the meeting-
+              type checkboxes above -- leaving every one of those
+              unchecked while checking just this one cancels every
+              YM/YW and adult class without touching Sacrament Meeting
+              at all. */}
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" name="cancel_second_hour_classes" />
+            Also cancel second-hour classes (YM/YW + Elders Quorum / Relief Society) in this date range
           </label>
 
           <FormSubmitButton

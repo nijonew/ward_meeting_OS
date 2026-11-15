@@ -2050,6 +2050,101 @@ avoid confusing the two.
 
 ## Known open items
 
+**New: second-hour class cancellations, migration `106`, not yet run,
+2026-11-14.** The user's own request, given in these exact words: "I
+want to add an option to cancel only the second hour of church
+meetings. This would mean cancelling ym/yw classes and adult classes.
+So for example on certain sundays sacrament meeting is held but no
+second hour classes. Please add this functionality into the
+cancellation page."
+
+Built as a new, orthogonal checkbox on the existing Meeting
+Cancellations page (`/meeting-cancellations`), alongside the existing
+meeting-type checklist and "cancel youth activities" checkbox --
+leaving every meeting type unchecked while checking only this one
+cancels every YM/YW and adult (Elders Quorum/Relief Society) class for
+the date range while Sacrament Meeting runs completely unaffected,
+exactly the example given.
+
+**Schema**: `teaching_assignments` gains `cancelled`/`cancellation_note`
+(migration `106`), the same shape `meetings`/`youth_activities` already
+use -- "shown, not hidden," never a deleted row. `meeting_cancellations`
+gains `cancel_second_hour_classes`, a plain boolean alongside the two
+existing targets.
+
+**The sweep needed a genuinely different shape than the other two
+targets**, not just a copy-pasted third branch -- `meetings`/
+`youth_activities` already have a real row for every relevant date
+before this sweep ever runs (via their own auto-generation), so
+marking one cancelled is a plain `.update().eq("cancelled", false)`.
+`teaching_assignments` is a deliberately sparse table (migration 042's
+own design -- a blank cell just means no row exists yet), so
+cancelling a date nothing was ever saved for means INSERTING a
+brand-new placeholder row, not updating one assumed to already be
+there. New `applySecondHourClassCancellations`
+(`lib/data/meeting-cancellations.ts`) reads every Sunday in range
+(5th Sundays included -- unlike migration 105's own topic pre-fill,
+there's no reason to spare them here; if the whole second hour is
+off, so is that week's combined lesson) x every real class
+(`ALL_TEACHING_CLASS_OPTIONS`, 2 adult + 6 youth), splits into rows
+that already exist (update in place, preserving whatever teacher/topic
+they already have) vs. rows that don't (insert a brand-new one,
+cancelled, with no teacher/topic to preserve) -- same "only ever adds,
+never auto-reverses" rule as every other cancellation sweep in this
+app.
+
+**Called from all four pages that read `teaching_assignments`**
+(`/youth-teaching-planning`, `/adult-teaching-planning`,
+`/ym-yw-lessons`, `/adult-teaching-lessons`), not from inside
+`getTeachingAssignmentGrid` itself -- that function's own module would
+need to import `sweepMeetingCancellations`, which itself needs
+`ALL_TEACHING_CLASS_OPTIONS` from that same module, a real circular
+import between the two files. Calling the sweep from each page instead
+(same lazy-sweep-on-read pattern as every other cancellation list in
+this app) sidesteps it entirely, at the cost of one extra explicit call
+per page rather than one shared one.
+
+**Visible on both the editable grid and the read-only Lessons
+pages** -- `TeachingGridReadOnly.tsx` shows "Cancelled" in place of the
+Topic text (plus the reason underneath, when one was given), matching
+`ActivitiesTable.tsx`'s own established cancelled-row styling exactly.
+`TeachingGridForm.tsx` (under "My calling") gained a new Cancelled
+checkbox column -- same hidden-"false"-before-the-real-checkbox
+convention as every other boolean toggle in this app's grids -- so an
+admin can manually cancel or un-cancel any single row directly, the
+same "bulk sweep tool + a per-row manual override" shape every other
+cancellation feature in this app already has. `saveTeachingGrid`
+(`app/youth-teaching-planning/actions.ts`) needed a real fix to support
+this safely: that action deletes and reinserts every submitted row
+regardless of which fields actually changed, so a cancelled row with
+blank Teacher/Topic had to be included in the "does this row need
+reinserting at all" check too -- otherwise saving the grid for any
+unrelated reason would have silently deleted the sweep's own
+placeholder row along with it. `cancellation_note` rides along as a
+hidden field (not independently editable from this grid) purely so it
+survives that same delete-then-reinsert round trip.
+
+Table Admin's existing "Teaching Assignments" raw-data fallback grid
+gained both new columns too, for the usual troubleshooting/bulk-fix
+case.
+
+No application code change needed beyond what's listed -- confirmed
+via `tsc`/`eslint`/`next build --webpack` only, same no-live-database-
+access gap as everything else in this project. **Confirm migration
+number `106` is actually free before running it**, per this project's
+own repeated numbering-collision history, then ask the user to run it
+and check: adding a cancellation on `/meeting-cancellations` with only
+"cancel second-hour classes" checked (no meeting type) leaves
+Sacrament Meeting untouched while every YM/YW and adult class shows
+"Cancelled" for that date range, on both `/youth-teaching-planning`/
+`/adult-teaching-planning` and the two read-only Lessons pages; that a
+date with nothing previously saved for it gets a real placeholder row
+inserted (check Table Admin's Teaching Assignments grid); that
+unchecking the new Cancelled checkbox on the editable grid and saving
+correctly un-cancels that one row; and that editing an unrelated row's
+Teacher/Topic on the same grid and saving doesn't clear any other
+row's cancelled state.
+
 **Teacher column dropped from both read-only Lessons pages, no
 migration needed, 2026-11-14.** The user's own request, right after
 confirming migration 105's topic pre-fill landed correctly: "Let's

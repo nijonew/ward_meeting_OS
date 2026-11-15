@@ -629,6 +629,8 @@ export const ADMIN_TABLES: Record<string, AdminTableConfig> = {
       { column: "class_name", label: "Class", type: "select", required: true, options: ALL_TEACHING_CLASS_OPTIONS },
       { column: "teacher_name", label: "Teacher", type: "text" },
       { column: "topic", label: "Topic", type: "text" },
+      { column: "cancelled", label: "Cancelled", type: "boolean" },
+      { column: "cancellation_note", label: "Cancellation Note", type: "text" },
     ],
   },
 };
