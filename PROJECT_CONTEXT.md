@@ -2050,6 +2050,51 @@ avoid confusing the two.
 
 ## Known open items
 
+**"Announcements" eliminated as its own section; Submit an
+Announcement / Manage Announcements moved into "My calling" -- no
+migration needed, 2026-11-15.** The user's own request: "lets move
+managing and submitting announcements into 'my calling' on the
+landing page and menus" -- the identical treatment "Youth program"
+got the day before (2026-11-14: its one link folded into "My calling"
+once that section stopped being youth-specific). Scoped entirely to
+`getNavSections()` (`lib/data/nav-sections.ts`) -- the one shared
+function both the landing page's own tile grid (`app/page.tsx`) and
+the persistent side-nav drawer's lazily-fetched sections
+(`components/NavDrawer.tsx`, via `app/nav-actions.ts`) already read
+from, so fixing it once fixes both surfaces named in the request with
+no page-level changes needed. The standalone section (`if
+(canSubmitAnnouncement || canAnnouncementManagement) { ... sections.push({
+title: "Announcements", ... }) }`) is removed outright; both links
+now push into "My calling"'s own list instead, inside that section's
+existing umbrella `if`, which grew the same two conditions
+(`canSubmitAnnouncement`/`canAnnouncementManagement`) so the section
+still appears for an account that holds only one of these and nothing
+else "My calling" already gates on.
+
+**Both links keep their own existing gates completely unchanged** --
+only which section lists them moved, not who sees either one.
+`canSubmitAnnouncement` is still `attendsMeetings ||
+hasFeature(profile, "announcement_adding")`; `canAnnouncementManagement`
+is still the plain `announcement_management` feature check. The "This
+week" tier's own separate, genuinely public "Announcements" tile
+(`components/AppHeader.tsx`'s `thisWeekSection`, linking to
+`/announcements/public` -- the read-only listing, no login needed) is
+a different link entirely and is untouched; the user's own wording
+("managing and submitting") named the two gated tools specifically,
+not that public tile.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (one build
+attempt hit the known, unrelated transient Google Fonts fetch failure
+on `app/layout.tsx`'s own `next/font/google` import -- a retry built
+clean), same no-live-database-access gap as everything else in this
+project -- ask the user to check: the landing page's own section list
+no longer shows a separate "Announcements" heading; an account
+holding either `announcement_adding`-equivalent access (attending a
+meeting, or the dedicated feature) or `announcement_management` now
+sees "Submit an Announcement"/"Manage Announcements" listed under "My
+calling" instead; and that the persistent side-nav drawer shows the
+same thing.
+
 **Agenda item submission can now target several meetings at once --
 no migration needed, 2026-11-15.** The user's own request: "I want a
 way to have a way to select multiple meeting dates for agenda items

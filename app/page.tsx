@@ -36,7 +36,7 @@ export default async function HomePage() {
   const earlyAccessSacramentMeeting =
     !todaysSacramentMeeting && canPreviewSacramentEarly ? await getEarlyAccessSacramentMeeting() : null;
 
-  // My meetings/Announcements/My calling/Admin --
+  // My meetings/My calling/Admin --
   // factored out into `getNavSections()` (2026-11-05, built for the new
   // persistent side nav) rather than re-derived here a second time, per
   // this app's own "Single Source of Truth" principle. "This week"
@@ -172,16 +172,19 @@ export default async function HomePage() {
         </TileGrid>
       </section>
 
-      {/* My meetings/Announcements/My calling/Admin, 2026-11-05 --
+      {/* My meetings/My calling/Admin, 2026-11-05 --
           sourced from `getNavSections()` (lib/data/nav-sections.ts)
           instead of being hand-rolled here; see that function's own
           doc comment for the per-section gating this loop no longer
           needs to repeat. Order matches the function's own push order
-          (My meetings, Announcements, My calling, Admin), same
-          reading order this page always had. "Youth program" was its
-          own section here through 2026-11-14, when it was eliminated
-          -- its one link (Youth Activity Planning) moved into "My
-          calling" instead, per the user's own request. */}
+          (My meetings, My calling, Admin), same reading order this
+          page always had. "Youth program" was its own section here
+          through 2026-11-14, when it was eliminated -- its one link
+          (Youth Activity Planning) moved into "My calling" instead.
+          "Announcements" was its own section through 2026-11-15, when
+          it was eliminated the same way, per the user's own request --
+          both of its links (Submit an Announcement, Manage
+          Announcements) moved into "My calling" too. */}
       {navSections.map((section) => (
         <section key={section.title} className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">{section.title}</p>

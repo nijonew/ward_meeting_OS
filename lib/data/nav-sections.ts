@@ -24,12 +24,16 @@ export interface NavSection {
  * duplicated, per this app's own "Single Source of Truth"/"Views
  * Instead of Duplicate Data" design principles (architecture.md) --
  * `app/page.tsx` itself now calls this for its own My meetings/
- * Announcements/My calling/Admin sections instead of re-deriving the
- * identical gating a second time. **"Youth program" existed as its
- * own section here from 2026-09-09 through 2026-11-14, when it was
- * eliminated** -- the user's own request: "eliminate youth program on
- * landing page and menus." Its one link, Youth Activity Planning,
- * moved into "My calling" instead (see that section below).
+ * My calling/Admin sections instead of re-deriving the identical
+ * gating a second time. **"Youth program" existed as its own section
+ * here from 2026-09-09 through 2026-11-14, when it was eliminated** --
+ * the user's own request: "eliminate youth program on landing page and
+ * menus." Its one link, Youth Activity Planning, moved into "My
+ * calling" instead (see that section below). **"Announcements"
+ * existed as its own section from 2026-11-05 through 2026-11-15, when
+ * it was eliminated the same way** -- the user's own request: "move
+ * managing and submitting announcements into 'my calling'." Both of
+ * its links moved into "My calling" too.
  *
  * Deliberately does NOT include "This week" -- that section's tiles
  * are either genuinely public (no login at all) or carry per-request
@@ -108,12 +112,6 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
 
   const canSubmitAnnouncement = attendsMeetings || hasFeature(profile, "announcement_adding");
   const canAnnouncementManagement = hasFeature(profile, "announcement_management");
-  if (canSubmitAnnouncement || canAnnouncementManagement) {
-    const links: NavLink[] = [];
-    if (canSubmitAnnouncement) links.push({ title: "Submit an Announcement", href: "/submit/announcement" });
-    if (canAnnouncementManagement) links.push({ title: "Manage Announcements", href: "/announcements" });
-    sections.push({ title: "Announcements", links });
-  }
 
   const canPlanAnyMeeting = hasAnyFeature(profile, allMeetingFeatures("planning"));
   const canMeetingSchedule = hasFeature(profile, "meeting_schedule");
@@ -144,7 +142,26 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
   // by its own feature (`youth_activity_planning`), same as every
   // other link in this section, just like the rest here manages a
   // specific thing by calling rather than attends a meeting by one.
-  if (canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canTeachYouth || canTeachAdult || isYouthLeader) {
+  //
+  // **Submit an Announcement / Manage Announcements moved in here too,
+  // and "Announcements" (its own section) eliminated entirely,
+  // 2026-11-15** -- the user's own request: "lets move managing and
+  // submitting announcements into 'my calling' on the landing page and
+  // menus," the identical treatment "Youth program" got the day
+  // before. Both keep their own existing gates
+  // (`canSubmitAnnouncement`/`canAnnouncementManagement`, defined
+  // above) unchanged -- only which section lists them moved, not who
+  // sees either one.
+  if (
+    canMeetingPlanningHub ||
+    canCallingPlanning ||
+    isMusicPlanner ||
+    canTeachYouth ||
+    canTeachAdult ||
+    isYouthLeader ||
+    canSubmitAnnouncement ||
+    canAnnouncementManagement
+  ) {
     const links: NavLink[] = [];
     if (canMeetingPlanningHub) links.push({ title: "Meeting Planning", href: "/meeting-planning" });
     if (canCallingPlanning) links.push({ title: "Calling Planning", href: "/calling-planning" });
@@ -152,6 +169,8 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
     if (canTeachYouth) links.push({ title: "YM/YW Teaching Planning", href: "/youth-teaching-planning" });
     if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
     if (isYouthLeader) links.push({ title: "Youth Activity Planning", href: "/youth-activity-planning" });
+    if (canSubmitAnnouncement) links.push({ title: "Submit an Announcement", href: "/submit/announcement" });
+    if (canAnnouncementManagement) links.push({ title: "Manage Announcements", href: "/announcements" });
     sections.push({ title: "My calling", links });
   }
 
