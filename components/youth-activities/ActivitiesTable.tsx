@@ -284,11 +284,18 @@ function compareText(a: string, b: string): number {
  * alone, not `deletable`, for the same duplicate-field-name reason
  * Time/Title/Notes already are: Upcoming Activities can show the same
  * real row exploded into up to 6 copies, and a same-named checkbox
- * repeated that many times has no well-defined submitted value. The
- * existing read-only "Tentative" badge is left in place everywhere
- * (including next to the new checkbox on an editable page) rather than
- * removed -- harmless redundancy, and still the only indicator at all
- * on Upcoming Activities, where there's no checkbox to look at instead.
+ * repeated that many times has no well-defined submitted value.
+ *
+ * **"Tentative" badge removed entirely, 2026-11-15** (the user's own
+ * request: "I want to eliminate the tentative label from all youth
+ * activities"). The Title cell no longer shows it next to "Cancelled"
+ * on any page this component renders -- `row.confirmed` is otherwise
+ * untouched (still a real column, still toggled via the Confirmed
+ * checkbox above), so nothing about whether an activity counts as
+ * confirmed changed, only whether that state is ever called out in
+ * text. The Confirmed column/checkbox itself is unaffected -- its own
+ * header already says what it means with no need for a second label
+ * elsewhere on the row.
  */
 export function ActivitiesTable({
   activities,
@@ -467,9 +474,6 @@ export function ActivitiesTable({
                   )}
                   {row.cancelled && (
                     <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger">Cancelled</span>
-                  )}
-                  {!row.cancelled && !row.confirmed && (
-                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-accent">Tentative</span>
                   )}
                   {!editable && (
                     <div className="mt-1">

@@ -2050,6 +2050,35 @@ avoid confusing the two.
 
 ## Known open items
 
+**The "Tentative" badge on youth activities is gone -- no migration
+needed, 2026-11-15.** The user's own request: "I want to eliminate the
+tentative label from all youth activities." `ActivitiesTable.tsx` (the
+one shared grid behind Upcoming Activities, the three Combined-group
+pages, and every other place a youth activity row renders) showed a
+small "Tentative" badge next to the title whenever `!cancelled &&
+!confirmed` -- added 2026-10-11 back when there was no way at all to
+see or change that state, and extended with a real Confirmed checkbox
+on 2026-10-17 once the user asked for one. The badge itself is now
+removed outright, scoped to exactly that one `<span>` -- the
+`Cancelled` badge right next to it, `row.confirmed` as a real column,
+and the Confirmed checkbox/column that sets it are all completely
+untouched. The checkbox's own column header already reads "Confirmed"
+with no need for a second label elsewhere on the row to explain what
+checking or unchecking it means.
+
+No application code beyond this one component needed to change --
+`ClassActivityGridForm.tsx` (the per-class grid) already had no
+"Tentative" text of its own, only its own Confirmed checkbox, which is
+unaffected.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask
+the user to check: no youth activity row anywhere in the app (Upcoming
+Activities, the three Combined-group pages, or any per-class grid)
+shows a "Tentative" badge, Cancelled still shows correctly on a
+cancelled row, and the Confirmed checkbox still toggles and saves
+`confirmed` exactly as before.
+
 **"Edit via Form" on Manage Announcements changed from a list of
 every row to a dropdown of non-archived ones -- no migration needed,
 2026-11-15.** The user's own request: "update the edit via form
