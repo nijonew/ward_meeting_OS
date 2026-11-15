@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 105
+## Current migration number: 107
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,120 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Two concurrency pinch points fixed ahead of the app's first real
+multi-user rollout -- migration `107`, not yet run, 2026-11-14.** The
+user asked a direct analytical question first: "What are pinch points
+and failure points that will cause issues when there are several
+people logged in at the same time viewing programs, meetings, and
+announcements?" A fork-verified audit (file:line references, not
+speculation) turned up five real candidates; the user's own follow-up
+scoped exactly which two to act on right now, in these words: "Please
+act on 1 and 2 but nothing can break anything else with the big
+rollout tomorrow." That constraint -- nothing else may break, there's
+a real deadline -- shaped every design choice below; the other three
+candidates from the audit (not acted on here, available on request)
+were a missing index on a hot lookup, a lack of optimistic-locking on
+a couple of multi-step admin writes, and the Conducting script's own
+8-second poll multiplying under concurrent admin sessions on the same
+meeting.
+
+**1. The public Sacrament Meeting program (`/meetings/[id]/public`)
+had zero cross-request caching.** It's the single highest-concurrency
+page in the app by a wide margin -- every ward member opens the same
+meeting's program the same Sunday morning -- yet every single viewer
+triggered its own independent ~12 Supabase round trips, with nothing
+shared between them. `lib/data/public-view.ts` is restructured: the
+actual row-fetching (`fetchRawSacramentData`) and the pure item-
+assembly logic (`assembleView`) are each factored into their own
+shared helper, so there's exactly one implementation of the real
+business logic to ever get wrong, used by two entry points:
+- **`getPublicSacramentView`** -- unchanged in every observable
+  respect from how this file always worked, still a live, cookie-based
+  fetch on every call. Kept as the one and only path for a
+  `sacrament_planning` holder's own preview (any stage, any date,
+  archived meetings included, per this app's own Vision workflow:
+  "Bishopric keeps unconditional any-stage/any-date preview").
+- **New `getPublicSacramentViewCached`** -- for every OTHER viewer
+  (the actual concurrency concern). Wraps the raw-row fetch in a real
+  `unstable_cache`, 20 seconds, using the existing `createCacheableClient()`
+  (a plain anon-key client, the same pattern already proven on
+  `hymnal_songs`/`ward_settings`). 20 seconds, not the 5 minutes those
+  reference tables use, because this content genuinely changes far
+  more often -- an admin can keep editing the program right up to and
+  during the meeting itself, and this app's own Vision workflow is
+  explicit that the public program "updates in real time... no
+  separate publish step." 20 seconds collapses an entire burst of the
+  whole congregation opening the page within the same couple of
+  minutes down to roughly one real fetch instead of one per viewer,
+  while staying short enough that nobody would ever notice it as
+  staleness. `unstable_cache` can't call anything that reads
+  `cookies()`/`headers()`, and its return value has to survive a real
+  JSON round trip -- the two `Map`s this function builds
+  (`rabnmPeopleByRabnmId`, `nameById`) are serialized to plain objects
+  before returning and reconstructed into real `Map`s immediately
+  after, so every line of the shared `assembleView` logic stays
+  completely unaware the data might have come from a cache.
+  `getSacramentProgramItems`/`getTitlePrefixesForAssignments` --
+  both already their own independent, always-live, cookie-based
+  fetches -- are completely untouched either way, confirmed by reading
+  both directly before writing anything.
+- **Why this needed a genuine split, not just one unconditional
+  caching change**: migration `075` (confirmed, already run) added
+  anon-facing RLS policies on `sacrament_assignments`/
+  `sacrament_program_items` gated on `meetings.stage <> 'archived'`.
+  Routing an admin's own archived-meeting preview through the new
+  anon-key cached path would have silently returned empty results
+  instead of the real content -- a real regression this session caught
+  before writing any code, not after. `app/meetings/[id]/public/page.tsx`
+  now picks between the two based on the exact same `hasFeature(profile,
+  "sacrament_planning")` check the page already computes for its own
+  access gate -- no new gate, no new risk surface, just routing an
+  already-computed boolean to one more decision.
+
+**2. A real, confirmed race condition in `getOrCreateMeetingId`**
+(`lib/data/meetings.ts`) -- a plain check-then-insert with no
+database-level guarantee behind it. Two concurrent calls for the same
+`(date, meeting_type_id)` (two admins, or an admin colliding with the
+auto-generation sweep) could both pass the initial SELECT seeing
+nothing, then both INSERT, producing a genuine duplicate meeting row.
+Fixed in two parts, deliberately ordered so the application-code half
+is safe to ship regardless of whether the migration half has actually
+been run by the time of tomorrow's rollout:
+- **`getOrCreateMeetingId` now checks the insert's own error** for a
+  Postgres unique-violation (code `23505`) and, on exactly that error,
+  re-selects and returns the real row instead of returning `null` --
+  the race's loser ends up with the winner's id rather than erroring
+  or creating a duplicate. **Until migration `107` is actually run,
+  there is no constraint to violate, so this new branch can never
+  fire and behavior is byte-for-byte identical to before this
+  shipped** -- the fix is a true no-op without its migration, not a
+  change that depends on timing to be safe.
+- **New migration `107`** adds a unique constraint on `meetings(date,
+  meeting_type_id)` -- guarded, not a bare `alter table`: it first
+  checks for existing duplicate rows (`group by ... having count(*) >
+  1`) and only adds the constraint when the data is already clean,
+  otherwise leaves everything untouched and says so via `raise
+  notice` rather than failing the whole migration outright. This app
+  has already hit exactly this kind of accidental duplicate by hand
+  before (Delete Meeting, migration `054`, exists specifically to
+  clean one up), so assuming production data is already clean would
+  have been the wrong default.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project --
+**confirm migration number `107` is actually free before running
+it**, then ask the user to run it and check: an admin/Bishopric
+account can still preview an already-archived Sacrament Meeting's
+public program exactly as before (this is the one path that must
+never silently go empty); an ordinary, logged-out visitor's view of a
+live/upcoming meeting's program still shows correct, current content,
+updating within about 20 seconds of an admin's own edit rather than
+instantly (expected, and the only user-visible behavior change from
+fix #1); and that creating two meetings for the same date/type at
+nearly the same time (the Table Admin `createIfMissing` picker is the
+easiest way to try this concurrently in two tabs) no longer produces
+a duplicate row once migration `107` has actually run.
 
 **Clearer sign-in/verification messaging on the landing page and the
 self-serve sign-up confirmation screen -- no migration needed,

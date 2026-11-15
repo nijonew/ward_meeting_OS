@@ -437,7 +437,37 @@ export async function getOrCreateMeetingId(
     .insert({ meeting_type_id: meetingType.id, date: dateIso, stage: "template" })
     .select("id")
     .single();
-  if (error || !created) return null;
+
+  if (error || !created) {
+    // A real, confirmed race: this was a plain check-then-insert with
+    // no database-level guarantee behind it -- two concurrent calls
+    // for the same (date, meeting_type_id) (two admins, or an admin
+    // colliding with the auto-generation sweep) could both pass the
+    // `existing` check above seeing nothing, then both insert,
+    // producing a genuine duplicate meeting row. Migration 107
+    // (2026-11-14) adds a unique constraint on exactly that pair --
+    // once it's run, the race's loser lands here instead, as a real
+    // unique-violation (Postgres code 23505), and the fix is to
+    // re-select and return the winner's row rather than erroring out.
+    // Until that migration is actually run, no constraint means no
+    // violation, so this branch never fires and behavior is
+    // byte-for-byte unchanged -- safe to ship ahead of the migration,
+    // found during a pinch-point audit before the app's first real
+    // multi-user rollout.
+    if (error?.code === "23505") {
+      const { data: winner } = await supabase
+        .from("meetings")
+        .select("id, meeting_types!inner(slug)")
+        .eq("date", dateIso)
+        .eq("meeting_types.slug", meetingTypeSlug)
+        .maybeSingle();
+      if (winner) {
+        cache?.set(dateIso, winner.id as string);
+        return winner.id as string;
+      }
+    }
+    return null;
+  }
 
   // Independent of each other for this one new meeting -- run as one
   // parallel wave instead of two sequential round trips (2026-10-31,

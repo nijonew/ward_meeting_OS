@@ -1,4 +1,4 @@
-import { getPublicSacramentView } from "@/lib/data/public-view";
+import { getPublicSacramentView, getPublicSacramentViewCached } from "@/lib/data/public-view";
 import { getMeetingById, getNextTwoSacramentMeetingIds } from "@/lib/data/meetings";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { isSacramentMeetingPubliclyVisible } from "@/lib/data/timezone";
@@ -64,7 +64,9 @@ export default async function PublicViewPage({
     );
   }
 
-  if (!hasFeature(profile, "sacrament_planning")) {
+  const isAdmin = hasFeature(profile, "sacrament_planning");
+
+  if (!isAdmin) {
     // Archived is admin-only, full stop, regardless of the "ready for
     // public" flag or who's asking -- the Vision workflow's own rule
     // ("no calling-based or public access at all once archived") isn't
@@ -104,7 +106,16 @@ export default async function PublicViewPage({
     }
   }
 
-  const view = await getPublicSacramentView(meetingId);
+  // Admin preview stays live, always -- it's the only path that can
+  // ever reach an archived meeting (see the `isAdmin` branch above),
+  // and the anon-key-backed cached path below can't read that data at
+  // all for an archived meeting (migration 075's own anon RLS
+  // policies on sacrament_assignments/sacrament_program_items require
+  // `stage <> 'archived'`). Everyone else -- the actual concurrency
+  // concern, the whole congregation opening this on the same Sunday
+  // morning -- gets the short-TTL cached path instead (2026-11-14
+  // pinch-point audit, see getPublicSacramentViewCached's own comment).
+  const view = isAdmin ? await getPublicSacramentView(meetingId) : await getPublicSacramentViewCached(meetingId);
 
   if (!view) {
     return <p className="text-ink-muted">Could not load this meeting.</p>;

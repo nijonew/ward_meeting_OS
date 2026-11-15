@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createCacheableClient } from "@/lib/supabase/cacheable-client";
 import { getMeetingById } from "@/lib/data/meetings";
 import { getSacramentProgramItems } from "@/lib/data/sacrament-program";
 import { kindOfItemKey } from "@/lib/data/sacrament-program-shared";
@@ -53,30 +55,64 @@ interface RawRabnm {
   detail: string | null;
 }
 
-export async function getPublicSacramentView(meetingId: string): Promise<PublicSacramentView | null> {
-  const supabase = await createClient();
-  // getMeetingById doesn't need anything the wave below fetches (and
-  // vice versa), so it runs concurrently with it instead of blocking
-  // it first (2026-10-31, chasing the user's own "this app is
-  // extremely slow" report) -- this is the single most-opened page in
-  // the app by ordinary ward members, every Sunday.
-  const meetingPromise = getMeetingById(meetingId);
+interface RawSacramentData {
+  specialFormat: string;
+  assignments: RawAssignment[];
+  adults: RawSpeaker[];
+  youth: RawSpeaker[];
+  music: RawMusic[];
+  rabnm: RawRabnm[];
+  rabnmPeopleByRabnmId: Map<string, string[]>;
+  nameById: Map<string, string>;
+}
 
-  const [
-    formatRes,
-    assignmentsRes,
-    adultsRes,
-    youthRes,
-    musicRes,
-    rabnmRes,
-    programItems,
-    hymnalIndex,
-  ] = await Promise.all([
+/** Plain-object shape `RawSacramentData` is serialized to across the
+ *  `unstable_cache` boundary -- a `Map` doesn't survive
+ *  JSON (de)serialization, so the cached fetcher below returns this
+ *  instead and `toRawSacramentData` reconstructs the real Maps
+ *  immediately after, so every line of `assembleView` can stay
+ *  completely unaware the data might have come from a cache. */
+interface SerializableRawSacramentData {
+  specialFormat: string;
+  assignments: RawAssignment[];
+  adults: RawSpeaker[];
+  youth: RawSpeaker[];
+  music: RawMusic[];
+  rabnm: RawRabnm[];
+  rabnmPeopleByRabnmId: Record<string, string[]>;
+  nameById: Record<string, string>;
+}
+
+function toRawSacramentData(s: SerializableRawSacramentData): RawSacramentData {
+  return {
+    specialFormat: s.specialFormat,
+    assignments: s.assignments,
+    adults: s.adults,
+    youth: s.youth,
+    music: s.music,
+    rabnm: s.rabnm,
+    rabnmPeopleByRabnmId: new Map(Object.entries(s.rabnmPeopleByRabnmId)),
+    nameById: new Map(Object.entries(s.nameById)),
+  };
+}
+
+/**
+ * The actual row-level fetch, parameterized by which Supabase client
+ * to use -- shared between the always-live path (the caller's own
+ * cookie-based client) and the cached path below (a plain anon-key
+ * client, required since `unstable_cache` can't call anything that
+ * reads `cookies()`). Every query here is identical to what this file
+ * always ran directly inside `getPublicSacramentView` before
+ * 2026-11-14 -- only WHERE the client comes from changed, not what's
+ * asked for.
+ */
+async function fetchRawSacramentData(
+  meetingId: string,
+  supabase: ReturnType<typeof createCacheableClient>
+): Promise<RawSacramentData> {
+  const [formatRes, assignmentsRes, adultsRes, youthRes, musicRes, rabnmRes] = await Promise.all([
     supabase.rpc("get_meeting_special_format", { p_meeting_id: meetingId }),
-    supabase
-      .from("sacrament_assignments")
-      .select("role, assigned_to_id, guest_name")
-      .eq("meeting_id", meetingId),
+    supabase.from("sacrament_assignments").select("role, assigned_to_id, guest_name").eq("meeting_id", meetingId),
     supabase
       .from("sacrament_speakers_adults")
       .select("slot, speaker_id, guest_speaker_name, topic")
@@ -93,12 +129,7 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
       .eq("meeting_id", meetingId)
       .eq("status", "published"),
     supabase.from("sacrament_rabnm").select("id, detail").eq("meeting_id", meetingId).eq("type", "baby_blessing"),
-    getSacramentProgramItems(meetingId),
-    getHymnalIndex(),
   ]);
-
-  const meeting = await meetingPromise;
-  if (!meeting) return null;
 
   const assignments = (assignmentsRes.data ?? []) as RawAssignment[];
   const adults = (adultsRes.data ?? []) as RawSpeaker[];
@@ -107,38 +138,16 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
   const rabnm = (rabnmRes.data ?? []) as RawRabnm[];
 
   // Baby Blessing items can name more than one child -- fetch the
-  // linked people separately, keyed by rabnm_id. Independent of
-  // "title + last name" resolution below (that one only needs
-  // `assignments`, already in hand) -- the two run together rather
-  // than one after the other.
+  // linked people separately, keyed by rabnm_id.
   const rabnmIds = rabnm.map((r) => r.id);
-  // "Title + last name" (2026-10-21) for any role resolved via a
-  // calling -- see getTitlePrefixesForAssignments. **Known limitation
-  // for a genuinely anonymous (no-login) viewer**: unlike
-  // get_public_people_names below, this reads `callings` through the
-  // ordinary client, which has no anon-facing RLS policy today -- it
-  // degrades gracefully (plain names, no error) rather than crashing,
-  // but an anonymous visitor to this specific page won't see the title
-  // prefix; an admin/Bishopric preview (always authenticated) does. A
-  // dedicated security-definer RPC, mirroring get_public_people_names,
-  // would be the fix if extending this to anonymous viewers matters.
-  const titlePairs = assignments
-    .filter((a) => a.assigned_to_id)
-    .map((a) => ({ elementKey: a.role, personId: a.assigned_to_id as string }));
-
-  const [rabnmPeopleRows, titlePrefixByKey] = await Promise.all([
+  const rabnmPeopleRows =
     rabnmIds.length > 0
-      ? supabase
-          .from("sacrament_rabnm_people")
-          .select("rabnm_id, person_id")
-          .in("rabnm_id", rabnmIds)
-          .then((r) => r.data)
-      : Promise.resolve([] as { rabnm_id: string; person_id: string }[] | null),
-    getTitlePrefixesForAssignments("sacrament-meeting", titlePairs),
-  ]);
+      ? ((await supabase.from("sacrament_rabnm_people").select("rabnm_id, person_id").in("rabnm_id", rabnmIds)).data ??
+        [])
+      : [];
 
   const rabnmPeopleByRabnmId = new Map<string, string[]>();
-  for (const row of (rabnmPeopleRows ?? []) as { rabnm_id: string; person_id: string }[]) {
+  for (const row of rabnmPeopleRows as { rabnm_id: string; person_id: string }[]) {
     const list = rabnmPeopleByRabnmId.get(row.rabnm_id) ?? [];
     list.push(row.person_id);
     rabnmPeopleByRabnmId.set(row.rabnm_id, list);
@@ -159,6 +168,97 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     p_ids: Array.from(idSet),
   });
   const nameById = new Map(((peopleRows ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+
+  return {
+    specialFormat: (formatRes.data as string | null) ?? "standard",
+    assignments,
+    adults,
+    youth,
+    music,
+    rabnm,
+    rabnmPeopleByRabnmId,
+    nameById,
+  };
+}
+
+const CACHE_SECONDS = 20;
+
+/**
+ * The cached counterpart to `fetchRawSacramentData` above -- 2026-11-14,
+ * a pinch-point audit before the app's own first real multi-user
+ * rollout found this page (the single most-opened one in the app,
+ * every Sunday, by the whole congregation at once) doing ~12
+ * independent Supabase round trips with nothing shared between
+ * concurrent viewers, unlike the small reference tables
+ * (`hymnal_songs`, `ward_settings`, etc.) that already got a 5-minute
+ * cross-request cache in the prior performance pass.
+ *
+ * A real `unstable_cache`, not just a shorter revalidate window on an
+ * existing one -- this content changes far more often than those
+ * reference tables (an admin can edit the program up to and during
+ * the meeting itself, per the Vision workflow's own "updates in real
+ * time... no separate publish step" rule), so a 20-second window was
+ * chosen deliberately short: imperceptible as staleness in practice
+ * (nobody is watching their own program auto-refresh second by
+ * second), while still collapsing an entire burst of the whole
+ * congregation opening the page within the same couple of minutes
+ * down to roughly one real fetch instead of one per viewer.
+ *
+ * **Deliberately NOT used for a `sacrament_planning` holder's own
+ * preview** (see `getPublicSacramentView` below) -- this uses a plain
+ * anon-key client, which is correct for every genuinely public viewer
+ * since the explicit `.eq("confirmed", true)`/`.eq("status",
+ * "published")` filters above already narrow every query down to
+ * exactly what an anonymous reader is allowed to see regardless of
+ * which key fetched it. The one real exception: `sacrament_assignments`/
+ * `sacrament_program_items`'s own anon-facing RLS policies (migration
+ * 075) additionally require the meeting's own stage to not be
+ * `archived` -- true for every meeting this cached path is ever
+ * actually reached for (the page itself already blocks a non-admin
+ * from reaching an archived meeting before calling this at all), but
+ * NOT true for a Bishopric member previewing an already-archived
+ * Sacrament Meeting, which this app's own Vision workflow explicitly
+ * allows ("Bishopric keeps unconditional any-stage/any-date preview").
+ * Routing that case through the anon-key client would silently return
+ * empty results for an archived meeting instead of the real content --
+ * a real regression, avoided entirely by keeping that one path fully
+ * live and untouched.
+ */
+const fetchRawSacramentDataCached = unstable_cache(
+  async (meetingId: string): Promise<SerializableRawSacramentData> => {
+    const supabase = createCacheableClient();
+    const raw = await fetchRawSacramentData(meetingId, supabase);
+    return {
+      specialFormat: raw.specialFormat,
+      assignments: raw.assignments,
+      adults: raw.adults,
+      youth: raw.youth,
+      music: raw.music,
+      rabnm: raw.rabnm,
+      rabnmPeopleByRabnmId: Object.fromEntries(raw.rabnmPeopleByRabnmId),
+      nameById: Object.fromEntries(raw.nameById),
+    };
+  },
+  ["public-sacrament-raw-data"],
+  { revalidate: CACHE_SECONDS }
+);
+
+/**
+ * Builds the finished `PublicSacramentView` from already-fetched raw
+ * data -- the one place the actual program-assembly logic lives (item
+ * order, hymn URLs, speaker/title resolution, Ward Business), shared
+ * by both the live and cached entry points below so there's exactly
+ * one implementation of this to ever get wrong, not two that could
+ * quietly drift apart.
+ */
+function assembleView(
+  meeting: { title: string; date: string },
+  raw: RawSacramentData,
+  programItems: Awaited<ReturnType<typeof getSacramentProgramItems>>,
+  hymnalIndex: Awaited<ReturnType<typeof getHymnalIndex>>,
+  titlePrefixByKey: Map<string, string>
+): PublicSacramentView {
+  const { assignments, adults, youth, music, rabnm, rabnmPeopleByRabnmId, nameById } = raw;
 
   const roleName = (role: string) => {
     const a = assignments.find((x) => x.role === role);
@@ -219,8 +319,6 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
     url: sacramentHymn?.hymn_number ? resolveHymnUrl(sacramentHymn.hymn_number, hymnalIndex) : null,
   });
 
-  const specialFormat = (formatRes.data as string | null) ?? "standard";
-
   // Speakers & Music, in the meeting's own chosen order (2026-09-10) --
   // this used to be grouped by type (all youth speakers, then
   // intermediate hymns, then musical numbers, then adult speakers)
@@ -278,7 +376,70 @@ export async function getPublicSacramentView(meetingId: string): Promise<PublicS
   return {
     meetingTitle: meeting.title,
     meetingDate: meeting.date,
-    specialFormat,
+    specialFormat: raw.specialFormat,
     items,
   };
+}
+
+/** `getTitlePrefixesForAssignments` depends on `raw.assignments`, so
+ *  it can't join the first wave of fetches -- same two-wave shape this
+ *  file has always had, shared by both entry points below. */
+async function resolveTitlePrefixes(raw: RawSacramentData): Promise<Map<string, string>> {
+  const titlePairs = raw.assignments
+    .filter((a) => a.assigned_to_id)
+    .map((a) => ({ elementKey: a.role, personId: a.assigned_to_id as string }));
+  return getTitlePrefixesForAssignments("sacrament-meeting", titlePairs);
+}
+
+/**
+ * Always live, never cached -- for a `sacrament_planning` holder's own
+ * preview (any stage, any date, including an already-archived
+ * meeting), unchanged in every respect from how this file always
+ * worked before 2026-11-14. See `getPublicSacramentViewCached` below
+ * for the genuinely public path, and that function's own doc comment
+ * for exactly why the two are kept separate.
+ */
+export async function getPublicSacramentView(meetingId: string): Promise<PublicSacramentView | null> {
+  const supabase = await createClient();
+  // getMeetingById doesn't need anything the wave below fetches (and
+  // vice versa), so it runs concurrently with it instead of blocking
+  // it first (2026-10-31, chasing the user's own "this app is
+  // extremely slow" report).
+  const meetingPromise = getMeetingById(meetingId);
+
+  const [raw, programItems, hymnalIndex] = await Promise.all([
+    fetchRawSacramentData(meetingId, supabase),
+    getSacramentProgramItems(meetingId),
+    getHymnalIndex(),
+  ]);
+
+  const meeting = await meetingPromise;
+  if (!meeting) return null;
+
+  const titlePrefixByKey = await resolveTitlePrefixes(raw);
+  return assembleView(meeting, raw, programItems, hymnalIndex, titlePrefixByKey);
+}
+
+/**
+ * The cached path -- for every viewer WITHOUT `sacrament_planning`
+ * (the entire congregation, on a normal Sunday, which is the actual
+ * concurrency concern this exists for). `app/meetings/[id]/public/page.tsx`
+ * is the only caller, and it already resolves `sacrament_planning`
+ * before deciding which of these two functions to call.
+ */
+export async function getPublicSacramentViewCached(meetingId: string): Promise<PublicSacramentView | null> {
+  const meetingPromise = getMeetingById(meetingId);
+
+  const [rawSerialized, programItems, hymnalIndex] = await Promise.all([
+    fetchRawSacramentDataCached(meetingId),
+    getSacramentProgramItems(meetingId),
+    getHymnalIndex(),
+  ]);
+  const raw = toRawSacramentData(rawSerialized);
+
+  const meeting = await meetingPromise;
+  if (!meeting) return null;
+
+  const titlePrefixByKey = await resolveTitlePrefixes(raw);
+  return assembleView(meeting, raw, programItems, hymnalIndex, titlePrefixByKey);
 }
