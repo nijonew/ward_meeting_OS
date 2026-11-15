@@ -7,18 +7,10 @@ import { getOrCreateMeetingId } from "@/lib/data/meetings";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import type { MeetingTypeSlug } from "@/lib/types";
-import { OTHER_VALUE } from "@/lib/data/announcement-constants";
+import { parseAnnouncementFormData } from "@/lib/data/announcements";
 
 const TIME_NEEDED_OPTIONS = ["1-2 Minutes", "3-5 Minutes", "6+ Minutes"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-/** For the form's two "Other" radio questions (organization, type): the
- *  free-text box submitted alongside the radio replaces the literal
- *  "Other" value, so admins see the real answer instead of a dead-end
- *  label. Falls back to "Other" only if the box was left blank. */
-function resolveOtherRadio(rawValue: string, otherText: string): string {
-  return rawValue === OTHER_VALUE ? otherText.trim() || OTHER_VALUE : rawValue;
-}
 
 /** No separate title field on the real form this matches -- derive a
  *  short one from the description so agenda_items.title (NOT NULL)
@@ -62,6 +54,12 @@ function deriveTitle(description: string): string {
  * Storage bucket, and includes the resulting public URL on the insert.
  * A failed upload fails the whole submission, same redirect-with-error
  * pattern every other validation in this function already uses.
+ *
+ * **Field parsing extracted into `parseAnnouncementFormData`,
+ * 2026-11-14** (`lib/data/announcements.ts`) -- shared with the new
+ * form-based editor's own `updateAnnouncement`
+ * (`app/announcements/actions.ts`) so the two can't drift apart on how
+ * a field gets read/validated.
  */
 export async function submitAnnouncement(formData: FormData) {
   const supabase = await createClient();
@@ -79,48 +77,9 @@ export async function submitAnnouncement(formData: FormData) {
     }
   }
 
-  const title = String(formData.get("title") ?? "").trim();
-  const body = String(formData.get("body") ?? "").trim();
-  const organization = resolveOtherRadio(
-    String(formData.get("organization") ?? "").trim(),
-    String(formData.get("organization_other") ?? "")
-  );
-  const announcementType = resolveOtherRadio(
-    String(formData.get("announcement_type") ?? "").trim(),
-    String(formData.get("announcement_type_other") ?? "")
-  );
-  const audience = formData.getAll("audience").map(String).filter(Boolean).join(", ");
-  const whereAnnounced = formData.getAll("where_announced").map(String).filter(Boolean).join(", ");
-  const startDate = String(formData.get("start_date") ?? "").trim() || null;
-  const startTime = String(formData.get("start_time") ?? "").trim() || null;
-  const endDate = String(formData.get("end_date") ?? "").trim() || null;
-  const endTime = String(formData.get("end_time") ?? "").trim() || null;
-  const location = String(formData.get("location") ?? "").trim() || null;
-  const linkUrl = String(formData.get("link_url") ?? "").trim() || null;
-
-  // RecurrenceToggle's checkbox has a hidden "" fallback before it in
-  // the DOM (so unchecking it still submits something) -- getAll's
-  // LAST entry is the real submitted state, matching how every other
-  // hidden-fallback checkbox in this app is read (see
-  // saveAgendaGrid's PLANNING_BOOLEAN_COLUMNS handling).
-  const isRecurringValues = formData.getAll("is_recurring");
-  const isRecurring = isRecurringValues[isRecurringValues.length - 1] === "on";
-  const recurrence = isRecurring ? String(formData.get("recurrence") ?? "").trim() || null : null;
-  const recurrenceDayOfWeek =
-    isRecurring && (recurrence === "weekly" || recurrence === "monthly_nth_weekday")
-      ? Number(formData.get("recurrence_day_of_week") ?? 0)
-      : null;
-  const recurrenceNthOccurrence =
-    isRecurring && recurrence === "monthly_nth_weekday" ? Number(formData.get("recurrence_nth_occurrence") ?? 1) : null;
-  const recurrenceDayOfMonth =
-    isRecurring && recurrence === "monthly_date" ? Number(formData.get("recurrence_day_of_month") ?? 1) : null;
-
-  if (!title || !body || !organization || !announcementType || !audience || !whereAnnounced) {
-    redirect(
-      `/submit/announcement?error=${encodeURIComponent(
-        "Organization, audience, where to announce, type, title, and description are required."
-      )}`
-    );
+  const parsed = parseAnnouncementFormData(formData);
+  if ("error" in parsed) {
+    redirect(`/submit/announcement?error=${encodeURIComponent(parsed.error)}`);
   }
 
   let imageUrl: string | null = null;
@@ -144,26 +103,11 @@ export async function submitAnnouncement(formData: FormData) {
   }
 
   const { error } = await supabase.from("announcements").insert({
-    title,
-    body,
+    ...parsed,
     submitted_by_name: profile?.display_name || user.email || "(not given)",
     submitted_by_email: profile?.email || user.email || "",
     status: "published",
-    organization,
-    announcement_type: announcementType,
-    audience,
-    where_announced: whereAnnounced,
-    start_date: startDate,
-    start_time: startTime,
-    end_date: endDate,
-    end_time: endTime,
-    location,
-    link_url: linkUrl,
     image_url: imageUrl,
-    recurrence,
-    recurrence_day_of_week: recurrenceDayOfWeek,
-    recurrence_nth_occurrence: recurrenceNthOccurrence,
-    recurrence_day_of_month: recurrenceDayOfMonth,
   });
 
   if (error) {

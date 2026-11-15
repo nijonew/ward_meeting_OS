@@ -5,6 +5,14 @@ import { ANNOUNCEMENT_RECURRENCE_TYPES, WEEKDAY_NAMES, NTH_OCCURRENCE_NAMES } fr
 
 const SELECT_CLASS = "rounded border border-rule bg-paper px-2 py-2 text-xs text-ink";
 
+export interface RecurrenceInitial {
+  recurring: boolean;
+  recurrence: string | null;
+  dayOfWeek: number | null;
+  nthOccurrence: number | null;
+  dayOfMonth: number | null;
+}
+
 /**
  * "Is this a recurring thing?" toggle + cadence picker for the
  * Announcement submit form (migration 083, 2026-10-25) -- the user's
@@ -24,9 +32,22 @@ const SELECT_CLASS = "rounded border border-rule bg-paper px-2 py-2 text-xs text
  * relabeled "Series Start/End Date"/"Time" -- same fields, same
  * `name`s, just read as "the window this recurs within" and "each
  * occurrence's own time" instead of one event's start/end.
+ *
+ * **Gained an optional `initial` prop, 2026-11-14** (the new form-based
+ * announcement editor, `AnnouncementForm.tsx`) -- a single component
+ * now covers both submitting a brand-new announcement (no `initial`,
+ * every field starts off/blank, exactly as before) and editing an
+ * existing one (pre-checked/pre-selected from its own saved recurrence
+ * fields), rather than two parallel copies of the same toggle+picker.
  */
-export function RecurrenceToggle({ children }: { children: (recurring: boolean) => React.ReactNode }) {
-  const [recurring, setRecurring] = useState(false);
+export function RecurrenceToggle({
+  children,
+  initial,
+}: {
+  children: (recurring: boolean) => React.ReactNode;
+  initial?: RecurrenceInitial;
+}) {
+  const [recurring, setRecurring] = useState(initial?.recurring ?? false);
   return (
     <div className="flex flex-col gap-3">
       <label className="flex items-center gap-2 text-sm text-ink">
@@ -34,14 +55,31 @@ export function RecurrenceToggle({ children }: { children: (recurring: boolean) 
         <input type="checkbox" name="is_recurring" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
         This is a recurring item (a weekly/monthly class, etc.), not a single date
       </label>
-      {recurring && <RecurrenceFields />}
+      {recurring && (
+        <RecurrenceFields
+          initialRecurrence={initial?.recurrence ?? "weekly"}
+          initialDayOfWeek={initial?.dayOfWeek ?? 0}
+          initialNthOccurrence={initial?.nthOccurrence ?? 1}
+          initialDayOfMonth={initial?.dayOfMonth ?? 1}
+        />
+      )}
       {children(recurring)}
     </div>
   );
 }
 
-function RecurrenceFields() {
-  const [recurrence, setRecurrence] = useState<string>("weekly");
+function RecurrenceFields({
+  initialRecurrence,
+  initialDayOfWeek,
+  initialNthOccurrence,
+  initialDayOfMonth,
+}: {
+  initialRecurrence: string;
+  initialDayOfWeek: number;
+  initialNthOccurrence: number;
+  initialDayOfMonth: number;
+}) {
+  const [recurrence, setRecurrence] = useState<string>(initialRecurrence);
 
   return (
     <div className="rounded border border-rule px-3 py-2">
@@ -64,7 +102,7 @@ function RecurrenceFields() {
       {recurrence === "weekly" && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
           Every
-          <select name="recurrence_day_of_week" required className={SELECT_CLASS}>
+          <select name="recurrence_day_of_week" required defaultValue={initialDayOfWeek} className={SELECT_CLASS}>
             {WEEKDAY_NAMES.map((d, i) => (
               <option key={d} value={i}>
                 {d}
@@ -77,14 +115,14 @@ function RecurrenceFields() {
       {recurrence === "monthly_nth_weekday" && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
           The
-          <select name="recurrence_nth_occurrence" required className={SELECT_CLASS}>
+          <select name="recurrence_nth_occurrence" required defaultValue={initialNthOccurrence} className={SELECT_CLASS}>
             {NTH_OCCURRENCE_NAMES.map((n, i) => (
               <option key={n} value={i + 1}>
                 {n}
               </option>
             ))}
           </select>
-          <select name="recurrence_day_of_week" required className={SELECT_CLASS}>
+          <select name="recurrence_day_of_week" required defaultValue={initialDayOfWeek} className={SELECT_CLASS}>
             {WEEKDAY_NAMES.map((d, i) => (
               <option key={d} value={i}>
                 {d}
@@ -104,6 +142,7 @@ function RecurrenceFields() {
             required
             min={1}
             max={31}
+            defaultValue={initialDayOfMonth}
             placeholder="Day"
             className={`${SELECT_CLASS} w-16`}
           />

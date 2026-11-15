@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMountainTimeNow } from "@/lib/data/timezone";
 import { deleteStorageImageAtUrl } from "@/lib/storage/image-cleanup";
-import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES } from "@/lib/data/announcement-constants";
+import { WEEKDAY_NAMES, WEEKDAY_PLURAL_NAMES, NTH_OCCURRENCE_NAMES, OTHER_VALUE } from "@/lib/data/announcement-constants";
 import { weeklyDates, nthWeekdayDates, monthlyDateDates } from "@/lib/data/cadence";
 
 /**
@@ -445,4 +445,134 @@ export function groupAndSortAnnouncements<T extends { title: string; start_date:
   });
 
   return result;
+}
+
+export interface AnnouncementRecord extends ParsedAnnouncementFields {
+  id: string;
+  status: string;
+  image_url: string | null;
+}
+
+/**
+ * One announcement's full editable row, for the new form-based editor
+ * (`app/announcements/[id]/edit/page.tsx`, 2026-11-14) -- every field
+ * `AnnouncementForm` can pre-fill, plus `status` and `image_url` (not
+ * part of `ParsedAnnouncementFields` since neither is read from the
+ * submit form itself: `status` is always "published" on a brand-new
+ * submission, and the image is a Storage upload, not a plain field).
+ */
+export async function getAnnouncementById(id: string): Promise<AnnouncementRecord | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("announcements")
+    .select(
+      "id, title, body, organization, announcement_type, audience, where_announced, start_date, start_time, end_date, end_time, location, link_url, image_url, recurrence, recurrence_day_of_week, recurrence_nth_occurrence, recurrence_day_of_month, status"
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as AnnouncementRecord;
+}
+
+export interface ParsedAnnouncementFields {
+  title: string;
+  body: string;
+  organization: string;
+  announcement_type: string;
+  audience: string;
+  where_announced: string;
+  start_date: string | null;
+  start_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  location: string | null;
+  link_url: string | null;
+  recurrence: string | null;
+  recurrence_day_of_week: number | null;
+  recurrence_nth_occurrence: number | null;
+  recurrence_day_of_month: number | null;
+}
+
+/** For the form's two "Other" radio questions (organization, type): the
+ *  free-text box submitted alongside the radio replaces the literal
+ *  "Other" value, so the saved row shows the real answer instead of a
+ *  dead-end label. Falls back to "Other" only if the box was left
+ *  blank. */
+function resolveOtherRadio(rawValue: string, otherText: string): string {
+  return rawValue === OTHER_VALUE ? otherText.trim() || OTHER_VALUE : rawValue;
+}
+
+/**
+ * The field-parsing/validation half of submitting OR editing an
+ * announcement, shared between `submitAnnouncement`
+ * (`app/submit/actions.ts`) and `updateAnnouncement`
+ * (`app/announcements/actions.ts`, 2026-11-14's new form-based editor --
+ * the user's own request: "a way to edit announcements by using a form
+ * like the entry form, rather than just the table"). Extracted here,
+ * rather than left duplicated in both Server Action files, so the two
+ * entry points can never quietly drift apart on how a field gets
+ * read/validated. Image upload is deliberately NOT handled here -- it
+ * needs Supabase Storage access and a real decision about what to do
+ * with an announcement's EXISTING image on edit (keep it unless a new
+ * file is chosen), which differs enough between create and edit that
+ * each caller still does its own.
+ */
+export function parseAnnouncementFormData(formData: FormData): ParsedAnnouncementFields | { error: string } {
+  const title = String(formData.get("title") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const organization = resolveOtherRadio(
+    String(formData.get("organization") ?? "").trim(),
+    String(formData.get("organization_other") ?? "")
+  );
+  const announcementType = resolveOtherRadio(
+    String(formData.get("announcement_type") ?? "").trim(),
+    String(formData.get("announcement_type_other") ?? "")
+  );
+  const audience = formData.getAll("audience").map(String).filter(Boolean).join(", ");
+  const whereAnnounced = formData.getAll("where_announced").map(String).filter(Boolean).join(", ");
+  const startDate = String(formData.get("start_date") ?? "").trim() || null;
+  const startTime = String(formData.get("start_time") ?? "").trim() || null;
+  const endDate = String(formData.get("end_date") ?? "").trim() || null;
+  const endTime = String(formData.get("end_time") ?? "").trim() || null;
+  const location = String(formData.get("location") ?? "").trim() || null;
+  const linkUrl = String(formData.get("link_url") ?? "").trim() || null;
+
+  if (!title || !body || !organization || !announcementType || !audience || !whereAnnounced) {
+    return { error: "Organization, audience, where to announce, type, title, and description are required." };
+  }
+
+  // RecurrenceToggle's checkbox has a hidden "" fallback before it in
+  // the DOM (so unchecking it still submits something) -- getAll's
+  // LAST entry is the real submitted state, matching how every other
+  // hidden-fallback checkbox in this app is read.
+  const isRecurringValues = formData.getAll("is_recurring");
+  const isRecurring = isRecurringValues[isRecurringValues.length - 1] === "on";
+  const recurrence = isRecurring ? String(formData.get("recurrence") ?? "").trim() || null : null;
+  const recurrenceDayOfWeek =
+    isRecurring && (recurrence === "weekly" || recurrence === "monthly_nth_weekday")
+      ? Number(formData.get("recurrence_day_of_week") ?? 0)
+      : null;
+  const recurrenceNthOccurrence =
+    isRecurring && recurrence === "monthly_nth_weekday" ? Number(formData.get("recurrence_nth_occurrence") ?? 1) : null;
+  const recurrenceDayOfMonth =
+    isRecurring && recurrence === "monthly_date" ? Number(formData.get("recurrence_day_of_month") ?? 1) : null;
+
+  return {
+    title,
+    body,
+    organization,
+    announcement_type: announcementType,
+    audience,
+    where_announced: whereAnnounced,
+    start_date: startDate,
+    start_time: startTime,
+    end_date: endDate,
+    end_time: endTime,
+    location,
+    link_url: linkUrl,
+    recurrence,
+    recurrence_day_of_week: recurrenceDayOfWeek,
+    recurrence_nth_occurrence: recurrenceNthOccurrence,
+    recurrence_day_of_month: recurrenceDayOfMonth,
+  };
 }

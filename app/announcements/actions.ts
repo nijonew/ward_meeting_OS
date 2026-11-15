@@ -5,8 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getAdminTableConfig } from "@/lib/admin/registry";
 import { updateAdminRow, insertAdminRow, deleteAdminRow } from "@/lib/admin/table-data";
+import { parseAnnouncementFormData } from "@/lib/data/announcements";
+import { deleteStorageImageAtUrl } from "@/lib/storage/image-cleanup";
 
 type ActionResult = { success: true } | { error: string };
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Real management for /announcements, 2026-10-12 (the user's own
@@ -63,6 +67,62 @@ export async function deleteAnnouncementRow(table: string, id: string): Promise<
   const result = await deleteAdminRow(config, id);
   if ("success" in result) revalidatePath("/announcements");
   return result;
+}
+
+/**
+ * The form-based editor's own save action, 2026-11-14 (the user's own
+ * request: "a way to edit announcements by using a form like the entry
+ * form, rather than just the table") -- `app/announcements/[id]/edit/page.tsx`
+ * is this action's only caller. Shares `parseAnnouncementFormData`
+ * (lib/data/announcements.ts) with `submitAnnouncement`
+ * (app/submit/actions.ts) so the two entry points can't drift apart on
+ * how a field gets read/validated; `status` is the one field this form
+ * has that the create form doesn't (a brand-new submission is always
+ * "published").
+ *
+ * Image handling mirrors `submitAnnouncement`'s own upload step, with
+ * one addition: a REPLACED image's old Storage file is deleted first
+ * (`deleteStorageImageAtUrl`), so editing a flyer doesn't leave the
+ * previous one orphaned in Storage. Choosing no new file at all leaves
+ * `image_url` completely untouched -- the existing image, if any,
+ * stays exactly as it was.
+ */
+export async function updateAnnouncement(id: string, formData: FormData): Promise<ActionResult> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "announcement_management")) return { error: "Not authorized." };
+
+  const parsed = parseAnnouncementFormData(formData);
+  if ("error" in parsed) return parsed;
+
+  const status = String(formData.get("status") ?? "published");
+  const supabase = await createClient();
+
+  const patch: Record<string, unknown> = { ...parsed, status };
+
+  const image = formData.get("image");
+  if (image instanceof File && image.size > 0) {
+    if (!image.type.startsWith("image/")) return { error: "The attachment must be an image." };
+    if (image.size > MAX_IMAGE_BYTES) return { error: "Image must be smaller than 5MB." };
+
+    const { data: existing } = await supabase.from("announcements").select("image_url").eq("id", id).maybeSingle();
+    if (existing?.image_url) await deleteStorageImageAtUrl(supabase, existing.image_url as string);
+
+    const ext = image.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("announcement-images")
+      .upload(path, image, { contentType: image.type });
+    if (uploadError) return { error: `Could not upload image: ${uploadError.message}` };
+    patch.image_url = supabase.storage.from("announcement-images").getPublicUrl(path).data.publicUrl;
+  }
+
+  const { error } = await supabase.from("announcements").update(patch).eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/announcements");
+  revalidatePath("/announcements/public");
+  revalidatePath(`/announcements/${id}/edit`);
+  return { success: true };
 }
 
 // Had no server-side check at all before this (2026-10-04, found while

@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { sweepPastAnnouncements, compareAnnouncementsBySchedule } from "@/lib/data/announcements";
-import { ANNOUNCEMENT_WHERE, MEETING_TYPE_ANNOUNCEMENT_LABEL, MULTI_SELECT_SEPARATOR } from "@/lib/data/announcement-constants";
+import {
+  ANNOUNCEMENT_WHERE,
+  MEETING_TYPE_ANNOUNCEMENT_LABEL,
+  parseMultiSelectValue,
+} from "@/lib/data/announcement-constants";
 import type { MeetingTypeSlug } from "@/lib/types";
 
 export interface ReviewAnnouncement {
@@ -21,28 +25,14 @@ function isCollaborativeType(slug: MeetingTypeSlug): slug is CollaborativeMeetin
 
 /**
  * Whether a comma-joined `where_announced` value includes `label` --
- * same ordered-prefix-matching approach as `AdminTableEditor.tsx`'s own
- * `parseMultiSelectValue` (needed there for the identical reason: one
- * real option's own label contains the separator, "Ward Communications
- * (Printed, Weekly Email, Social Media, etc.)", so a naive
- * `.split(", ")` would fracture it). Kept as its own small copy here
- * rather than importing that function directly -- it takes
- * `AdminOption[]` ({value, label} pairs) where this only ever has a
- * plain `ANNOUNCEMENT_WHERE` string list to check against.
+ * now a thin wrapper over the shared `parseMultiSelectValue`
+ * (`lib/data/announcement-constants.ts`, extracted 2026-11-14 once
+ * `getCalendarItems` needed the identical check for the new "Calendar"
+ * checkbox) rather than its own hand-rolled copy of the same
+ * ordered-prefix-matching logic.
  */
 function whereAnnouncedIncludes(raw: string | null, label: string, allValues: readonly string[]): boolean {
-  if (!raw) return false;
-  let remaining = raw;
-  for (const value of allValues) {
-    if (remaining === value) {
-      return value === label;
-    }
-    if (remaining.startsWith(`${value}${MULTI_SELECT_SEPARATOR}`)) {
-      if (value === label) return true;
-      remaining = remaining.slice(value.length + MULTI_SELECT_SEPARATOR.length);
-    }
-  }
-  return false;
+  return parseMultiSelectValue(raw, allValues).includes(label);
 }
 
 /**

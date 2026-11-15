@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWardEvents } from "@/lib/data/ward-events";
 import { getPublishedAnnouncements } from "@/lib/data/general-submissions";
 import { announcementOccurrenceDates } from "@/lib/data/announcements";
+import { ANNOUNCEMENT_WHERE, CALENDAR_ANNOUNCEMENT_LABEL, parseMultiSelectValue } from "@/lib/data/announcement-constants";
 import { getYouthActivities, type YouthActivityRow } from "@/lib/data/youth-activities";
 import { ACTIVITY_CLASSES, classesForCombinedGroup } from "@/lib/data/class-activities-shared";
 import { getAccessibleClasses, TEACHING_CLASSES } from "@/lib/data/teaching-assignments";
@@ -106,16 +107,27 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   an anonymous visitor to `status = 'published'` rows (see that
  *   function's own comment).
  * - **Announcements**: `getPublishedAnnouncements()`, the same list
- *   `/announcements/public` shows. A one-time item places one item on
- *   its own `start_date`, same as always. **A recurring one expands
- *   into a real item on every date it actually falls on, 2026-11-04**
- *   (the user's own report: "events that recur are not showing up for
- *   each occurrence in the calendar" -- the original version showed it
- *   once, on the series' own start date only, same shape as the public
- *   Announcements LIST page's own single row -- fine there, since that
- *   page already states the cadence in words ("Weekly on Sundays..."),
- *   but wrong for a day-by-day grid, where a recurring item needs a dot
- *   on every day it happens). `announcementOccurrenceDates`
+ *   `/announcements/public` shows -- **but only the ones with
+ *   "Calendar" checked in their own "Where should this be announced?"
+ *   field, 2026-11-14** (the user's own request: "I want to control
+ *   if an announcement is seen on the calendar based on the calendar
+ *   check box"). Before this, every published announcement with a
+ *   date showed up here unconditionally -- a real behavior change:
+ *   since "Calendar" is a brand-new `ANNOUNCEMENT_WHERE` option
+ *   (`lib/data/announcement-constants.ts`), no announcement saved
+ *   before this shipped has it checked yet, so nothing shows here
+ *   until it's re-saved with the box checked (via the edit form, see
+ *   `app/announcements/[id]/edit/page.tsx`, or Manage Announcements'
+ *   own grid). A one-time item places one item on its own `start_date`,
+ *   same as always. **A recurring one expands into a real item on
+ *   every date it actually falls on, 2026-11-04** (the user's own
+ *   report: "events that recur are not showing up for each occurrence
+ *   in the calendar" -- the original version showed it once, on the
+ *   series' own start date only, same shape as the public Announcements
+ *   LIST page's own single row -- fine there, since that page already
+ *   states the cadence in words ("Weekly on Sundays..."), but wrong for
+ *   a day-by-day grid, where a recurring item needs a dot on every day
+ *   it happens). `announcementOccurrenceDates`
  *   (`lib/data/announcements.ts`) computes those real dates, bounded to
  *   `[rangeStartIso, rangeEndIso]` -- the caller's own currently-
  *   displayed month grid -- since an ongoing series (`end_date` left
@@ -399,6 +411,8 @@ export async function getCalendarItems(rangeStartIso: string, rangeEndIso: strin
   }
 
   for (const an of announcements) {
+    const whereChecked = parseMultiSelectValue(an.where_announced, ANNOUNCEMENT_WHERE);
+    if (!whereChecked.includes(CALENDAR_ANNOUNCEMENT_LABEL)) continue;
     if (an.recurrence) {
       for (const date of announcementOccurrenceDates(an, rangeStartIso, rangeEndIso)) {
         items.push({ date, time: an.start_time, title: an.title, kind: "announcement", note: null, href: null });

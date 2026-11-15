@@ -24,16 +24,37 @@ import { useState } from "react";
  * no JS needed for that part. The chosen filename (or "No file
  * chosen") renders next to the button, since hiding the native input
  * also hides its own built-in filename display.
+ *
+ * **Gained an optional `existingUrl`, 2026-11-14** (the new form-based
+ * announcement editor) -- shows a small link to whatever image is
+ * already saved, right above the button, so editing an announcement
+ * doesn't look like it has no image at all just because nothing's
+ * been re-chosen. Choosing a new file only ever replaces it on save
+ * (`updateAnnouncement`, app/announcements/actions.ts) -- leaving this
+ * field untouched keeps the existing image exactly as it was.
  */
-export function ImageUploadField({ name, label = "Image (optional)" }: { name: string; label?: string }) {
+export function ImageUploadField({
+  name,
+  label = "Image (optional)",
+  existingUrl,
+}: {
+  name: string;
+  label?: string;
+  existingUrl?: string | null;
+}) {
   const [fileName, setFileName] = useState<string | null>(null);
 
   return (
     <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
       {label}
+      {existingUrl && !fileName && (
+        <a href={existingUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+          View current image
+        </a>
+      )}
       <span className="flex items-center gap-2">
         <span className="w-fit rounded border border-rule px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-ink/5">
-          {fileName ? "Change Image" : "Choose Image"}
+          {fileName ? "Change Image" : existingUrl ? "Replace Image" : "Choose Image"}
         </span>
         <span className="truncate text-xs text-ink-muted">{fileName ?? "No file chosen"}</span>
       </span>

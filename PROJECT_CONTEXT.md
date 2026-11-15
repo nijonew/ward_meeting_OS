@@ -2050,6 +2050,116 @@ avoid confusing the two.
 
 ## Known open items
 
+**New: a "Calendar" checkbox on announcements gating `/calendar`
+visibility, and a real form-based editor for existing announcements --
+no migration needed, 2026-11-14.** The user's own request, given in
+these exact words: "I would like to have the calendar as an option
+when entering an announcement and where it should be announced. I
+would like for sacrament meeting, ward council, ward youth council, to
+pre-populate with the announcement if those options are selected for
+the announcement. Similarly, I want to control if an announcement is
+seen on the calendar based on the calendar check box. I would also like
+a way to edit announcements by using a form like the entry form, rather
+than just the table."
+
+**The middle ask -- Sacrament Meeting/Ward Council/Youth Council
+pre-population from `where_announced` -- was already fully built and
+working** (migration 083's auto-pull for Sacrament Meeting, 2026-10-19's
+live Review-section read for the other two) -- checked both paths
+directly before assuming otherwise; nothing needed to change there.
+
+**1. "Calendar" is now a real `ANNOUNCEMENT_WHERE` option**
+(`lib/data/announcement-constants.ts`), appended at the very end of
+the list -- same "never reorder, only add at the end" rule every value
+before it already needed, since this is a fixed-order, prefix-matched
+list and an existing saved `where_announced` string can't have its own
+order disturbed. New `CALENDAR_ANNOUNCEMENT_LABEL` constant names it
+for code that needs to check for it specifically.
+
+**2. `/calendar` now only shows an announcement whose own "Calendar" box
+is checked** (`getCalendarItems`, `lib/data/calendar.ts`) -- a real
+behavior change, not additive: before this, every published
+announcement with a date showed up on the calendar unconditionally.
+Since "Calendar" is a brand-new option, **no announcement saved before
+this shipped has it checked yet** -- nothing will show on `/calendar`
+until each one is re-saved with the box checked, either through the new
+edit form (below) or Manage Announcements' own Where Announced
+checklist.
+
+**New shared `parseMultiSelectValue(raw, allValues)`**
+(`lib/data/announcement-constants.ts`) -- the one ordered-prefix-
+matching implementation behind reading a comma-joined multi-select
+value back apart (needed because one real option's own label contains
+the separator itself, "Ward Communications (Printed, Weekly Email,
+Social Media, etc.)", so a naive `.split(", ")` would fracture it).
+Replaces two separate hand-rolled copies of the identical logic that
+had drifted into existence in two different files over time --
+`lib/data/meeting-review.ts`'s own private `whereAnnouncedIncludes`
+(now a thin wrapper over this) and `AdminTableEditor.tsx`'s own
+`parseMultiSelectValue` (left as-is, deliberately not touched, to avoid
+any risk to the generic Table Admin engine for a feature that didn't
+need it changed).
+
+**3. New form-based editor, `/announcements/[id]/edit`** -- the exact
+same `AnnouncementForm` component the public `/submit/announcement`
+flow already uses, now genuinely pre-fillable rather than always
+starting blank:
+- `RadioSelectWithOther` (Organization, Type) gained a `defaultValue`
+  prop -- falls back to "Other" + the real saved text when the saved
+  value doesn't match any fixed option, same rule Table Admin's own
+  `select_with_other` column type already established.
+- `CheckboxGroup` (Audience, Where Announced) gained a `defaultChecked`
+  set, computed via the new shared `parseMultiSelectValue`.
+- `RecurrenceToggle` (`components/submit/RecurrenceFields.tsx`) gained
+  an optional `initial` prop -- one component now covers both a
+  brand-new announcement (no `initial`, starts off exactly as before)
+  and an existing one's saved cadence, rather than two parallel copies
+  of the same toggle+picker.
+- `ImageUploadField` gained an optional `existingUrl` -- shows a "View
+  current image" link on edit; choosing a new file replaces it on save,
+  leaving the field untouched keeps the existing one exactly as it was.
+- A new Status select (Published/Archived) appears only in
+  `mode="edit"` -- the create form has no equivalent, since a
+  brand-new submission is always published by design.
+
+**New shared `parseAnnouncementFormData`** (`lib/data/announcements.ts`)
+-- the field-parsing/validation half of `submitAnnouncement`
+(`app/submit/actions.ts`) extracted out so the new `updateAnnouncement`
+(`app/announcements/actions.ts`) can't drift apart from it on how a
+field gets read or validated; `submitAnnouncement` itself now just
+calls this and handles its own image upload, same as before.
+`updateAnnouncement` mirrors that upload step with one addition -- a
+REPLACED image's old Storage file is deleted first
+(`deleteStorageImageAtUrl`) so editing a flyer doesn't leave the
+previous one orphaned; choosing no new file leaves `image_url`
+completely untouched.
+
+**Reached from a new "Edit via Form" link list on `/announcements`**
+(Manage Announcements), sitting above the existing grid -- not a new
+column inside it, since `AdminTableEditor` has no per-row extension
+point and this app deliberately avoids adding per-table special cases
+to that shared, generic component. The grid itself is completely
+unchanged, still the fast way to tweak one field inline; the new list
+is the slower, fuller form for changing several fields on one
+announcement at once. Gated the same way as the rest of that page
+(`announcement_management`).
+
+No migration needed -- confirmed via `tsc`/`eslint`/`next build
+--webpack` only, same no-live-database-access gap as everything else in
+this project. Ask the user to check: `/submit/announcement` still
+submits exactly as before (the "Calendar" checkbox is just one more box
+in the existing Where Announced checklist); `/calendar` shows no
+announcements at all until one is re-saved with "Calendar" checked,
+then shows correctly on its own date (and every occurrence, if
+recurring); opening `/announcements/[id]/edit` for a real announcement
+shows every field correctly pre-filled, including an "Other" organization/type
+with its real saved text, every checked Audience/Where Announced box,
+a recurring item's own cadence, and a link to its existing image if it
+has one; saving a change there updates the real row and (if the
+Calendar box is now checked) makes it appear on `/calendar`; and that
+replacing an image on edit removes the old Storage file rather than
+leaving it orphaned.
+
 **New: second-hour class cancellations, migration `106`, not yet run,
 2026-11-14.** The user's own request, given in these exact words: "I
 want to add an option to cancel only the second hour of church

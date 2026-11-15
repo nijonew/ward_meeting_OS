@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getGeneralSubmissions } from "@/lib/data/general-submissions";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
@@ -35,6 +36,16 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
  * (`getOrCreateMeetingId`, 2026-09-09) -- kept as a small fallback
  * list below the grid, using the original Publish/Archive controls,
  * so a genuinely stray one is never silently hidden.
+ *
+ * **Gained a form-based "Edit" link per row, 2026-11-14** (the user's
+ * own request: "a way to edit announcements by using a form like the
+ * entry form, rather than just the table"). `AdminTableEditor` has no
+ * per-row extension point of its own (and this app deliberately avoids
+ * adding per-table special cases to that shared, generic component),
+ * so this is a small, separate list above the grid rather than a new
+ * column inside it -- the grid itself is completely unchanged, still
+ * the fast way to tweak one field inline; the new list is the slower,
+ * fuller editing experience for everything at once.
  */
 export default async function AnnouncementsInboxPage() {
   const { user, profile } = await getSessionUser();
@@ -90,6 +101,23 @@ export default async function AnnouncementsInboxPage() {
           Archived to exclude it.
         </p>
       </section>
+
+      <div className="rounded border border-rule bg-surface p-6">
+        <h2 className="font-display text-xl">Edit via Form</h2>
+        <p className="mt-1 text-xs text-ink-muted">
+          The same form used to submit a new announcement, pre-filled -- easier than the grid
+          below for changing several fields on one announcement at once.
+        </p>
+        <ul className="mt-4 flex flex-col gap-1">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <Link href={`/announcements/${row.id}/edit`} className="text-sm text-ink hover:text-accent hover:underline">
+                {String(row.title ?? "(untitled)")}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <AdminTableEditor
         table="announcements"

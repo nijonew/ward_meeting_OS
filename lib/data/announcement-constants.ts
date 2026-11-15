@@ -58,6 +58,18 @@ export const ANNOUNCEMENT_WHERE = [
   "Young Women 16-18",
   "Primary Sharing Time",
   "Ward Communications (Printed, Weekly Email, Social Media, etc.)",
+  // Added at the end, 2026-11-14 (the user's own request: "I would
+  // like to have the calendar as an option when entering an
+  // announcement and where it should be announced... I want to
+  // control if an announcement is seen on the calendar based on the
+  // calendar check box") -- see CALENDAR_ANNOUNCEMENT_LABEL/
+  // getCalendarItems (lib/data/calendar.ts) for what checking it
+  // actually does. Appended rather than inserted anywhere else in the
+  // list, same "never reorder, only ever add at the end" rule this
+  // fixed-order, prefix-matched list already needed for every value
+  // before it -- an existing saved where_announced string's own order
+  // can't be disturbed.
+  "Calendar",
 ] as const;
 
 /**
@@ -106,6 +118,52 @@ export const ANNOUNCEMENT_TYPES = [
 export const OTHER_VALUE = "Other";
 
 export const MULTI_SELECT_SEPARATOR = ", ";
+
+/**
+ * Parses a comma-joined multi-select value (Audience, Where Announced)
+ * back into the individual checked options, in order -- the shared
+ * version of the ordered-prefix-matching logic `AdminTableEditor.tsx`'s
+ * own `parseMultiSelectValue` and (until this extraction, 2026-11-14)
+ * `lib/data/meeting-review.ts`'s own private `whereAnnouncedIncludes`
+ * each separately implemented. Needed because one real option's own
+ * label contains the separator itself ("Ward Communications (Printed,
+ * Weekly Email, Social Media, etc.)"), so a naive `.split(", ")` would
+ * fracture it -- walking `allValues` in its own fixed order and peeling
+ * matches off the front of `raw` instead only works for a value that
+ * was actually saved through a real checkbox list in that same order,
+ * which is true for every value in this table (nothing else writes to
+ * either column).
+ */
+export function parseMultiSelectValue(raw: string | null | undefined, allValues: readonly string[]): string[] {
+  if (!raw) return [];
+  const found: string[] = [];
+  let remaining = raw;
+  for (const value of allValues) {
+    if (remaining === value) {
+      found.push(value);
+      return found;
+    }
+    if (remaining.startsWith(`${value}${MULTI_SELECT_SEPARATOR}`)) {
+      found.push(value);
+      remaining = remaining.slice(value.length + MULTI_SELECT_SEPARATOR.length);
+    }
+  }
+  return found;
+}
+
+/**
+ * The "Calendar" checkbox's own label, within `ANNOUNCEMENT_WHERE` --
+ * checking it on the submit/edit form is what makes an announcement
+ * show up on `/calendar` at all (see `getCalendarItems`,
+ * lib/data/calendar.ts). Unlike every other value in that list, this
+ * one isn't a literal meeting/class/channel name to announce it to --
+ * it's a display destination within this app itself -- but it lives on
+ * the same field since "where should this be seen" is the same real
+ * question either way, and the user's own request was explicit that
+ * it belongs there: "the calendar as an option when entering an
+ * announcement and where it should be announced."
+ */
+export const CALENDAR_ANNOUNCEMENT_LABEL = "Calendar";
 
 /**
  * Which `ANNOUNCEMENT_WHERE` label corresponds to each collaborative
