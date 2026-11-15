@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { getGeneralSubmissions } from "@/lib/data/general-submissions";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
@@ -46,6 +45,23 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
  * column inside it -- the grid itself is completely unchanged, still
  * the fast way to tweak one field inline; the new list is the slower,
  * fuller editing experience for everything at once.
+ *
+ * **That list became a dropdown of non-archived announcements,
+ * 2026-11-15** (the user's own request: "update the edit via form
+ * announcements list to a dropdown of non-archived announcements") --
+ * a plain `<ul>` of every row grows unwieldy once there are more than
+ * a handful, and an already-archived announcement is rarely what
+ * someone reaches for this slower, fuller form to fix (the inline grid
+ * below, or Table Admin, already covers that rare case). A plain
+ * `method="get"` form (this app's own established "pick one, then go"
+ * convention elsewhere, e.g. `/admin/calling-features`) doesn't fit
+ * here -- each option's destination is a genuinely different path
+ * (`/announcements/<id>/edit`), not a query-string variant of this
+ * same page -- so this uses a real `<form action={goToEdit}>` with an
+ * inline `"use server"` closure instead (the identical pattern this
+ * page's own stray-agenda-items Publish/Archive buttons already use,
+ * legal here since this whole page is a Server Component, never
+ * pulled into a client bundle).
  */
 export default async function AnnouncementsInboxPage() {
   const { user, profile } = await getSessionUser();
@@ -88,6 +104,13 @@ export default async function AnnouncementsInboxPage() {
     getGeneralSubmissions(),
   ]);
   const strayAgendaItems = generalSubmissions.filter((item) => item.kind === "agenda_item");
+  const editableRows = rows.filter((row) => row.status !== "archived");
+
+  const goToEdit = async (formData: FormData) => {
+    "use server";
+    const id = String(formData.get("announcement_id") ?? "");
+    if (id) redirect(`/announcements/${id}/edit`);
+  };
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -106,17 +129,33 @@ export default async function AnnouncementsInboxPage() {
         <h2 className="font-display text-xl">Edit via Form</h2>
         <p className="mt-1 text-xs text-ink-muted">
           The same form used to submit a new announcement, pre-filled -- easier than the grid
-          below for changing several fields on one announcement at once.
+          below for changing several fields on one announcement at once. Archived announcements
+          aren&rsquo;t listed here -- edit one of those in the grid below, or Table Admin.
         </p>
-        <ul className="mt-4 flex flex-col gap-1">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <Link href={`/announcements/${row.id}/edit`} className="text-sm text-ink hover:text-accent hover:underline">
-                {String(row.title ?? "(untitled)")}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {editableRows.length > 0 ? (
+          <form action={goToEdit} className="mt-4 flex flex-wrap items-center gap-2">
+            <select
+              name="announcement_id"
+              required
+              defaultValue=""
+              className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
+            >
+              <option value="" disabled>
+                Choose an announcement...
+              </option>
+              {editableRows.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {String(row.title ?? "(untitled)")}
+                </option>
+              ))}
+            </select>
+            <FormSubmitButton pendingLabel="Opening..." className="rounded border border-rule px-3 py-1.5 text-xs text-ink hover:bg-ink/5">
+              Edit
+            </FormSubmitButton>
+          </form>
+        ) : (
+          <p className="mt-4 text-sm text-ink-muted/50">No non-archived announcements to edit.</p>
+        )}
       </div>
 
       <AdminTableEditor

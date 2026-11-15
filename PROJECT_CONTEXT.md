@@ -2050,6 +2050,102 @@ avoid confusing the two.
 
 ## Known open items
 
+**"Edit via Form" on Manage Announcements changed from a list of
+every row to a dropdown of non-archived ones -- no migration needed,
+2026-11-15.** The user's own request: "update the edit via form
+announcements list to a dropdown of non-archived announcements." The
+plain `<ul>` of links (built 2026-11-14) grows unwieldy once there are
+more than a handful of announcements, and an already-archived one is
+rarely what the slower, fuller form (built for changing several
+fields at once) is reached for -- the grid below, or Table Admin,
+already covers that rarer case.
+
+`app/announcements/page.tsx` now filters to `editableRows = rows.filter((row)
+=> row.status !== "archived")` and renders a `<select>` + "Edit"
+button instead of one link per row. A plain `method="get"` form (this
+app's own established "pick one, then reload with a query param"
+convention, e.g. `/admin/calling-features`'s own calling picker)
+doesn't fit here -- each option's destination is a genuinely different
+path (`/announcements/<id>/edit`), not a query-string variant of this
+same page -- so this uses a real `<form action={goToEdit}>` with an
+inline `"use server"` closure reading the selected id and calling
+`redirect(...)`, the identical pattern this same page's own
+stray-agenda-items Publish/Archive buttons already use (legal here
+since the whole page is a Server Component, never pulled into a
+client bundle). An empty result (every announcement archived) shows a
+plain muted message instead of a dropdown with nothing in it.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask
+the user to check `/announcements`: the "Edit via Form" box now shows
+a dropdown of non-archived announcements plus an "Edit" button,
+picking one and clicking it opens that announcement's own form
+editor, and an archived announcement doesn't appear in the list.
+
+**"Add from a past meeting" dropdown on Agenda Items, for Bishopric
+Meeting/Ward Council/Youth Council -- no migration needed,
+2026-11-15.** The user's own request: "a way to add past meeting
+agenda items by dropdown in non-sacrament meetings." An item that
+didn't get addressed (or needs raising again) previously had no way
+back onto a later meeting's own agenda short of retyping it through
+`/submit/agenda-item` from scratch.
+
+New `getPastAgendaItemsForType(meetingTypeId, excludeMeetingId)`
+(`lib/data/bishopric-meeting.ts`) -- every past agenda item of the
+SAME meeting type (a Ward Council item has no business showing up
+while planning a Bishopric Meeting), excluding the meeting currently
+being planned, most recent meeting first, capped at the last 30 so
+the dropdown stays usable for a meeting type with a long history.
+Deliberately not filtered by `status` -- "published" vs. "archived"
+here just means "currently showing on that meeting's own agenda" vs.
+"removed from it," neither of which reliably means "was actually
+addressed" -- every past item is a fair candidate, and the admin
+picking from the dropdown is the one who actually knows which one
+still needs raising.
+
+**New `addPastAgendaItemToMeeting`** (`app/meetings/[id]/bishopric-actions.ts`)
+copies the past item's title/body/submitted-by fields onto a BRAND
+NEW `agenda_items` row pointed at today's meeting -- deliberately a
+copy, not a move (unlike the existing, unrelated
+`assignAgendaItemToMeeting`, which really does reassign a publicly-
+submitted item that never had a meeting at all). Moving the original
+row's own `meeting_id` would quietly rewrite a past -- likely already-
+archived -- meeting's own finalized agenda, which this app's own
+Vision document treats as a frozen historical record; a copy leaves
+the original exactly where it was, so the same stuck item can be
+carried forward again at a third meeting later if it's still sitting
+in the past-items dropdown. Gated via `requireMeetingFeature(meetingId,
+"agenda_items")` -- a real check from day one, unlike its three older
+siblings in the same file (`setAgendaItemStatus`/`saveAgendaItemNotes`/
+`assignAgendaItemToMeeting`), which still have the pre-existing,
+already-flagged gap of relying entirely on the UI path being gated;
+this new action had no such precedent to match, so it starts checked.
+
+New `AddPastItemPicker` (`components/bishopric/AgendaItemsSection.tsx`)
+-- a `<select>` of past items (labeled "`<meeting date>` — `<title>`")
+plus an "Add" button, plain `type="button"` + `useTransition` (never
+a `<form>`), matching every other "pull from a pool" picker already
+in this app (Ward Business, RABNM, Announcements) -- committing
+immediately rather than through the page's own combined Save-All-
+Changes button. Renders nothing at all when there are no past items
+yet, rather than an empty, confusing dropdown. Threaded down from the
+Planning page's own main data-fetch wave
+(`app/meetings/[id]/planning/page.tsx`) through `CollaborativeMeetingBody.tsx`
+as a new `pastAgendaItems` prop -- skipped entirely for Sacrament
+Meeting (`isSacrament ? Promise.resolve([]) : ...`), which never has
+an `agenda_items` element on its own template to begin with.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask
+the user to check a Bishopric Meeting/Ward Council/Youth Council's
+Planning page: the Agenda Items section now shows an "Add from a past
+meeting..." dropdown (listing only that same meeting type's own past
+items, most recent meeting first) once at least one exists; picking
+one and clicking Add creates a fresh copy on today's meeting without
+altering the original past meeting's own agenda item; and that
+Sacrament Meeting's own Planning page is unaffected (it has no Agenda
+Items section at all).
+
 **"Announcements" eliminated as its own section; Submit an
 Announcement / Manage Announcements moved into "My calling" -- no
 migration needed, 2026-11-15.** The user's own request: "lets move
