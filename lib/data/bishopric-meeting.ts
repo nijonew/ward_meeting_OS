@@ -48,6 +48,12 @@ export interface UnassignedAgendaItemRow {
   created_at: string;
 }
 
+export interface PastAgendaItemRow {
+  id: string;
+  title: string;
+  meetingDate: string;
+}
+
 export interface BishopricMeetingData {
   minutes: BishopricMinutes | null;
   assignments: BishopricAssignmentRow[];
@@ -85,6 +91,52 @@ export async function getUnassignedAgendaItems(): Promise<UnassignedAgendaItemRo
     .is("meeting_id", null)
     .order("created_at");
   return (data as UnassignedAgendaItemRow[] | null) ?? [];
+}
+
+/**
+ * Past agenda items of the SAME meeting type, for the "Add from a past
+ * meeting" dropdown in the Discussion section (2026-11-15, the user's
+ * own request: "add past meeting agenda items by dropdown in
+ * non-sacrament meetings") -- an item that never got addressed (or
+ * needs raising again) can be carried forward onto today's meeting
+ * without retyping it. Scoped to this one meeting type specifically --
+ * a Ward Council item has no business showing up while planning a
+ * Bishopric Meeting -- and excludes the current meeting itself (an
+ * item already on today's own agenda has nothing to be "added from").
+ *
+ * Deliberately not filtered by `status` -- "published" vs. "archived"
+ * here just means "currently showing on that meeting's own agenda" vs.
+ * "removed from it," neither of which reliably means "was actually
+ * addressed." Every past item is a fair candidate; the admin picking
+ * from the dropdown is the one who knows which still needs raising.
+ * Limited to the most recent 30 so the dropdown stays usable even for
+ * a meeting type with a long history.
+ */
+export async function getPastAgendaItemsForType(
+  meetingTypeId: string,
+  excludeMeetingId: string
+): Promise<PastAgendaItemRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agenda_items")
+    .select("id, title, created_at, meetings!inner(date, meeting_type_id)")
+    .eq("meetings.meeting_type_id", meetingTypeId)
+    .neq("meeting_id", excludeMeetingId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  const rows = ((data ?? []) as unknown[]).map((row) => {
+    const r = row as { id: string; title: string; meetings: { date: string } | { date: string }[] | null };
+    const meeting = Array.isArray(r.meetings) ? r.meetings[0] : r.meetings;
+    return { id: r.id, title: r.title, meetingDate: meeting?.date ?? "" };
+  });
+
+  // Most recent meeting first, regardless of each item's own
+  // created_at (an item submitted well ahead of its meeting would
+  // otherwise sort out of order relative to one submitted the same
+  // week as an earlier meeting).
+  rows.sort((a, b) => (a.meetingDate < b.meetingDate ? 1 : a.meetingDate > b.meetingDate ? -1 : 0));
+  return rows;
 }
 
 export async function getBishopricMeetingData(meetingId: string): Promise<BishopricMeetingData> {

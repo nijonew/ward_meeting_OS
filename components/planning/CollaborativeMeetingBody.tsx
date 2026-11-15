@@ -7,7 +7,7 @@ import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesFor
 import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
 import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
 import type { AgendaRow } from "@/lib/data/agenda-rows";
-import type { AgendaItemRow, BishopricMinutes, ActionItemRow } from "@/lib/data/bishopric-meeting";
+import type { AgendaItemRow, BishopricMinutes, ActionItemRow, PastAgendaItemRow } from "@/lib/data/bishopric-meeting";
 import type { CouncilNotes } from "@/lib/data/council-notes";
 import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
@@ -50,6 +50,7 @@ export function CollaborativeMeetingBody({
   hymnalIndex,
   sections,
   agendaItems,
+  pastAgendaItems,
   isBishopric,
   bishopricMinutes,
   actionItems,
@@ -62,6 +63,7 @@ export function CollaborativeMeetingBody({
   hymnalIndex: HymnalIndexEntry[];
   sections: CollaborativeSectionData[];
   agendaItems: AgendaItemRow[];
+  pastAgendaItems: PastAgendaItemRow[];
   isBishopric: boolean;
   bishopricMinutes: BishopricMinutes | null;
   actionItems: ActionItemRow[];
@@ -99,7 +101,9 @@ export function CollaborativeMeetingBody({
                 onStateChange={onStateChangeFor(`section-${i}-before`)}
               />
             )}
-            {section.hasAgendaItems && <AgendaItemsSection meetingId={meetingId} items={agendaItems} />}
+            {section.hasAgendaItems && (
+              <AgendaItemsSection meetingId={meetingId} items={agendaItems} pastItems={pastAgendaItems} />
+            )}
             {section.afterRows.length > 0 && (
               <AgendaGridForm
                 meetingId={meetingId}

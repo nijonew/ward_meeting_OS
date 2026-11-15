@@ -1,8 +1,80 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveAgendaItemNotes, setAgendaItemStatus } from "@/app/meetings/[id]/bishopric-actions";
-import type { AgendaItemRow } from "@/lib/data/bishopric-meeting";
+import { addPastAgendaItemToMeeting, saveAgendaItemNotes, setAgendaItemStatus } from "@/app/meetings/[id]/bishopric-actions";
+import type { AgendaItemRow, PastAgendaItemRow } from "@/lib/data/bishopric-meeting";
+
+function formatMeetingDate(dateIso: string): string {
+  if (!dateIso) return "";
+  const date = new Date(`${dateIso}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateIso;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * "Add from a past meeting" (2026-11-15, the user's own request: "add
+ * past meeting agenda items by dropdown in non-sacrament meetings") --
+ * a dropdown of this meeting type's own past agenda items (most
+ * recent meeting first), for raising an item again that didn't get
+ * addressed. Adds a fresh copy onto TODAY's meeting -- see
+ * `addPastAgendaItemToMeeting`'s own doc comment for why this is a
+ * copy, not a move. Plain button + `useTransition`, not a `<form>`,
+ * matching every other "pull from a pool" picker already in this app
+ * (Ward Business, RABNM, Announcements) -- committing immediately
+ * rather than through any surrounding Save-All-Changes form.
+ */
+function AddPastItemPicker({ meetingId, pastItems }: { meetingId: string; pastItems: PastAgendaItemRow[] }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState(false);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  if (pastItems.length === 0) return null;
+
+  const add = () => {
+    const itemId = selectRef.current?.value;
+    if (!itemId) return;
+    setError(null);
+    setAdded(false);
+    startTransition(async () => {
+      const result = await addPastAgendaItemToMeeting(itemId, meetingId);
+      if ("error" in result) setError(result.error);
+      else {
+        setAdded(true);
+        if (selectRef.current) selectRef.current.value = "";
+      }
+    });
+  };
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <select
+        ref={selectRef}
+        defaultValue=""
+        className="rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink"
+      >
+        <option value="" disabled>
+          Add from a past meeting...
+        </option>
+        {pastItems.map((item) => (
+          <option key={item.id} value={item.id}>
+            {formatMeetingDate(item.meetingDate)} — {item.title}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={add}
+        disabled={pending}
+        className="rounded border border-rule px-2.5 py-1 text-xs text-ink hover:bg-ink/5 disabled:opacity-50"
+      >
+        {pending ? "Adding..." : "Add"}
+      </button>
+      {added && !pending && <span className="text-xs text-success">Added.</span>}
+      {error && <span className="text-xs text-danger">{error}</span>}
+    </div>
+  );
+}
 
 /**
  * Agenda Items, rendered inline in the Discussion section (2026-10-19)
@@ -122,9 +194,11 @@ function AgendaItemRowView({ item, meetingId }: { item: AgendaItemRow; meetingId
 export function AgendaItemsSection({
   meetingId,
   items,
+  pastItems,
 }: {
   meetingId: string;
   items: AgendaItemRow[];
+  pastItems: PastAgendaItemRow[];
 }) {
   return (
     <div className="rounded border border-rule bg-surface p-6">
@@ -136,6 +210,8 @@ export function AgendaItemsSection({
           Add an agenda item &rarr;
         </a>
       </p>
+
+      <AddPastItemPicker meetingId={meetingId} pastItems={pastItems} />
 
       {items.length > 0 ? (
         <ul className="mt-4 flex flex-col gap-3">

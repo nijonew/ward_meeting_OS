@@ -168,3 +168,41 @@ export async function assignAgendaItemToMeeting(itemId: string, meetingId: strin
   revalidatePath(`/meetings/${meetingId}/planning`);
   return { success: true };
 }
+
+/**
+ * Carries a PAST agenda item forward onto today's meeting (2026-11-15,
+ * the user's own request: "add past meeting agenda items by dropdown
+ * in non-sacrament meetings") -- deliberately a COPY, not a move
+ * (unlike `assignAgendaItemToMeeting` above, which really does
+ * reassign an item that never had a meeting at all). Moving the
+ * original row's own `meeting_id` would quietly rewrite a past --
+ * likely already-archived -- meeting's own finalized agenda, which
+ * this app's own Vision document explicitly treats as a frozen
+ * historical record. A new row, referencing today's meeting, leaves
+ * the original exactly where it was; if the same stuck item needs
+ * raising again at a THIRD meeting later, it's still sitting there in
+ * the past-items dropdown to carry forward again.
+ */
+export async function addPastAgendaItemToMeeting(pastItemId: string, meetingId: string): Promise<ActionResult> {
+  const authError = await requireMeetingFeature(meetingId, "agenda_items");
+  if (authError) return authError;
+
+  const supabase = await createClient();
+
+  const { data: source, error: fetchError } = await supabase
+    .from("agenda_items")
+    .select("title, body, submitted_by_name, submitted_by_email, time_needed")
+    .eq("id", pastItemId)
+    .maybeSingle();
+  if (fetchError || !source) return { error: "Could not find that agenda item." };
+
+  const { error } = await supabase.from("agenda_items").insert({
+    ...source,
+    meeting_id: meetingId,
+    status: "published",
+  });
+
+  if (error) return { error: error.message };
+  revalidatePath(`/meetings/${meetingId}/planning`);
+  return { success: true };
+}

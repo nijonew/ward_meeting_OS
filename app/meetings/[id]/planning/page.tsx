@@ -14,7 +14,7 @@ import { getElementNotes } from "@/lib/data/meeting-element-notes";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
 import { getCurrentHolderIdByCallingName } from "@/lib/data/callings";
-import { getBishopricMeetingData, getAgendaItemsForMeeting } from "@/lib/data/bishopric-meeting";
+import { getBishopricMeetingData, getAgendaItemsForMeeting, getPastAgendaItemsForType } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { meetingFeature } from "@/lib/data/meeting-features";
@@ -223,6 +223,7 @@ export default async function PlanningViewPage({
     bishopricData,
     councilNotes,
     agendaItems,
+    pastAgendaItems,
   ] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
@@ -268,6 +269,11 @@ export default async function PlanningViewPage({
     isBishopric ? getBishopricMeetingData(meetingId) : Promise.resolve(null),
     isCouncil ? getCouncilNotes(meetingId) : Promise.resolve(null),
     getAgendaItemsForMeeting(meetingId),
+    // "Add from a past meeting" dropdown (2026-11-15) -- Sacrament
+    // Meeting never has an agenda_items element on its template, so
+    // this is skipped there the same way the other four Sacrament-
+    // only/non-Sacrament-only fetches above already are.
+    isSacrament ? Promise.resolve([]) : getPastAgendaItemsForType(meetingWithType.meetingTypeId, meetingId),
   ]);
 
   // Meetings created before the per-meeting agenda existed, or created
@@ -582,6 +588,7 @@ export default async function PlanningViewPage({
                   })
                   .filter((s) => s.beforeRows.length > 0 || s.hasAgendaItems || s.afterRows.length > 0)}
                 agendaItems={agendaItems}
+                pastAgendaItems={pastAgendaItems}
                 isBishopric={isBishopric}
                 bishopricMinutes={isBishopric ? bishopricData?.minutes ?? null : null}
                 actionItems={isBishopric ? bishopricData?.actionItems ?? [] : []}
