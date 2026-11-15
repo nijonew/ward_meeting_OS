@@ -9,6 +9,13 @@
  */
 
 export const ANNOUNCEMENT_ORGANIZATIONS = [
+  // First Presidency/Area Presidency added 2026-11-14, the user's own
+  // request -- a single-select (radio) field with its own "Other"
+  // fallback, unlike Where Announced, so there's no fixed-order/
+  // prefix-matching constraint to worry about placing these; put
+  // above Stake to match the real organizational hierarchy.
+  { value: "First Presidency", label: "First Presidency" },
+  { value: "Area Presidency", label: "Area Presidency" },
   { value: "Stake", label: "Stake" },
   { value: "Bishopric", label: "Bishopric" },
   { value: "Relief Society", label: "Relief Society" },

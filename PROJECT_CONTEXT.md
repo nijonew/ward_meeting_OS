@@ -2050,6 +2050,31 @@ avoid confusing the two.
 
 ## Known open items
 
+**"First Presidency"/"Area Presidency" added to the announcement
+submit form's own Organization field, no migration needed,
+2026-11-14.** The user's own request: "Add 'Area Presidency' and
+'First Presidency' as options for 'Who is originating the
+announcement' on the announcement entry page." `ANNOUNCEMENT_ORGANIZATIONS`
+(`lib/data/announcement-constants.ts`) gained both, placed above
+"Stake" to match the real organizational hierarchy -- unlike Where
+Announced (a multi-select, comma-joined, fixed-order-dependent list),
+Organization is a single-select radio field with its own "Other"
+fallback, so there's no prefix-matching/ordering constraint to worry
+about here; the two could be inserted anywhere in the list. Both the
+public submit form and the new form-based announcement editor
+(`/announcements/[id]/edit`) share this one constant, so both picked
+up the new options automatically with no other change needed.
+
+No migration needed -- confirmed via `tsc`/`eslint`/`next build
+--webpack` only (the build needed three attempts before clearing the
+known, unrelated transient Google Fonts fetch failure on
+`app/layout.tsx`'s own `next/font/google` import -- confirmed
+unrelated since `tsc`/`eslint` were already clean beforehand, same
+root cause as every other time this has happened in this project),
+same no-live-database-access gap as everything else in this project --
+ask the user to check `/submit/announcement` (and the edit form) and
+confirm both new options show up in the Organization dropdown.
+
 **Calling Planning's own Calling dropdown gained a richer label and
 the same substring search, no migration needed, 2026-11-14.** The
 user's own request, right after the person-picker search feature
