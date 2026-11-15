@@ -300,12 +300,12 @@ async function getPersonalMeetingOccurrences(
  * - **Youth Council for every youth leader, regardless of calling**
  *   (the user's own explicit follow-up: "I would also like the Ward
  *   Youth Council meeting to show up in the calendar view of all youth
- *   leaders"). Reuses the exact same `isYouthLeader` feature check
- *   `app/page.tsx` already defines for its own "Youth program"
- *   section -- holding `youth_activity_planning`, or any calling-based
- *   teaching scope covering at least one YM/YW class (migration `104`,
- *   2026-11-14, replacing the old blanket `youth_teaching_planning`
- *   feature check here). A youth leader's own calling very often
+ *   leaders"). Reuses the same `isYouthLeader` idea this app's own nav
+ *   resolution (`getNavSections()`, lib/data/nav-sections.ts) uses for
+ *   its "My calling" section -- holding `youth_activity_planning`, or
+ *   any calling-based teaching scope covering at least one YM/YW class
+ *   (migration `104`, 2026-11-14, replacing the old blanket
+ *   `youth_teaching_planning` feature check here). A youth leader's own calling very often
  *   doesn't map to Youth Council via `meeting_type_members` at all
  *   (that mapping is about who sits ON the council, not who leads a
  *   youth program it discusses), so this is a real, separate

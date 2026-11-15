@@ -2050,8 +2050,76 @@ avoid confusing the two.
 
 ## Known open items
 
+**"Youth program" eliminated from the landing page and both menus;
+both read-only Lessons pages moved into "This week" -- no migration
+needed, 2026-11-14.** The user's own request, given in these exact
+words: "Move Youth Activity planning into My Calling and eliminate
+youth program on landing page and menus. move the viewable lessons
+for youth and adults into This Week. Recall that the youth items are
+only to be viewed when logged in."
+
+Three real navigation surfaces share the underlying gating logic and
+all needed the matching fix: the landing page's own tile grid
+(`app/page.tsx`), the persistent side-nav drawer's lazily-fetched
+sections (`getNavSections()`, `lib/data/nav-sections.ts`), and that
+same drawer's hand-written "This week" group (`components/AppHeader.tsx`'s
+`thisWeekSection`, since that one tier deliberately isn't sourced from
+`getNavSections()` at all -- see that function's own doc comment for
+why).
+
+1. **"Youth program" (its own section, holding only a single "Youth
+   Activity Planning" tile since 2026-10-10) is gone entirely.**
+   `getNavSections()`'s own `isYouthLeader` check
+   (`hasFeature(profile, "youth_activity_planning")`) now folds its one
+   link into the existing "My calling" section instead -- same
+   treatment as every other link there (Meeting Planning, Calling
+   Planning, Music Planning, both Teaching Planning tiles): granted by
+   its own feature, listed alongside the rest of what a calling
+   manages. "My calling"'s own gate condition grew `|| isYouthLeader`
+   so the section still appears for an account that holds ONLY this
+   one feature and nothing else in that section.
+2. **Both read-only "Lessons" pages (`/ym-yw-lessons`,
+   `/adult-teaching-lessons`) moved out of "My meetings" into "This
+   week."** Neither page's own access control changed at all -- both
+   still just `redirect("/login")` for a signed-out visitor, open to
+   any signed-in account otherwise, exactly as built 2026-11-08. Only
+   which section links to them moved.
+3. **"Recall that the youth items are only to be viewed when logged
+   in"** -- applied consistently to both Lessons tiles (not just the
+   YM/YW one) since both pages genuinely do require a session. On the
+   landing page, both get the same grayed-out-with-a-reason treatment
+   Youth Activities already has in this tier (`disabledLabel`, no
+   `href`, `prefetch={false}`) rather than a plain dead link for a
+   logged-out visitor. In the side-nav drawer's own hand-written "This
+   week" array, both are simply omitted from the list when logged
+   out -- that drawer has no "disabled tile" rendering at all, so this
+   matches the exact same pattern Youth Activities already used there.
+
+Every doc comment elsewhere in the codebase that named "Youth program"
+as a current section (the "My meetings/Announcements/Meeting
+Planning/Youth program/Admin" ordering comments on `app/page.tsx`,
+`components/NavDrawer.tsx`, and `lib/data/nav-sections.ts`'s own top
+comment; `app/youth-activity-planning/page.tsx`'s own description of
+where its hub is reached from; `lib/data/calendar.ts`'s reference to
+where the shared `isYouthLeader` idea comes from) was updated to
+describe the new "My calling"-based reality, while keeping a dated
+historical note of where things used to live -- same house style as
+every other superseded-design note already in this file.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: the landing page's "This week" tier now shows YM/YW Lessons
+and Elders Quorum/Relief Society Lessons tiles (grayed out with a
+login prompt when logged out, working links when logged in); there is
+no "Youth program" section anywhere on the landing page or in the
+persistent side-nav drawer; an account holding only
+`youth_activity_planning` now sees a "My calling" section with just
+Youth Activity Planning in it; and that an account holding other "My
+calling" features too sees Youth Activity Planning listed alongside
+them in that same section.
+
 **One-time data sweep: FSY Magazine topics pre-filled for 5 of the 6
-youth classes, migration `105`, not yet run, 2026-11-14.** The user's
+youth classes, migration `105`, confirmed run, 2026-11-14.** The user's
 own request, given in these exact words: "pre-fill all youth topics
 in all classes based on the date with the '(Month) -
 (Fast/Second/Third/Last) Sunday - FSY Magazine'. This first sweep can
@@ -2102,12 +2170,11 @@ is still blank. A second run of this same migration, or a topic a real
 teacher has since typed in by hand, is never overwritten.
 
 No application code changed -- nothing to `tsc`/`eslint`/`next build`
-for this one. **Confirm migration number `105` is actually free before
-running it**, per this project's own repeated numbering-collision
-history, then ask the user to run it and check: each of the 5 covered
-classes on `/youth-teaching-planning` shows a pre-filled Topic for
-every upcoming Sunday from tomorrow through mid-May 2027, reading
-correctly (e.g. "November - Third Sunday - FSY Magazine" for
+for this one. **Migration `105` confirmed run, 2026-11-14** --
+functional behavior not yet confirmed; ask the user to check: each of
+the 5 covered classes on `/youth-teaching-planning` shows a pre-filled
+Topic for every upcoming Sunday from tomorrow through mid-May 2027,
+reading correctly (e.g. "November - Third Sunday - FSY Magazine" for
 2026-11-15, "November - Last Sunday - FSY Magazine" for 2026-11-22);
 that 2026-11-29 (a real 5th Sunday) is untouched, still showing the
 existing "5th Sunday" default; and that the Priests class shows no

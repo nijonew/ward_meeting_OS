@@ -24,18 +24,24 @@ export interface NavSection {
  * duplicated, per this app's own "Single Source of Truth"/"Views
  * Instead of Duplicate Data" design principles (architecture.md) --
  * `app/page.tsx` itself now calls this for its own My meetings/
- * Announcements/Meeting Planning/Youth program/Admin sections instead
- * of re-deriving the identical gating a second time.
+ * Announcements/My calling/Admin sections instead of re-deriving the
+ * identical gating a second time. **"Youth program" existed as its
+ * own section here from 2026-09-09 through 2026-11-14, when it was
+ * eliminated** -- the user's own request: "eliminate youth program on
+ * landing page and menus." Its one link, Youth Activity Planning,
+ * moved into "My calling" instead (see that section below).
  *
- * Deliberately does NOT include "This week" -- that section's three
- * tiles are either genuinely public (no login at all) or carry
- * per-request state the home page itself still computes fresh (which
- * specific Sacrament Meeting is today's/early-access, the disabled-vs-
- * linked Youth Activities tile for a logged-out visitor) -- there's no
- * single stable link for "today's Sacrament Meeting program," so a
+ * Deliberately does NOT include "This week" -- that section's tiles
+ * are either genuinely public (no login at all) or carry per-request
+ * state the home page itself still computes fresh (which specific
+ * Sacrament Meeting is today's/early-access, the disabled-vs-linked
+ * Youth Activities/Lessons tiles for a logged-out visitor) -- there's
+ * no single stable link for "today's Sacrament Meeting program," so a
  * persistent nav has nothing stable to point at for that one tile.
- * `components/NavDrawer.tsx`'s own small "This week" group (Calendar +
- * public Announcements, always; Youth Activities, logged-in only) is
+ * `components/AppHeader.tsx`'s own small "This week" group (Calendar +
+ * public Announcements, always; Youth Activities and both read-only
+ * Lessons pages, logged-in only -- the latter two moved here from "My
+ * meetings" 2026-11-14, see that section's own comment below) is
  * hand-written separately for exactly this reason, not sourced here.
  *
  * Returns an empty list for a logged-out visitor or an account with
@@ -73,27 +79,26 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
   );
 
   // "My meetings" always shows now, for any signed-in account at all
-  // (2026-11-08, replacing the Youth/Adult teaching-schedule links
-  // this section gained 2026-11-08 the first time around) -- the user's
-  // own request: "YM/YW Lessons" and "Relief Society & Priesthood
-  // [Elders Quorum] Lessons" are plain, read-only date/topic/teacher
-  // views, open to "logged in youth and adults" generally, not scoped
-  // to a calling or a `youth_class_teachers` assignment the way editing
-  // is. These are genuinely different, brand-new pages
-  // (`/ym-yw-lessons`, `/adult-teaching-lessons`) from the real
-  // Planning pages below -- not the same destination with different
-  // labels -- so a teacher who ALSO has edit rights sees both: their
-  // own read-only schedule here, and the editable grid under "My
-  // calling".
+  // (2026-11-08).
+  //
+  // **"YM/YW Lessons" and "Elders Quorum / Relief Society Lessons"
+  // moved out of here into "This week" instead, 2026-11-14** -- the
+  // user's own request, same day "Youth program" was eliminated below:
+  // "move the viewable lessons for youth and adults into This Week."
+  // Both are still the exact same plain, read-only date/topic/teacher
+  // pages (`/ym-yw-lessons`, `/adult-teaching-lessons`), open to any
+  // signed-in account with no calling or `youth_class_teachers`
+  // assignment needed -- that never changed, only which section lists
+  // them. See `components/AppHeader.tsx`'s own `thisWeekSection` (the
+  // persistent side nav's hand-written counterpart to this function,
+  // since "This week" deliberately isn't sourced here -- see this
+  // function's own top comment) and `app/page.tsx`'s Tier 0 for where
+  // they live now.
   {
-    const links: NavLink[] = [
-      { title: "YM/YW Lessons", href: "/ym-yw-lessons" },
-      { title: "Elders Quorum / Relief Society Lessons", href: "/adult-teaching-lessons" },
-      ...visibleMeetingTypes.map((slug) => ({
-        title: MEETING_TYPE_LABELS[slug],
-        href: `/dashboard?type=${slug}`,
-      })),
-    ];
+    const links: NavLink[] = visibleMeetingTypes.map((slug) => ({
+      title: MEETING_TYPE_LABELS[slug],
+      href: `/dashboard?type=${slug}`,
+    }));
     if (attendsMeetings) links.push({ title: "Meeting Agenda Items", href: "/submit/agenda-item" });
     if (hasFeature(profile, "sacrament_program_view")) {
       links.push({ title: "Sacrament Meeting Programs", href: "/dashboard?type=sacrament-meeting&readonly=1" });
@@ -119,6 +124,7 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
     canPlanAnyMeeting || canMeetingSchedule || canMeetingCancellations || canRotations || canSpeakerPrayerHistory;
   const canCallingPlanning = hasFeature(profile, "calling_planning");
   const isMusicPlanner = hasFeature(profile, "sacrament_music");
+  const isYouthLeader = hasFeature(profile, "youth_activity_planning");
   // "My calling," renamed from "Meeting Planning" (2026-11-08, the
   // user's own request) -- also gains YM/YW Teaching Planning
   // (renamed from "Youth Teaching Planning" the same day, 2026-11-08,
@@ -127,22 +133,26 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
   // own broader, edit-capable planning view (for whoever actually
   // teaches, or for Bishopric/YW Presidency managing every class) lives
   // here -- genuinely gated by the real planning feature (and, for
-  // youth, a real `youth_class_teachers` assignment), unlike the new
-  // read-only "Lessons" links under "My meetings" above, which are open
-  // to anyone signed in.
-  if (canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canTeachYouth || canTeachAdult) {
+  // youth, a real `youth_class_teachers` assignment), unlike the
+  // read-only "Lessons" links under "This week" (see AppHeader.tsx),
+  // which are open to anyone signed in.
+  //
+  // **Youth Activity Planning moved in here, and "Youth program" (its
+  // own section) eliminated entirely, 2026-11-14** -- the user's own
+  // request: "Move Youth Activity planning into My Calling and
+  // eliminate youth program on landing page and menus." It's granted
+  // by its own feature (`youth_activity_planning`), same as every
+  // other link in this section, just like the rest here manages a
+  // specific thing by calling rather than attends a meeting by one.
+  if (canMeetingPlanningHub || canCallingPlanning || isMusicPlanner || canTeachYouth || canTeachAdult || isYouthLeader) {
     const links: NavLink[] = [];
     if (canMeetingPlanningHub) links.push({ title: "Meeting Planning", href: "/meeting-planning" });
     if (canCallingPlanning) links.push({ title: "Calling Planning", href: "/calling-planning" });
     if (isMusicPlanner) links.push({ title: "Sacrament Meeting Music Planning", href: "/music" });
     if (canTeachYouth) links.push({ title: "YM/YW Teaching Planning", href: "/youth-teaching-planning" });
     if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
+    if (isYouthLeader) links.push({ title: "Youth Activity Planning", href: "/youth-activity-planning" });
     sections.push({ title: "My calling", links });
-  }
-
-  const isYouthLeader = hasFeature(profile, "youth_activity_planning");
-  if (isYouthLeader) {
-    sections.push({ title: "Youth program", links: [{ title: "Youth Activity Planning", href: "/youth-activity-planning" }] });
   }
 
   const canTableAdmin =

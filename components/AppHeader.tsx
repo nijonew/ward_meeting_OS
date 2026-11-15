@@ -42,11 +42,20 @@ import { SignOutButton } from "@/components/SignOutButton";
  * features associated with those categories from our cleanup").
  * Renders `NavDrawer` (a Client Component, for its own open/closed
  * state) with a small hand-written "This week" group (Calendar and
- * public Announcements always; Youth Activities only when signed in)
- * -- the rest of the categories (My meetings/Announcements/Meeting
- * Planning/Youth program/Admin, from `getNavSections()`) are fetched
- * by `NavDrawer` itself, lazily, only once the drawer is actually
- * opened.
+ * public Announcements always; Youth Activities and both read-only
+ * Lessons pages only when signed in) -- the rest of the categories (My
+ * meetings/Announcements/My calling/Admin, from `getNavSections()`)
+ * are fetched by `NavDrawer` itself, lazily, only once the drawer is
+ * actually opened.
+ *
+ * **"This week" gained both read-only Lessons links, 2026-11-14** --
+ * moved here from `getNavSections()`'s own "My meetings" section, per
+ * the user's own request: "move the viewable lessons for youth and
+ * adults into This Week. Recall that the youth items are only to be
+ * viewed when logged in." Both pages already require a signed-in
+ * session on their own (`redirect("/login")`), so, same as Youth
+ * Activities right above them, they're simply omitted from this array
+ * entirely for a logged-out visitor rather than shown as a dead link.
  *
  * **Deliberately NOT fetched here, 2026-11-08** -- this component
  * renders on nearly every page in the app, so calling
@@ -68,7 +77,13 @@ export async function AppHeader({ tag }: { tag?: string }) {
     links: [
       { title: "Announcements", href: "/announcements/public" },
       { title: "Calendar", href: "/calendar" },
-      ...(user ? [{ title: "Youth Activities", href: "/youth-activities?readonly=1" }] : []),
+      ...(user
+        ? [
+            { title: "Youth Activities", href: "/youth-activities?readonly=1" },
+            { title: "YM/YW Lessons", href: "/ym-yw-lessons" },
+            { title: "Elders Quorum / Relief Society Lessons", href: "/adult-teaching-lessons" },
+          ]
+        : []),
     ],
   };
 

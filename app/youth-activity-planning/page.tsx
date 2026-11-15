@@ -5,11 +5,21 @@ import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 /**
- * Hub page for the landing page's "Youth program" section (2026-10-10,
+ * Hub page reached from the landing page's own tile grid (2026-10-10,
  * the user's own request -- see the previous version of this file's
  * own doc comment in git history for the full build-up through a
  * 7-tile first draft, then a 3-tile collapse once the four activity
  * views landed on `/youth-activities` instead).
+ *
+ * **Lived under its own "Youth program" section through 2026-11-14,
+ * when that section was eliminated** -- the user's own request, the
+ * same day Youth Teaching Management's own tile below was cut: "Move
+ * Youth Activity planning into My Calling and eliminate youth program
+ * on landing page and menus." This hub's own destination, feature
+ * gate (`youth_activity_planning`), and every tile on it are
+ * completely unaffected -- only which section of the landing
+ * page/persistent nav links to it changed (see
+ * `lib/data/nav-sections.ts`'s own comment).
  *
  * **Flattened back down to the real destinations directly, 2026-10-17**
  * (the user's own report: "There are too many levels to the tile

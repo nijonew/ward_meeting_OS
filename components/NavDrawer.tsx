@@ -30,9 +30,9 @@ import type { NavSection } from "@/lib/data/nav-sections";
  *
  * `thisWeekSection` arrives already resolved from `AppHeader` (free --
  * built straight from the session check that component already does).
- * Every other category (My meetings/Announcements/Meeting Planning/
- * Youth program/Admin, from `getNavSections()`) is fetched here
- * instead, lazily, the first time the drawer is actually opened --
+ * Every other category (My meetings/Announcements/My calling/Admin,
+ * from `getNavSections()`) is fetched here instead, lazily, the first
+ * time the drawer is actually opened --
  * **not** eagerly from `AppHeader` on every page render, 2026-11-08.
  * The first version did fetch everything eagerly; since `AppHeader`
  * renders on nearly every page, that meant every single page load

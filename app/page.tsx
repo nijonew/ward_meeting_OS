@@ -36,7 +36,7 @@ export default async function HomePage() {
   const earlyAccessSacramentMeeting =
     !todaysSacramentMeeting && canPreviewSacramentEarly ? await getEarlyAccessSacramentMeeting() : null;
 
-  // My meetings/Announcements/Meeting Planning/Youth program/Admin --
+  // My meetings/Announcements/My calling/Admin --
   // factored out into `getNavSections()` (2026-11-05, built for the new
   // persistent side nav) rather than re-derived here a second time, per
   // this app's own "Single Source of Truth" principle. "This week"
@@ -116,8 +116,10 @@ export default async function HomePage() {
               suppresses all of that for this one entry point, mirroring
               /dashboard's own readonly convention. An account that
               actually needs to manage activities still reaches full
-              access the normal way, via "Youth program" -> Youth
-              Activity Planning -> Manage. */}
+              access the normal way, via "My calling" -> Youth
+              Activity Planning -> Manage (moved there from its own
+              "Youth program" section 2026-11-14, see
+              lib/data/nav-sections.ts's own comment). */}
           <Tile
             title="Youth Activities"
             href={user ? "/youth-activities?readonly=1" : undefined}
@@ -132,17 +134,39 @@ export default async function HomePage() {
               /ward-events themselves, and all of Ward Events' admin
               tooling, are untouched and still reachable directly, in
               case this needs to come back without rebuilding anything. */}
+          {/* Both read-only Lessons pages moved here from "My
+              meetings" (getNavSections()), 2026-11-14 -- the user's
+              own request: "move the viewable lessons for youth and
+              adults into This Week. Recall that the youth items are
+              only to be viewed when logged in." Same grayed-out-with-
+              a-reason treatment as Youth Activities right above, not
+              a plain dead link, since both pages already require a
+              signed-in session on their own. */}
+          <Tile
+            title="YM/YW Lessons"
+            href={user ? "/ym-yw-lessons" : undefined}
+            disabledLabel={user ? undefined : "Please log in to see YM/YW lessons"}
+            prefetch={Boolean(user)}
+          />
+          <Tile
+            title="Elders Quorum / Relief Society Lessons"
+            href={user ? "/adult-teaching-lessons" : undefined}
+            disabledLabel={user ? undefined : "Please log in to see Elders Quorum / Relief Society lessons"}
+            prefetch={Boolean(user)}
+          />
         </TileGrid>
       </section>
 
-      {/* My meetings/Announcements/Meeting Planning/Youth program/Admin,
-          2026-11-05 -- sourced from `getNavSections()`
-          (lib/data/nav-sections.ts) instead of being hand-rolled here;
-          see that function's own doc comment for the per-section
-          gating this loop no longer needs to repeat. Order matches the
-          function's own push order (My meetings, Announcements,
-          Meeting Planning, Youth program, Admin), same reading order
-          this page always had. */}
+      {/* My meetings/Announcements/My calling/Admin, 2026-11-05 --
+          sourced from `getNavSections()` (lib/data/nav-sections.ts)
+          instead of being hand-rolled here; see that function's own
+          doc comment for the per-section gating this loop no longer
+          needs to repeat. Order matches the function's own push order
+          (My meetings, Announcements, My calling, Admin), same
+          reading order this page always had. "Youth program" was its
+          own section here through 2026-11-14, when it was eliminated
+          -- its one link (Youth Activity Planning) moved into "My
+          calling" instead, per the user's own request. */}
       {navSections.map((section) => (
         <section key={section.title} className="mt-10">
           <p className="font-mono text-xs uppercase tracking-wider text-ink-muted">{section.title}</p>
