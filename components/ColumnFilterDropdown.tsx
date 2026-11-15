@@ -59,6 +59,18 @@ const EMPTY_LABEL = "(Blanks)";
  * since the table itself can scroll horizontally while this is open
  * and a stale-positioned panel floating away from its trigger would be
  * its own bug.
+ *
+ * **`handleScroll` ignores a scroll that originated inside the panel
+ * itself, 2026-11-14** -- found and fixed on `SearchableSelect.tsx`
+ * first (the user's own report: scrolling that component's own
+ * suggestion list closed it outright, since a `window` listener
+ * registered with `capture: true` fires for every scroll event in the
+ * document regardless of bubbling, including one dispatched on this
+ * panel's own `max-h-48 overflow-y-auto` value list). This component
+ * has the identical structure (a portal, a capturing window scroll
+ * listener, an internally-scrollable panel) and so had the same latent
+ * bug -- fixed proactively here too, before anyone happened to need to
+ * scroll a long enough value list to notice it.
  */
 export function ColumnFilterDropdown({
   values,
@@ -81,7 +93,8 @@ export function ColumnFilterDropdown({
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) setPosition({ top: rect.bottom + 4, left: rect.left });
 
-    function handleScroll() {
+    function handleScroll(e: Event) {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
       setOpen(false);
     }
     function handlePointerDown(e: MouseEvent) {

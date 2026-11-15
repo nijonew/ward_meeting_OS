@@ -2050,6 +2050,53 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-14: scrolling a `SearchableSelect`/
+`SuggestedTextField` suggestion list closed the dropdown instead of
+scrolling it. No migration needed.** The user's own report, the same
+day both components shipped: "with those changes the search is
+improved, but now the scroll is worsened. I go to scroll the list and
+any way I do it (scroll wheel, arrows, scroll bar) it is clunky and
+fails exiting the field."
+
+Root cause: both components' own "close the dropdown if the page
+scrolls out from under this fixed-positioned panel" safeguard
+registered its `scroll` listener on `window` with `capture: true` --
+which fires during the CAPTURING phase for every scroll event
+anywhere in the document, regardless of whether that event bubbles.
+Scroll events on an ordinary element don't bubble, but capture
+doesn't care -- scrolling the suggestion list's OWN `overflow-y-auto`
+panel (by wheel, arrow-key-driven highlight, or dragging its native
+scrollbar) fired a scroll event whose capturing phase still passed
+through `window` first, which this listener couldn't tell apart from
+"some ancestor outside the panel scrolled" -- so it closed the
+dropdown on every attempt, exactly matching the report.
+
+Fixed by checking the scroll event's own `target` and ignoring it
+when the scroll originated from inside the panel itself (`panelRef.current.contains(e.target)`)
+-- only a scroll on some other ancestor (the real case this safeguard
+exists for) still closes it. Also added `scrollIntoView({ block:
+"nearest" })` for the highlighted suggestion on Arrow Up/Down, so
+keyboard navigation can't highlight an item that's scrolled out of
+view with no way to see it -- a related rough edge the user's own
+"arrows" complaint pointed at.
+
+**`ColumnFilterDropdown.tsx` (the Excel-style column filter) has the
+identical structure** (a portal, the same capturing `window` scroll
+listener, its own internally-scrollable `max-h-48 overflow-y-auto`
+value list) and so had the same latent bug, just not yet reported --
+fixed proactively there too, before anyone happened to need to scroll
+a long enough value list to notice it.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+browser gap as everything else in this project -- this assistant
+can't actually scroll a live dropdown to confirm. Ask the user to
+check: scrolling a `SearchableSelect`/`SuggestedTextField` suggestion
+list (speaker/teacher/calling pickers) by wheel, scrollbar, or arrow
+keys now scrolls the list smoothly without the dropdown closing, with
+the highlighted item staying visible as you arrow through it; and that
+a Table Admin/Calling Planning/Youth Activities column filter with
+enough distinct values to scroll behaves the same way.
+
 **"First Presidency"/"Area Presidency" added to the announcement
 submit form's own Organization field, no migration needed,
 2026-11-14.** The user's own request: "Add 'Area Presidency' and

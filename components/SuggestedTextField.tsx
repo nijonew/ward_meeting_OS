@@ -21,16 +21,24 @@ const MAX_SUGGESTIONS = 50;
  * consistently filter a datalist's suggestions by substring (some
  * versions match by prefix only, the exact limitation this whole
  * feature exists to get around), so this does the filtering itself in
- * JS instead, the same reliable approach `PersonCombobox.tsx` uses for
- * the person-id-resolving case.
+ * JS instead, the same reliable approach `SearchableSelect.tsx` uses
+ * for the id-resolving case.
  *
- * Unlike `PersonCombobox`, there's no hidden input/id to resolve --
+ * Unlike `SearchableSelect`, there's no hidden input/id to resolve --
  * this component's own visible `<input>` IS the real named form field,
  * so whatever's typed (picked from a suggestion or not) is exactly
  * what gets submitted. `onDirty` still exists for the same reason it
  * does there: clicking a suggestion updates this field's value via
  * React state, which fires no native `change` event an ancestor
  * `<form onChange=...>` would otherwise catch.
+ *
+ * **Bug found and fixed 2026-11-14, the first day this shipped: the
+ * suggestion list's own internal scrolling closed the dropdown
+ * outright** -- see `SearchableSelect.tsx`'s own doc comment for the
+ * full root cause (a capturing `window` scroll listener can't tell
+ * "the page scrolled out from under this" apart from "the suggestion
+ * list itself scrolled") and the identical fix applied here too, plus
+ * `scrollIntoView` for the highlighted suggestion on Arrow Up/Down.
  */
 export function SuggestedTextField({
   name,
@@ -54,6 +62,7 @@ export function SuggestedTextField({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const highlightedRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
 
   const trimmed = value.trim().toLowerCase();
@@ -67,12 +76,20 @@ export function SuggestedTextField({
     const rect = inputRef.current?.getBoundingClientRect();
     if (rect) setPosition({ top: rect.bottom + 2, left: rect.left, width: rect.width });
 
-    function handleScroll() {
+    // Ignores a scroll that originated INSIDE the panel (the
+    // suggestion list's own overflow-y-auto) -- only a scroll on some
+    // other ancestor should actually close it.
+    function handleScroll(e: Event) {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
       setOpen(false);
     }
     window.addEventListener("scroll", handleScroll, true);
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [open]);
+
+  useEffect(() => {
+    highlightedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [highlighted]);
 
   function pick(suggestion: string) {
     if (suggestion !== value) onDirty?.();
@@ -136,6 +153,7 @@ export function SuggestedTextField({
             {filtered.map((s, i) => (
               <button
                 key={s}
+                ref={i === highlighted ? highlightedRef : undefined}
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();

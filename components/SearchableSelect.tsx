@@ -64,6 +64,24 @@ export interface SearchableSelectOption {
  * overflow can clip it; closes on scroll rather than tracking a live
  * position, since the table itself can scroll while this is open.
  *
+ * **Bug found and fixed 2026-11-14, the first day this shipped: the
+ * suggestion list's own internal scrolling closed the dropdown
+ * outright** -- the user's own report: "I go to scroll the list and
+ * any way I do it (scroll wheel, arrows, scroll bar) it is clunky and
+ * fails exiting the field." A `window` listener registered with
+ * `capture: true` fires during the CAPTURE phase for every scroll
+ * event in the document, including one dispatched on the panel's own
+ * `overflow-y-auto` list -- scroll events don't bubble, but capture
+ * doesn't care, so scrolling the suggestions themselves looked
+ * identical to "the page scrolled out from under this" and closed the
+ * panel instantly. Fixed by checking the event's own target and
+ * ignoring it when the scroll originated inside the panel itself --
+ * only an ancestor OUTSIDE the panel scrolling (the real case this
+ * was meant to guard against) still closes it. Also added
+ * `scrollIntoView` for the highlighted suggestion on Arrow Up/Down, so
+ * keyboard navigation can't highlight an item that's scrolled out of
+ * view with no way to see it.
+ *
  * **`onDirty` (optional)** -- called whenever a selection actually
  * changes (pick, or clearing to empty), since a React-state-driven
  * value change on a hidden input fires no native `change` event for
@@ -100,6 +118,7 @@ export function SearchableSelect({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const highlightedRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
 
   const filtered = (
@@ -111,12 +130,21 @@ export function SearchableSelect({
     const rect = inputRef.current?.getBoundingClientRect();
     if (rect) setPosition({ top: rect.bottom + 2, left: rect.left, width: rect.width });
 
-    function handleScroll() {
+    // Ignores a scroll that originated INSIDE the panel (the
+    // suggestion list's own overflow-y-auto) -- only a scroll on some
+    // other ancestor (the real "the page moved out from under this
+    // fixed-positioned panel" case) should actually close it.
+    function handleScroll(e: Event) {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
       setOpen(false);
     }
     window.addEventListener("scroll", handleScroll, true);
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [open]);
+
+  useEffect(() => {
+    highlightedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [highlighted]);
 
   function commit(option: SearchableSelectOption | null) {
     if (required && !option) return;
@@ -242,6 +270,7 @@ export function SearchableSelect({
             {filtered.map((o, i) => (
               <button
                 key={o.id}
+                ref={i === highlighted ? highlightedRef : undefined}
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
