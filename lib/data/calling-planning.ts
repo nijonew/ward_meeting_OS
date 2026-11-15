@@ -3,6 +3,14 @@ import { getActivePeople } from "@/lib/data/people";
 import { getMountainTimeNow } from "@/lib/data/timezone";
 import { insertSacramentRabnmLink } from "@/lib/data/sacrament-rabnm-linking";
 import { sweepPoolIntoMeeting } from "@/lib/data/pool-sweep";
+import { type CallingOption, formatCallingOptionLabel } from "@/lib/data/calling-planning-shared";
+
+// Re-exported so every existing server-side caller of this module
+// keeps importing CallingOption/formatCallingOptionLabel from the
+// same place as before -- see calling-planning-shared.ts's own doc
+// comment for why the real definitions moved there.
+export type { CallingOption };
+export { formatCallingOptionLabel };
 
 export interface CallingDetail {
   id: string;
@@ -83,12 +91,6 @@ export interface CallingPlanningRow {
   created_at: string;
 }
 
-export interface CallingOption {
-  id: string;
-  name: string;
-  title_prefix: string | null;
-}
-
 export function personName(rel: unknown): string | null {
   if (Array.isArray(rel)) return (rel[0] as { name?: string } | undefined)?.name ?? null;
   return (rel as { name?: string } | null)?.name ?? null;
@@ -125,15 +127,24 @@ export async function getCallingDetail(callingId: string): Promise<CallingDetail
  * feature's own purpose. Ordered the same way the roster itself is
  * (sort_order), not alphabetically, so it matches whatever order the
  * ward already thinks of callings in.
+ *
+ * **Also resolves each calling's current holder, 2026-11-14** -- see
+ * `formatCallingOptionLabel` above for why.
  */
 export async function getCallingOptions(): Promise<CallingOption[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("callings")
-    .select("id, name, title_prefix")
+    .select("id, name, title_prefix, people:current_holder_id(name)")
     .order("sort_order");
 
-  return error || !data ? [] : data;
+  if (error || !data) return [];
+  return data.map((c) => ({
+    id: c.id,
+    name: c.name,
+    title_prefix: c.title_prefix,
+    current_holder_name: personName(c.people),
+  }));
 }
 
 export interface CallableCallingItem {

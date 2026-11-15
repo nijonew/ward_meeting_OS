@@ -5,6 +5,7 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import {
   getAllCallingPlanningRows,
   getCallingOptions,
+  formatCallingOptionLabel,
   DEFAULT_CALLING_STATUSES,
   DEFAULT_RELEASE_STATUSES,
 } from "@/lib/data/calling-planning";
@@ -15,6 +16,7 @@ import { createCallingPlanningEntry } from "@/app/calling-planning/actions";
 import { CallingPlanningGridForm } from "@/components/calling-planning/CallingPlanningGridForm";
 import { PushCallingForm } from "@/components/calling-planning/PushCallingForm";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 export default async function CallingPlanningPage({
   searchParams,
@@ -46,6 +48,10 @@ export default async function CallingPlanningPage({
 
   const sacramentMeetings = meetings.filter((m) => m.meetingType === "sacrament-meeting");
   const filteredCallingName = callingFilter ? callingOptions.find((c) => c.id === callingFilter)?.name : null;
+  // "(Calling) - (current holder or N/A)" for the add-form's own
+  // picker (2026-11-14, the user's own request) -- see
+  // formatCallingOptionLabel's own doc comment.
+  const callingSelectOptions = callingOptions.map((c) => ({ id: c.id, name: formatCallingOptionLabel(c) }));
 
   // Bug fix (2026-10-16, the user's own report: "I entered a calling
   // 'to be announced'... the new one didn't land there"). This used to
@@ -94,21 +100,16 @@ export default async function CallingPlanningPage({
         <form action={addEntry} className="flex flex-wrap items-end gap-2">
           <label className="text-xs text-ink-muted">
             Calling
-            <select
-              name="calling_id"
-              required
-              defaultValue={callingFilter ?? ""}
-              className="mt-1 block rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
-            >
-              <option value="" disabled>
-                Choose a calling&hellip;
-              </option>
-              {callingOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1">
+              <SearchableSelect
+                name="calling_id"
+                options={callingSelectOptions}
+                defaultValue={callingFilter ?? ""}
+                placeholder="Choose a calling…"
+                required
+                className="rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+              />
+            </div>
           </label>
           <label className="text-xs text-ink-muted">
             Date Initiated

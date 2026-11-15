@@ -2050,6 +2050,69 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calling Planning's own Calling dropdown gained a richer label and
+the same substring search, no migration needed, 2026-11-14.** The
+user's own request, right after the person-picker search feature
+above shipped: "I would like to have the dropdown for entering a new
+calling into the calling planning table to include be '(calling
+title) - (person currently in calling or N/A)' rather than just the
+title. This is also another field that I would like to have the
+ability to search within the text if possible."
+
+**`PersonCombobox` renamed `SearchableSelect`** (`components/SearchableSelect.tsx`)
+-- nothing about the component was actually person-specific, and
+reusing it here (for callings, not people) under its old name would
+have been a confusing mismatch going forward. Both existing call
+sites (`PersonSelect`/`SpeakerPersonOrGuestField.tsx`) updated to the
+new import; no behavior change for either.
+
+**New `required` prop** -- Calling Planning's own Calling field (both
+the per-row grid dropdown and the "+ Start New Calling Change"
+add-form's own picker) must always resolve to a real calling, unlike
+a person picker's "Unassigned" state. When `required` is true, the
+dropdown's own "Clear selection" option is gone, and the real HTML
+`required` attribute moves to the VISIBLE text input specifically
+(never the hidden one carrying the actual submitted value -- a hidden
+input is excluded from constraint validation entirely by spec, so
+putting it there would silently do nothing) -- this restores the same
+native browser blocking the old plain `<select required>` already
+had, so a blank submission still can't happen by accident.
+
+**`getCallingOptions()` now also resolves each calling's current
+holder** (`lib/data/calling-planning.ts`, via the same `people:current_holder_id(name)`
+join `getCallingDetail` already used) -- new `CallingOption.current_holder_name`
+and a new `formatCallingOptionLabel(c)` helper (`"<Calling> - <holder
+or N/A>"`) build the dropdown's own option text. **Deliberately
+separate from the grid's own "Calling" column display/sort/filter**
+(`cellText`'s `"calling"` case, and `callingNameById`) -- those still
+show and compare on the plain calling title alone, completely
+unaffected; only the picker's own option list shows the richer label.
+
+**A real build failure, not just a lint warning, surfaced a
+circular-bundling risk** -- `formatCallingOptionLabel` is a real value
+(not just a type), and importing it into `CallingPlanningGridForm.tsx`
+(a Client Component) from `lib/data/calling-planning.ts` dragged that
+whole module -- including its top-level `createClient` import, which
+itself imports `next/headers`, a server-only API -- into the client
+bundle, breaking the build outright. Same bug class, same fix, this
+app already has precedent for (`sacrament-program-shared.ts`,
+`rotations-shared.ts`): new `lib/data/calling-planning-shared.ts`, a
+pure file with no `createClient` import, holds the real
+`CallingOption`/`formatCallingOptionLabel` definitions;
+`calling-planning.ts` now just imports and re-exports both, so every
+existing server-side caller keeps importing them from the same place
+as before, unchanged.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calling-planning`: both the "+ Start New Calling Change"
+picker and the grid's own per-row Calling dropdown now show
+"`<Calling>` - `<current holder or N/A>`" for every option, support
+typing to search anywhere in that combined text (e.g. typing a
+holder's name finds their calling), and can't be left blank on
+submission; and that the grid's own Calling column still sorts/
+filters/displays by the plain calling title alone, unaffected.
+
 **Searchable, substring-matching person pickers, no migration needed,
 2026-11-14.** The user's own exploratory question, then narrowed once
 asked which fields: "is there a way to change fields where names can

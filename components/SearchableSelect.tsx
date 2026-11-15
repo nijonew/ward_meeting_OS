@@ -5,39 +5,53 @@ import { createPortal } from "react-dom";
 
 const MAX_SUGGESTIONS = 50;
 
-export interface PersonComboboxOption {
+export interface SearchableSelectOption {
   id: string;
   name: string;
 }
 
 /**
- * A searchable replacement for a plain person-picker `<select>`
- * (2026-11-14, the user's own request: "is there a way to change
- * fields where names can be entered, but are also dropdown... and to
- * have the entry search not just exactly, but also... within the
- * whole entry" -- narrowed to "person pickers like speakers and
- * teachers" once asked which fields). A native `<select>`'s own
- * built-in typeahead only matches by PREFIX (typing "chris" never
- * finds "Merry Christmas"), which can't be changed for a native
- * element -- this is a real combobox instead: a text input the visitor
- * can type into, with a dropdown of every option whose name CONTAINS
- * what's typed (not just starts with it), filtered live.
+ * A searchable replacement for a plain `<select>` whose own option
+ * list is long or hard to scan by prefix alone (2026-11-14, the
+ * user's own request: "is there a way to change fields where names
+ * can be entered, but are also dropdown... and to have the entry
+ * search not just exactly, but also... within the whole entry" --
+ * first built for "person pickers like speakers and teachers," then
+ * reused as-is for Calling Planning's own Calling picker once asked
+ * for the same searchability there too, since the underlying need is
+ * identical regardless of what the id/name pair actually represents.
+ * Named generically (not `PersonCombobox`, its original name) for
+ * exactly that reason -- nothing in this component is person-specific.
  *
- * Still resolves to a specific person id, not free text -- the actual
+ * A native `<select>`'s own built-in typeahead only matches by PREFIX
+ * (typing "chris" never finds "Merry Christmas"), which can't be
+ * changed for a native element -- this is a real combobox instead: a
+ * text input the visitor can type into, with a dropdown of every
+ * option whose name CONTAINS what's typed (not just starts with it),
+ * filtered live.
+ *
+ * Still resolves to a specific option id, not free text -- the actual
  * submitted value is a hidden `<input>` with this component's own
  * `name`, updated only when a suggestion is explicitly picked (click/
- * Enter) or the field is cleared to empty and blurred. Typing alone
- * never changes what's submitted; blurring with unconfirmed typed text
- * that doesn't match a pick reverts the visible text back to whatever
- * is still actually selected, so there's never a UI/submitted-value
- * mismatch.
+ * Enter) or (when `required` is false) the field is cleared to empty
+ * and blurred. Typing alone never changes what's submitted; blurring
+ * with unconfirmed typed text that doesn't match a pick reverts the
+ * visible text back to whatever is still actually selected, so
+ * there's never a UI/submitted-value mismatch.
  *
- * The caller is responsible for the "always keep the currently-
- * assigned person selectable even if a calling change since made them
- * ineligible for this role" merge (unchanged from the old `<select>`
- * era -- see `PersonSelect`/`SpeakerPersonOrGuestField`'s own
- * `options` construction) -- this component just searches whatever
- * `options` it's given.
+ * **`required`** (2026-11-14, added for Calling Planning's own Calling
+ * field, which -- unlike a person picker's "Unassigned" -- must always
+ * resolve to a real calling): when true, there's no "Clear selection"
+ * option and clearing the text to empty never commits an empty value
+ * -- blurring or pressing Escape with nothing (or unconfirmed text)
+ * typed just reverts back to whatever is still actually selected.
+ *
+ * The caller is responsible for any "always keep the currently-
+ * selected option available even if it's since fallen out of the
+ * normal eligible/options list" merge (e.g.
+ * `PersonSelect`/`SpeakerPersonOrGuestField`'s own `options`
+ * construction, for a person no longer eligible by calling) -- this
+ * component just searches whatever `options` it's given.
  *
  * **Rendered through a portal**, like `ColumnFilterDropdown.tsx` --
  * every real call site sits inside a wide table wrapped in
@@ -59,18 +73,20 @@ export interface PersonComboboxOption {
  * dirty-tracking concept at all (e.g. `SacramentProgramSection.tsx`'s
  * own always-enabled per-item Save buttons).
  */
-export function PersonCombobox({
+export function SearchableSelect({
   name,
   options,
   defaultValue,
   placeholder = "Unassigned",
+  required = false,
   onDirty,
   className = "rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink",
 }: {
   name: string;
-  options: PersonComboboxOption[];
+  options: SearchableSelectOption[];
   defaultValue: string;
   placeholder?: string;
+  required?: boolean;
   onDirty?: () => void;
   className?: string;
 }) {
@@ -102,7 +118,8 @@ export function PersonCombobox({
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [open]);
 
-  function commit(option: PersonComboboxOption | null) {
+  function commit(option: SearchableSelectOption | null) {
+    if (required && !option) return;
     const newId = option?.id ?? "";
     if (newId !== selectedId) onDirty?.();
     setSelectedId(newId);
@@ -123,6 +140,10 @@ export function PersonCombobox({
     // panel by then.
     setTimeout(() => {
       if (query.trim() === "") {
+        if (required) {
+          revertToSelection();
+          return;
+        }
         if (selectedId !== "") onDirty?.();
         setSelectedId("");
         setOpen(false);
@@ -173,6 +194,16 @@ export function PersonCombobox({
         aria-expanded={open}
         aria-controls={panelId}
         aria-autocomplete="list"
+        // Real HTML `required` goes on this VISIBLE input, not the
+        // hidden one carrying the actual value -- a hidden input is
+        // excluded from constraint validation entirely by spec, so
+        // putting it there would silently do nothing. This still
+        // blocks a genuinely empty submission the same way the native
+        // <select required> this replaced always did; the blur-revert
+        // logic above means typed-but-unpicked text can't normally
+        // reach a submit click without first reverting back to empty
+        // (or the actually-selected name) when focus moves away.
+        required={required}
         value={query}
         placeholder={placeholder}
         onChange={(e) => {
@@ -195,7 +226,7 @@ export function PersonCombobox({
             style={{ position: "fixed", top: position.top, left: position.left, width: Math.max(position.width, 180) }}
             className="z-50 max-h-56 overflow-y-auto rounded border border-rule bg-surface p-1 text-sm text-ink shadow-lg"
           >
-            {selectedId !== "" && (
+            {!required && selectedId !== "" && (
               <button
                 type="button"
                 onMouseDown={(e) => {

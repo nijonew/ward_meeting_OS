@@ -9,7 +9,7 @@ import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
-import { PersonCombobox } from "@/components/PersonCombobox";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 // Dynamically imported (2026-11-14, pre-launch performance pass) --
 // both pull in @dnd-kit/core/sortable/utilities for their own Move
@@ -72,14 +72,14 @@ function PersonSelect({
         ]
       : people;
 
-  // Swapped from a plain <select> to PersonCombobox, 2026-11-14 (the
+  // Swapped from a plain <select> to SearchableSelect, 2026-11-14 (the
   // user's own request: searchable, substring-matching person
   // pickers, not a native select's prefix-only typeahead) -- the
   // "always keep the currently-assigned person selectable" merge
-  // above is unchanged, it's exactly what PersonCombobox's own
+  // above is unchanged, it's exactly what SearchableSelect's own
   // `options` list needs.
   return (
-    <PersonCombobox name={name} options={options} defaultValue={defaultValue} placeholder="Unassigned" onDirty={onDirty} className={INPUT} />
+    <SearchableSelect name={name} options={options} defaultValue={defaultValue} placeholder="Unassigned" onDirty={onDirty} className={INPUT} />
   );
 }
 

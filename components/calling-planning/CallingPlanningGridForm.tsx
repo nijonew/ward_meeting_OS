@@ -5,8 +5,10 @@ import { saveCallingPlanningGrid, deleteCallingPlanningEntry } from "@/app/calli
 import { MultiPersonSelect } from "@/components/calling-planning/MultiPersonSelect";
 import { ColumnFilterDropdown } from "@/components/ColumnFilterDropdown";
 import { DualScrollbar } from "@/components/DualScrollbar";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import { usePersistedSortFilter } from "@/lib/hooks/use-persisted-sort-filter";
-import type { CallingPlanningRow, CallingOption } from "@/lib/data/calling-planning";
+import type { CallingPlanningRow } from "@/lib/data/calling-planning";
+import { formatCallingOptionLabel, type CallingOption } from "@/lib/data/calling-planning-shared";
 import type { PersonOption } from "@/lib/data/people";
 import type { SelectOption } from "@/lib/data/select-options";
 
@@ -183,6 +185,13 @@ export function CallingPlanningGridForm({
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p.name])), [people]);
   const callingNameById = useMemo(() => new Map(callingOptions.map((c) => [c.id, c.name])), [callingOptions]);
+  // "(Calling) - (current holder or N/A)" for the picker's own option
+  // list only (2026-11-14) -- the plain-name map above still drives
+  // this column's committed display/sort/filter, unchanged.
+  const callingSelectOptions = useMemo(
+    () => callingOptions.map((c) => ({ id: c.id, name: formatCallingOptionLabel(c) })),
+    [callingOptions]
+  );
   const callingStatusLabels = useMemo(() => new Map(callingStatusOptions.map((s) => [s.value, s.label])), [callingStatusOptions]);
   const releaseStatusLabels = useMemo(() => new Map(releaseStatusOptions.map((s) => [s.value, s.label])), [releaseStatusOptions]);
 
@@ -393,13 +402,15 @@ export function CallingPlanningGridForm({
                       changes -- never during an in-progress, unsaved
                       edit, since `row` itself only updates after a
                       real save. */}
-                  <select key={row.calling_id} name={`${row.id}::calling_id`} defaultValue={row.calling_id} className={WIDE_SELECT_CLASS}>
-                    {callingOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    key={row.calling_id}
+                    name={`${row.id}::calling_id`}
+                    options={callingSelectOptions}
+                    defaultValue={row.calling_id}
+                    required
+                    onDirty={() => setDirty(true)}
+                    className={WIDE_SELECT_CLASS}
+                  />
                 </td>
                 <td className="px-2 py-1.5">
                   <input

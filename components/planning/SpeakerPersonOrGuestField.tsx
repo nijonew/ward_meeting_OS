@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { PersonOption } from "@/lib/data/people";
-import { PersonCombobox } from "@/components/PersonCombobox";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 /**
  * "select speakers from a dropdown (all people) or to enter the name of
@@ -103,11 +103,11 @@ export function SpeakerPersonOrGuestField({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Swapped from a plain <select> to PersonCombobox, 2026-11-14
+      {/* Swapped from a plain <select> to SearchableSelect, 2026-11-14
           (the user's own request: searchable, substring-matching
           person pickers) -- the "always keep the currently-assigned
           person selectable" merge above (personOptions) is unchanged. */}
-      <PersonCombobox
+      <SearchableSelect
         name={personFieldName}
         options={personOptions}
         defaultValue={defaultPersonId}
