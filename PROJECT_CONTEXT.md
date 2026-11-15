@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 107
+## Current migration number: 108
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,69 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Bug found and fixed 2026-11-15: `/admin/calling-features` showed no
+features at all for anyone -- migration `108`, not yet run.** The
+user's own report: "I am not able to update feature access for a
+calling on admin/person-callings" -- tracked down to actually be
+`/admin/calling-features` once confirmed directly, then: "104 was run
+previously. and I ran it again. no improvement. the features list
+doesn't show up." Re-running an idempotent migration with no change
+ruled out "a migration just hasn't run yet" and pointed at the read
+path itself.
+
+Root cause: the 2026-11-14 pre-launch performance pass wrapped
+`getFeatureCatalogByCategory()` (`lib/data/calling-features.ts`) and
+`getSelectOptions()` (`lib/data/select-options.ts`) in `unstable_cache`
+for a cross-request 5-minute cache -- `unstable_cache` can't call
+anything that reads `cookies()`/`headers()`, so both switched to
+`createCacheableClient()` (`lib/supabase/cacheable-client.ts`), a
+plain anon-key client with no session attached at all. That client's
+own doc comment said this was safe "because every table this is used
+against already has its own anon-facing RLS policy" -- true for its
+original two callers (`hymnal_songs`/`ward_settings`), but nobody
+checked that for the two new ones before adding them. `features` and
+`admin_select_options` have only ever had a `to authenticated` SELECT
+policy (migrations `060`/`022`), never an `anon` one. A session-less
+client is the `anon` Postgres role no matter which API key built it,
+so RLS silently returned zero rows for `features` -- no error, just an
+empty catalog, exactly "the features list doesn't show up."
+`admin_select_options` has the identical gap, but it's been masked
+the whole time by `getSelectOptions`'s own `fallback` parameter
+quietly substituting the hardcoded default list whenever the real
+query comes back empty -- meaning any admin customization made
+through `/admin/admin_select_options` (e.g. Calling Planning's own
+Status/Release Status option lists) has likely been silently ignored
+since that performance pass shipped, with nothing on screen ever
+showing it.
+
+**Migration `108`** adds a narrow `anon` SELECT policy to both tables,
+matching the exact precedent already set for `hymnal_songs`/
+`ward_settings` -- both are pure catalog/reference data (a feature's
+key/label/category; a dropdown's value/label list), nothing about a
+real person, so this is consistent with this app's own documented RLS
+philosophy (architecture.md section 10) rather than a loosening of it.
+Chosen over reverting the cache (which would bring back the slower
+round trips this performance pass was for) or switching to the
+service-role client (which would bypass RLS outright for data that
+doesn't need it bypassed -- an anon policy is the narrower, more
+honest fix). `lib/supabase/cacheable-client.ts`'s own doc comment was
+rewritten to spell out this exact trap -- any future caller added
+there needs its own matching `anon` policy checked first, not
+assumed.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only (no
+application code changed -- this is a pure RLS fix), same no-live-
+database-access gap as everything else in this project -- **confirm
+migration number `108` is actually free before running it**, then ask
+the user to run it and check: `/admin/calling-features` shows every
+category (including "Teaching Schedules") and every feature again for
+any account that can reach the page; and separately, check whether
+`/admin/admin_select_options` has any rows that look like intentional
+customizations (not the original seeded defaults) -- if so, confirm
+those are now actually reflected wherever that field reads from
+`admin_select_options` (e.g. Calling Planning's Status dropdown),
+since they may have been silently ignored until this fix.
 
 **"My calling"'s Elders Quorum / Relief Society tile renamed to match
 its own page, no migration needed, 2026-11-15.** Found while doing a
