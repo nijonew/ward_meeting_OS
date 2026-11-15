@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { PersonOption } from "@/lib/data/people";
+import { PersonCombobox } from "@/components/PersonCombobox";
 
 /**
  * "select speakers from a dropdown (all people) or to enter the name of
@@ -33,6 +34,7 @@ export function SpeakerPersonOrGuestField({
   guestPlaceholder = "Guest name",
   guestToggleLabel = "Guest speaker instead",
   personToggleLabel = "Choose from People instead",
+  onDirty,
 }: {
   people: PersonOption[];
   /** The full active-people list, used only to resolve a real name for
@@ -51,6 +53,10 @@ export function SpeakerPersonOrGuestField({
   guestPlaceholder?: string;
   guestToggleLabel?: string;
   personToggleLabel?: string;
+  /** See PersonCombobox's own doc comment -- omit for a caller with no
+   *  dirty-tracking concept at all (e.g. SacramentProgramSection.tsx's
+   *  own always-enabled per-item Save buttons). */
+  onDirty?: () => void;
 }) {
   const [showGuest, setShowGuest] = useState(Boolean(defaultGuestName) && !defaultPersonId);
 
@@ -97,18 +103,18 @@ export function SpeakerPersonOrGuestField({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <select
+      {/* Swapped from a plain <select> to PersonCombobox, 2026-11-14
+          (the user's own request: searchable, substring-matching
+          person pickers) -- the "always keep the currently-assigned
+          person selectable" merge above (personOptions) is unchanged. */}
+      <PersonCombobox
         name={personFieldName}
+        options={personOptions}
         defaultValue={defaultPersonId}
+        placeholder={personPlaceholder}
+        onDirty={onDirty}
         className="rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
-      >
-        <option value="">{personPlaceholder}</option>
-        {personOptions.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      />
       <input type="hidden" name={guestFieldName} value="" />
       <button type="button" onClick={() => setShowGuest(true)} className="text-xs text-ink-muted hover:text-ink">
         {guestToggleLabel}

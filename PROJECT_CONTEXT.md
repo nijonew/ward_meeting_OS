@@ -2050,6 +2050,100 @@ avoid confusing the two.
 
 ## Known open items
 
+**Searchable, substring-matching person pickers, no migration needed,
+2026-11-14.** The user's own exploratory question, then narrowed once
+asked which fields: "is there a way to change fields where names can
+be entered, but are also dropdown to show the letters being typed, and
+to have the entry search not just exactly, but also to search within
+the whole entry... I would like to be able to type 'chris' and have
+'Merry Christmas' be a selectable option." -> "Person pickers like
+speakers and teachers."
+
+A native `<select>`'s own built-in typeahead only matches by PREFIX,
+and that can't be changed for a native element -- the only real fix is
+a genuine custom combobox (a text input + a JS-filtered suggestion
+list), not a CSS/attribute tweak.
+
+**New `components/PersonCombobox.tsx`** -- replaces a plain person-
+picker `<select>` everywhere it's used, still resolving to a specific
+person id (a hidden input carries the real submitted value; the
+visible text input is just for searching/display). Typing alone never
+changes what's submitted -- only clicking a suggestion (or clearing the
+field to empty and clicking away, which unassigns) commits a new
+value; blurring with unconfirmed typed text that doesn't match a pick
+reverts the visible text back to whatever's still actually selected,
+so there's never a UI/submitted-value mismatch. Rendered through a
+portal (`createPortal` into `document.body`, positioned `fixed` at the
+input's own on-screen coordinates), same technique
+`ColumnFilterDropdown.tsx` already uses and for the identical reason --
+every real call site sits inside a table wrapped in `overflow-x-auto`,
+which clips a plain `position: absolute` panel to nothing.
+
+**Swapped into the two shared components that already cover every
+real person-picker in the planning/agenda system** -- not a one-off
+per field, since both are reused far beyond literal "Speaker" rows:
+- `PersonSelect` (`components/planning/AgendaGridForm.tsx`) -- every
+  `person`/`person_text`/`speaker`-kind agenda row (prayers, Presiding/
+  Conducting's own fallback, etc.).
+- `SpeakerPersonOrGuestField.tsx`'s person branch -- Speaker/Youth
+  Speaker (`SacramentProgramSection.tsx`), Chorister/Organist
+  (`recognize_music`), and Visiting Authorities
+  (`VisitingAuthoritiesField`), all in `AgendaGridForm.tsx`.
+
+Each kept its own existing "always keep the currently-assigned person
+selectable even if a calling change since made them ineligible" merge
+logic completely unchanged -- `PersonCombobox` just searches whatever
+`options` list it's handed, so that safeguard (confirmed real,
+2026-10-30's own bug fix) carries over automatically.
+
+**A new `onDirty?` prop had to be threaded through every call site
+inside `AgendaGridForm.tsx`'s own big grid** -- a React-state-driven
+value change (clicking a suggestion) fires no native `change` event
+for that grid's `<form onChange={() => setDirty(true)}>` to catch,
+same problem `MultiPersonSelect.tsx`/`VisitingAuthoritiesField`
+already solved the identical way for their own non-native-event
+interactions. `SacramentProgramSection.tsx`'s own call site needed no
+such prop -- its Save buttons are always enabled regardless (no
+dirty-tracking concept there at all).
+
+**New `components/SuggestedTextField.tsx` for the "teachers" half** --
+`teaching_assignments.teacher_name` is deliberately plain free text,
+not a person FK (migration 042's own design), so there's no id to
+resolve here; typing something not on the suggestion list still saves
+exactly as typed, unchanged. Native `<input list>` + `<datalist>` was
+considered and rejected -- browsers don't consistently filter a
+datalist's own suggestions by substring (some only match by prefix,
+the exact limitation this feature exists to get around), so this does
+its own reliable JS filtering instead, the same approach as
+`PersonCombobox`. `TeachingGridForm.tsx`'s Teacher column now uses
+this, with suggestions coming from every active person's name
+(`getActivePeople()`, fetched once per page -- `/youth-teaching-planning`,
+`/adult-teaching-planning` -- and passed down as a new
+`teacherSuggestions` prop) rather than a calling-restricted list, since
+a Teacher entry has never been scoped to a specific calling to begin
+with.
+
+**Deliberately left unchanged**: `MultiPersonSelect.tsx` (Calling
+Planning's own Candidates chip-picker -- a genuinely different,
+multi-value shape, not named by the user) and the raw inline
+"Accompanist" `<select>` in `SacramentProgramSection.tsx` (a one-off
+that doesn't go through either shared component) -- flag if broader
+coverage turns out to matter in practice.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- this
+assistant has no live browser to actually try typing into one of
+these. Ask the user to check, once deployed: typing "chris" into any
+Speaker/Youth Speaker/prayer/Chorister/Organist/Visiting-Authority
+picker on a Sacrament Meeting's Planning page finds "Merry Christmas"-
+style substring matches (any name containing what's typed, not just
+starting with it); clicking a suggestion assigns it and enables "Save
+All Changes"; clicking away without picking anything reverts the
+field back to whoever was already assigned; and that typing into the
+Teacher field on `/youth-teaching-planning` or `/adult-teaching-planning`
+suggests real people by substring match while still accepting a name
+that isn't on the list.
+
 **New: a "Calendar" checkbox on announcements gating `/calendar`
 visibility, and a real form-based editor for existing announcements --
 no migration needed, 2026-11-14.** The user's own request, given in

@@ -3,6 +3,7 @@
 import { useState, useActionState } from "react";
 import { saveTeachingGrid } from "@/app/youth-teaching-planning/actions";
 import { DualScrollbar } from "@/components/DualScrollbar";
+import { SuggestedTextField } from "@/components/SuggestedTextField";
 import type { TeachingGridRow } from "@/lib/data/teaching-assignments";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -55,13 +56,27 @@ function formatDate(iso: string) {
  * the same grid can't accidentally clear it on save -- saveTeachingGrid
  * deletes and reinserts every submitted row regardless of which fields
  * actually changed.
+ *
+ * **Teacher field gained searchable, substring-matched suggestions,
+ * 2026-11-14** (the user's own request, narrowed to "person pickers
+ * like speakers and teachers" when asked which fields) -- still plain
+ * free text underneath, unchanged from migration 042's own design (a
+ * name, a topic, or both, whatever's useful, not a person FK); typing
+ * someone not on the suggestion list still saves exactly as typed.
+ * `teacherSuggestions` (optional -- every real caller passes it, but
+ * nothing breaks if a future one doesn't) is every active person's
+ * name, fetched once by the page and passed down rather than refetched
+ * per row. See `SuggestedTextField.tsx`'s own doc comment for why this
+ * isn't a native `<datalist>`.
  */
 export function TeachingGridForm({
   teachingClass,
   rows,
+  teacherSuggestions = [],
 }: {
   teachingClass: string;
   rows: TeachingGridRow[];
+  teacherSuggestions?: string[];
 }) {
   const [state, formAction, pending] = useActionState(saveTeachingGrid, initialState);
   const [dirty, setDirty] = useState(false);
@@ -106,11 +121,12 @@ export function TeachingGridForm({
                     )}
                   </td>
                   <td className="px-2 py-1.5 align-top">
-                    <input
-                      type="text"
+                    <SuggestedTextField
                       name={`${row.classDate}::teacher`}
+                      suggestions={teacherSuggestions}
                       defaultValue={row.teacher}
-                      className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+                      onDirty={() => setDirty(true)}
+                      className="rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     />
                   </td>
                   <td className="px-2 py-1.5 align-top">

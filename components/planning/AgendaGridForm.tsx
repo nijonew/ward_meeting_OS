@@ -9,6 +9,7 @@ import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
 import { useHymnTitleLiveFill } from "@/lib/hooks/use-hymn-title-live-fill";
 import { SpeakerPersonOrGuestField } from "@/components/planning/SpeakerPersonOrGuestField";
+import { PersonCombobox } from "@/components/PersonCombobox";
 
 // Dynamically imported (2026-11-14, pre-launch performance pass) --
 // both pull in @dnd-kit/core/sortable/utilities for their own Move
@@ -34,6 +35,7 @@ function PersonSelect({
   people,
   allPeople,
   defaultValue,
+  onDirty,
 }: {
   name: string;
   people: PersonOption[];
@@ -42,6 +44,10 @@ function PersonSelect({
    *  option-building logic below. */
   allPeople: PersonOption[];
   defaultValue: string;
+  /** See PersonCombobox's own doc comment -- a React-state-driven
+   *  value change here fires no native `change` event for this grid's
+   *  wrapping `<form onChange=...>` to catch. */
+  onDirty?: () => void;
 }) {
   // Always keep the currently-assigned person selectable even if a
   // calling change since makes them no longer "eligible" for this
@@ -66,15 +72,14 @@ function PersonSelect({
         ]
       : people;
 
+  // Swapped from a plain <select> to PersonCombobox, 2026-11-14 (the
+  // user's own request: searchable, substring-matching person
+  // pickers, not a native select's prefix-only typeahead) -- the
+  // "always keep the currently-assigned person selectable" merge
+  // above is unchanged, it's exactly what PersonCombobox's own
+  // `options` list needs.
   return (
-    <select name={name} defaultValue={defaultValue} className={INPUT}>
-      <option value="">Unassigned</option>
-      {options.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-        </option>
-      ))}
-    </select>
+    <PersonCombobox name={name} options={options} defaultValue={defaultValue} placeholder="Unassigned" onDirty={onDirty} className={INPUT} />
   );
 }
 
@@ -233,6 +238,7 @@ function VisitingAuthoritiesField({
               personPlaceholder="Choose a visiting authority"
               guestToggleLabel="Write in a name instead"
               personToggleLabel="Choose from the list instead"
+              onDirty={onDirty}
             />
             {rowCount > 1 && i === rowCount - 1 && (
               <button type="button" onClick={removeLastRow} className="text-xs text-danger/70 hover:text-danger">
@@ -445,7 +451,13 @@ export function AgendaGridForm({
                   </th>
                   <td className="px-2 py-1.5">
                     {row.kind === "person" && (
-                      <PersonSelect name={row.field} people={row.eligiblePeople} allPeople={people} defaultValue={row.value} />
+                      <PersonSelect
+                        name={row.field}
+                        people={row.eligiblePeople}
+                        allPeople={people}
+                        defaultValue={row.value}
+                        onDirty={() => setDirty(true)}
+                      />
                     )}
 
                     {row.kind === "text" && (
@@ -466,6 +478,7 @@ export function AgendaGridForm({
                             people={people}
                             allPeople={people}
                             defaultValue={row.personValue}
+                            onDirty={() => setDirty(true)}
                           />
                         </div>
                         <input
@@ -488,6 +501,7 @@ export function AgendaGridForm({
                             people={people}
                             allPeople={people}
                             defaultValue={row.personValue}
+                            onDirty={() => setDirty(true)}
                           />
                         </div>
                         <input
@@ -524,6 +538,7 @@ export function AgendaGridForm({
                             personPlaceholder="Choose chorister"
                             guestPlaceholder="Guest chorister name"
                             guestToggleLabel="Guest chorister instead"
+                            onDirty={() => setDirty(true)}
                           />
                         </div>
                         <div className="sm:w-1/2">
@@ -541,6 +556,7 @@ export function AgendaGridForm({
                             personPlaceholder="Choose organist"
                             guestPlaceholder="Guest organist name"
                             guestToggleLabel="Guest organist instead"
+                            onDirty={() => setDirty(true)}
                           />
                         </div>
                       </div>
