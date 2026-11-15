@@ -2050,6 +2050,30 @@ avoid confusing the two.
 
 ## Known open items
 
+**"My calling"'s Elders Quorum / Relief Society tile renamed to match
+its own page, no migration needed, 2026-11-15.** Found while doing a
+sweep of every landing-page/nav tile against its destination page's
+own title, prompted by the user's own request to "check the dashboard
+tiles for stale names too." `lib/data/nav-sections.ts`'s "My calling"
+section had this tile reading "Elders Quorum / Relief Society
+Teaching" since the feature was first built (migration 100,
+2026-11-05) -- its own page (`/adult-teaching-planning`) has always
+been titled "Elders Quorum / Relief Society Teaching Planning," and
+its sibling tile right above it ("YM/YW Teaching Planning") already
+matches its own page exactly. Corrected to "Elders Quorum / Relief
+Society Teaching Planning" so both teaching-planning tiles follow the
+same naming pattern. Every other tile reachable from the landing
+page, the persistent side nav, and every sub-hub (Meeting Planning,
+Meeting Agendas, Youth Activity Planning, Admin's "Other Admin
+Tools") was checked the same way against its own destination page's
+`<h1>`/`AppHeader` tag -- nothing else was out of sync.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask
+the user to check: "My calling" (landing page and the persistent side
+nav) now reads "Elders Quorum / Relief Society Teaching Planning,"
+matching the page it links to.
+
 **The "Tentative" badge on youth activities is gone -- no migration
 needed, 2026-11-15.** The user's own request: "I want to eliminate the
 tentative label from all youth activities." `ActivitiesTable.tsx` (the

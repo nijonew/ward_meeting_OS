@@ -167,7 +167,8 @@ export const getNavSections = cache(async (): Promise<NavSection[]> => {
     if (canCallingPlanning) links.push({ title: "Calling Planning", href: "/calling-planning" });
     if (isMusicPlanner) links.push({ title: "Sacrament Meeting Music Planning", href: "/music" });
     if (canTeachYouth) links.push({ title: "YM/YW Teaching Planning", href: "/youth-teaching-planning" });
-    if (canTeachAdult) links.push({ title: "Elders Quorum / Relief Society Teaching", href: "/adult-teaching-planning" });
+    if (canTeachAdult)
+      links.push({ title: "Elders Quorum / Relief Society Teaching Planning", href: "/adult-teaching-planning" });
     if (isYouthLeader) links.push({ title: "Youth Activity Planning", href: "/youth-activity-planning" });
     if (canSubmitAnnouncement) links.push({ title: "Submit an Announcement", href: "/submit/announcement" });
     if (canAnnouncementManagement) links.push({ title: "Manage Announcements", href: "/announcements" });
