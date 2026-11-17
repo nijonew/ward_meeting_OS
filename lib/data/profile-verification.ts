@@ -56,3 +56,69 @@ export async function getUnverifiedProfileCount(): Promise<number> {
   const { count, error } = await query;
   return error || count === null ? 0 : count;
 }
+
+export interface VerifiedProfileRow {
+  personId: string;
+  personName: string;
+  email: string | null;
+  /** The login's own sign-up timestamp (`profiles.created_at`) -- not
+   *  literally "when an admin approved it," since that moment has
+   *  never been recorded anywhere (see this file's own history in
+   *  PROJECT_CONTEXT.md). This is the one date already on record for
+   *  every account, past and future, per the user's own explicit
+   *  choice when asked. */
+  signedUpAt: string | null;
+}
+
+/**
+ * Every login already linked to a person, newest sign-up first --
+ * "a list of approvals by date" (2026-11-16, the user's own request).
+ * The inverse of `getUnverifiedProfiles()` above: that one lists what
+ * still needs a human to confirm identity; this one is the completed
+ * record of that same step, for every account that's already been
+ * through it.
+ *
+ * Reads `people` (not `profiles`) as the base table and embeds the
+ * linked `profiles` row through `profile_id` -- `people.name` is the
+ * real display name everywhere else in this app, unlike
+ * `profiles.display_name`, which only a self-signed-up account's own
+ * first-name field ever populates (see the 2026-10-30 "submitted by
+ * showed an email" fix elsewhere in this file's history) and would
+ * leave an admin-invited account's row blank.
+ */
+export async function getVerifiedProfiles(): Promise<VerifiedProfileRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("people")
+    .select("id, name, profiles:profile_id(email, created_at)")
+    .not("profile_id", "is", null);
+
+  if (error || !data) return [];
+
+  const rows = (data as unknown[]).map((row) => {
+    const r = row as {
+      id: string;
+      name: string;
+      profiles: { email: string | null; created_at: string | null } | { email: string | null; created_at: string | null }[] | null;
+    };
+    const linked = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+    return {
+      personId: r.id,
+      personName: r.name,
+      email: linked?.email ?? null,
+      signedUpAt: linked?.created_at ?? null,
+    };
+  });
+
+  // Newest sign-up first; a row with no date at all (shouldn't happen
+  // once linked, but defensively) sorts to the end rather than
+  // throwing off the rest of the order.
+  rows.sort((a, b) => {
+    if (!a.signedUpAt && !b.signedUpAt) return 0;
+    if (!a.signedUpAt) return 1;
+    if (!b.signedUpAt) return -1;
+    return b.signedUpAt.localeCompare(a.signedUpAt);
+  });
+
+  return rows;
+}

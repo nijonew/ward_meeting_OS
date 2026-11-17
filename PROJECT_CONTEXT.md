@@ -2050,6 +2050,43 @@ avoid confusing the two.
 
 ## Known open items
 
+**"Already Verified" list added to Verify Logins, sorted by sign-up
+date -- no migration needed, 2026-11-16.** The user's own request:
+"can I get a list of approvals by date?" -- clarified in two rounds to
+mean already-linked logins (/admin/verify-logins' own "approval"
+step), ordered by date. Checked first, via a diagnostic query run
+directly by the user, since this assistant has no live database
+access: there is no "verified on" timestamp recorded anywhere in this
+schema at all -- once an admin links a login to a person, nothing
+stores when that happened. Confirmed `profiles.created_at` (the
+account's own sign-up timestamp) does exist, and the user's own
+explicit choice, once told the real tradeoff, was to use that instead
+of adding new tracking: "Use each account's sign-up date instead."
+
+New `getVerifiedProfiles()` (`lib/data/profile-verification.ts`) --
+the inverse of the existing `getUnverifiedProfiles()` right above it:
+every `people` row with `profile_id` set, embedding its linked
+`profiles` row for `email`/`created_at`, sorted newest-sign-up-first.
+Reads `people.name` for the display name rather than
+`profiles.display_name` -- the latter is only ever populated by a
+self-signed-up account's own typed-in first name (migration `092`),
+leaving an admin-invited account's row blank, exactly the "submitted
+by showed an email" bug class already fixed once elsewhere in this
+app for the identical reason.
+
+New "Already Verified" section on `/admin/verify-logins`, below the
+existing pending-logins table -- Person/Login/Signed up columns, read-
+only (no actions, unlike the pending list above it), with its own note
+that the date is sign-up, not literally "approved on," so nobody reads
+too much into it later. Same `verify_logins` feature gate as the rest
+of the page -- no new access control needed.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask the
+user to check `/admin/verify-logins` and confirm the new "Already
+Verified" section lists every already-linked person with their real
+name (not an email), correct sign-up date, newest first.
+
 **Bug found and fixed 2026-11-15: `/admin/calling-features` showed no
 features at all for anyone -- migration `108`, confirmed run,
 2026-11-16.** The
