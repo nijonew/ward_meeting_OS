@@ -2051,7 +2051,8 @@ avoid confusing the two.
 ## Known open items
 
 **Bug found and fixed 2026-11-15: `/admin/calling-features` showed no
-features at all for anyone -- migration `108`, not yet run.** The
+features at all for anyone -- migration `108`, confirmed run,
+2026-11-16.** The
 user's own report: "I am not able to update feature access for a
 calling on admin/person-callings" -- tracked down to actually be
 `/admin/calling-features` once confirmed directly, then: "104 was run
@@ -2102,16 +2103,17 @@ assumed.
 
 Confirmed via `tsc`/`eslint`/`next build --webpack` only (no
 application code changed -- this is a pure RLS fix), same no-live-
-database-access gap as everything else in this project -- **confirm
-migration number `108` is actually free before running it**, then ask
-the user to run it and check: `/admin/calling-features` shows every
-category (including "Teaching Schedules") and every feature again for
-any account that can reach the page; and separately, check whether
-`/admin/admin_select_options` has any rows that look like intentional
-customizations (not the original seeded defaults) -- if so, confirm
-those are now actually reflected wherever that field reads from
-`admin_select_options` (e.g. Calling Planning's Status dropdown),
-since they may have been silently ignored until this fix.
+database-access gap as everything else in this project. **Migration
+`108` confirmed run, 2026-11-16** -- functional behavior not yet
+independently confirmed back; ask the user to check:
+`/admin/calling-features` shows every category (including "Teaching
+Schedules") and every feature again for any account that can reach
+the page; and separately, check whether `/admin/admin_select_options`
+has any rows that look like intentional customizations (not the
+original seeded defaults) -- if so, confirm those are now actually
+reflected wherever that field reads from `admin_select_options` (e.g.
+Calling Planning's Status dropdown), since they may have been
+silently ignored until this fix.
 
 **"My calling"'s Elders Quorum / Relief Society tile renamed to match
 its own page, no migration needed, 2026-11-15.** Found while doing a
