@@ -39,7 +39,6 @@ const COLUMNS = [
   { key: "date_initiated", label: "Date Initiated" },
   { key: "candidates", label: "Candidates" },
   { key: "status", label: "Status" },
-  { key: "date_set_apart", label: "Date Set Apart" },
   { key: "notes", label: "Notes" },
   { key: "release_person", label: "Person Being Released" },
   { key: "release_status", label: "Release Status" },
@@ -137,6 +136,16 @@ function compareText(a: string, b: string): number {
  * drop-in replacement for the plain `useState` these used to be. See
  * that hook's own comment for the full reasoning (including why it
  * doesn't risk a hydration mismatch).
+ *
+ * **Date Set Apart column removed, 2026-11-17** (the user's own
+ * request: "can we take the set apart date out of the calling
+ * planning page?"). `calling_planning.date_set_apart` is untouched in
+ * the schema -- just dropped from this grid's own COLUMNS/cellText/
+ * fieldNameFor and its `<td>`, same "harmless but real" treatment
+ * this app already gives a handful of other unused-but-real columns
+ * elsewhere. Dropped from `EDITABLE_FIELDS`
+ * (`app/calling-planning/actions.ts`) to match, since nothing can
+ * submit that field name from this grid any more.
  */
 export function CallingPlanningGridForm({
   rows,
@@ -208,8 +217,6 @@ export function CallingPlanningGridForm({
           .join(", ");
       case "status":
         return callingStatusLabels.get(row.calling_status) ?? row.calling_status;
-      case "date_set_apart":
-        return row.date_set_apart ?? "";
       case "notes":
         return row.notes ?? "";
       case "release_person":
@@ -231,8 +238,6 @@ export function CallingPlanningGridForm({
         return null;
       case "status":
         return `${rowId}::calling_status`;
-      case "date_set_apart":
-        return `${rowId}::date_set_apart`;
       case "notes":
         return `${rowId}::notes`;
       case "release_person":
@@ -438,15 +443,6 @@ export function CallingPlanningGridForm({
                       </option>
                     ))}
                   </select>
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    key={row.date_set_apart ?? ""}
-                    type="date"
-                    name={`${row.id}::date_set_apart`}
-                    defaultValue={row.date_set_apart ?? ""}
-                    className={INPUT_CLASS}
-                  />
                 </td>
                 <td className="px-2 py-1.5">
                   <textarea

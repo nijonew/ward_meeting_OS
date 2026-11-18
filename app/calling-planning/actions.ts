@@ -77,11 +77,14 @@ function parseFieldName(name: string): { planningId: string; field: string } | n
   return { planningId: name.slice(0, idx), field: name.slice(idx + 2) };
 }
 
+// date_set_apart dropped 2026-11-17, matching its removal from the
+// grid itself (CallingPlanningGridForm.tsx's own comment) -- the
+// column stays real in the schema, just nothing can submit this field
+// name from the grid any more.
 const EDITABLE_FIELDS = [
   "calling_id",
   "date_initiated",
   "calling_status",
-  "date_set_apart",
   "notes",
   "release_person_id",
   "release_status",

@@ -2050,6 +2050,35 @@ avoid confusing the two.
 
 ## Known open items
 
+**Date Set Apart column removed from Calling Planning, no migration
+needed, 2026-11-17.** The user's own request: "can we take the set
+apart date out of the calling planning page?"
+`calling_planning.date_set_apart` is untouched in the schema -- real
+data from migration 043's own design, and migration 067's bulk import
+set it on 123 real rows -- just dropped from
+`CallingPlanningGridForm.tsx`'s own `COLUMNS`/`cellText`/`fieldNameFor`
+and its `<td>`, the same "harmless but real" treatment this app
+already gives a handful of other columns no longer touched by their
+own page (e.g. `callings.title_prefix`'s own history). Dropped from
+`EDITABLE_FIELDS` in `app/calling-planning/actions.ts` to match, since
+nothing can submit that field name from this grid any more --
+`saveCallingPlanningGrid` simply never sees an edit for it, leaving
+whatever's already stored untouched. No other code reads this column
+at all (confirmed by grep before removing) -- it was never used in the
+Conducting script, the archived view, or the public program, only on
+this one grid.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calling-planning` and confirm the grid no longer shows a
+Date Set Apart column and every other column still saves correctly.
+Whether a row's own existing `date_set_apart` value is still intact
+underneath can't be checked visually (`calling_planning` is
+deliberately excluded from Table Admin, see its own entry in that
+registry) -- this is a trust-the-code confirmation, since
+`saveCallingPlanningGrid` simply never touches a field it was never
+asked to patch.
+
 **Upcoming Activities shows "In Charge" again, no migration needed,
 2026-11-17.** The user's own request: "Lets add back into the activity
 page which group is planning the combined activities." The three
