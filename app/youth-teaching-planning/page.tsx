@@ -5,7 +5,6 @@ import { Tile, TileGrid } from "@/components/Tile";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses, getTeachingAssignmentGrid, TEACHING_CLASSES } from "@/lib/data/teaching-assignments";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
-import { getActivePeople } from "@/lib/data/people";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
 /** 6 months out, computed fresh on every render -- "available for the
@@ -136,11 +135,9 @@ export default async function YouthTeachingPlanningPage({
   // meeting-cancellations.ts (which needs ALL_TEACHING_CLASS_OPTIONS
   // from here). Cheap no-op when there's nothing scheduled to cancel.
   // The sweep must finish before the grid is read -- it may insert or
-  // update the very rows getTeachingAssignmentGrid is about to select,
-  // so it can't run concurrently with that read (unlike activePeople,
-  // which is independent of both).
+  // update the very rows getTeachingAssignmentGrid is about to select.
   await sweepMeetingCancellations();
-  const [grid, activePeople] = await Promise.all([getTeachingAssignmentGrid(throughDate, rawClass), getActivePeople()]);
+  const grid = await getTeachingAssignmentGrid(throughDate, rawClass);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -173,11 +170,7 @@ export default async function YouthTeachingPlanningPage({
         {grid.rows.length === 0 ? (
           <p className="mt-4 text-sm text-ink-muted">No Sundays in this range.</p>
         ) : (
-          <TeachingGridForm
-            teachingClass={grid.teachingClass}
-            rows={grid.rows}
-            teacherSuggestions={activePeople.map((p) => p.name)}
-          />
+          <TeachingGridForm teachingClass={grid.teachingClass} rows={grid.rows} />
         )}
       </div>
     </main>

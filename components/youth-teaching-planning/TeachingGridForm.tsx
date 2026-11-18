@@ -3,7 +3,6 @@
 import { useState, useActionState } from "react";
 import { saveTeachingGrid } from "@/app/youth-teaching-planning/actions";
 import { DualScrollbar } from "@/components/DualScrollbar";
-import { SuggestedTextField } from "@/components/SuggestedTextField";
 import type { TeachingGridRow } from "@/lib/data/teaching-assignments";
 
 const initialState: { error?: string; success?: boolean } = {};
@@ -57,26 +56,30 @@ function formatDate(iso: string) {
  * deletes and reinserts every submitted row regardless of which fields
  * actually changed.
  *
- * **Teacher field gained searchable, substring-matched suggestions,
- * 2026-11-14** (the user's own request, narrowed to "person pickers
- * like speakers and teachers" when asked which fields) -- still plain
- * free text underneath, unchanged from migration 042's own design (a
- * name, a topic, or both, whatever's useful, not a person FK); typing
- * someone not on the suggestion list still saves exactly as typed.
- * `teacherSuggestions` (optional -- every real caller passes it, but
- * nothing breaks if a future one doesn't) is every active person's
- * name, fetched once by the page and passed down rather than refetched
- * per row. See `SuggestedTextField.tsx`'s own doc comment for why this
- * isn't a native `<datalist>`.
+ * **Teacher field gained searchable, substring-matched suggestions on
+ * 2026-11-14, then reverted back to a plain text field on 2026-11-17**
+ * (the user's own request: "I want to be able to add more than one
+ * teacher in the teacher planning. I think the way to do that is to
+ * not have a selectable name, but only a short entry field"). The
+ * suggestion dropdown's own "pick a name" action replaced the field's
+ * entire value outright (`SuggestedTextField.tsx`'s `pick()`) -- fine
+ * for choosing exactly one teacher, but it meant clicking a suggestion
+ * after typing a first name's own text (e.g. "Jane Doe, ") wiped that
+ * typing out, making it look impossible to list more than one teacher
+ * in the same cell. `teacher_name` has always been plain free text
+ * (migration 042's own design, a name/topic/both, never a person FK),
+ * so nothing about the data model needed to change -- a plain
+ * `<input>`, same as Topic right next to it, already lets an admin
+ * type "Jane Doe, John Smith" and have it save exactly as typed.
+ * `SuggestedTextField.tsx` itself is deleted outright along with this
+ * -- it had no other caller.
  */
 export function TeachingGridForm({
   teachingClass,
   rows,
-  teacherSuggestions = [],
 }: {
   teachingClass: string;
   rows: TeachingGridRow[];
-  teacherSuggestions?: string[];
 }) {
   const [state, formAction, pending] = useActionState(saveTeachingGrid, initialState);
   const [dirty, setDirty] = useState(false);
@@ -121,12 +124,12 @@ export function TeachingGridForm({
                     )}
                   </td>
                   <td className="px-2 py-1.5 align-top">
-                    <SuggestedTextField
+                    <input
+                      type="text"
                       name={`${row.classDate}::teacher`}
-                      suggestions={teacherSuggestions}
                       defaultValue={row.teacher}
-                      onDirty={() => setDirty(true)}
-                      className="rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
+                      placeholder="One name, or several separated by commas"
+                      className="w-full min-w-[9rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink"
                     />
                   </td>
                   <td className="px-2 py-1.5 align-top">

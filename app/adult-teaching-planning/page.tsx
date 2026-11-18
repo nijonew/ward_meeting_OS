@@ -4,7 +4,6 @@ import { AppHeader } from "@/components/AppHeader";
 import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getAccessibleClasses, getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
-import { getActivePeople } from "@/lib/data/people";
 import { TeachingGridForm } from "@/components/youth-teaching-planning/TeachingGridForm";
 
 /** 6 months out, computed fresh on every render -- same rolling
@@ -74,12 +73,10 @@ export default async function AdultTeachingPlanningPage({
   // inside getTeachingAssignmentGrid itself.
   await sweepMeetingCancellations();
 
-  const [eqGrid, rsGrid, activePeople] = await Promise.all([
+  const [eqGrid, rsGrid] = await Promise.all([
     canSeeEldersQuorum ? getTeachingAssignmentGrid(throughDate, "Elders Quorum") : null,
     canSeeReliefSociety ? getTeachingAssignmentGrid(throughDate, "Relief Society") : null,
-    getActivePeople(),
   ]);
-  const teacherSuggestions = activePeople.map((p) => p.name);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-12 sm:px-8">
@@ -120,7 +117,7 @@ export default async function AdultTeachingPlanningPage({
           {eqGrid.rows.length === 0 ? (
             <p className="mt-4 text-sm text-ink-muted">No Sundays in this range.</p>
           ) : (
-            <TeachingGridForm teachingClass={eqGrid.teachingClass} rows={eqGrid.rows} teacherSuggestions={teacherSuggestions} />
+            <TeachingGridForm teachingClass={eqGrid.teachingClass} rows={eqGrid.rows} />
           )}
         </div>
         )}
@@ -131,7 +128,7 @@ export default async function AdultTeachingPlanningPage({
           {rsGrid.rows.length === 0 ? (
             <p className="mt-4 text-sm text-ink-muted">No Sundays in this range.</p>
           ) : (
-            <TeachingGridForm teachingClass={rsGrid.teachingClass} rows={rsGrid.rows} teacherSuggestions={teacherSuggestions} />
+            <TeachingGridForm teachingClass={rsGrid.teachingClass} rows={rsGrid.rows} />
           )}
         </div>
         )}
