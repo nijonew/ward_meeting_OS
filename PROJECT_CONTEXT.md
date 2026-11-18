@@ -2050,6 +2050,57 @@ avoid confusing the two.
 
 ## Known open items
 
+**Upcoming Activities shows "In Charge" again, no migration needed,
+2026-11-17.** The user's own request: "Lets add back into the activity
+page which group is planning the combined activities." The three
+Combined-group pages (`/youth-activities/combined-ym`/`combined-ym-yw`/
+`combined-yw`) have always shown `planning_group` via `ActivitiesTable`'s
+`showPlanningGroupColumn` (2026-10-11), but Upcoming Activities --
+"every upcoming activity, all groups" -- never did.
+`explodeActivitiesByClass` (`lib/data/class-activities-shared.ts`)
+already spreads a Combined row's own `planning_group` onto every class
+it explodes into, so turning the column on needed no data-layer
+change -- `app/youth-activities/upcoming/page.tsx` now passes
+`showPlanningGroupColumn` unconditionally, same as the three Combined
+pages, since it's read-only display (this page never sets `editable`,
+only `deletable`, so `ActivitiesTable` renders the cell as plain text
+regardless of who's viewing).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask the
+user to check `/youth-activities/upcoming` and confirm an "In Charge"
+column now shows which class is responsible for planning a combined
+activity, matching what the three Combined-group pages already show.
+
+**Teacher Planning's Teacher field reverted to a plain text field, no
+migration needed, 2026-11-17.** The user's own request: "I want to be
+able to add more than one teacher in the teacher planning. I think the
+way to do that is to not have a selectable name, but only a short
+entry field." `teaching_assignments.teacher_name` has always been
+plain free text (migration 042's own design, a name/topic/both, never
+a person FK) -- nothing stopped typing "Jane Doe, John Smith" directly.
+The real obstacle was `SuggestedTextField.tsx`'s own suggestion-click
+behavior (built 2026-11-14): clicking a suggested name replaced the
+whole field's value outright, so picking a name after already typing
+a first one wiped that typing out -- making it look like the field
+could only ever hold one person.
+
+`components/youth-teaching-planning/TeachingGridForm.tsx`'s Teacher
+cell is now a plain `<input type="text">`, matching Topic right next
+to it, with a placeholder hinting several names can be comma-separated.
+`SuggestedTextField.tsx` is deleted outright -- it had no other
+caller. The now-unused `teacherSuggestions` prop (and the
+`getActivePeople()` calls on `/youth-teaching-planning` and
+`/adult-teaching-planning` that only ever existed to build it) were
+removed too, rather than left as dead plumbing.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask the
+user to check `/youth-teaching-planning` and `/adult-teaching-planning`:
+the Teacher field is a plain text box with no suggestion dropdown, and
+typing "Jane Doe, John Smith" and saving keeps both names exactly as
+typed.
+
 **"Already Verified" list added to Verify Logins, sorted by sign-up
 date -- no migration needed, 2026-11-16.** The user's own request:
 "can I get a list of approvals by date?" -- clarified in two rounds to

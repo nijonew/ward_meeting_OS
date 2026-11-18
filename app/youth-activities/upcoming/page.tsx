@@ -57,6 +57,18 @@ function todayISO(): string {
  * times over would not). Both gated on `youth_activity_planning`, same
  * feature the three Combined-group pages already gate their own Add/
  * Edit/Delete on.
+ *
+ * **Gained the "In Charge" column back, 2026-11-17** (the user's own
+ * request) -- the three Combined-group pages have always shown
+ * `planning_group` (which class is on the hook to plan that combined
+ * week) via `showPlanningGroupColumn`, but this page never did.
+ * `explodeActivitiesByClass` already spreads a Combined row's own
+ * `planning_group` onto every class it explodes into, so turning the
+ * column on here needed no data-layer change -- shown unconditionally,
+ * same as the three Combined pages, since it's read-only display, not
+ * an editing capability (this page never sets `editable`, only
+ * `deletable`, so `ActivitiesTable` renders it as plain text
+ * regardless of who's viewing).
  */
 export default async function UpcomingActivitiesPage() {
   const { user, profile } = await getSessionUser();
@@ -87,7 +99,13 @@ export default async function UpcomingActivitiesPage() {
       {canManage && <AddActivityForm />}
 
       <div className="rounded border border-rule bg-surface p-6">
-        <ActivitiesTable activities={upcoming} deletable={canManage} storageKey="activities-upcoming" userId={user?.id ?? null} />
+        <ActivitiesTable
+          activities={upcoming}
+          showPlanningGroupColumn
+          deletable={canManage}
+          storageKey="activities-upcoming"
+          userId={user?.id ?? null}
+        />
       </div>
     </main>
   );
