@@ -2050,6 +2050,54 @@ avoid confusing the two.
 
 ## Known open items
 
+**"Import features from another calling" added to Calling Features, no
+migration needed, 2026-11-21.** The user's own request: "can we create
+a tool in .../admin/calling-features where we can import the settings
+of another calling?"
+
+New `getCallingFeatureKeysForImport(sourceCallingId)`
+(`app/admin/calling-features/actions.ts`) -- a read, not a write, same
+`table_admin_callings` gate as `saveCallingFeatures`. `CallingFeaturesForm.tsx`
+gained a new "Import features from another calling" box above the
+category checklist: pick any other calling, click Import, confirm a
+`window.confirm` (it silently overwrites every checkbox on screen,
+including any not-yet-saved edits), and every checkbox is set to match
+the source calling's current `calling_features` grants. **Nothing is
+written to the database by Import itself** -- it only pre-checks the
+on-screen checkboxes and marks the form dirty, exactly like picking a
+different calling from the top picker would leave things if the admin
+then edited by hand; the actual write still only happens on the
+existing "Save Changes" click, so an import can be reviewed (and
+individual boxes unchecked) before anything real changes. This matches
+how every other "stage the change, then an explicit Save" control in
+this app already works, rather than copying on click with no review
+step.
+
+Every checkbox already existed as an uncontrolled (`defaultChecked`)
+field -- rather than rewriting the whole form to controlled state,
+each checkbox now also registers itself in a plain `useRef` map keyed
+by feature key, and Import sets `.checked` directly on each matching
+DOM node rather than going through React state, the same kind of
+direct-DOM technique this app already leans on for uncontrolled grids
+elsewhere. The source-calling picker reuses the existing
+`formatCallingOptionLabel`/`CallingOption` from
+`lib/data/calling-planning-shared.ts` (the same "`<Calling>` -
+`<current holder or N/A>`" label Calling Planning's own picker already
+uses) -- a real, deliberate choice: this ward already has callings that
+share a literal name (e.g. "Stake High Councilor (`<area>`)" seats),
+and importing from the wrong one of two identically-named callings
+would be a confusing, hard-to-notice mistake, so the richer label
+disambiguates which one is actually being imported from.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/admin/calling-features`: picking a calling, then picking a
+different source calling from the new Import box and confirming,
+updates the checkboxes below to match that source calling's own
+current grants (not yet saved); clicking "Save Changes" afterward
+actually applies it; and that declining the confirm dialog leaves
+every checkbox untouched.
+
 **Date Set Apart column removed from Calling Planning, no migration
 needed, 2026-11-17.** The user's own request: "can we take the set
 apart date out of the calling planning page?"

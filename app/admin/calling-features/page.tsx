@@ -79,6 +79,7 @@ export default async function CallingFeaturesPage({
           callingName={selectedCalling.name}
           categories={categories}
           grantedKeys={grantedKeys}
+          otherCallings={callingOptions.filter((c) => c.id !== selectedCalling.id)}
         />
       ) : callingId ? (
         <p className="text-sm text-ink-muted">That calling couldn&rsquo;t be found.</p>

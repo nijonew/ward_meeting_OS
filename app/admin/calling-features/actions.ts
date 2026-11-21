@@ -7,6 +7,32 @@ import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 type ActionResult = { error?: string; success?: boolean };
 
 /**
+ * Looks up which features a DIFFERENT calling currently grants, for
+ * the checklist's own "Import features from another calling" control
+ * (2026-11-21, the user's own request: "can we create a tool... where
+ * we can import the settings of another calling?"). Deliberately a
+ * read, not a write -- it only hands the checked keys back to the
+ * client, which pre-checks the on-screen checkboxes to match and
+ * leaves the real save to the existing "Save Changes" button, so an
+ * import can be reviewed (and un-checked where it shouldn't apply)
+ * before anything actually changes in `calling_features`. Same
+ * `table_admin_callings` gate as `saveCallingFeatures` -- reading
+ * another calling's own grants is part of the same admin capability
+ * as editing them.
+ */
+export async function getCallingFeatureKeysForImport(sourceCallingId: string): Promise<{ keys?: string[]; error?: string }> {
+  const { profile } = await getSessionUser();
+  if (!hasFeature(profile, "table_admin_callings")) return { error: "Not authorized." };
+  if (!sourceCallingId) return { error: "Choose a calling to import from." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("calling_features").select("feature_key").eq("calling_id", sourceCallingId);
+  if (error) return { error: error.message };
+
+  return { keys: (data ?? []).map((r) => r.feature_key as string) };
+}
+
+/**
  * Saves one calling's complete feature set in a single submit --
  * purpose-built for the Calling Features checklist page, replacing the
  * "add a row per (calling, feature) pair" workflow Table Admin's raw
