@@ -2050,6 +2050,65 @@ avoid confusing the two.
 
 ## Known open items
 
+**Agenda person pickers can now search by calling too, no migration
+needed, 2026-11-21.** Direct follow-up to the SearchableSelect
+`displayName` fix just below -- asked "And where else would it make
+sense to do the same?", the proposal was to extend the same
+search-by-more-than-one-thing trick to the agenda's own person
+pickers (Presiding, Conducting, every prayer, Speaker/Youth Speaker,
+Chorister/Organist, Visiting Authorities) so typing a calling name
+(e.g. "bishop") finds whoever holds it, the same value Calling
+Planning's own Calling field already got. The user confirmed: "Please
+add the suggested new feature."
+
+New `getCallingNamesByPersonId()` (`lib/data/callings.ts`) -- every
+active calling with a current holder, grouped by person id and
+comma-joined when someone holds more than one at once (`"Bishop"`,
+or `"Ward Clerk, Ward Assistant Clerk"`). Deliberately takes no
+person-id filter at all -- this table is small and ward-wide, so it's
+one more unconditional fetch folded into
+`app/meetings/[id]/planning/page.tsx`'s existing big `Promise.all`
+wave rather than something that has to wait on `activePeople`'s own
+ids first.
+
+**`PersonSelect` (`components/planning/AgendaGridForm.tsx`) and
+`SpeakerPersonOrGuestField.tsx` both build their own enriched search
+options now**, reusing the exact `name`/`displayName` split
+`SearchableSelect` already got for Calling Planning: each option's
+search text becomes `"<Person> - <Calling>"` when a calling is known,
+with `displayName` set to the plain name so the resting box is
+unaffected -- someone holding no calling renders exactly as before,
+nothing added. This is a new `callingsByPersonId?: Record<string,
+string>` prop threaded straight down the same path `people`/
+`hymnalIndex` already travel: `page.tsx` -> `CombinedAgendaGrids.tsx`/
+`CollaborativeMeetingBody.tsx`/`SacramentProgramSection.tsx` ->
+`AgendaGridForm.tsx`/`SpeakerPersonOrGuestField.tsx`. Every "always
+keep the currently-assigned person selectable even if no longer
+eligible" merge in both components is completely unchanged -- the
+enrichment step runs after that merge, over whatever the final option
+list already is, so it applies equally to a role's own calling-
+restricted list and to the full-ward fallback.
+
+Picking this up for free, since `SpeakerPersonOrGuestField` is shared:
+Speaker/Youth Speaker (`SacramentProgramSection.tsx`), Chorister/
+Organist and Visiting Authorities (`AgendaGridForm.tsx`'s
+`recognize_music`/`VisitingAuthoritiesField`) all gained the same
+calling search, not just the plain `person_role` rows (Presiding,
+Conducting, every prayer, Spiritual Thought, Handbook Training).
+**Deliberately left out**: the raw inline Accompanist `<select>` in
+`SacramentProgramSection.tsx` (a one-off that's never gone through
+either shared component, per that file's own existing note) and
+`ActionItemsSection.tsx`'s assignee picker (not named in the original
+ask, and not a `SearchableSelect` caller today).
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-
+live-database-access gap as everything else in this project -- ask
+the user to check a Sacrament Meeting (or any collaborative meeting
+type)'s Planning page: typing a calling name like "bishop" or
+"chorister" into any person picker should now find whoever currently
+holds it, alongside the existing name search, while the field's own
+resting box still shows just the plain person name once picked.
+
 **Bug found and fixed 2026-11-21: Calling Planning's Calling field
 showed "title - holder" jammed into one small box, not just the
 title. No migration needed.** The user's own report: "Some calling

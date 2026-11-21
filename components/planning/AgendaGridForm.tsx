@@ -35,6 +35,7 @@ function PersonSelect({
   people,
   allPeople,
   defaultValue,
+  callingsByPersonId,
   onDirty,
 }: {
   name: string;
@@ -44,6 +45,13 @@ function PersonSelect({
    *  option-building logic below. */
   allPeople: PersonOption[];
   defaultValue: string;
+  /** Every active person's current calling(s), by id (2026-11-21, the
+   *  same search-by-more-than-one-thing trick already given to Calling
+   *  Planning's own Calling field) -- folded into each option's own
+   *  search text below ("<Person> - <Calling>"), so typing a calling
+   *  name (e.g. "bishop") finds whoever holds it. The resting box still
+   *  shows just the plain name, via SearchableSelect's `displayName`. */
+  callingsByPersonId?: Record<string, string>;
   /** See PersonCombobox's own doc comment -- a React-state-driven
    *  value change here fires no native `change` event for this grid's
    *  wrapping `<form onChange=...>` to catch. */
@@ -77,9 +85,23 @@ function PersonSelect({
   // pickers, not a native select's prefix-only typeahead) -- the
   // "always keep the currently-assigned person selectable" merge
   // above is unchanged, it's exactly what SearchableSelect's own
-  // `options` list needs.
+  // `options` list needs. Each option's own search text folds in its
+  // current calling(s), when known (2026-11-21) -- `displayName` keeps
+  // the resting box showing just the plain name either way.
+  const searchOptions = options.map((p) => {
+    const calling = callingsByPersonId?.[p.id];
+    return calling ? { id: p.id, name: `${p.name} - ${calling}`, displayName: p.name } : p;
+  });
+
   return (
-    <SearchableSelect name={name} options={options} defaultValue={defaultValue} placeholder="Unassigned" onDirty={onDirty} className={INPUT} />
+    <SearchableSelect
+      name={name}
+      options={searchOptions}
+      defaultValue={defaultValue}
+      placeholder="Unassigned"
+      onDirty={onDirty}
+      className={INPUT}
+    />
   );
 }
 
@@ -205,10 +227,12 @@ function MusicCell({
 function VisitingAuthoritiesField({
   row,
   allPeople,
+  callingsByPersonId,
   onDirty,
 }: {
   row: Extract<AgendaRow, { kind: "visiting_authorities" }>;
   allPeople: PersonOption[];
+  callingsByPersonId?: Record<string, string>;
   onDirty: () => void;
 }) {
   const [rowCount, setRowCount] = useState(Math.max(row.rows.length, 1));
@@ -231,6 +255,7 @@ function VisitingAuthoritiesField({
             <SpeakerPersonOrGuestField
               people={row.eligiblePeople}
               allPeople={allPeople}
+              callingsByPersonId={callingsByPersonId}
               defaultPersonId={existing?.personId ?? ""}
               defaultGuestName={existing?.guestName ?? ""}
               personFieldName={`${row.fieldPrefix}${FIELD_SEPARATOR}${i}${FIELD_SEPARATOR}person_id`}
@@ -296,6 +321,7 @@ export function AgendaGridForm({
   roleTable,
   rows,
   people,
+  callingsByPersonId,
   hymnalIndex,
   formId,
   hideActions,
@@ -307,6 +333,11 @@ export function AgendaGridForm({
   roleTable: "sacrament_assignments" | "bishopric_assignments";
   rows: AgendaRow[];
   people: PersonOption[];
+  /** Every active person's current calling(s), by id (2026-11-21) --
+   *  see PersonSelect's own doc comment above. Threaded down to every
+   *  person picker on this grid (PersonSelect, SpeakerPersonOrGuestField)
+   *  so each one can search by calling too. */
+  callingsByPersonId?: Record<string, string>;
   hymnalIndex: HymnalIndexEntry[];
   formId?: string;
   hideActions?: boolean;
@@ -456,6 +487,7 @@ export function AgendaGridForm({
                         people={row.eligiblePeople}
                         allPeople={people}
                         defaultValue={row.value}
+                        callingsByPersonId={callingsByPersonId}
                         onDirty={() => setDirty(true)}
                       />
                     )}
@@ -478,6 +510,7 @@ export function AgendaGridForm({
                             people={people}
                             allPeople={people}
                             defaultValue={row.personValue}
+                            callingsByPersonId={callingsByPersonId}
                             onDirty={() => setDirty(true)}
                           />
                         </div>
@@ -501,6 +534,7 @@ export function AgendaGridForm({
                             people={people}
                             allPeople={people}
                             defaultValue={row.personValue}
+                            callingsByPersonId={callingsByPersonId}
                             onDirty={() => setDirty(true)}
                           />
                         </div>
@@ -531,6 +565,7 @@ export function AgendaGridForm({
                             key={`${row.choristerValue}::${row.choristerGuestValue}`}
                             people={row.choristerEligible}
                             allPeople={people}
+                            callingsByPersonId={callingsByPersonId}
                             defaultPersonId={row.choristerValue}
                             defaultGuestName={row.choristerGuestValue}
                             personFieldName={row.choristerPersonField}
@@ -549,6 +584,7 @@ export function AgendaGridForm({
                             key={`${row.organistValue}::${row.organistGuestValue}`}
                             people={row.organistEligible}
                             allPeople={people}
+                            callingsByPersonId={callingsByPersonId}
                             defaultPersonId={row.organistValue}
                             defaultGuestName={row.organistGuestValue}
                             personFieldName={row.organistPersonField}
@@ -565,7 +601,12 @@ export function AgendaGridForm({
                     {row.kind === "stake_business" && <StakeBusinessCell row={row} />}
 
                     {row.kind === "visiting_authorities" && (
-                      <VisitingAuthoritiesField row={row} allPeople={people} onDirty={() => setDirty(true)} />
+                      <VisitingAuthoritiesField
+                        row={row}
+                        allPeople={people}
+                        callingsByPersonId={callingsByPersonId}
+                        onDirty={() => setDirty(true)}
+                      />
                     )}
                   </td>
                 </tr>

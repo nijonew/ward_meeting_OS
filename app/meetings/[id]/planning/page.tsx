@@ -13,7 +13,7 @@ import {
 import { getElementNotes } from "@/lib/data/meeting-element-notes";
 import { getSacramentPlanningData } from "@/lib/data/sacrament-planning";
 import { getActivePeople } from "@/lib/data/people";
-import { getCurrentHolderIdByCallingName } from "@/lib/data/callings";
+import { getCurrentHolderIdByCallingName, getCallingNamesByPersonId } from "@/lib/data/callings";
 import { getBishopricMeetingData, getAgendaItemsForMeeting, getPastAgendaItemsForType } from "@/lib/data/bishopric-meeting";
 import { getCouncilNotes } from "@/lib/data/council-notes";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
@@ -224,6 +224,7 @@ export default async function PlanningViewPage({
     councilNotes,
     agendaItems,
     pastAgendaItems,
+    callingNamesByPersonId,
   ] = await Promise.all([
     getPlannedElements(meetingId),
     getActivePeople(),
@@ -274,6 +275,11 @@ export default async function PlanningViewPage({
     // this is skipped there the same way the other four Sacrament-
     // only/non-Sacrament-only fetches above already are.
     isSacrament ? Promise.resolve([]) : getPastAgendaItemsForType(meetingWithType.meetingTypeId, meetingId),
+    // Powers the agenda's own person pickers' calling search (2026-11-21,
+    // extending Calling Planning's own search-by-more-than-one-thing
+    // trick to these pickers too) -- small, ward-wide, no dependency on
+    // anything else fetched here, so it's folded into this same wave.
+    getCallingNamesByPersonId(),
   ]);
 
   // Meetings created before the per-meeting agenda existed, or created
@@ -519,6 +525,7 @@ export default async function PlanningViewPage({
                 openingRows={openingRows}
                 closingRows={closingRows}
                 people={people}
+                callingsByPersonId={callingNamesByPersonId}
                 hymnalIndex={hymnalIndex}
                 footer={
                   <label className="mt-4 flex items-center gap-1.5 border-t border-rule/60 pt-4 text-sm text-ink">
@@ -540,6 +547,7 @@ export default async function PlanningViewPage({
                     meetingId={meetingId}
                     items={resolvedProgramItems}
                     people={people}
+                    callingsByPersonId={callingNamesByPersonId}
                     hymnalIndex={hymnalIndex}
                   />
                 </div>
@@ -573,6 +581,7 @@ export default async function PlanningViewPage({
                 meetingId={meetingId}
                 roleTable={roleTable}
                 people={people}
+                callingsByPersonId={callingNamesByPersonId}
                 hymnalIndex={hymnalIndex}
                 sections={collaborativeSections
                   .map((section) => {

@@ -32,6 +32,7 @@ export function CombinedAgendaGrids({
   openingRows,
   closingRows,
   people,
+  callingsByPersonId,
   hymnalIndex,
   children,
   footer,
@@ -41,6 +42,10 @@ export function CombinedAgendaGrids({
   openingRows: AgendaRow[];
   closingRows: AgendaRow[];
   people: PersonOption[];
+  /** Every active person's current calling(s), by id -- lets each
+   *  AgendaGridForm's own person pickers search by calling too, not
+   *  just name. See AgendaGridForm.tsx's own doc comment. */
+  callingsByPersonId?: Record<string, string>;
   hymnalIndex: HymnalIndexEntry[];
   /** Rendered between the two forms -- Teaching Program (SacramentProgramSection
    *  plus its own section heading), which can't live inside either `<form>`
@@ -77,6 +82,7 @@ export function CombinedAgendaGrids({
         roleTable={roleTable}
         rows={openingRows}
         people={people}
+        callingsByPersonId={callingsByPersonId}
         hymnalIndex={hymnalIndex}
         formId={OPENING_FORM_ID}
         hideActions
@@ -96,6 +102,7 @@ export function CombinedAgendaGrids({
           roleTable={roleTable}
           rows={closingRows}
           people={people}
+          callingsByPersonId={callingsByPersonId}
           hymnalIndex={hymnalIndex}
           formId={CLOSING_FORM_ID}
           hideActions

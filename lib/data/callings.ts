@@ -67,6 +67,38 @@ export async function getCurrentHolderIdByCallingName(name: string): Promise<str
 }
 
 /**
+ * Every active person's current calling name(s), keyed by person id --
+ * powers the agenda's own person pickers (PersonSelect, AgendaGridForm.tsx;
+ * SpeakerPersonOrGuestField.tsx) so typing a calling name (e.g. "bishop")
+ * finds whoever holds it, the same value SearchableSelect's own `name`/
+ * `displayName` split already gave Calling Planning's Calling field
+ * (2026-11-21) -- the picker's own search text carries "<Person> -
+ * <Calling(s)>", while its resting box still shows just the plain name.
+ * Someone holding more than one calling at once gets every one of them
+ * joined, comma-separated. Small and ward-wide, with no person-id filter
+ * needed -- safe to fetch unconditionally alongside everything else a
+ * planning page already fetches in one wave.
+ */
+export async function getCallingNamesByPersonId(): Promise<Record<string, string>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("callings")
+    .select("name, current_holder_id")
+    .eq("active", true)
+    .not("current_holder_id", "is", null);
+
+  const byPerson = new Map<string, string[]>();
+  for (const row of (data ?? []) as { name: string; current_holder_id: string | null }[]) {
+    if (!row.current_holder_id) continue;
+    const names = byPerson.get(row.current_holder_id) ?? [];
+    names.push(row.name);
+    byPerson.set(row.current_holder_id, names);
+  }
+
+  return Object.fromEntries(Array.from(byPerson, ([personId, names]) => [personId, names.join(", ")]));
+}
+
+/**
  * Every active calling linked to a given meeting type via
  * meeting_type_members -- scopes the "Add a calling..." rotation-member
  * picker (2026-10-31, the user's own request: "I want only the callings

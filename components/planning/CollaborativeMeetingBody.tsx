@@ -47,6 +47,7 @@ export function CollaborativeMeetingBody({
   meetingId,
   roleTable,
   people,
+  callingsByPersonId,
   hymnalIndex,
   sections,
   agendaItems,
@@ -60,6 +61,9 @@ export function CollaborativeMeetingBody({
   meetingId: string;
   roleTable: "sacrament_assignments" | "bishopric_assignments";
   people: PersonOption[];
+  /** Every active person's current calling(s), by id -- see
+   *  AgendaGridForm.tsx's own doc comment. */
+  callingsByPersonId?: Record<string, string>;
   hymnalIndex: HymnalIndexEntry[];
   sections: CollaborativeSectionData[];
   agendaItems: AgendaItemRow[];
@@ -94,6 +98,7 @@ export function CollaborativeMeetingBody({
                 roleTable={roleTable}
                 rows={section.beforeRows}
                 people={people}
+                callingsByPersonId={callingsByPersonId}
                 hymnalIndex={hymnalIndex}
                 formId={`section-${i}-before`}
                 hideActions
@@ -110,6 +115,7 @@ export function CollaborativeMeetingBody({
                 roleTable={roleTable}
                 rows={section.afterRows}
                 people={people}
+                callingsByPersonId={callingsByPersonId}
                 hymnalIndex={hymnalIndex}
                 formId={`section-${i}-after`}
                 hideActions

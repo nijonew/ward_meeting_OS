@@ -26,6 +26,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 export function SpeakerPersonOrGuestField({
   people,
   allPeople,
+  callingsByPersonId,
   defaultPersonId,
   defaultGuestName,
   personFieldName = "person_id",
@@ -45,6 +46,13 @@ export function SpeakerPersonOrGuestField({
    *  regardless. For a caller whose `people` is already unrestricted,
    *  this can just be the same list. */
   allPeople: PersonOption[];
+  /** Every active person's current calling(s), by id (2026-11-21, the
+   *  same search-by-more-than-one-thing trick already given to Calling
+   *  Planning's own Calling field) -- folded into each option's own
+   *  search text below ("<Person> - <Calling>"), so typing a calling
+   *  name finds whoever holds it. The resting box still shows just the
+   *  plain name, via SearchableSelect's `displayName`. */
+  callingsByPersonId?: Record<string, string>;
   defaultPersonId: string;
   defaultGuestName: string;
   personFieldName?: string;
@@ -83,6 +91,15 @@ export function SpeakerPersonOrGuestField({
         ]
       : people;
 
+  // Each option's own search text folds in its current calling(s), when
+  // known (2026-11-21) -- same trick as AgendaGridForm.tsx's own
+  // PersonSelect; `displayName` keeps the resting box showing just the
+  // plain name either way.
+  const searchOptions = personOptions.map((p) => {
+    const calling = callingsByPersonId?.[p.id];
+    return calling ? { id: p.id, name: `${p.name} - ${calling}`, displayName: p.name } : p;
+  });
+
   if (showGuest) {
     return (
       <div className="flex flex-wrap items-center gap-2">
@@ -109,7 +126,7 @@ export function SpeakerPersonOrGuestField({
           person selectable" merge above (personOptions) is unchanged. */}
       <SearchableSelect
         name={personFieldName}
-        options={personOptions}
+        options={searchOptions}
         defaultValue={defaultPersonId}
         placeholder={personPlaceholder}
         onDirty={onDirty}

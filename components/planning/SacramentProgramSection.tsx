@@ -26,11 +26,13 @@ function ItemRow({
   item,
   meetingId,
   people,
+  callingsByPersonId,
   hymnalIndex,
 }: {
   item: ResolvedProgramItem;
   meetingId: string;
   people: PersonOption[];
+  callingsByPersonId?: Record<string, string>;
   hymnalIndex: HymnalIndexEntry[];
 }) {
   // Live hymn-title pre-fill for Intermediate Hymn (2026-10-03, the
@@ -111,6 +113,7 @@ function ItemRow({
             key={personFieldKey}
             people={people}
             allPeople={people}
+            callingsByPersonId={callingsByPersonId}
             defaultPersonId={item.personId}
             defaultGuestName={item.guestName}
           />
@@ -226,11 +229,15 @@ export function SacramentProgramSection({
   meetingId,
   items,
   people,
+  callingsByPersonId,
   hymnalIndex,
 }: {
   meetingId: string;
   items: ResolvedProgramItem[];
   people: PersonOption[];
+  /** Every active person's current calling(s), by id -- see
+   *  AgendaGridForm.tsx's own doc comment. */
+  callingsByPersonId?: Record<string, string>;
   hymnalIndex: HymnalIndexEntry[];
 }) {
   const [adding, startAdd] = useTransition();
@@ -261,7 +268,14 @@ export function SacramentProgramSection({
               {orderedIds.map((id) => {
                 const item = byId.get(id);
                 return item ? (
-                  <ItemRow key={id} item={item} meetingId={meetingId} people={people} hymnalIndex={hymnalIndex} />
+                  <ItemRow
+                    key={id}
+                    item={item}
+                    meetingId={meetingId}
+                    people={people}
+                    callingsByPersonId={callingsByPersonId}
+                    hymnalIndex={hymnalIndex}
+                  />
                 ) : null;
               })}
             </ul>
