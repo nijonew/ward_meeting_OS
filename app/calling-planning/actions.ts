@@ -92,6 +92,30 @@ const EDITABLE_FIELDS = [
 
 type RowPatch = Record<string, string | null> & { candidate_person_ids?: string[] };
 
+/** The columns `saveCallingPlanningGrid` compares a submitted row
+ *  against, to tell whether it actually changed -- see that function's
+ *  own 2026-11-21 performance-fix comment. */
+interface StoredRow {
+  id: string;
+  calling_id: string | null;
+  date_initiated: string | null;
+  calling_status: string;
+  notes: string | null;
+  release_person_id: string | null;
+  release_status: string;
+  candidate_person_ids: string[] | null;
+}
+
+/** Order-insensitive array equality -- `candidate_person_ids` can come
+ *  back from the DB in a different order than the multi-select's own
+ *  hidden inputs submitted it in, which isn't a real change. */
+function sameIdSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((v, i) => v === sortedB[i]);
+}
+
 /**
  * Saves every row's every field in one submit -- the "our favorite grid
  * format" pattern (2026-09-08, the user's own words) already built for
@@ -109,6 +133,39 @@ type RowPatch = Record<string, string | null> & { candidate_person_ids?: string[
  * hidden fallback input of the same name so "deselect everyone" is
  * still detectable as an explicit empty array rather than "field not
  * submitted, leave whatever was there."
+ *
+ * **Performance fix, 2026-11-21** (the user's own report: "the save
+ * function was painfully slow... we had a lot of changes we were
+ * working through and saving frequently"). The real cause wasn't just
+ * that each row's write was sequential -- it's that this grid has no
+ * per-row dirty tracking at all (unlike AdminTableEditor's own
+ * `drafts`), only a single whole-form dirty flag. Every row's inputs
+ * are always real DOM elements inside this one `<form>`, so
+ * `formData` has always contained EVERY row currently in the grid on
+ * EVERY submit, whether that row was touched or not. A ward with
+ * 100+ `calling_planning` rows (this one has over that from migration
+ * 067's own bulk import alone, plus everything added since) meant
+ * every single "Save All Changes" click issued one UPDATE -- and, for
+ * a row completing a calling or release, up to two more roster-sync
+ * queries on top -- for every one of those 100+ rows, sequentially,
+ * even to save a single Notes edit on one row.
+ *
+ * Fixed by fetching every submitted row's own current stored values
+ * in one batched query, keeping only the rows that actually differ
+ * from what's already saved, and running just those rows' own
+ * writes concurrently -- "100+ rows in the grid" becomes "1 extra
+ * read, plus however many rows really changed, written in parallel"
+ * instead of a sequential pass over the whole table. Running changed
+ * rows concurrently is safe for the same reason the roster-sync
+ * failures right below already couldn't block each other (2026-10-30
+ * fix) -- each row updates its own id, and `syncCallingRosterFromPlanning`
+ * only ever writes `callings.current_holder_id` for that row's own
+ * `calling_id`; two rows in the same batch that happen to share a
+ * calling_id (e.g. a presidency change split across two rows) were
+ * already resolved by whichever happened to process last under the
+ * old sequential order -- parallel execution just makes that same
+ * pre-existing ambiguity timing-based instead of Map-order-based, not
+ * a new correctness risk.
  */
 export async function saveCallingPlanningGrid(_prevState: unknown, formData: FormData): Promise<SaveGridActionResult> {
   const denied = await requireCallingPlanningFeature();
@@ -139,64 +196,101 @@ export async function saveCallingPlanningGrid(_prevState: unknown, formData: For
     byRow.set(parsed.planningId, patch);
   }
 
-  // Calling names for every row being saved, fetched once up front
-  // (not per-row) so a roster-sync warning below can name the calling
-  // in plain language instead of a raw uuid.
-  const callingIds = Array.from(new Set(Array.from(byRow.values()).map((p) => p.calling_id).filter((id): id is string => Boolean(id))));
+  // calling_status/release_status are required columns -- never null
+  // them out even if a <select> somehow submitted blank. Filled in
+  // before comparing against the DB below, so a genuinely unchanged
+  // row never reads as "changed" just because of this fallback.
+  for (const patch of byRow.values()) {
+    if (!patch.calling_status) patch.calling_status = "discussing";
+    if (!patch.release_status) patch.release_status = "previously_vacant";
+  }
+
+  const rowIds = Array.from(byRow.keys());
+  const { data: storedRows, error: fetchError } =
+    rowIds.length > 0
+      ? await supabase
+          .from("calling_planning")
+          .select("id, calling_id, date_initiated, calling_status, notes, release_person_id, release_status, candidate_person_ids")
+          .in("id", rowIds)
+      : { data: [] as StoredRow[], error: null };
+  if (fetchError) return { error: fetchError.message };
+
+  const storedById = new Map((storedRows ?? []).map((r) => [r.id as string, r as StoredRow]));
+
+  const changedRows = Array.from(byRow.entries()).filter(([planningId, patch]) => {
+    if (!patch.calling_id) return false; // can't save a row with no calling
+    const stored = storedById.get(planningId);
+    if (!stored) return true; // not found locally -- let the real UPDATE surface the actual error
+    return (
+      stored.calling_id !== patch.calling_id ||
+      (stored.date_initiated ?? null) !== (patch.date_initiated ?? null) ||
+      stored.calling_status !== patch.calling_status ||
+      (stored.notes ?? null) !== (patch.notes ?? null) ||
+      (stored.release_person_id ?? null) !== (patch.release_person_id ?? null) ||
+      stored.release_status !== patch.release_status ||
+      !sameIdSet(stored.candidate_person_ids ?? [], patch.candidate_person_ids ?? [])
+    );
+  });
+
+  if (changedRows.length === 0) {
+    return { success: true };
+  }
+
+  // Calling names for warnings, scoped to only the rows actually being
+  // written now (not every row in the grid).
+  const callingIds = Array.from(new Set(changedRows.map(([, patch]) => patch.calling_id).filter((id): id is string => Boolean(id))));
   const { data: callingRows } = callingIds.length > 0
     ? await supabase.from("callings").select("id, name").in("id", callingIds)
     : { data: [] as { id: string; name: string }[] };
   const callingNameById = new Map((callingRows ?? []).map((c) => [c.id, c.name]));
 
-  // Roster-sync failures for individual rows are collected here instead
-  // of aborting the whole save (2026-10-30 bug fix, the user's own
-  // report: "I got an error and none of the changes worked"). Before
-  // this, a single row's sync problem -- most likely the pre-existing
-  // enforce_calling_handoff trigger (migration 057) blocking an
-  // unauthorized reassignment of a protected calling -- would `return`
-  // immediately, aborting every row not yet processed in this same
-  // batch, while rows already processed had already silently committed.
-  // That's a confusing, inconsistent result, not an honest failure --
-  // the admin's own real edits (Notes, Status, Candidates, etc.) should
-  // never be lost just because a secondary roster write couldn't go
-  // through for one specific calling.
-  const syncWarnings: string[] = [];
+  // Every changed row's own update + roster sync runs concurrently now
+  // -- see this function's own 2026-11-21 doc comment above for why
+  // that's safe. Roster-sync failures for individual rows are still
+  // collected rather than aborting the batch (2026-10-30 bug fix, the
+  // user's own report: "I got an error and none of the changes
+  // worked") -- the admin's own real edits (Notes, Status, Candidates,
+  // etc.) should never be lost just because a secondary roster write
+  // couldn't go through for one specific calling.
+  const rowResults = await Promise.all(
+    changedRows.map(async ([planningId, patch]) => {
+      const { error } = await supabase
+        .from("calling_planning")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", planningId);
+      if (error) return { updateError: error.message, syncError: null as string | null };
 
-  for (const [planningId, patch] of byRow) {
-    // calling_status/release_status/calling_id are required columns --
-    // never null them out even if a <select> somehow submitted blank.
-    if (!patch.calling_status) patch.calling_status = "discussing";
-    if (!patch.release_status) patch.release_status = "previously_vacant";
-    if (!patch.calling_id) continue; // can't save a row with no calling
-
-    const { error } = await supabase
-      .from("calling_planning")
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq("id", planningId);
-    if (error) return { error: error.message };
-
-    // Keeps the real roster in step with this row's own status, the
-    // user's own request (2026-10-30) -- see syncCallingRosterFromPlanning's
-    // own doc comment for the full design. A failure here no longer
-    // blocks this row's own already-saved fields, or any other row in
-    // this same batch -- see this function's own comment above.
-    const syncError = await syncCallingRosterFromPlanning({
-      calling_id: patch.calling_id,
-      calling_status: patch.calling_status,
-      candidate_person_ids: patch.candidate_person_ids ?? [],
-      release_person_id: patch.release_person_id ?? null,
-      release_status: patch.release_status,
-    });
-    if (syncError) {
-      const callingName = callingNameById.get(patch.calling_id) ?? "a calling";
-      syncWarnings.push(`${callingName} (${syncError.error})`);
-    }
-  }
+      const syncError = await syncCallingRosterFromPlanning({
+        calling_id: patch.calling_id as string,
+        calling_status: patch.calling_status as string,
+        candidate_person_ids: patch.candidate_person_ids ?? [],
+        release_person_id: patch.release_person_id ?? null,
+        release_status: patch.release_status as string,
+      });
+      return {
+        updateError: null as string | null,
+        syncError: syncError ? `${callingNameById.get(patch.calling_id as string) ?? "a calling"} (${syncError.error})` : null,
+      };
+    })
+  );
 
   revalidatePath("/calling-planning");
   revalidatePath("/admin/people");
   revalidatePath("/admin/callings");
   revalidatePath("/callings");
+
+  const updateFailures = rowResults.filter((r) => r.updateError).map((r) => r.updateError as string);
+  const syncWarnings = rowResults.filter((r) => r.syncError).map((r) => r.syncError as string);
+
+  if (updateFailures.length > 0) {
+    const savedCount = rowResults.length - updateFailures.length;
+    return {
+      error:
+        savedCount > 0
+          ? `Saved ${savedCount} of ${rowResults.length} changed row(s). ${updateFailures.length} failed: ${updateFailures.join("; ")}`
+          : updateFailures.join("; "),
+    };
+  }
 
   if (syncWarnings.length > 0) {
     return {

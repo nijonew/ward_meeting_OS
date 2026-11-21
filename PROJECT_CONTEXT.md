@@ -2050,6 +2050,71 @@ avoid confusing the two.
 
 ## Known open items
 
+**Calling Planning's "Save All Changes" fixed to only write rows that
+actually changed, no migration needed, 2026-11-21.** The user's own
+report: "Worked quite a bit in the calling planning tool last week.
+The save function was painfully slow as we had a lot of changes we
+were working through and saving frequently."
+
+**Root cause, confirmed by reading the actual save path (not just
+"make it parallel" as a guess): `CallingPlanningGridForm.tsx` has no
+per-row dirty tracking at all -- every row's inputs are real DOM
+elements inside one `<form>`, the whole time, so `formData` on every
+submit has always contained every row currently in the grid, whether
+that row was touched or not.** (This is genuinely different from
+AdminTableEditor's own "Save All Changes," which tracks per-row
+`drafts` and only ever submits the rows actually edited -- see that
+component's own 2026-10-30 fix elsewhere in this file.) This ward's
+`calling_planning` table has well over 100 rows (123 alone from
+migration 067's bulk import, plus everything added since) --
+`saveCallingPlanningGrid` looped over every one of them sequentially,
+issuing one `UPDATE` (plus, for any row completing a calling or
+release, up to two more `syncCallingRosterFromPlanning` queries) per
+row regardless of whether it changed, so a single Notes edit on one
+row still meant 100+ sequential round trips on every click -- directly
+matching "a lot of changes... saving frequently," since the pain
+scales with how often Save is clicked, not how much was actually
+edited each time.
+
+**Fixed in two parts, in `app/calling-planning/actions.ts`:**
+1. **Skip unchanged rows.** Before writing anything, every submitted
+   row's id is fetched back from `calling_planning` in one batched
+   query, compared field-by-field (`candidate_person_ids` compared as
+   an order-insensitive set, since the multi-select's own hidden
+   inputs don't necessarily submit in the same order the DB stores
+   them) against what was actually submitted, and only the rows that
+   genuinely differ go on to be written at all. "100+ rows in the
+   grid" becomes "1 extra read, plus however many rows really
+   changed" -- typically a handful, even in a long editing session.
+2. **Write the changed rows concurrently, not one at a time.** The
+   remaining per-row update + roster-sync pair now runs via
+   `Promise.all` instead of a sequential loop -- safe for the same
+   reason a roster-sync failure for one row already couldn't block
+   another row's own save (the 2026-10-30 fix, already in this file):
+   each row only ever touches its own id, and two rows that happen to
+   share a `calling_id` (e.g. a presidency change split across two
+   rows) were already resolved by whichever one happened to process
+   last under the old sequential order -- running them concurrently
+   just makes that same pre-existing ambiguity timing-based instead of
+   order-based, not a new correctness risk.
+
+**A real behavior change, noted rather than silently absorbed**: the
+save-result message now reports counts against the number of rows
+that actually *changed* ("Saved N of M changed row(s)...") rather than
+the number of rows in the whole grid, which is the more meaningful
+denominator now that most saves only ever touch a handful of rows.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- this
+assistant has no way to measure real-world latency before/after
+without a live deploy. Ask the user to check `/calling-planning`:
+editing one row's Notes and clicking "Save All Changes" should feel
+noticeably faster than before, especially the more rows this ward's
+table has accumulated; editing several rows at once and saving still
+saves all of them correctly; and that a roster-sync warning (e.g. a
+calling's "To Record"/"Complete" status with a stale candidate) still
+shows up exactly as before, naming the right calling.
+
 **"Import features from another calling" added to Calling Features, no
 migration needed, 2026-11-21.** The user's own request: "can we create
 a tool in .../admin/calling-features where we can import the settings
