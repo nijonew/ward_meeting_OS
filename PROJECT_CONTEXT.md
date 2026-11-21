@@ -2050,6 +2050,59 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-21: Calling Planning's Calling field
+showed "title - holder" jammed into one small box, not just the
+title. No migration needed.** The user's own report: "Some calling
+titles plus names are very long in calling planning and the field to
+view the calling is very small. How can we improve the visibility of
+the contents in every field on that page?"
+
+**Root cause, confirmed by reading `SearchableSelect.tsx` directly,
+not assumed**: the Calling column's own dropdown (`SearchableSelect`)
+is deliberately handed a richer search label, `"<Calling> - <current
+holder>"` (migration-free, 2026-11-14, built so typing a holder's name
+finds their calling and duplicate-named callings can be told apart) --
+but that same `options` list has always ALSO been the only source
+`SearchableSelect` used for the field's own RESTING text once
+something's committed. The 2026-11-14 feature's own doc comment
+already claimed "the committed cell text... shows... the plain title
+alone," but nothing in the component actually implemented that split
+-- `nameById`/`commit`/`revertToSelection` all resolved the resting
+text from the exact same enriched string, so every row's Calling field
+sat showing the full "`<title>` - `<holder>`" concatenation, not the
+shorter title, in a box only sized for one plain name.
+
+**Fixed with a new, optional `displayName` on `SearchableSelectOption`**
+(`components/SearchableSelect.tsx`) -- `name` keeps driving the
+dropdown's own suggestion list and what typed search matches against;
+`displayName`, when given, is what the field's resting box shows
+instead, once committed. Falls back to `name` when omitted, so every
+other existing caller (the person pickers in
+`components/planning/AgendaGridForm.tsx`/`SpeakerPersonOrGuestField.tsx`)
+is completely unaffected. Both places that build Calling Planning's
+own enriched option list -- `CallingPlanningGridForm.tsx`'s grid
+column and `/calling-planning`'s own "+ Start New Calling Change"
+add-form picker -- now pass `displayName: c.name` alongside the
+existing `formatCallingOptionLabel(c)` as `name`, so both resting
+boxes show just the plain calling title while search still works
+across the combined text.
+
+**Also widened for the broader "every field" ask**: `WIDE_SELECT_CLASS`
+(Calling, Release Person, and now Notes) bumped from `max-w-[22rem]`
+to `max-w-[26rem]` -- the resting-text bug above explains most of why
+Calling specifically felt cramped, but a genuinely long calling title
+or person name can still run past 22rem on its own. Notes switched
+from the narrower `INPUT_CLASS` (`max-w-[16rem]`, 2 rows) to this same
+wider class at 3 rows -- it's usually the longest freeform content on
+the page and had the smallest box of anything here.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/calling-planning`: the Calling field on each row now shows
+just the calling's own name at rest (not "title - holder"); clicking
+into it and typing a holder's name still finds and can select their
+calling; and that Notes now has a visibly larger box.
+
 **Calling Planning's "Save All Changes" fixed to only write rows that
 actually changed, no migration needed, 2026-11-21.** The user's own
 report: "Worked quite a bit in the calling planning tool last week.

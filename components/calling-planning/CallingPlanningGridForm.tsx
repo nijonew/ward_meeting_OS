@@ -18,20 +18,29 @@ const initialState: { error?: string; success?: boolean } = {};
 // is "clunky" and they'd "prefer to see the line wrapped") -- eight
 // 9rem-wide columns forced a ~72rem-wide table regardless of actual
 // content, triggering a scrollbar even when nothing was really
-// overflowing. Notes (the one field long enough to actually need
-// wrapping) is already a <textarea>, which wraps natively within this
-// same class's max-w.
+// overflowing. Status/Release Status fit comfortably here -- their
+// longest real label ("To be Announced") never needs more room.
 const INPUT_CLASS = "w-full min-w-[7rem] max-w-[16rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
-// Wider, for Calling and Release Person specifically (2026-10-13, the
+// Wider, for Calling, Release Person, and Notes (2026-10-13, the
 // user's own follow-up: "so we can see the calling and release that
 // are associated with each other... a large enough field... I can see
 // all of the information"). A <select>'s own displayed text can't
 // wrap the way a <textarea> can -- the browser just clips it -- so the
-// only real fix for these two is a wider box. Calling names in
-// particular run long ("Young Women Camp Director," etc.); Status/
-// Release Status stay on the narrower INPUT_CLASS since their longest
-// real label ("To be Announced") already fits comfortably there.
-const WIDE_SELECT_CLASS = "w-full min-w-[11rem] max-w-[22rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
+// only real fix for a single-line field like Calling/Release Person
+// is a wider box; Notes is already a <textarea> (wraps natively) but
+// was previously capped at the narrower INPUT_CLASS despite usually
+// holding the longest freeform content on the page.
+//
+// **Bumped from max-w-[22rem], 2026-11-21** (the user's own report:
+// "calling titles plus names are very long in calling planning and
+// the field to view the calling is very small") -- the real root
+// cause for Calling specifically was a separate bug (see
+// SearchableSelect's own `displayName` fix, and this grid's own
+// `callingSelectOptions`), but a genuinely long calling title or
+// person name can still run past 22rem on its own, so a bit more
+// headroom here helps every field that uses this class, not just the
+// one that was actually broken.
+const WIDE_SELECT_CLASS = "w-full min-w-[11rem] max-w-[26rem] rounded border border-rule bg-paper px-2 py-1.5 text-xs text-ink";
 const STORAGE_KEY = "calling-planning-grid-sort-filter";
 
 const COLUMNS = [
@@ -197,8 +206,15 @@ export function CallingPlanningGridForm({
   // "(Calling) - (current holder or N/A)" for the picker's own option
   // list only (2026-11-14) -- the plain-name map above still drives
   // this column's committed display/sort/filter, unchanged.
+  //
+  // `displayName` (2026-11-21 bugfix, see SearchableSelect's own doc
+  // comment) is what actually makes that "unchanged" claim true for
+  // the field's own resting box too -- without it, SearchableSelect
+  // had no way to know the enriched `name` here was meant only for
+  // the dropdown, and showed the full "title - holder" string jammed
+  // into one small field on every row.
   const callingSelectOptions = useMemo(
-    () => callingOptions.map((c) => ({ id: c.id, name: formatCallingOptionLabel(c) })),
+    () => callingOptions.map((c) => ({ id: c.id, name: formatCallingOptionLabel(c), displayName: c.name })),
     [callingOptions]
   );
   const callingStatusLabels = useMemo(() => new Map(callingStatusOptions.map((s) => [s.value, s.label])), [callingStatusOptions]);
@@ -449,8 +465,8 @@ export function CallingPlanningGridForm({
                     key={row.notes ?? ""}
                     name={`${row.id}::notes`}
                     defaultValue={row.notes ?? ""}
-                    rows={2}
-                    className={INPUT_CLASS}
+                    rows={3}
+                    className={WIDE_SELECT_CLASS}
                   />
                 </td>
                 <td className="px-2 py-1.5">

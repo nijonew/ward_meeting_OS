@@ -50,8 +50,12 @@ export default async function CallingPlanningPage({
   const filteredCallingName = callingFilter ? callingOptions.find((c) => c.id === callingFilter)?.name : null;
   // "(Calling) - (current holder or N/A)" for the add-form's own
   // picker (2026-11-14, the user's own request) -- see
-  // formatCallingOptionLabel's own doc comment.
-  const callingSelectOptions = callingOptions.map((c) => ({ id: c.id, name: formatCallingOptionLabel(c) }));
+  // formatCallingOptionLabel's own doc comment. `displayName` (2026-11-21
+  // bugfix, see SearchableSelect's own doc comment) keeps this field's
+  // resting box -- reached whenever `?calling=` pre-fills it -- showing
+  // just the plain calling name, same fix as the grid's own Calling
+  // column.
+  const callingSelectOptions = callingOptions.map((c) => ({ id: c.id, name: formatCallingOptionLabel(c), displayName: c.name }));
 
   // Bug fix (2026-10-16, the user's own report: "I entered a calling
   // 'to be announced'... the new one didn't land there"). This used to

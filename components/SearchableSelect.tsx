@@ -8,6 +8,16 @@ const MAX_SUGGESTIONS = 50;
 export interface SearchableSelectOption {
   id: string;
   name: string;
+  /** Shown in the field's own resting/committed state once a value is
+   *  picked, in place of `name` -- optional, falls back to `name` when
+   *  omitted (every existing caller before 2026-11-21, unaffected).
+   *  `name` itself still drives the dropdown's own suggestion-list text
+   *  and what typed search matches against, so a caller can keep a
+   *  richer search label (e.g. Calling Planning's own "<Calling> -
+   *  <current holder>", which helps disambiguate duplicate-named
+   *  callings and lets typing a holder's name find their calling) while
+   *  this field's resting box shows something shorter once committed. */
+  displayName?: string;
 }
 
 /**
@@ -90,6 +100,25 @@ export interface SearchableSelectOption {
  * documented for the identical problem. Omit it for a caller with no
  * dirty-tracking concept at all (e.g. `SacramentProgramSection.tsx`'s
  * own always-enabled per-item Save buttons).
+ *
+ * **Bug found and fixed 2026-11-21: the resting/committed field showed
+ * the enriched search label, not the shorter display name it was
+ * supposed to.** The user's own report: "calling titles plus names are
+ * very long in calling planning and the field to view the calling is
+ * very small." `options` here has always doubled as both "what the
+ * dropdown searches/shows while picking" and "what this field's own
+ * resting state shows once something's committed" -- fine for a plain
+ * person picker, where both are the same string, but Calling
+ * Planning's own Calling field (2026-11-14) deliberately gave this
+ * component a richer `name` ("<Calling> - <current holder>") purely
+ * for the dropdown/search side, per that feature's own documented
+ * intent that "the committed cell text... shows... the plain title
+ * alone." Nothing here ever actually implemented that second half --
+ * `nameById`/`commit`/`revertToSelection` all resolved the resting
+ * text from the same enriched `name`, so every row's own Calling field
+ * sat showing the full "title - holder" string jammed into one small
+ * box, not the shorter title alone. `displayName` is the real fix --
+ * see that field's own doc comment above.
  */
 export function SearchableSelect({
   name,
@@ -108,10 +137,16 @@ export function SearchableSelect({
   onDirty?: () => void;
   className?: string;
 }) {
-  const nameById = (id: string) => options.find((o) => o.id === id)?.name ?? "";
+  // `displayName` (falling back to `name`) is what the field's own
+  // resting text shows once committed -- `name` itself stays what the
+  // dropdown lists and what typed search matches against, below.
+  const displayTextById = (id: string) => {
+    const option = options.find((o) => o.id === id);
+    return option ? (option.displayName ?? option.name) : "";
+  };
 
   const [selectedId, setSelectedId] = useState(defaultValue);
-  const [query, setQuery] = useState(nameById(defaultValue));
+  const [query, setQuery] = useState(displayTextById(defaultValue));
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -151,12 +186,12 @@ export function SearchableSelect({
     const newId = option?.id ?? "";
     if (newId !== selectedId) onDirty?.();
     setSelectedId(newId);
-    setQuery(option?.name ?? "");
+    setQuery(option ? (option.displayName ?? option.name) : "");
     setOpen(false);
   }
 
   function revertToSelection() {
-    setQuery(nameById(selectedId));
+    setQuery(displayTextById(selectedId));
     setOpen(false);
   }
 
@@ -177,7 +212,7 @@ export function SearchableSelect({
         setOpen(false);
         return;
       }
-      if (query !== nameById(selectedId)) revertToSelection();
+      if (query !== displayTextById(selectedId)) revertToSelection();
       else setOpen(false);
     }, 0);
   }
