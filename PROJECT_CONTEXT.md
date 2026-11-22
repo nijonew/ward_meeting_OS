@@ -2050,6 +2050,33 @@ avoid confusing the two.
 
 ## Known open items
 
+**YM/YW Lessons shows Teacher again, no migration needed, 2026-11-22.**
+The user's own request, a reversal of just one piece of the 2026-11-14
+change: "I would like to also have teachers for youth visible to the
+public when they are logged in, not just in the planning view." That
+earlier change dropped the Teacher column from `TeachingGridReadOnly.tsx`
+-- the one shared component behind both `/ym-yw-lessons` and
+`/adult-teaching-lessons` -- entirely; `row.teacher` itself was never
+touched in the data layer, just not rendered.
+
+New optional `showTeacher` prop on `TeachingGridReadOnly`, default
+`false` -- `/adult-teaching-lessons` (Elders Quorum/Relief Society,
+never named in this request) keeps rendering exactly as it did before;
+`/ym-yw-lessons` passes `showTeacher` and gets a third column, Sunday
+-> Topic -> Teacher -- the same column order this component used
+before 2026-11-14 removed it (deliberately Topic-before-Teacher, unlike
+`TeachingGridForm`'s own editable grid, which puts Teacher first), not
+a new order invented for this. A cancelled Sunday shows "—" for Teacher
+rather than whatever name might still be sitting in that row -- matches
+Topic's own existing "Cancelled" treatment for the same row.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check `/ym-yw-lessons` and confirm each class's table now shows
+Sunday/Topic/Teacher, with Teacher correctly blank on a cancelled
+Sunday, and that `/adult-teaching-lessons` is unaffected (still just
+Sunday/Topic).
+
 **Agenda Items and the Review section's Announcements both gained a
 drag handle, migrations `109`/`110`, not yet run, 2026-11-22.** The
 user's own request: "I would like to have a way to reorder agenda

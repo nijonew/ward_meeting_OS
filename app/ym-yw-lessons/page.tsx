@@ -89,7 +89,7 @@ export default async function YmYwLessonsPage({
             {grid.rows.length === 0 ? (
               <p className="mt-4 text-sm text-ink-muted">No Sundays in this range.</p>
             ) : (
-              <TeachingGridReadOnly rows={grid.rows} />
+              <TeachingGridReadOnly rows={grid.rows} showTeacher />
             )}
           </div>
         ))}
