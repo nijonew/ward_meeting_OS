@@ -309,6 +309,16 @@ export async function pushCombinedActivityToClasses(activityId: string): Promise
  * still useful to force a re-push with no field actually changing (e.g.
  * after a direct Table Admin edit, which bypasses this action
  * entirely).
+ *
+ * **Skips unchanged rows, 2026-11-22** -- the same bug class
+ * `saveCallingPlanningGrid` was fixed for (2026-11-21, see that
+ * function's own doc comment): this grid has no per-row dirty tracking
+ * either, so every visible row on the page -- touched or not -- is
+ * always present in `formData` on every submit. Rows are now compared
+ * against what's already stored first; only the ones that actually
+ * differ get written (still concurrently) or re-pushed to their
+ * attending classes, so editing one row no longer re-writes (and, for
+ * a Combined row, re-pushes) every other row on the page too.
  */
 export async function saveActivityGrid(
   _prevState: { error?: string; success?: boolean },
@@ -342,7 +352,9 @@ export async function saveActivityGrid(
   const ids = Array.from(byId.keys());
   const { data: existingRows, error: fetchError } = await supabase
     .from("youth_activities")
-    .select("id, activity_date, group_name, location, development_category, youth_lead, advisor_lead")
+    .select(
+      "id, activity_date, group_name, activity_time, title, location, development_category, planning_group, notes, confirmed, youth_lead, advisor_lead"
+    )
     .in("id", ids);
   if (fetchError) return { error: fetchError.message };
 
@@ -350,15 +362,40 @@ export async function saveActivityGrid(
     id: string;
     activity_date: string;
     group_name: string;
+    activity_time: string | null;
+    title: string;
     location: string | null;
     development_category: string | null;
+    planning_group: string | null;
+    notes: string | null;
+    confirmed: boolean;
     youth_lead: string | null;
     advisor_lead: string | null;
   };
   const existingById = new Map(((existingRows ?? []) as ExistingRow[]).map((r) => [r.id, r]));
 
+  // `<input type="time">` always submits "HH:MM" (no seconds), while
+  // Postgres's own `time` column normalizes storage to "HH:MM:SS" --
+  // comparing the two directly would make an untouched row's own time
+  // look "changed" on every single save.
+  const normalizeTime = (t: string | null | undefined): string => (t ? t.slice(0, 5) : "");
+
+  const changedIds = Array.from(byId.entries()).filter(([id, fields]) => {
+    const existing = existingById.get(id);
+    if (!existing) return true;
+    return (
+      normalizeTime(existing.activity_time) !== normalizeTime(fields.activity_time) ||
+      existing.title !== fields.title ||
+      (existing.planning_group ?? "") !== fields.planning_group ||
+      (existing.notes ?? "") !== fields.notes ||
+      existing.confirmed !== (fields.confirmed === "true")
+    );
+  });
+
+  if (changedIds.length === 0) return { success: true };
+
   const results = await Promise.all(
-    Array.from(byId.entries()).map(([id, fields]) =>
+    changedIds.map(([id, fields]) =>
       supabase
         .from("youth_activities")
         .update({
@@ -376,7 +413,7 @@ export async function saveActivityGrid(
   if (failed?.error) return { error: failed.error.message };
 
   const overwriteResults = await Promise.all(
-    Array.from(byId.entries())
+    changedIds
       .filter(([id]) => classesForCombinedGroup(existingById.get(id)?.group_name ?? "") !== null)
       .map(([id, fields]) => {
         const existing = existingById.get(id)!;

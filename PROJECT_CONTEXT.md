@@ -2050,6 +2050,93 @@ avoid confusing the two.
 
 ## Known open items
 
+**The "skip unchanged rows, write what changed concurrently" fix swept
+across every other "favorite grid format" save in the app, no
+migration needed, 2026-11-22.** The user's own request, right after
+confirming the Calling Planning performance fix worked: "can we sweep
+the app and update all saves like we did with the calling planning
+save?"
+
+Audited every save action in the app for the exact bug class
+`saveCallingPlanningGrid` was fixed for on 2026-11-21: a grid with no
+per-row dirty tracking, where every visible row/cell -- touched or
+not -- is always present in `formData` on every "Save All Changes"
+click, so a save that should only touch one edited line instead
+rewrites every line on the page, sequentially. Three were already
+fine and needed no change: `AdminTableEditor.tsx`'s generic `saveAll()`
+(real per-row `drafts` state, only sends dirty rows, already
+concurrent), `saveCallingFeatures`/`savePersonCallings` (both already
+diff the submitted set against what's stored and only touch what
+changed). `saveBishopricAssignments` (`app/meetings/[id]/bishopric-actions.ts`)
+turned out to have no callers anywhere in the app at all -- confirmed
+dead code, left alone. `submitBulkMusicRows` (`app/music/actions.ts`)
+is a one-time bulk *create*, not an edit of existing rows, so there
+was nothing to diff against -- a different problem than this sweep
+is about.
+
+Five real instances of the bug, all fixed the same way -- fetch every
+submitted row/cell's current stored value in one batched query first,
+keep only what actually differs, write just that subset concurrently:
+
+- **`saveAgendaGrid`** (`app/meetings/[id]/agenda-actions.ts`) -- by
+  far the highest-value fix, since this is the single most-used save
+  in the app (every meeting type's own Planning page, every element on
+  the agenda, every time "Save All Changes" is clicked). Its six
+  independent sections (person-role assignments, free-text/person-and-
+  text notes, the single `sacrament_planning` row, music, speakers,
+  Visiting Authorities) each got their own batched-fetch-then-diff
+  treatment. Music and Speakers specifically used to run one lookup
+  query *and* one write query per slot, sequentially (e.g. up to ~20
+  round trips just to save 10 untouched hymn/speaker slots) -- now one
+  fetch per section, period. Visiting Authorities (a replace-the-whole-
+  list element with no per-row identity to diff against) gets a
+  cheaper fix: a full equality check against what's already stored
+  before ever doing the delete-then-reinsert, so the common case of
+  "didn't touch this section at all" skips it entirely rather than
+  doing a pointless full replace every single save.
+- **`saveAssignmentGrid`** (`app/rotations/actions.ts`, the Assignment
+  Rotations applied-assignment grid) -- every meeting-x-role cell's
+  current assignee (split between `meeting_element_notes` and whichever
+  role table applies, per that grid's own 2026-10-21 routing fix) is
+  now fetched once in two batched queries instead of being recomputed
+  and rewritten unconditionally for every cell on every save.
+- **`saveTeachingGrid`** (`app/youth-teaching-planning/actions.ts`,
+  shared by YM/YW Teaching Planning and Elders Quorum/Relief Society
+  Teaching) -- roughly six months' worth of Sundays used to each get a
+  delete-then-insert-if-set on every save regardless of whether that
+  Sunday's own teacher/topic/cancellation fields had actually changed;
+  now only a changed date's row is touched, and all the changed ones
+  write concurrently.
+- **`saveActivityGrid`** (`app/youth-activities/actions.ts`, the three
+  Combined-group pages' own inline grid) and **`saveClassActivityGrid`**
+  (`app/youth-activities/manage/classes/actions.ts`, the per-class
+  grid) -- both already wrote concurrently (`Promise.all`) but rewrote
+  every row regardless of change, including re-running the Combined-
+  activity-to-classes overwrite push for every Combined row on the page
+  every time, not just the ones actually edited (the manual Overwrite
+  button, unaffected by this fix, still exists for the "force a
+  re-push with nothing changed" case). Both now expand their existing
+  fetch to also read back the fields they write, diff against what was
+  submitted, and only update/re-push what's actually different.
+  `saveActivityGrid`'s own `activity_time` comparison needed a small
+  normalizer first -- `<input type="time">` always submits "HH:MM"
+  with no seconds, while Postgres's own `time` column stores and
+  returns "HH:MM:SS," so comparing the two raw would have flagged
+  every untouched row's time as "changed" on every save.
+
+Confirmed via `tsc --noEmit`, `eslint` on all five changed files, and
+a full `rm -rf .next && next build --webpack` -- all clean, no errors.
+Same no-live-database-access gap as everything else in this project --
+this assistant has no way to measure real-world latency before/after
+without a live deploy. Ask the user to check each of the five pages
+(a meeting's own Planning page, `/rotations`, `/youth-teaching-planning`/
+`/adult-teaching-planning`, and the three Combined-group Youth
+Activities pages): editing one field and clicking Save should feel at
+least as fast as before (faster the more unedited rows/elements a
+given page has); every field that's actually edited should still save
+correctly; and that saving with nothing touched at all still reports
+success with no errors anywhere.
+
 **Agenda person pickers can now search by calling too, no migration
 needed, 2026-11-21.** Direct follow-up to the SearchableSelect
 `displayName` fix just below -- asked "And where else would it make

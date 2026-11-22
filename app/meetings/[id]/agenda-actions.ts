@@ -71,6 +71,19 @@ interface SpeakerPatch {
  * so an element that isn't on this meeting's agenda (or a column this
  * grid doesn't own, like a speaker's duration/confirmed) is never
  * touched, let alone cleared, by a save from here.
+ *
+ * **Skips unchanged fields, 2026-11-22** -- the same bug class fixed
+ * in `saveCallingPlanningGrid` (2026-11-21): this is the single most-
+ * used grid in the app (every meeting type's own Planning page), and
+ * it has no per-field dirty tracking at all -- every element currently
+ * on the agenda is resubmitted on every "Save All Changes" click
+ * regardless of whether it was actually touched. Each of the six
+ * sections below now fetches its own current stored values in one
+ * batched query first, compares against what was submitted, and only
+ * writes what actually differs -- with the changed fields in a given
+ * section written concurrently rather than one at a time. Nothing
+ * about which column a save is scoped to changed, only whether an
+ * unchanged one still gets rewritten.
  */
 export async function saveAgendaGrid(
   meetingId: string,
@@ -178,175 +191,304 @@ export async function saveAgendaGrid(
   }
 
   // --- person_role elements -------------------------------------------
-  for (const [role, entry] of roles) {
-    const { error: deleteError } = await supabase
+  if (roles.size > 0) {
+    const selectCols = roleTable === "sacrament_assignments" ? "role, assigned_to_id, guest_name" : "role, assigned_to_id";
+    const { data: existingRoleRows, error: fetchError } = await supabase
       .from(roleTable)
-      .delete()
+      .select(selectCols)
       .eq("meeting_id", meetingId)
-      .eq("role", role);
-    if (deleteError) return { error: deleteError.message };
+      .in("role", Array.from(roles.keys()));
+    if (fetchError) return { error: fetchError.message };
 
-    if (entry.personId || entry.guestName) {
-      const insertPayload: Record<string, unknown> = {
-        meeting_id: meetingId,
-        role,
-        assigned_to_id: entry.personId || null,
-      };
-      // guest_name only exists on sacrament_assignments (migration 064,
-      // Chorister/Organist's guest option) -- never send it to
-      // bishopric_assignments, which has no such column.
-      if (roleTable === "sacrament_assignments") insertPayload.guest_name = entry.guestName || null;
-      const { error } = await supabase.from(roleTable).insert(insertPayload);
-      if (error) return { error: error.message };
-    }
+    type ExistingRoleRow = { role: string; assigned_to_id: string | null; guest_name?: string | null };
+    const existingByRole = new Map(((existingRoleRows ?? []) as unknown as ExistingRoleRow[]).map((r) => [r.role, r]));
+
+    const changedRoles = Array.from(roles.entries()).filter(([role, entry]) => {
+      const existing = existingByRole.get(role);
+      const currentPersonId = existing?.assigned_to_id ?? null;
+      const currentGuestName = roleTable === "sacrament_assignments" ? existing?.guest_name ?? null : null;
+      return currentPersonId !== (entry.personId || null) || currentGuestName !== (entry.guestName || null);
+    });
+
+    const roleResults = await Promise.all(
+      changedRoles.map(async ([role, entry]) => {
+        const { error: deleteError } = await supabase
+          .from(roleTable)
+          .delete()
+          .eq("meeting_id", meetingId)
+          .eq("role", role);
+        if (deleteError) return { error: deleteError.message };
+
+        if (entry.personId || entry.guestName) {
+          const insertPayload: Record<string, unknown> = {
+            meeting_id: meetingId,
+            role,
+            assigned_to_id: entry.personId || null,
+          };
+          // guest_name only exists on sacrament_assignments (migration 064,
+          // Chorister/Organist's guest option) -- never send it to
+          // bishopric_assignments, which has no such column.
+          if (roleTable === "sacrament_assignments") insertPayload.guest_name = entry.guestName || null;
+          const { error } = await supabase.from(roleTable).insert(insertPayload);
+          if (error) return { error: error.message };
+        }
+        return { error: null as string | null };
+      })
+    );
+    const roleFailure = roleResults.find((r) => r.error);
+    if (roleFailure?.error) return { error: roleFailure.error };
   }
 
   // --- free_text / person_and_text elements ----------------------------
-  for (const [key, entry] of notes) {
-    const personId = entry.person || null;
-    const textValue = entry.text || null;
+  if (notes.size > 0) {
+    const { data: existingNoteRows, error: fetchError } = await supabase
+      .from("meeting_element_notes")
+      .select("element_key, person_id, text_value")
+      .eq("meeting_id", meetingId)
+      .in("element_key", Array.from(notes.keys()));
+    if (fetchError) return { error: fetchError.message };
 
-    if (!personId && !textValue) {
-      // Nothing left in this element -- drop the row rather than leaving
-      // an all-null one behind (meeting_element_notes is a sparse table:
-      // no row simply means nothing was entered).
-      const { error } = await supabase
-        .from("meeting_element_notes")
-        .delete()
-        .eq("meeting_id", meetingId)
-        .eq("element_key", key);
-      if (error) return { error: error.message };
-      continue;
-    }
+    type ExistingNoteRow = { element_key: string; person_id: string | null; text_value: string | null };
+    const existingByKey = new Map(((existingNoteRows ?? []) as ExistingNoteRow[]).map((r) => [r.element_key, r]));
 
-    const { error } = await supabase.from("meeting_element_notes").upsert(
-      {
-        meeting_id: meetingId,
-        element_key: key,
-        person_id: personId,
-        text_value: textValue,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "meeting_id,element_key" }
+    const changedNotes = Array.from(notes.entries()).filter(([key, entry]) => {
+      const existing = existingByKey.get(key);
+      const currentPersonId = existing?.person_id ?? null;
+      const currentText = existing?.text_value ?? null;
+      return currentPersonId !== (entry.person || null) || currentText !== (entry.text || null);
+    });
+
+    const noteResults = await Promise.all(
+      changedNotes.map(async ([key, entry]) => {
+        const personId = entry.person || null;
+        const textValue = entry.text || null;
+
+        if (!personId && !textValue) {
+          // Nothing left in this element -- drop the row rather than leaving
+          // an all-null one behind (meeting_element_notes is a sparse table:
+          // no row simply means nothing was entered).
+          const { error } = await supabase
+            .from("meeting_element_notes")
+            .delete()
+            .eq("meeting_id", meetingId)
+            .eq("element_key", key);
+          return { error: error?.message ?? null };
+        }
+
+        const { error } = await supabase.from("meeting_element_notes").upsert(
+          {
+            meeting_id: meetingId,
+            element_key: key,
+            person_id: personId,
+            text_value: textValue,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "meeting_id,element_key" }
+        );
+        return { error: error?.message ?? null };
+      })
     );
-    if (error) return { error: error.message };
+    const noteFailure = noteResults.find((r) => r.error);
+    if (noteFailure?.error) return { error: noteFailure.error };
   }
 
   // --- sacrament_planning columns ---------------------------------------
   if (planning.size > 0) {
-    const payload: Record<string, unknown> = { meeting_id: meetingId, updated_at: new Date().toISOString() };
+    const columnsSubmitted = Array.from(planning.keys());
+    const { data: existingPlanningRow } = await supabase
+      .from("sacrament_planning")
+      .select(columnsSubmitted.join(", "))
+      .eq("meeting_id", meetingId)
+      .maybeSingle();
+    const existingRecord = (existingPlanningRow ?? {}) as Record<string, unknown>;
+
+    const payload: Record<string, unknown> = {};
+    let anyChanged = false;
     for (const [column, value] of planning) {
-      payload[column] = PLANNING_BOOLEAN_COLUMNS.has(column) ? value === "on" : value || null;
+      const newValue = PLANNING_BOOLEAN_COLUMNS.has(column) ? value === "on" : value || null;
+      const currentValue = existingRecord[column] ?? (PLANNING_BOOLEAN_COLUMNS.has(column) ? false : null);
+      if (currentValue !== newValue) anyChanged = true;
+      payload[column] = newValue;
     }
 
     // Only the submitted columns are in the payload, so special_format
-    // and hidden_notes keep whatever they already had.
-    const { error } = await supabase.from("sacrament_planning").upsert(payload, { onConflict: "meeting_id" });
-    if (error) return { error: error.message };
+    // and hidden_notes keep whatever they already had. Skipped entirely
+    // when nothing actually changed, rather than touching updated_at
+    // for no real edit.
+    if (anyChanged) {
+      payload.meeting_id = meetingId;
+      payload.updated_at = new Date().toISOString();
+      const { error } = await supabase.from("sacrament_planning").upsert(payload, { onConflict: "meeting_id" });
+      if (error) return { error: error.message };
+    }
   }
 
   // --- music -----------------------------------------------------------
-  // Auto-fill missing titles from Music Reference (2026-09-10, the
-  // user's own report: "hymn numbers... weren't submitted with
-  // titles") -- batched into one lookup rather than one query per row.
-  // hymn_number is a free-text identifier now (migration 051), not a
-  // plain integer -- "C20" means Children's Songbook #20, anything
-  // else matches across the 1985 Hymnal and Hymns for Home and Church
-  // (2026-10-03, the user's own request for the "C" prefix convention;
-  // see lib/data/hymnal-shared.ts).
-  const rawNumbersNeedingTitles: string[] = [];
-  for (const patch of music.values()) {
-    const num = patch.number?.trim() || null;
-    if (num && !patch.title) rawNumbersNeedingTitles.push(num);
-  }
-  const titleByNumber = await lookupHymnTitles(rawNumbersNeedingTitles);
+  if (music.size > 0) {
+    // Auto-fill missing titles from Music Reference (2026-09-10, the
+    // user's own report: "hymn numbers... weren't submitted with
+    // titles") -- batched into one lookup rather than one query per row.
+    // hymn_number is a free-text identifier now (migration 051), not a
+    // plain integer -- "C20" means Children's Songbook #20, anything
+    // else matches across the 1985 Hymnal and Hymns for Home and Church
+    // (2026-10-03, the user's own request for the "C" prefix convention;
+    // see lib/data/hymnal-shared.ts).
+    const rawNumbersNeedingTitles: string[] = [];
+    for (const patch of music.values()) {
+      const num = patch.number?.trim() || null;
+      if (num && !patch.title) rawNumbersNeedingTitles.push(num);
+    }
+    const titleByNumber = await lookupHymnTitles(rawNumbersNeedingTitles);
 
-  for (const patch of music.values()) {
-    const hymnNumber = patch.number?.trim() || null;
-    const pieceName = patch.title || (hymnNumber ? titleByNumber.get(hymnNumber) ?? null : null);
-    const performer = patch.performer || null;
-    const isEmpty = hymnNumber == null && !pieceName && !performer;
+    // Every existing music row for this meeting, fetched once instead of
+    // one lookup query per patch -- grouped by type so the slot-null
+    // "singleton hymn type" matching rule below still works.
+    const { data: existingMusicRows, error: fetchError } = await supabase
+      .from("sacrament_music")
+      .select("id, type, slot, hymn_number, piece_name, group_name")
+      .eq("meeting_id", meetingId);
+    if (fetchError) return { error: fetchError.message };
 
-    // A singleton hymn type (slot null) matches on type alone -- only one
-    // of each ever exists per meeting, and older rows may carry a stray
-    // slot value from before this grid assigned them positionally.
-    let query = supabase.from("sacrament_music").select("id").eq("meeting_id", meetingId).eq("type", patch.type);
-    query = patch.slot === null ? query : query.eq("slot", patch.slot);
-    const { data: existingRows, error: lookupError } = await query.limit(1);
-    if (lookupError) return { error: lookupError.message };
-    const existingId = (existingRows as { id: string }[] | null)?.[0]?.id ?? null;
+    type ExistingMusicRow = {
+      id: string;
+      type: string;
+      slot: string | null;
+      hymn_number: string | null;
+      piece_name: string | null;
+      group_name: string | null;
+    };
+    const musicByType = new Map<string, ExistingMusicRow[]>();
+    for (const row of (existingMusicRows ?? []) as ExistingMusicRow[]) {
+      const list = musicByType.get(row.type) ?? [];
+      list.push(row);
+      musicByType.set(row.type, list);
+    }
 
-    if (isEmpty) {
-      if (existingId) {
-        const { error } = await supabase.from("sacrament_music").delete().eq("id", existingId);
-        if (error) return { error: error.message };
+    type MusicAction =
+      | { kind: "delete"; id: string }
+      | { kind: "update"; id: string; payload: Record<string, unknown> }
+      | { kind: "insert"; payload: Record<string, unknown> };
+    const actions: MusicAction[] = [];
+
+    for (const patch of music.values()) {
+      const hymnNumber = patch.number?.trim() || null;
+      const pieceName = patch.title || (hymnNumber ? titleByNumber.get(hymnNumber) ?? null : null);
+      const performer = patch.performer || null;
+      const isEmpty = hymnNumber == null && !pieceName && !performer;
+
+      // A singleton hymn type (slot null) matches on type alone -- only one
+      // of each ever exists per meeting, and older rows may carry a stray
+      // slot value from before this grid assigned them positionally.
+      const candidates = musicByType.get(patch.type) ?? [];
+      const existing = patch.slot === null ? candidates[0] : candidates.find((r) => r.slot === patch.slot);
+
+      if (isEmpty) {
+        if (existing) actions.push({ kind: "delete", id: existing.id });
+        continue;
       }
-      continue;
+
+      if (existing) {
+        if (existing.hymn_number === hymnNumber && existing.piece_name === pieceName && existing.group_name === performer) {
+          continue; // already correct -- nothing to write
+        }
+        actions.push({ kind: "update", id: existing.id, payload: { hymn_number: hymnNumber, piece_name: pieceName, group_name: performer } });
+      } else {
+        actions.push({
+          kind: "insert",
+          payload: {
+            meeting_id: meetingId,
+            type: patch.type,
+            slot: patch.slot,
+            hymn_number: hymnNumber,
+            piece_name: pieceName,
+            group_name: performer,
+            status: "published",
+            submitted_by: user.id,
+          },
+        });
+      }
     }
 
-    if (existingId) {
-      const { error } = await supabase
-        .from("sacrament_music")
-        .update({ hymn_number: hymnNumber, piece_name: pieceName, group_name: performer })
-        .eq("id", existingId);
-      if (error) return { error: error.message };
-    } else {
-      const { error } = await supabase.from("sacrament_music").insert({
-        meeting_id: meetingId,
-        type: patch.type,
-        slot: patch.slot,
-        hymn_number: hymnNumber,
-        piece_name: pieceName,
-        group_name: performer,
-        status: "published",
-        submitted_by: user.id,
-      });
-      if (error) return { error: error.message };
-    }
+    const musicResults = await Promise.all(
+      actions.map((action) => {
+        if (action.kind === "delete") return supabase.from("sacrament_music").delete().eq("id", action.id);
+        if (action.kind === "update") return supabase.from("sacrament_music").update(action.payload).eq("id", action.id);
+        return supabase.from("sacrament_music").insert(action.payload);
+      })
+    );
+    const musicFailure = musicResults.find((r) => r.error);
+    if (musicFailure?.error) return { error: musicFailure.error.message };
   }
 
   // --- speakers ---------------------------------------------------------
-  for (const patch of speakers.values()) {
-    const speakerId = patch.person || null;
-    const guestName = patch.guest || null;
-    const topic = patch.topic || null;
-    const isEmpty = !speakerId && !guestName && !topic;
+  if (speakers.size > 0) {
+    // Every existing row across whichever speaker table(s) this meeting's
+    // own patches actually touch, fetched once per table instead of one
+    // lookup query per slot.
+    const tablesUsed = Array.from(new Set(Array.from(speakers.values()).map((p) => p.table)));
+    const fetches = await Promise.all(
+      tablesUsed.map((t) => supabase.from(t).select("id, slot, speaker_id, guest_speaker_name, topic").eq("meeting_id", meetingId))
+    );
+    const fetchFailure = fetches.find((f) => f.error);
+    if (fetchFailure?.error) return { error: fetchFailure.error.message };
 
-    const { data: existingRows, error: lookupError } = await supabase
-      .from(patch.table)
-      .select("id")
-      .eq("meeting_id", meetingId)
-      .eq("slot", patch.slot)
-      .limit(1);
-    if (lookupError) return { error: lookupError.message };
-    const existingId = (existingRows as { id: string }[] | null)?.[0]?.id ?? null;
-
-    if (isEmpty) {
-      if (existingId) {
-        const { error } = await supabase.from(patch.table).delete().eq("id", existingId);
-        if (error) return { error: error.message };
+    type ExistingSpeakerRow = { id: string; slot: string; speaker_id: string | null; guest_speaker_name: string | null; topic: string | null };
+    const existingBySlotKey = new Map<string, ExistingSpeakerRow>();
+    tablesUsed.forEach((t, i) => {
+      for (const row of (fetches[i].data ?? []) as ExistingSpeakerRow[]) {
+        existingBySlotKey.set(`${t}${FIELD_SEPARATOR}${row.slot}`, row);
       }
-      continue;
+    });
+
+    type SpeakerAction =
+      | { kind: "delete"; id: string; table: SpeakerTable }
+      | { kind: "update"; id: string; table: SpeakerTable; payload: Record<string, unknown> }
+      | { kind: "insert"; table: SpeakerTable; payload: Record<string, unknown> };
+    const actions: SpeakerAction[] = [];
+
+    for (const patch of speakers.values()) {
+      const speakerId = patch.person || null;
+      const guestName = patch.guest || null;
+      const topic = patch.topic || null;
+      const isEmpty = !speakerId && !guestName && !topic;
+
+      const existing = existingBySlotKey.get(`${patch.table}${FIELD_SEPARATOR}${patch.slot}`);
+
+      if (isEmpty) {
+        if (existing) actions.push({ kind: "delete", id: existing.id, table: patch.table });
+        continue;
+      }
+
+      if (existing) {
+        if (existing.speaker_id === speakerId && existing.guest_speaker_name === guestName && existing.topic === topic) {
+          continue; // already correct -- nothing to write
+        }
+        // Update rather than delete-and-reinsert so duration/confirmed --
+        // columns this grid doesn't show -- survive a save from here.
+        actions.push({
+          kind: "update",
+          id: existing.id,
+          table: patch.table,
+          payload: { speaker_id: speakerId, guest_speaker_name: guestName, topic },
+        });
+      } else {
+        actions.push({
+          kind: "insert",
+          table: patch.table,
+          payload: { meeting_id: meetingId, slot: patch.slot, speaker_id: speakerId, guest_speaker_name: guestName, topic },
+        });
+      }
     }
 
-    // Update rather than delete-and-reinsert so duration/confirmed --
-    // columns this grid doesn't show -- survive a save from here.
-    if (existingId) {
-      const { error } = await supabase
-        .from(patch.table)
-        .update({ speaker_id: speakerId, guest_speaker_name: guestName, topic })
-        .eq("id", existingId);
-      if (error) return { error: error.message };
-    } else {
-      const { error } = await supabase.from(patch.table).insert({
-        meeting_id: meetingId,
-        slot: patch.slot,
-        speaker_id: speakerId,
-        guest_speaker_name: guestName,
-        topic,
-      });
-      if (error) return { error: error.message };
-    }
+    const speakerResults = await Promise.all(
+      actions.map((action) => {
+        if (action.kind === "delete") return supabase.from(action.table).delete().eq("id", action.id);
+        if (action.kind === "update") return supabase.from(action.table).update(action.payload).eq("id", action.id);
+        return supabase.from(action.table).insert(action.payload);
+      })
+    );
+    const speakerFailure = speakerResults.find((r) => r.error);
+    if (speakerFailure?.error) return { error: speakerFailure.error.message };
   }
 
   // --- visiting authorities ----------------------------------------------
@@ -366,22 +508,43 @@ export async function saveAgendaGrid(
       .map(([, entry]) => entry)
       .filter((entry) => entry.personId || entry.guestName);
 
-    const { error: deleteError } = await supabase
+    // Skip the whole replace-everything round trip when the submitted
+    // list is byte-for-byte what's already stored, in the same order
+    // (2026-11-22) -- this section submits every time the form is
+    // saved, even when nobody touched Visiting Authorities at all.
+    const { data: existingVaRows, error: fetchError } = await supabase
       .from("sacrament_visiting_authorities")
-      .delete()
-      .eq("meeting_id", meetingId);
-    if (deleteError) return { error: deleteError.message };
+      .select("person_id, guest_name")
+      .eq("meeting_id", meetingId)
+      .order("sort_order", { ascending: true });
+    if (fetchError) return { error: fetchError.message };
 
-    if (entries.length > 0) {
-      const { error: insertError } = await supabase.from("sacrament_visiting_authorities").insert(
-        entries.map((entry, i) => ({
-          meeting_id: meetingId,
-          person_id: entry.personId || null,
-          guest_name: entry.guestName || null,
-          sort_order: i * 10,
-        }))
+    type ExistingVaRow = { person_id: string | null; guest_name: string | null };
+    const existingList = (existingVaRows ?? []) as ExistingVaRow[];
+    const unchanged =
+      existingList.length === entries.length &&
+      existingList.every(
+        (row, i) => (row.person_id ?? null) === (entries[i].personId || null) && (row.guest_name ?? null) === (entries[i].guestName || null)
       );
-      if (insertError) return { error: insertError.message };
+
+    if (!unchanged) {
+      const { error: deleteError } = await supabase
+        .from("sacrament_visiting_authorities")
+        .delete()
+        .eq("meeting_id", meetingId);
+      if (deleteError) return { error: deleteError.message };
+
+      if (entries.length > 0) {
+        const { error: insertError } = await supabase.from("sacrament_visiting_authorities").insert(
+          entries.map((entry, i) => ({
+            meeting_id: meetingId,
+            person_id: entry.personId || null,
+            guest_name: entry.guestName || null,
+            sort_order: i * 10,
+          }))
+        );
+        if (insertError) return { error: insertError.message };
+      }
     }
   }
 

@@ -35,6 +35,16 @@ type ActionResult = { error?: string; success?: boolean };
  * fires for a brand-new blank line filled in -- `blankRow` always
  * gives that its own class's name, never a Combined one, so there's
  * nothing to push.
+ *
+ * **Skips unchanged lines, 2026-11-22** -- same bug class fixed in
+ * `saveCallingPlanningGrid` (2026-11-21) and `saveActivityGrid`
+ * (`app/youth-activities/actions.ts`): this grid has no per-row dirty
+ * tracking, so every visible line -- every upcoming Sunday/Wednesday
+ * this class has, filled in or not -- is resubmitted on every save
+ * regardless of whether it was touched. Each line is now compared
+ * against what's already stored first; only lines that actually
+ * differ get written (or, for a Combined-sourced line, re-pushed to
+ * the other attending classes).
  */
 export async function saveClassActivityGrid(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
   const { profile } = await getSessionUser();
@@ -77,7 +87,9 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
 
   const { data: existingRows, error: fetchError } = await supabase
     .from("youth_activities")
-    .select("id, activity_date, group_name, activity_time, youth_lead, advisor_lead, notes")
+    .select(
+      "id, activity_date, group_name, activity_time, title, location, development_category, planning_group, confirmed, youth_lead, advisor_lead, notes"
+    )
     .in("activity_date", dates)
     .in("group_name", groupNames);
 
@@ -88,6 +100,11 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
     activity_date: string;
     group_name: string;
     activity_time: string | null;
+    title: string;
+    location: string | null;
+    development_category: string | null;
+    planning_group: string | null;
+    confirmed: boolean;
     youth_lead: string | null;
     advisor_lead: string | null;
     notes: string | null;
@@ -96,8 +113,22 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
     ((existingRows ?? []) as ExistingRow[]).map((r) => [`${r.activity_date}::${r.group_name}`, r])
   );
 
+  const changedEntries = entries.filter(([key, fields]) => {
+    const existing = existingByKey.get(key);
+    if (!existing) return true;
+    return (
+      existing.title !== fields.title ||
+      (existing.location ?? "") !== fields.location ||
+      (existing.development_category ?? "") !== fields.development_category ||
+      (existing.planning_group ?? "") !== fields.planning_group ||
+      existing.confirmed !== (fields.confirmed === "true")
+    );
+  });
+
+  if (changedEntries.length === 0) return { success: true };
+
   const results = await Promise.all(
-    entries.map(([key, fields]) => {
+    changedEntries.map(([key, fields]) => {
       const [activityDate, sourceGroupName] = key.split("::");
       const existing = existingByKey.get(key);
 
@@ -134,7 +165,7 @@ export async function saveClassActivityGrid(_prevState: ActionResult, formData: 
   if (failed?.error) return { error: failed.error.message };
 
   const overwriteResults = await Promise.all(
-    entries
+    changedEntries
       .filter(([key]) => classesForCombinedGroup(key.split("::")[1]) !== null)
       .map(([key, fields]) => {
         const [activityDate, sourceGroupName] = key.split("::");

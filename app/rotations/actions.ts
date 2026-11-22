@@ -83,6 +83,19 @@ function parseGridFieldName(name: string): { meetingId: string; roleKey: string 
  * never clobbers a free-text note already saved on the same element
  * from the meeting's own Planning page -- only `person_id` is ever
  * touched here.
+ *
+ * **Skips unchanged cells, 2026-11-22** -- same bug class fixed in
+ * `saveCallingPlanningGrid` (2026-11-21): this grid has no per-cell
+ * dirty tracking either, so every meeting-x-role cell currently shown
+ * (every upcoming meeting of this type, times every rotation column)
+ * is resubmitted on every save regardless of whether it was touched.
+ * Every cell's current assignee (from `meeting_element_notes` or this
+ * meeting type's own role table, whichever applies) is now fetched
+ * once, up front, in two batched queries; a cell is only
+ * deleted/upserted when the person it resolves to actually differs
+ * from who's already assigned, and the cells that do change are
+ * written concurrently rather than one at a time. `UNLISTED_CALLING_VALUE`
+ * cells were already skipped entirely before this; that's unchanged.
  */
 export async function saveAssignmentGrid(
   meetingTypeSlug: MeetingTypeSlug,
@@ -122,7 +135,39 @@ export async function saveAssignmentGrid(
     );
   }
 
+  // Every submitted cell's CURRENT assignee, fetched once instead of
+  // per-cell, split by which table actually holds it (see this
+  // function's own 2026-11-22 doc comment above).
+  const meetingIds = Array.from(byMeeting.keys());
+  const roleTableKeys = Array.from(columnKeys).filter((k) => !PERSON_AND_TEXT_ROTATION_KEYS.has(k));
+  const noteKeys = Array.from(columnKeys).filter((k) => PERSON_AND_TEXT_ROTATION_KEYS.has(k));
+  const currentAssigneeByCell = new Map<string, string | null>();
+
+  if (meetingIds.length > 0 && roleTableKeys.length > 0) {
+    const { data } = await supabase
+      .from(table)
+      .select("meeting_id, role, assigned_to_id")
+      .in("meeting_id", meetingIds)
+      .in("role", roleTableKeys);
+    for (const row of (data ?? []) as { meeting_id: string; role: string; assigned_to_id: string | null }[]) {
+      currentAssigneeByCell.set(`${row.meeting_id}::${row.role}`, row.assigned_to_id);
+    }
+  }
+
+  if (meetingIds.length > 0 && noteKeys.length > 0) {
+    const { data } = await supabase
+      .from("meeting_element_notes")
+      .select("meeting_id, element_key, person_id")
+      .in("meeting_id", meetingIds)
+      .in("element_key", noteKeys);
+    for (const row of (data ?? []) as { meeting_id: string; element_key: string; person_id: string | null }[]) {
+      currentAssigneeByCell.set(`${row.meeting_id}::${row.element_key}`, row.person_id);
+    }
+  }
+
   let clearedVacant = 0;
+  type CellWrite = { meetingId: string; roleKey: string; assignedToId: string | null; isNoteKind: boolean };
+  const toWrite: CellWrite[] = [];
 
   for (const [meetingId, values] of byMeeting) {
     for (const roleKey of columnKeys) {
@@ -145,37 +190,43 @@ export async function saveAssignmentGrid(
         }
       }
 
-      if (PERSON_AND_TEXT_ROTATION_KEYS.has(roleKey)) {
+      const current = currentAssigneeByCell.get(`${meetingId}::${roleKey}`) ?? null;
+      if (current === assignedToId) continue; // already correct -- nothing to write
+
+      toWrite.push({ meetingId, roleKey, assignedToId, isNoteKind: PERSON_AND_TEXT_ROTATION_KEYS.has(roleKey) });
+    }
+  }
+
+  const writeResults = await Promise.all(
+    toWrite.map(async ({ meetingId, roleKey, assignedToId, isNoteKind }) => {
+      if (isNoteKind) {
         if (assignedToId) {
           const { error } = await supabase
             .from("meeting_element_notes")
             .upsert({ meeting_id: meetingId, element_key: roleKey, person_id: assignedToId }, { onConflict: "meeting_id,element_key" });
-          if (error) return { error: error.message };
-        } else {
-          const { error } = await supabase
-            .from("meeting_element_notes")
-            .update({ person_id: null })
-            .eq("meeting_id", meetingId)
-            .eq("element_key", roleKey);
-          if (error) return { error: error.message };
+          return { error: error?.message ?? null };
         }
-        continue;
+        const { error } = await supabase
+          .from("meeting_element_notes")
+          .update({ person_id: null })
+          .eq("meeting_id", meetingId)
+          .eq("element_key", roleKey);
+        return { error: error?.message ?? null };
       }
 
-      const { error: deleteError } = await supabase
-        .from(table)
-        .delete()
-        .eq("meeting_id", meetingId)
-        .eq("role", roleKey);
+      const { error: deleteError } = await supabase.from(table).delete().eq("meeting_id", meetingId).eq("role", roleKey);
       if (deleteError) return { error: deleteError.message };
 
       if (assignedToId) {
         const row: Record<string, unknown> = { meeting_id: meetingId, role: roleKey, assigned_to_id: assignedToId };
         const { error: insertError } = await supabase.from(table).insert(row);
-        if (insertError) return { error: insertError.message };
+        return { error: insertError?.message ?? null };
       }
-    }
-  }
+      return { error: null as string | null };
+    })
+  );
+  const writeFailure = writeResults.find((r) => r.error);
+  if (writeFailure?.error) return { error: writeFailure.error };
 
   revalidatePath("/rotations");
   return { success: true, clearedVacant: clearedVacant > 0 ? clearedVacant : undefined };

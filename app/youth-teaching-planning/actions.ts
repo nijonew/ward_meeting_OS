@@ -40,6 +40,16 @@ function parseFieldName(
  * way; both resolve access through the one unified, calling-based
  * `getAccessibleClasses` (2026-11-14, see that function's own doc
  * comment) rather than branching on adult vs. youth.
+ *
+ * **Skips unchanged rows, 2026-11-22** -- same bug class fixed in
+ * `saveCallingPlanningGrid` (2026-11-21): this grid has no per-row
+ * dirty tracking, so every visible Sunday on the page (roughly six
+ * months' worth, filled in or not) is resubmitted on every save
+ * regardless of whether it was touched. Every submitted date's own
+ * current stored row is now fetched once, up front, and a date is only
+ * deleted-and-reinserted when its teacher/topic/cancelled/note actually
+ * differ from what's already there, with the changed ones written
+ * concurrently rather than one at a time.
  */
 export async function saveTeachingGrid(_prevState: unknown, formData: FormData): Promise<SaveGridActionResult> {
   const { user, profile } = await getSessionUser();
@@ -65,33 +75,71 @@ export async function saveTeachingGrid(_prevState: unknown, formData: FormData):
     byDate.set(parsed.classDate, entry);
   }
 
+  if (byDate.size === 0) return { success: true };
+
   const supabase = await createClient();
 
-  for (const [classDate, { teacher, topic, cancelled, cancellation_note }] of byDate) {
-    const { error: deleteError } = await supabase
-      .from("teaching_assignments")
-      .delete()
-      .eq("class_date", classDate)
-      .eq("class_name", className);
-    if (deleteError) return { error: deleteError.message };
+  const dates = Array.from(byDate.keys());
+  const { data: existingRows, error: fetchError } = await supabase
+    .from("teaching_assignments")
+    .select("class_date, teacher_name, topic, cancelled, cancellation_note")
+    .eq("class_name", className)
+    .in("class_date", dates);
+  if (fetchError) return { error: fetchError.message };
 
+  type ExistingRow = {
+    class_date: string;
+    teacher_name: string | null;
+    topic: string | null;
+    cancelled: boolean;
+    cancellation_note: string | null;
+  };
+  const existingByDate = new Map(((existingRows ?? []) as ExistingRow[]).map((r) => [r.class_date, r]));
+
+  const changedDates = Array.from(byDate.entries()).filter(([classDate, { teacher, topic, cancelled, cancellation_note }]) => {
+    const existing = existingByDate.get(classDate);
     const isCancelled = cancelled === "true";
-    // A cancelled row with no teacher/topic still needs to be
-    // reinserted (2026-11-14) -- otherwise saving this grid for any
-    // unrelated reason would silently delete the cancellation sweep's
-    // own placeholder row along with it.
-    if (teacher || topic || isCancelled) {
-      const { error: insertError } = await supabase.from("teaching_assignments").insert({
-        class_date: classDate,
-        class_name: className,
-        teacher_name: teacher || null,
-        topic: topic || null,
-        cancelled: isCancelled,
-        cancellation_note: isCancelled ? cancellation_note || null : null,
-      });
-      if (insertError) return { error: insertError.message };
-    }
-  }
+    if (!existing) return Boolean(teacher || topic || isCancelled);
+    return (
+      (existing.teacher_name ?? "") !== teacher ||
+      (existing.topic ?? "") !== topic ||
+      existing.cancelled !== isCancelled ||
+      (isCancelled ? (existing.cancellation_note ?? "") !== cancellation_note : Boolean(existing.cancellation_note))
+    );
+  });
+
+  if (changedDates.length === 0) return { success: true };
+
+  const writeResults = await Promise.all(
+    changedDates.map(async ([classDate, { teacher, topic, cancelled, cancellation_note }]) => {
+      const { error: deleteError } = await supabase
+        .from("teaching_assignments")
+        .delete()
+        .eq("class_date", classDate)
+        .eq("class_name", className);
+      if (deleteError) return { error: deleteError.message };
+
+      const isCancelled = cancelled === "true";
+      // A cancelled row with no teacher/topic still needs to be
+      // reinserted (2026-11-14) -- otherwise saving this grid for any
+      // unrelated reason would silently delete the cancellation sweep's
+      // own placeholder row along with it.
+      if (teacher || topic || isCancelled) {
+        const { error: insertError } = await supabase.from("teaching_assignments").insert({
+          class_date: classDate,
+          class_name: className,
+          teacher_name: teacher || null,
+          topic: topic || null,
+          cancelled: isCancelled,
+          cancellation_note: isCancelled ? cancellation_note || null : null,
+        });
+        if (insertError) return { error: insertError.message };
+      }
+      return { error: null as string | null };
+    })
+  );
+  const writeFailure = writeResults.find((r) => r.error);
+  if (writeFailure?.error) return { error: writeFailure.error };
 
   revalidatePath("/youth-teaching-planning");
   revalidatePath("/adult-teaching-planning");
