@@ -1,8 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCombinedSave } from "@/lib/hooks/use-combined-save";
 import { AgendaGridForm } from "@/components/planning/AgendaGridForm";
-import { AgendaItemsSection } from "@/components/bishopric/AgendaItemsSection";
 import { BishopricMinutesForm } from "@/components/bishopric/BishopricMinutesForm";
 import { ActionItemsSection } from "@/components/bishopric/ActionItemsSection";
 import { CouncilNotesForm } from "@/components/council/CouncilNotesForm";
@@ -11,6 +11,14 @@ import type { AgendaItemRow, BishopricMinutes, ActionItemRow, PastAgendaItemRow 
 import type { CouncilNotes } from "@/lib/data/council-notes";
 import type { PersonOption } from "@/lib/data/people";
 import type { HymnalIndexEntry } from "@/lib/data/hymnal-shared";
+
+// Dynamically imported (2026-11-22, same reasoning as AgendaGridForm.tsx's
+// own WardBusinessField/AnnouncementsField/ReviewAnnouncementsField) --
+// its new drag handle pulls in @dnd-kit, which this keeps out of the
+// shared chunk rendered by every page.
+const AgendaItemsSection = dynamic(() =>
+  import("@/components/bishopric/AgendaItemsSection").then((mod) => mod.AgendaItemsSection),
+);
 
 export interface CollaborativeSectionData {
   label: string | null;

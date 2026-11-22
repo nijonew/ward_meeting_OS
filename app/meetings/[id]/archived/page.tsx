@@ -305,7 +305,7 @@ export default async function ArchivedMeetingPage({
   const collaborativeSections = !isSacrament ? splitIntoSections(templateElements) : [];
   const [reviewAnnouncements, previousMinutes] = !isSacrament
     ? await Promise.all([
-        getAnnouncementsForMeetingReview(meeting.meetingType),
+        getAnnouncementsForMeetingReview(meetingId, meeting.meetingType),
         getPreviousMeetingMinutes(meeting.meetingType, meeting.date),
       ])
     : [[], null];

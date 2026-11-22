@@ -1,7 +1,16 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { addPastAgendaItemToMeeting, saveAgendaItemNotes, setAgendaItemStatus } from "@/app/meetings/[id]/bishopric-actions";
+import {
+  addPastAgendaItemToMeeting,
+  saveAgendaItemNotes,
+  setAgendaItemOrder,
+  setAgendaItemStatus,
+} from "@/app/meetings/[id]/bishopric-actions";
+import { DragReorderGroup } from "@/components/drag-reorder/DragReorderGroup";
+import { DragHandle } from "@/components/drag-reorder/DragHandle";
+import { useSortableRow } from "@/lib/hooks/use-sortable-row";
+import { useReorderAction } from "@/lib/hooks/use-reorder-action";
 import type { AgendaItemRow, PastAgendaItemRow } from "@/lib/data/bishopric-meeting";
 
 function formatMeetingDate(dateIso: string): string {
@@ -103,11 +112,20 @@ function AddPastItemPicker({ meetingId, pastItems }: { meetingId: string; pastIt
  * here either -- Publish/Archive/Save notes all still commit
  * immediately per item, so this stays outside the Planning page's
  * combined "Save All Changes" button.
+ *
+ * **Drag-reorderable, 2026-11-22** (migration 109, the user's own
+ * request: "I would like to have a way to reorder agenda items with a
+ * handle like we have done in other meetings. Please make this
+ * ubiquitous in all non-sacrament meetings.") -- same shape as every
+ * other drag-reorderable list in this app since 2026-10-31. Each row's
+ * own `useSortableRow` call lives here rather than being passed down,
+ * same pattern `ExistingRow` in `AnnouncementsField.tsx` already uses.
  */
 function AgendaItemRowView({ item, meetingId }: { item: AgendaItemRow; meetingId: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const { rowProps, handleProps } = useSortableRow(item.id);
 
   const setStatus = (status: "published" | "archived") => {
     setError(null);
@@ -126,9 +144,12 @@ function AgendaItemRowView({ item, meetingId }: { item: AgendaItemRow; meetingId
   };
 
   return (
-    <li className="rounded border border-rule/60 px-3 py-2 text-sm">
+    <li {...rowProps} className="rounded border border-rule/60 px-3 py-2 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-ink">{item.title}</span>
+        <span className="flex items-center gap-2 text-ink">
+          <DragHandle {...handleProps} />
+          {item.title}
+        </span>
         <span className="flex items-center gap-2">
           <span
             className={[
@@ -200,6 +221,9 @@ export function AgendaItemsSection({
   items: AgendaItemRow[];
   pastItems: PastAgendaItemRow[];
 }) {
+  const { onReorder, error: reorderError } = useReorderAction((orderedIds) => setAgendaItemOrder(meetingId, orderedIds));
+  const byId = new Map(items.map((item) => [item.id, item]));
+
   return (
     <div className="rounded border border-rule bg-surface p-6">
       <h2 className="font-display text-xl">Agenda Items</h2>
@@ -214,14 +238,20 @@ export function AgendaItemsSection({
       <AddPastItemPicker meetingId={meetingId} pastItems={pastItems} />
 
       {items.length > 0 ? (
-        <ul className="mt-4 flex flex-col gap-3">
-          {items.map((item) => (
-            <AgendaItemRowView key={item.id} item={item} meetingId={meetingId} />
-          ))}
-        </ul>
+        <DragReorderGroup ids={items.map((item) => item.id)} onReorder={onReorder}>
+          {(orderedIds) => (
+            <ul className="mt-4 flex flex-col gap-3">
+              {orderedIds.map((id) => {
+                const item = byId.get(id);
+                return item ? <AgendaItemRowView key={id} item={item} meetingId={meetingId} /> : null;
+              })}
+            </ul>
+          )}
+        </DragReorderGroup>
       ) : (
         <p className="mt-4 text-sm text-ink-muted/50">No agenda items yet.</p>
       )}
+      {reorderError && <p className="mt-2 text-[11px] text-danger">{reorderError}</p>}
     </div>
   );
 }

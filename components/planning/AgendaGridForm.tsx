@@ -26,6 +26,9 @@ const WardBusinessField = dynamic(() =>
 const AnnouncementsField = dynamic(() =>
   import("@/components/planning/AnnouncementsField").then((mod) => mod.AnnouncementsField),
 );
+const ReviewAnnouncementsField = dynamic(() =>
+  import("@/components/planning/ReviewAnnouncementsField").then((mod) => mod.ReviewAnnouncementsField),
+);
 
 const initialState: { error?: string; success?: boolean } = {};
 const INPUT = "w-full rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink";
@@ -439,17 +442,7 @@ export function AgendaGridForm({
                       {row.label}
                     </th>
                     <td className="px-2 py-1.5">
-                      {row.items.length > 0 ? (
-                        <ul className="flex flex-col gap-2">
-                          {row.items.map((a) => (
-                            <li key={a.id} className="text-sm text-ink">
-                              {a.title}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-ink-muted/50">None</p>
-                      )}
+                      <ReviewAnnouncementsField meetingId={meetingId} items={row.items} />
                     </td>
                   </tr>
                 );

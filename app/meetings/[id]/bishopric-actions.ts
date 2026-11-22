@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireMeetingFeature } from "@/lib/data/meeting-auth";
+import { writeSortOrder } from "@/lib/data/reorder";
+import { nextAgendaItemSortOrder } from "@/lib/data/bishopric-meeting";
 
 type ActionResult = { success: true } | { error: string };
 
@@ -161,7 +163,14 @@ export async function setAgendaItemStatus(
 export async function assignAgendaItemToMeeting(itemId: string, meetingId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("agenda_items").update({ meeting_id: meetingId }).eq("id", itemId);
+  // An unassigned item has never had a sort_order (getUnassignedAgendaItems
+  // doesn't order by one) -- lands at the end of its new meeting's list,
+  // 2026-11-22, same as every other agenda item that just got a
+  // meeting_id for the first time.
+  const { error } = await supabase
+    .from("agenda_items")
+    .update({ meeting_id: meetingId, sort_order: await nextAgendaItemSortOrder(meetingId) })
+    .eq("id", itemId);
 
   if (error) return { error: error.message };
   revalidatePath("/dashboard");
@@ -200,9 +209,72 @@ export async function addPastAgendaItemToMeeting(pastItemId: string, meetingId: 
     ...source,
     meeting_id: meetingId,
     status: "published",
+    sort_order: await nextAgendaItemSortOrder(meetingId),
   });
 
   if (error) return { error: error.message };
+  revalidatePath(`/meetings/${meetingId}/planning`);
+  return { success: true };
+}
+
+/**
+ * Drag-handle reorder for a meeting's own Agenda Items list
+ * (2026-11-22, the user's own request: "I would like to have a way to
+ * reorder agenda items with a handle like we have done in other
+ * meetings. Please make this ubiquitous in all non-sacrament
+ * meetings.") -- same shape as every other drag-reorderable list in
+ * this app since 2026-10-31 (`setAnnouncementPullOrder`,
+ * `moveTemplateElement`'s own successor, etc.): writes the whole new
+ * order at once via the shared `writeSortOrder` helper, scoped to this
+ * one meeting's own rows so a client can never reorder a different
+ * meeting's items by forging an id it was never shown.
+ *
+ * Gated on the `agenda_items` feature, not just the page's own broader
+ * `planning` gate -- same as `addPastAgendaItemToMeeting`, the other
+ * recently-added action in this file: this is new code with no
+ * "the UI path is already gated" precedent to lean on, so it starts
+ * checked, matching this file's own documented caution about the
+ * older, still-unchecked actions above.
+ */
+export async function setAgendaItemOrder(meetingId: string, orderedIds: string[]): Promise<ActionResult> {
+  const authError = await requireMeetingFeature(meetingId, "agenda_items");
+  if (authError) return authError;
+
+  const supabase = await createClient();
+  const { error } = await writeSortOrder(supabase, "agenda_items", "id", orderedIds, { meeting_id: meetingId });
+  if (error) return { error };
+
+  revalidatePath(`/meetings/${meetingId}/planning`);
+  return { success: true };
+}
+
+/**
+ * Drag-handle reorder for the Review section's own announcements list
+ * (2026-11-22, same request as `setAgendaItemOrder` above: "Same with
+ * announcements"). Unlike Sacrament Meeting's explicit-pull Announcements
+ * block, Review's list has no membership of its own to reorder directly
+ * -- `collaborative_announcement_order` (migration 110) is a pure
+ * per-meeting order override, lazily populated by
+ * `getAnnouncementsForMeetingReview` itself (lib/data/meeting-review.ts)
+ * before this ever gets called, so by drag time every currently-shown
+ * announcement already has a row here for `writeSortOrder`'s own
+ * UPDATE-only write to land on.
+ *
+ * Gated on `planning`, not a narrower action -- Review has no feature
+ * of its own, and only an account holding this meeting type's own
+ * planning feature ever reaches the Planning page this control lives
+ * on in the first place.
+ */
+export async function setReviewAnnouncementOrder(meetingId: string, orderedIds: string[]): Promise<ActionResult> {
+  const authError = await requireMeetingFeature(meetingId, "planning");
+  if (authError) return authError;
+
+  const supabase = await createClient();
+  const { error } = await writeSortOrder(supabase, "collaborative_announcement_order", "announcement_id", orderedIds, {
+    meeting_id: meetingId,
+  });
+  if (error) return { error };
+
   revalidatePath(`/meetings/${meetingId}/planning`);
   return { success: true };
 }

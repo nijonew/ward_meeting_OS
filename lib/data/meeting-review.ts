@@ -64,8 +64,27 @@ function whereAnnouncedIncludes(raw: string | null, label: string, allValues: re
  * title of each announcement that named its meeting type, same as a
  * quick agenda line, not the full text. The full announcement is
  * still one click away on `/announcements/public`.
+ *
+ * **Drag-reorderable, 2026-11-22** (migration 110, the user's own
+ * request: "Same with announcements" -- same ask as Agenda Items'
+ * own new drag handle). Membership is still decided purely by
+ * `where_announced`, same as always -- this only adds a per-meeting
+ * DISPLAY order on top, via `collaborative_announcement_order`, a
+ * table with no membership concept of its own. Every currently-matched
+ * announcement that doesn't already have an order row for this
+ * meeting gets one lazily materialized here, in the existing schedule
+ * order, so a page that's never been reordered still looks exactly
+ * the same as before this shipped -- from then on, `setReviewAnnouncementOrder`
+ * (app/meetings/[id]/bishopric-actions.ts) just rewrites these rows'
+ * own `sort_order`. `onConflict`/`ignoreDuplicates` guards the one real
+ * race this lazy-insert can hit: two people opening the same meeting's
+ * Planning page for the first time at once, both computing the same
+ * "needs a row" set.
  */
-export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeSlug): Promise<ReviewAnnouncement[]> {
+export async function getAnnouncementsForMeetingReview(
+  meetingId: string,
+  meetingType: MeetingTypeSlug
+): Promise<ReviewAnnouncement[]> {
   if (!isCollaborativeType(meetingType)) return [];
   const label = MEETING_TYPE_ANNOUNCEMENT_LABEL[meetingType];
 
@@ -76,7 +95,7 @@ export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeS
     .select("id, title, where_announced, start_date, start_time")
     .eq("status", "published");
 
-  return ((data ?? []) as {
+  const matched = ((data ?? []) as {
     id: string;
     title: string;
     where_announced: string | null;
@@ -84,7 +103,37 @@ export async function getAnnouncementsForMeetingReview(meetingType: MeetingTypeS
     start_time: string | null;
   }[])
     .filter((row) => whereAnnouncedIncludes(row.where_announced, label, ANNOUNCEMENT_WHERE))
-    .sort(compareAnnouncementsBySchedule)
+    .sort(compareAnnouncementsBySchedule);
+
+  if (matched.length === 0) return [];
+
+  const { data: orderRows } = await supabase
+    .from("collaborative_announcement_order")
+    .select("announcement_id, sort_order")
+    .eq("meeting_id", meetingId);
+
+  const orderByAnnouncementId = new Map(
+    ((orderRows ?? []) as { announcement_id: string; sort_order: number }[]).map((r) => [r.announcement_id, r.sort_order])
+  );
+
+  let nextOrder = Math.max(0, ...Array.from(orderByAnnouncementId.values())) + 10;
+  const toInsert: { meeting_id: string; announcement_id: string; sort_order: number }[] = [];
+  for (const row of matched) {
+    if (orderByAnnouncementId.has(row.id)) continue;
+    orderByAnnouncementId.set(row.id, nextOrder);
+    toInsert.push({ meeting_id: meetingId, announcement_id: row.id, sort_order: nextOrder });
+    nextOrder += 10;
+  }
+
+  if (toInsert.length > 0) {
+    await supabase
+      .from("collaborative_announcement_order")
+      .upsert(toInsert, { onConflict: "meeting_id,announcement_id", ignoreDuplicates: true });
+  }
+
+  return matched
+    .slice()
+    .sort((a, b) => (orderByAnnouncementId.get(a.id) ?? 0) - (orderByAnnouncementId.get(b.id) ?? 0))
     .map((row) => ({ id: row.id, title: row.title }));
 }
 

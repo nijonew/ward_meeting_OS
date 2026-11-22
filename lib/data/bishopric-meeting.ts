@@ -65,6 +65,13 @@ export interface BishopricMeetingData {
  * Agenda items for one specific meeting -- usable for ANY meeting type,
  * not just Bishopric Meeting (agenda_items is a general catalog element
  * that any meeting type's template can include).
+ *
+ * **Ordered by `sort_order`, not `created_at`, 2026-11-22** (migration
+ * 109) -- the user's own request: "I would like to have a way to
+ * reorder agenda items with a handle like we have done in other
+ * meetings." A legacy null (shouldn't happen after the migration's own
+ * backfill, but defensive regardless) falls back to `created_at` as a
+ * tiebreaker rather than sorting ambiguously among themselves.
  */
 export async function getAgendaItemsForMeeting(meetingId: string): Promise<AgendaItemRow[]> {
   const supabase = await createClient();
@@ -72,8 +79,29 @@ export async function getAgendaItemsForMeeting(meetingId: string): Promise<Agend
     .from("agenda_items")
     .select("id, title, body, submitted_by_name, status, notes")
     .eq("meeting_id", meetingId)
+    .order("sort_order")
     .order("created_at");
   return (data as AgendaItemRow[] | null) ?? [];
+}
+
+/** New agenda items land at the end of their own meeting's list -- same
+ *  "compute max(sort_order) + 10" convention as
+ *  `nextAnnouncementPullSortOrder` (lib/data/sacrament-announcements.ts).
+ *  Called wherever an item gets a `meeting_id` for the first time
+ *  (a fresh submission, assigning an unassigned one, or carrying a past
+ *  one forward) -- never on an item that's already ordered, since
+ *  reordering an existing row goes through `setAgendaItemOrder`
+ *  instead. */
+export async function nextAgendaItemSortOrder(meetingId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: maxRow } = await supabase
+    .from("agenda_items")
+    .select("sort_order")
+    .eq("meeting_id", meetingId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (maxRow?.sort_order ?? 0) + 10;
 }
 
 /**
@@ -161,6 +189,7 @@ export async function getBishopricMeetingData(meetingId: string): Promise<Bishop
       .from("agenda_items")
       .select("id, title, body, submitted_by_name, status, notes")
       .eq("meeting_id", meetingId)
+      .order("sort_order")
       .order("created_at"),
   ]);
 

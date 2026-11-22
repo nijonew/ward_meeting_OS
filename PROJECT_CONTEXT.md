@@ -7,7 +7,7 @@ publishing, announcements, youth activities.
 **Production domain (always test/verify here, never a Vercel preview URL):**
 https://ward-meeting-os.vercel.app
 
-## Current migration number: 108
+## Current migration number: 110
 
 This file was reconciled 2026-09-06 after two parallel sessions
 (`main` directly, and this repo's `claude/project-workflow-review-226b91`
@@ -2049,6 +2049,103 @@ avoid confusing the two.
   Table Admin grid.
 
 ## Known open items
+
+**Agenda Items and the Review section's Announcements both gained a
+drag handle, migrations `109`/`110`, not yet run, 2026-11-22.** The
+user's own request: "I would like to have a way to reorder agenda
+items with a handle like we have done in other meetings. Please make
+this ubiquitous in all non-sacrament meetings. Same with
+announcements." Scoped to Bishopric Meeting/Ward Council/Youth
+Council -- the two elements named are both specific to those three
+types' own Discussion/Review sections; Sacrament Meeting's own
+Announcements block and every other list already got this treatment
+back on 2026-10-31.
+
+**Agenda Items** had never had a real order at all -- `agenda_items`
+always sorted by `created_at`, with no `sort_order` column to hang a
+drag handle on (it never existed as its own reorderable grid before
+the 2026-10-19 sectioned-agenda rework). Migration `109` adds
+`sort_order` and backfills every already-meeting-linked row in its
+existing `created_at` order, so nothing visibly reshuffles the moment
+it runs. New `nextAgendaItemSortOrder(meetingId)`
+(`lib/data/bishopric-meeting.ts`), same "compute max(sort_order) + 10"
+convention `nextAnnouncementPullSortOrder` already established --
+called everywhere an item gets a real `meeting_id` for the first time:
+a fresh `/submit/agenda-item` submission (`app/submit/actions.ts`),
+assigning a previously-unassigned item to a meeting
+(`assignAgendaItemToMeeting`), and carrying a past item forward
+(`addPastAgendaItemToMeeting`), both in
+`app/meetings/[id]/bishopric-actions.ts`. New
+`setAgendaItemOrder(meetingId, orderedIds)` in that same file writes
+the whole dragged order at once via the shared `writeSortOrder`
+helper, scoped to `{ meeting_id: meetingId }` so a forged id list
+can't touch another meeting's items -- gated on the `agenda_items`
+feature specifically (not just the page's own broader `planning`
+gate), matching `addPastAgendaItemToMeeting`'s own precedent of
+starting checked since it's new code with nothing already relying on
+"the UI path alone is enough." `AgendaItemsSection.tsx`
+(`components/bishopric/`) wraps its list in the same
+`DragReorderGroup`/`DragHandle`/`useSortableRow`/`useReorderAction`
+combo every other reorderable list in this app already uses -- and is
+now dynamically imported from `CollaborativeMeetingBody.tsx`, same
+reasoning as `WardBusinessField`/`AnnouncementsField` right next to it
+in `AgendaGridForm.tsx` (keeps `@dnd-kit` out of the shared chunk
+every page loads). The read-only Archived view needed no change at
+all beyond the ordering itself -- it already just renders
+`agendaItems` in whatever order `getAgendaItemsForMeeting` returns.
+
+**Announcements (the Review section's own list) needed a genuinely
+new piece of schema first** -- unlike Sacrament Meeting's explicit-pull
+Announcements block (`sacrament_announcement_pulls`), Review's list
+has never been a stored membership at all: `getAnnouncementsForMeetingReview`
+(`lib/data/meeting-review.ts`) computes it fresh every time by
+matching each announcement's own `where_announced` field against the
+meeting type's label, sorted by event date -- there was no row per
+(meeting, announcement) to hang a `sort_order` on. New migration `110`
+adds `collaborative_announcement_order`, a pure per-meeting DISPLAY
+ORDER OVERRIDE with no membership concept of its own -- membership is
+still decided entirely by `where_announced`, exactly as before.
+`getAnnouncementsForMeetingReview` (now also taking `meetingId`, not
+just the meeting type) lazily materializes a row here, in the existing
+schedule-based order, for any matched announcement that doesn't
+already have one for this meeting -- the same "nothing to see until
+something touches it" lazy-row convention this app already uses
+elsewhere (e.g. the second-hour class cancellation placeholders) --
+upserted with `ignoreDuplicates: true` to shrug off the one real race
+this can hit (two people opening the same meeting's Planning page for
+the first time at once). By the time a drag can happen, every
+currently-shown item already has a real row, so the new
+`setReviewAnnouncementOrder(meetingId, orderedIds)`
+(`app/meetings/[id]/bishopric-actions.ts`) can lean on the same
+UPDATE-only `writeSortOrder` helper with no bespoke upsert variant
+needed -- gated on the meeting's own `planning` feature, since Review
+has no narrower feature of its own and only a planner ever reaches the
+page this control lives on. New `components/planning/ReviewAnnouncementsField.tsx`
+(dynamically imported from `AgendaGridForm.tsx`, same `@dnd-kit`
+reasoning as above) replaces the old plain `<ul>` the `review_announcements`
+row kind rendered inline. `delete_meeting_cascade` (migration `054`,
+last amended by `084`) is amended again to clean up the new table --
+redundant with its own `on delete cascade` FKs, but matches every
+other per-meeting table added since 054 doing the same for
+documentation's sake. The read-only Archived view only needed its
+call site updated to pass `meetingId` through -- it already just
+renders `reviewAnnouncements` in whatever order comes back.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- **confirm
+migration numbers `109`/`110` are actually free before running them**,
+then run both in order and ask the user to check: a Bishopric Meeting/
+Ward Council/Youth Council's Agenda Items list shows a grip handle on
+each row that reorders correctly (and the new order is still there
+after a reload, and shows up correctly on the Archived view once that
+meeting archives); the Review section's Announcements list shows the
+same handle and reorders independently of Agenda Items; a brand-new
+agenda item (submitted, assigned from the unassigned queue, or carried
+forward from a past meeting) lands at the end of the list rather than
+somewhere in the middle; and that a newly-matching announcement (one
+whose own `where_announced` starts including this meeting type after
+the fact) shows up at the end of the Review list rather than disrupting
+whatever order was already dragged.
 
 **The "skip unchanged rows, write what changed concurrently" fix swept
 across every other "favorite grid format" save in the app, no

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateMeetingId } from "@/lib/data/meetings";
+import { nextAgendaItemSortOrder } from "@/lib/data/bishopric-meeting";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getVisibleMeetingTypesForUser } from "@/lib/data/meeting-type-access";
 import type { MeetingTypeSlug } from "@/lib/types";
@@ -228,6 +229,11 @@ export async function submitAgendaItem(formData: FormData) {
         status: "published",
         meeting_id: meetingId,
         time_needed: TIME_NEEDED_OPTIONS.includes(timeNeeded) ? timeNeeded : null,
+        // Lands at the end of this meeting's own list, 2026-11-22 --
+        // same reasoning as every other agenda item that gets a
+        // meeting_id for the first time (see nextAgendaItemSortOrder's
+        // own doc comment).
+        sort_order: await nextAgendaItemSortOrder(meetingId),
       });
 
       return error ? { ok: false as const, target } : { ok: true as const, meetingId };
