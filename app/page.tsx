@@ -117,8 +117,14 @@ export default async function HomePage() {
               reason rather than "Coming soon" for a logged-out
               visitor, since the feature exists and works, it's just
               gated. The page itself (app/youth-activities/page.tsx)
-              enforces the same login requirement server-side; this
-              tile alone wouldn't stop someone from typing the URL. */}
+              enforces the same requirement server-side; this tile
+              alone wouldn't stop someone from typing the URL.
+              **Tightened from "logged in" to "verified," 2026-11-25**
+              (a real reported gap: a signed-up-but-not-yet-verified
+              account could reach this with no admin having linked them
+              to a person yet) -- gates on `profile?.isLinked` now, not
+              plain `user`, with its own distinct grayed-out message for
+              the "logged in but not verified" case. */}
           {/* `readonly=1` (2026-10-12, the user's own request: "leave
               everything in the 'This Week' section read only") -- the
               other two tiles in this tier were already read-only with
@@ -137,9 +143,15 @@ export default async function HomePage() {
               lib/data/nav-sections.ts's own comment). */}
           <Tile
             title="Youth Activities"
-            href={user ? "/youth-activities?readonly=1" : undefined}
-            disabledLabel={user ? undefined : "Please log in to see youth activities"}
-            prefetch={Boolean(user)}
+            href={profile?.isLinked ? "/youth-activities?readonly=1" : undefined}
+            disabledLabel={
+              profile?.isLinked
+                ? undefined
+                : user
+                  ? "An admin still needs to verify your account"
+                  : "Please log in to see youth activities"
+            }
+            prefetch={Boolean(profile?.isLinked)}
           />
           {/* "Scheduled Events" (the merged Youth Activities + Ward
               Events listing, /events) removed from the landing page
@@ -156,18 +168,33 @@ export default async function HomePage() {
               only to be viewed when logged in." Same grayed-out-with-
               a-reason treatment as Youth Activities right above, not
               a plain dead link, since both pages already require a
-              signed-in session on their own. */}
+              signed-in session on their own.
+              **Tightened to require verification, 2026-11-25**, same
+              fix/reasoning as the Youth Activities tile right above --
+              both pages now also check `profile?.isLinked`. */}
           <Tile
             title="YM/YW Lessons"
-            href={user ? "/ym-yw-lessons" : undefined}
-            disabledLabel={user ? undefined : "Please log in to see YM/YW lessons"}
-            prefetch={Boolean(user)}
+            href={profile?.isLinked ? "/ym-yw-lessons" : undefined}
+            disabledLabel={
+              profile?.isLinked
+                ? undefined
+                : user
+                  ? "An admin still needs to verify your account"
+                  : "Please log in to see YM/YW lessons"
+            }
+            prefetch={Boolean(profile?.isLinked)}
           />
           <Tile
             title="Elders Quorum / Relief Society Lessons"
-            href={user ? "/adult-teaching-lessons" : undefined}
-            disabledLabel={user ? undefined : "Please log in to see Elders Quorum / Relief Society lessons"}
-            prefetch={Boolean(user)}
+            href={profile?.isLinked ? "/adult-teaching-lessons" : undefined}
+            disabledLabel={
+              profile?.isLinked
+                ? undefined
+                : user
+                  ? "An admin still needs to verify your account"
+                  : "Please log in to see Elders Quorum / Relief Society lessons"
+            }
+            prefetch={Boolean(profile?.isLinked)}
           />
         </TileGrid>
       </section>

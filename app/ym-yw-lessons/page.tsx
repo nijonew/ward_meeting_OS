@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getTeachingAssignmentGrid, TEACHING_CLASS_OPTIONS } from "@/lib/data/teaching-assignments";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { TeachingGridReadOnly } from "@/components/youth-teaching-planning/TeachingGridReadOnly";
+import { VerificationRequiredNotice } from "@/components/VerificationRequiredNotice";
 
 /** 6 months out, computed fresh on every render -- same rolling
  *  horizon as YM/YW Teaching Planning (see that page's own comment). */
@@ -36,14 +37,29 @@ function defaultThroughDate(): string {
  * layer Planning already uses -- this page never writes anything, so
  * no new server action was needed; `TeachingGridReadOnly` is the only
  * new piece.
+ *
+ * **Narrowed from "any signed-in account" to "verified," 2026-11-25**
+ * (the user's own report of unauthorized access): "open to any
+ * signed-in account" turned out to mean literally any confirmed
+ * Supabase Auth login, including one `/auth/request-access` created
+ * that no admin has linked to a `people` row yet via Verify Logins --
+ * see `VerificationRequiredNotice`'s own comment.
  */
 export default async function YmYwLessonsPage({
   searchParams,
 }: {
   searchParams: Promise<{ through?: string }>;
 }) {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
+  if (!profile?.isLinked) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+        <AppHeader tag="YM/YW Lessons" />
+        <VerificationRequiredNotice />
+      </main>
+    );
+  }
 
   const { through: rawThrough } = await searchParams;
   const throughDate = rawThrough || defaultThroughDate();

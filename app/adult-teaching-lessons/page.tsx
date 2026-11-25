@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
 import { getTeachingAssignmentGrid } from "@/lib/data/teaching-assignments";
 import { sweepMeetingCancellations } from "@/lib/data/meeting-cancellations";
 import { TeachingGridReadOnly } from "@/components/youth-teaching-planning/TeachingGridReadOnly";
+import { VerificationRequiredNotice } from "@/components/VerificationRequiredNotice";
 
 /** 6 months out, computed fresh on every render -- same rolling
  *  horizon as Elders Quorum / Relief Society Teaching Planning. */
@@ -25,14 +26,26 @@ function defaultThroughDate(): string {
  * (`AskUserQuestion`) that this means keeping the existing "Elders
  * Quorum" name as-is, not introducing "Priesthood" as a new label or a
  * third class.
+ *
+ * **Narrowed from "any signed-in account" to "verified," 2026-11-25**
+ * (the user's own report of unauthorized access) -- same fix, same
+ * reasoning, as `/ym-yw-lessons`' own doc comment.
  */
 export default async function AdultTeachingLessonsPage({
   searchParams,
 }: {
   searchParams: Promise<{ through?: string }>;
 }) {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
+  if (!profile?.isLinked) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+        <AppHeader tag="Elders Quorum / Relief Society Lessons" />
+        <VerificationRequiredNotice />
+      </main>
+    );
+  }
 
   const { through: rawThrough } = await searchParams;
   const throughDate = rawThrough || defaultThroughDate();

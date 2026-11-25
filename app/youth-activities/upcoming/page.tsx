@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { VerificationRequiredNotice } from "@/components/VerificationRequiredNotice";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 import { getYouthActivities } from "@/lib/data/youth-activities";
 import { explodeActivitiesByClass } from "@/lib/data/class-activities-shared";
@@ -73,6 +74,15 @@ function todayISO(): string {
 export default async function UpcomingActivitiesPage() {
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
+  // 2026-11-25 -- same verification gap fix as /youth-activities itself.
+  if (!profile?.isLinked) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+        <AppHeader tag="Upcoming Activities" />
+        <VerificationRequiredNotice />
+      </main>
+    );
+  }
   const canManage = hasFeature(profile, "youth_activity_planning");
 
   const all = await getYouthActivities();

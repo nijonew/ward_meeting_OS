@@ -14,10 +14,12 @@ import { getSessionUser } from "@/lib/supabase/get-session-user";
  * cancelled, with its own reason shown inline; Ward Events and
  * Announcements unchanged).
  *
- * **Youth Activities are logged-in-only, 2026-11-04** -- the page
- * itself needs no gate for this (it's `getCalendarItems()`'s own job
- * to decide whether to include any at all), but still renders
- * perfectly well with zero youth items for a logged-out visitor.
+ * **Youth Activities require being verified, 2026-11-04/2026-11-25** --
+ * the page itself needs no gate for this (it's `getCalendarItems()`'s
+ * own job to decide whether to include any at all), but still renders
+ * perfectly well with zero youth items for a logged-out or unverified
+ * visitor. Tightened from plain login to `profile?.isLinked` 2026-11-25
+ * (see that function's own comment).
  *
  * **"My Meetings" (Bishopric Meeting/Ward Council/Youth Council
  * occurrences this account is invited to), added 2026-11-05** -- same
@@ -95,7 +97,12 @@ export default async function CalendarPage({
   searchParams: Promise<{ y?: string; m?: string }>;
 }) {
   const { y, m } = await searchParams;
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
+  // Verified, not just logged in (2026-11-25) -- matches
+  // getCalendarItems' own isVerified gate, so the legend never
+  // promises a "Youth Activity"/"My Meetings" dot an unverified
+  // account could never actually see one of.
+  const isVerified = Boolean(user && profile?.isLinked);
   const { dateIso: todayIso } = getMountainTimeNow();
   const [todayYear, todayMonth] = todayIso.split("-").map(Number);
 
@@ -224,7 +231,7 @@ export default async function CalendarPage({
 
       <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
         {(Object.keys(KIND_LABELS) as CalendarItemKind[])
-          .filter((kind) => (kind !== "youth" && kind !== "meeting") || user)
+          .filter((kind) => (kind !== "youth" && kind !== "meeting") || isVerified)
           .map((kind) => (
             <span key={kind} className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${KIND_DOT_CLASS[kind]}`} aria-hidden="true" />

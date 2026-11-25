@@ -2050,6 +2050,96 @@ avoid confusing the two.
 
 ## Known open items
 
+**Bug found and fixed 2026-11-25: four surfaces let a signed-in-but-
+not-yet-verified account in, no migration needed.** The user's own
+report, prompted by an outside report of unauthorized access: "Can you
+confirm that those who have not been verified by admin cannot see
+anything other than sacrament programs, announcements, calendar (minus
+youth), and then grayed out tiles for the youth activities, youth
+teaching, adult teaching. I have reports that someone was able to
+access items without being verified."
+
+Traced the actual access-control code rather than assume -- the real
+`calling_features` permissions model is completely solid (`getSessionUser()`
+only ever resolves a non-empty feature set `if (person)`, i.e. once a
+`people` row is linked -- confirmed by reading it directly, see
+`lib/supabase/get-session-user.ts:185-202`), so nothing admin-facing
+was ever actually exposed (Table Admin, Calling Planning, Rotations,
+Meeting Planning, teaching *editing*, etc. all correctly stayed locked
+to a real calling grant, which an unlinked account can never have).
+
+**The real gap: four surfaces were deliberately built to check only
+"is anyone logged in" (`!user`), not "has an admin verified them"
+(`profile.isLinked`)** -- each a real, documented design decision at
+the time it was built (YM/YW Lessons' own 2026-11-08 entry literally
+says "open to any signed-in account, no feature check at all"), but
+together they add up to exactly the unauthorized-access symptom
+reported: any account created through `/auth/request-access`, the
+moment its email is confirmed -- well before an admin ever reaches
+`/admin/verify-logins` -- could fully reach:
+- `/youth-activities` and all four of its browsing sub-pages (Upcoming,
+  Combined YM/YW, Combined YM, Combined YW) -- full read access to
+  every activity row, including unpublished/unconfirmed ones
+  (`getYouthActivities()` has no `status` filter of its own at all,
+  relying entirely on RLS, which treats any authenticated user the
+  same regardless of verification).
+- `/ym-yw-lessons` and `/adult-teaching-lessons` -- the full Sunday/
+  Topic/Teacher grid for every class.
+- The Calendar's youth-activity dots and "My Meetings" legend entry
+  (`getCalendarItems`, `lib/data/calendar.ts`) -- gated on plain `user`.
+- The landing page's own tiles for all three (`app/page.tsx`) -- `href`/
+  `disabledLabel`/`prefetch` all branched on `user`, not
+  `profile?.isLinked`, so each tile went live the instant someone was
+  logged in at all, not once actually verified.
+
+Confirmed directly with the user via `AskUserQuestion` before changing
+anything, since reversing a previously-confirmed design decision across
+several pages is a real policy call, not an obvious bug fix -- chose
+"tighten all four to require verification," matching the access model
+described in the report exactly.
+
+**Fix**: every one of the above now checks `profile?.isLinked` (the
+real "an admin has linked this login to a person" signal), not `user`
+alone. New shared `components/VerificationRequiredNotice.tsx` is the
+one "An admin still needs to verify your account before you can see
+this" message, used by the five pages that now render a real blocked-
+access screen (`/youth-activities`, `/youth-activities/upcoming`, the
+three Combined-group pages, `/ym-yw-lessons`, `/adult-teaching-lessons`)
+instead of a second, now-duplicated copy of the same block seven times
+over. The landing page's three tiles now render a distinct grayed-out
+message depending on which case applies -- "Please log in to see..."
+when logged out, "An admin still needs to verify your account" when
+logged in but unlinked -- and only go live once `profile?.isLinked` is
+true. `getCalendarItems` gained a single `isVerified` flag (`user &&
+profile?.isLinked`) gating both the youth-activity fetch and the
+personal-meetings resolution; the calendar page's own legend filter
+and doc comments were updated to match. `resolvePersonalMeetingTypes`'s
+own result was already effectively empty for an unverified account
+either way (no `people` row means no calling, means no resolved
+meeting type) -- this closes it at the source (the query no longer
+runs at all) rather than relying on that second layer alone.
+
+**Not found to be the cause, checked and ruled out**: every page
+gated on a real `hasFeature(profile, ...)` check (Table Admin, Calling
+Planning, Rotations, Meeting Planning/Agendas, Meeting Schedule/
+Cancellations, Speaker & Prayer History, RABNM Planning, both Teaching
+*Planning* pages, Verify Logins, every `/admin/*` page) was re-checked
+and is correctly inaccessible to an unverified account, since
+`hasFeature` reads from a feature set that's guaranteed empty until a
+`people` row is linked -- none of these needed any change.
+
+Confirmed via `tsc`/`eslint`/`next build --webpack` only, same no-live-
+database-access gap as everything else in this project -- ask the user
+to check: a brand-new `/auth/request-access` account (confirmed by
+email, not yet linked to a person) sees only Sacrament Meeting Program,
+Announcements, and Calendar (with no Youth Activity dots and no "My
+Meetings" in the legend) as live tiles, with Youth Activities/YM-YW
+Lessons/Elders Quorum & Relief Society Lessons all showing grayed out
+with "An admin still needs to verify your account"; and that typing any
+of those pages' URLs directly still shows the same blocked message
+rather than real content, until the account is actually linked via
+`/admin/verify-logins`.
+
 **YM/YW Lessons shows Teacher again, no migration needed, 2026-11-22.**
 The user's own request, a reversal of just one piece of the 2026-11-14
 change: "I would like to also have teachers for youth visible to the

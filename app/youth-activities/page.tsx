@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Tile, TileGrid } from "@/components/Tile";
+import { VerificationRequiredNotice } from "@/components/VerificationRequiredNotice";
 import { getSessionUser, hasFeature } from "@/lib/supabase/get-session-user";
 
 export default async function YouthActivitiesPage({
@@ -18,6 +19,19 @@ export default async function YouthActivitiesPage({
   // this just adds the login requirement on top of it.
   const { user, profile } = await getSessionUser();
   if (!user) redirect("/login");
+  // 2026-11-25 -- real reported gap: this page used to only check
+  // `!user`, so a signed-up-but-not-yet-verified account could browse
+  // every activity (including unpublished ones) before an admin ever
+  // linked them to a person. See VerificationRequiredNotice's own
+  // comment.
+  if (!profile?.isLinked) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12 sm:px-8">
+        <AppHeader tag="Youth Activities" />
+        <VerificationRequiredNotice />
+      </main>
+    );
+  }
   const { readonly: rawReadOnly } = await searchParams;
   // `?readonly=1` (2026-10-12, same convention as /dashboard) -- set by
   // the landing page's own "This week" tile so that entry point stays

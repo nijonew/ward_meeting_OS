@@ -91,17 +91,19 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   Meeting)" with no reason clause for the rare case of a
  *   cancellation recorded with no note.
  *
- * - **Youth Activities, logged-in only, 2026-11-04** -- removed
- *   entirely on 2026-11-01 ("lets hold off on including the youth
- *   activities for now"), then re-added with a login gate the user's
- *   own words asked for directly: "I would like for the calendar to
- *   not show youth activities unless someone is logged in. If someone
- *   is logged in I want those shown." Gated on plain sign-in (any
- *   account, `getSessionUser()`'s own `user`), not on a specific
- *   feature/role -- matches the user's own literal "someone is logged
- *   in," and this calendar has no other per-item role gating to be
- *   consistent with. See `buildYouthActivityItems`'s own comment for
- *   how each one is titled and how a ward-wide cancellation collapses.
+ * - **Youth Activities, verified only, 2026-11-04/2026-11-25** --
+ *   removed entirely on 2026-11-01 ("lets hold off on including the
+ *   youth activities for now"), then re-added with a login gate the
+ *   user's own words asked for directly: "I would like for the
+ *   calendar to not show youth activities unless someone is logged
+ *   in. If someone is logged in I want those shown." **Tightened from
+ *   plain sign-in to `profile?.isLinked` (verified) on 2026-11-25** --
+ *   a reported gap: a signed-up-but-not-yet-verified account saw this
+ *   same data (including unpublished rows -- `getYouthActivities()`
+ *   has no status filter of its own) the instant they confirmed their
+ *   email, before an admin ever linked them to a person. See
+ *   `buildYouthActivityItems`'s own comment for how each one is titled
+ *   and how a ward-wide cancellation collapses.
  * - **Ward Events**: `getWardEvents()`, unfiltered -- the same call
  *   `/events` already makes with no login gate; RLS already limits
  *   an anonymous visitor to `status = 'published'` rows (see that
@@ -138,8 +140,12 @@ async function getCancelledSacramentMeetings(): Promise<SacramentMeetingRow[]> {
  *   either invited to by calling, or (Youth Council specifically)
  *   leads the youth program regardless of calling. See
  *   `resolvePersonalMeetingTypes`'s own comment for the two paths and
- *   `buildPersonalMeetingItems` for how a cancelled one renders.
- *   Logged-out visitors get none, same gating as Youth Activities.
+ *   `buildPersonalMeetingItems` for how a cancelled one renders. A
+ *   logged-out, or logged-in-but-unverified, account gets none -- same
+ *   `isVerified` gating as Youth Activities (2026-11-25); in practice
+ *   this was already effectively empty for an unverified account even
+ *   before that fix (no calling means no resolved meeting types
+ *   either way), but the query itself no longer runs at all now.
  */
 /**
  * "Can we put the group name in front of the activity title? And if
@@ -372,17 +378,24 @@ function buildPersonalMeetingItems(rows: PersonalMeetingRow[]): CalendarItem[] {
  */
 export async function getCalendarItems(rangeStartIso: string, rangeEndIso: string): Promise<CalendarItem[]> {
   const { user, profile } = await getSessionUser();
+  // Verified, not just logged in (2026-11-25 -- a real reported gap:
+  // both of these were gated on plain `user`, so a signed-up-but-not-
+  // yet-verified account saw every youth activity, including
+  // unpublished ones, the moment they confirmed their email, well
+  // before an admin ever linked them to a person). Matches the same
+  // fix applied to /youth-activities and both Lessons pages.
+  const isVerified = Boolean(user && profile?.isLinked);
 
   // Resolved before the main Promise.all below, since it needs the
   // user's own id/profile first and then feeds the personal-meetings
   // query that goes into that same batch.
-  const personalMeetingTypes = user ? await resolvePersonalMeetingTypes(user.id, profile) : [];
+  const personalMeetingTypes = isVerified && user ? await resolvePersonalMeetingTypes(user.id, profile) : [];
 
   const [cancelledSacramentMeetings, wardEvents, announcements, youthActivities, personalMeetings] = await Promise.all([
     getCancelledSacramentMeetings(),
     getWardEvents(),
     getPublishedAnnouncements(),
-    user ? getYouthActivities() : Promise.resolve([]),
+    isVerified ? getYouthActivities() : Promise.resolve([]),
     getPersonalMeetingOccurrences(personalMeetingTypes, rangeStartIso, rangeEndIso),
   ]);
 
